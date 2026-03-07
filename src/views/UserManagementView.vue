@@ -46,20 +46,31 @@
 
       <!-- Top bar -->
       <div class="um-topbar">
-        <div class="um-search-wrap">
-          <span class="um-search-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          </span>
-          <input v-model="searchQuery" class="um-search-input" type="text" placeholder="Search users…" />
+        <div class="um-view-tabs">
+          <button :class="['um-view-tab', activeView === 'active' ? 'um-view-tab--on' : '']" @click="activeView = 'active'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            All Users
+          </button>
+          <button :class="['um-view-tab', activeView === 'archived' ? 'um-view-tab--on' : '']" @click="activeView = 'archived'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            Archived
+            <span v-if="users.filter(u => u.status === 'Archived').length > 0" class="um-view-tab-badge">{{ users.filter(u => u.status === 'Archived').length }}</span>
+          </button>
         </div>
         <div class="um-topbar-right">
+          <div class="um-search-wrap">
+            <span class="um-search-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </span>
+            <input v-model="searchQuery" class="um-search-input" type="text" :placeholder="activeView === 'archived' ? 'Search archived...' : 'Search users...'" />
+          </div>
           <select v-model="roleFilter" class="um-filter-select">
             <option value="">All Roles</option>
             <option value="Admin">Admin</option>
             <option value="Teacher">Teacher</option>
             <option value="Student">Student</option>
           </select>
-          <button class="um-add-btn" @click="openAddUser">
+          <button v-if="activeView === 'active'" class="um-add-btn" @click="openAddUser">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add User
           </button>
@@ -104,6 +115,15 @@
             <div class="um-stat-label">Active</div>
           </div>
         </div>
+        <div class="um-stat-card um-stat-card--clickable" @click="activeView = 'archived'">
+          <div class="um-stat-icon um-stat-icon--archived">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          </div>
+          <div class="um-stat-info">
+            <div class="um-stat-val">{{ users.filter(u => u.status === 'Archived').length }}</div>
+            <div class="um-stat-label">Archived</div>
+          </div>
+        </div>
       </div>
 
       <!-- Table -->
@@ -135,7 +155,7 @@
                 <span :class="['um-role-badge', `um-role-badge--${user.role.toLowerCase()}`]">{{ user.role }}</span>
               </td>
               <td>
-                <span :class="['um-status-badge', user.status === 'Active' ? 'um-status--active' : 'um-status--inactive']">
+                <span :class="['um-status-badge', user.status === 'Active' ? 'um-status--active' : user.status === 'Archived' ? 'um-status--archived' : 'um-status--inactive']">
                   <span class="um-status-dot"></span>
                   {{ user.status }}
                 </span>
@@ -143,18 +163,26 @@
               <td class="um-date">{{ user.dateAdded }}</td>
               <td>
                 <div class="um-actions">
-                  <button class="um-btn um-btn--edit" @click="openEditUser(user)" title="Edit">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    Edit
-                  </button>
-                  <button class="um-btn um-btn--reset" @click="openResetPassword(user)" title="Reset Password">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    Reset
-                  </button>
-                  <button class="um-btn um-btn--delete" @click="openDeleteUser(user)" title="Delete">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                    Delete
-                  </button>
+                  <template v-if="activeView === 'active'">
+                    <button class="um-btn um-btn--edit" @click="openEditUser(user)" title="Edit">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      Edit
+                    </button>
+                    <button class="um-btn um-btn--reset" @click="openResetConfirm(user)" title="Reset Password">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      Reset
+                    </button>
+                    <button class="um-btn um-btn--archive" @click="openArchiveUser(user)" title="Archive">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                      Archive
+                    </button>
+                  </template>
+                  <template v-else>
+                    <button class="um-btn um-btn--restore" @click="openRestoreUser(user)" title="Restore">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
+                      Restore
+                    </button>
+                  </template>
                 </div>
               </td>
             </tr>
@@ -337,18 +365,95 @@
     </div>
   </Teleport>
 
-  <!-- ═══ Delete Confirm Modal ═══ -->
+  <!-- ═══ Restore User Modal ═══ -->
   <Teleport to="body">
-    <div v-if="showDeleteModal" class="modal-overlay" @click.self="showDeleteModal = false">
+    <div v-if="showRestoreModal" class="modal-overlay" @click.self="showRestoreModal = false">
       <div class="um-delete-box">
-        <div class="um-delete-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        <div class="um-delete-icon" style="background:#e8f5ee;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1b7a4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
         </div>
-        <h2 class="um-delete-title">Delete User?</h2>
-        <p class="um-delete-sub">This will permanently remove <strong>{{ deleteTarget?.name }}</strong>. This action cannot be undone.</p>
+        <h2 class="um-delete-title">Restore User?</h2>
+        <p class="um-delete-sub"><strong>{{ restoreTarget?.name }}</strong> will be moved back to active users and regain access.</p>
         <div class="um-delete-actions">
-          <button class="um-cancel-btn" @click="showDeleteModal = false">Cancel</button>
-          <button class="um-delete-confirm-btn" @click="confirmDeleteUser">Delete</button>
+          <button class="um-cancel-btn" @click="showRestoreModal = false">Cancel</button>
+          <button class="um-restore-confirm-btn" @click="confirmRestoreUser">Restore</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- ═══ Archive Confirm Modal ═══ -->
+  <Teleport to="body">
+    <div v-if="showArchiveModal" class="modal-overlay" @click.self="showArchiveModal = false">
+      <div class="um-delete-box">
+        <div class="um-delete-icon" style="background:#fff7ed;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        </div>
+        <h2 class="um-delete-title">Archive User?</h2>
+        <p class="um-delete-sub">This will archive <strong>{{ archiveTarget?.name }}</strong>. They will no longer have access but their data will be preserved.</p>
+        <div class="um-delete-actions">
+          <button class="um-cancel-btn" @click="showArchiveModal = false">Cancel</button>
+          <button class="um-archive-confirm-btn" @click="confirmArchiveUser">Archive</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- ═══ Reset Password Confirm ═══ -->
+  <Teleport to="body">
+    <div v-if="showResetConfirmModal" class="modal-overlay" @click.self="showResetConfirmModal = false">
+      <div class="um-delete-box">
+        <div class="um-delete-icon" style="background:#fef3c7;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h2 class="um-delete-title">Reset Password?</h2>
+        <p class="um-delete-sub">An OTP will be sent to <strong>{{ resetConfirmTarget?.email }}</strong> to verify this action.</p>
+        <div class="um-delete-actions">
+          <button class="um-cancel-btn" @click="showResetConfirmModal = false">Cancel</button>
+          <button class="um-reset-confirm-btn" @click="proceedResetPassword">Send OTP</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- ═══ Reset Password OTP Modal ═══ -->
+  <Teleport to="body">
+    <div v-if="showResetOtpModal" class="modal-overlay" @click.self="showResetOtpModal = false">
+      <div class="um-modal-box">
+        <div class="um-modal-banner um-modal-banner--warning">
+          <div class="um-modal-banner-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div class="um-modal-banner-text">
+            <p class="um-modal-banner-title">OTP Verification</p>
+            <p class="um-modal-banner-sub">Enter the code sent to {{ resetConfirmTarget?.email }}</p>
+          </div>
+          <button class="um-modal-close" @click="showResetOtpModal = false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="um-form">
+          <p class="um-otp-hint">Enter the 6-digit OTP to proceed. <strong>(Demo OTP: 123456)</strong></p>
+          <div class="otp-input-row">
+            <input
+              v-model="resetOtpInput"
+              class="form-input otp-input"
+              type="text"
+              maxlength="6"
+              placeholder="_ _ _ _ _ _"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+            />
+          </div>
+          <div v-if="otpError" class="um-pw-error">{{ otpError }}</div>
+          <div class="otp-resend-row">
+            <span class="otp-resend-text">Didn't receive it?</span>
+            <button type="button" class="otp-resend-btn" @click="resendOtp">Resend OTP</button>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="um-cancel-btn" @click="showResetOtpModal = false">Cancel</button>
+            <button type="button" class="um-submit-btn" @click="verifyResetOtp">Verify &amp; Continue</button>
+          </div>
         </div>
       </div>
     </div>
@@ -434,6 +539,9 @@ function confirmLogout() {
   router.push('/')
 }
 
+/* ── View Tabs ── */
+const activeView  = ref('active')
+
 /* ── Search & Filter ── */
 const searchQuery = ref('')
 const roleFilter  = ref('')
@@ -450,12 +558,13 @@ const users = ref([
 
 const filteredUsers = computed(() => {
   return users.value.filter(u => {
+    const matchView   = activeView.value === 'archived' ? u.status === 'Archived' : u.status !== 'Archived'
     const matchSearch = searchQuery.value === '' ||
       u.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       u.email.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       u.department.toLowerCase().includes(searchQuery.value.toLowerCase())
     const matchRole = roleFilter.value === '' || u.role === roleFilter.value
-    return matchSearch && matchRole
+    return matchView && matchSearch && matchRole
   })
 })
 
@@ -572,18 +681,76 @@ function confirmResetPassword() {
   showResetModal.value = false
 }
 
-/* ── Delete User ── */
-const showDeleteModal = ref(false)
-const deleteTarget    = ref(null)
+/* ── Reset Password Confirm + OTP ── */
+const showResetConfirmModal = ref(false)
+const resetConfirmTarget    = ref(null)
+const showResetOtpModal     = ref(false)
+const resetOtpInput         = ref('')
+const otpError              = ref('')
+let   _generatedOtp         = ''
 
-function openDeleteUser(user) {
-  deleteTarget.value    = user
-  showDeleteModal.value = true
+function openResetConfirm(user) {
+  resetConfirmTarget.value    = user
+  showResetConfirmModal.value = true
 }
 
-function confirmDeleteUser() {
-  users.value = users.value.filter(u => u.id !== deleteTarget.value.id)
-  showDeleteModal.value = false
+function proceedResetPassword() {
+  showResetConfirmModal.value = false
+  // Hardcoded for frontend demo — replace with API call in production
+  _generatedOtp          = '123456'
+  resetOtpInput.value    = ''
+  otpError.value         = ''
+  showResetOtpModal.value = true
+}
+
+function verifyResetOtp() {
+  if (!resetOtpInput.value || resetOtpInput.value.length < 6) {
+    otpError.value = 'Please enter the 6-digit OTP.'
+    return
+  }
+  if (resetOtpInput.value !== _generatedOtp) {
+    otpError.value = 'Incorrect OTP. Please try again.'
+    return
+  }
+  showResetOtpModal.value = false
+  openResetPassword(resetConfirmTarget.value)
+}
+
+function resendOtp() {
+  _generatedOtp = '123456'
+  otpError.value = ''
+  resetOtpInput.value = ''
+}
+
+/* ── Archive User ── */
+const showArchiveModal = ref(false)
+const archiveTarget    = ref(null)
+
+function openArchiveUser(user) {
+  archiveTarget.value    = user
+  showArchiveModal.value = true
+}
+
+function confirmArchiveUser() {
+  const u = users.value.find(u => u.id === archiveTarget.value.id)
+  if (u) u.status = 'Archived'
+  showArchiveModal.value = false
+}
+
+/* ── Restore User ── */
+const showRestoreModal = ref(false)
+const restoreTarget    = ref(null)
+
+function openRestoreUser(user) {
+  restoreTarget.value    = user
+  showRestoreModal.value = true
+}
+
+function confirmRestoreUser() {
+  const u = users.value.find(u => u.id === restoreTarget.value.id)
+  if (u) u.status = 'Active'
+  showRestoreModal.value = false
+  activeView.value = 'active'
 }
 </script>
 
@@ -783,7 +950,7 @@ function confirmDeleteUser() {
 /* ── Stats Row ── */
 .um-stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -807,6 +974,9 @@ function confirmDeleteUser() {
 }
 .um-stat-icon--total   { background: #e8f5ee; color: #1b7a4a; }
 .um-stat-icon--admin   { background: #e8eefe; color: #2563eb; }
+.um-stat-icon--archived { background: #f3f4f6; color: #6b7280; }
+.um-stat-card--clickable { cursor: pointer; transition: box-shadow 0.18s, transform 0.15s; }
+.um-stat-card--clickable:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.12); transform: translateY(-2px); }
 .um-stat-icon--teacher { background: #fef3c7; color: #b45309; }
 .um-stat-icon--active  { background: #d8f3e8; color: #1b7a4a; }
 .um-stat-val   { font-size: 1.6rem; font-weight: 800; color: #111; line-height: 1; }
@@ -884,7 +1054,8 @@ function confirmDeleteUser() {
   border-radius: 20px;
 }
 .um-status--active   { background: #d8f3e8; color: #1b7a4a; }
-.um-status--inactive { background: #f5f5f5; color: #999; }
+.um-status--inactive { background: #ffeaea; color: #e63946; }
+.um-status--archived { background: #f3f4f6; color: #6b7280; }
 .um-status-dot {
   width: 7px; height: 7px;
   border-radius: 50%;
@@ -910,8 +1081,10 @@ function confirmDeleteUser() {
 .um-btn--edit:hover { background: #dceafd; }
 .um-btn--reset  { background: #fef3c7; color: #b45309; }
 .um-btn--reset:hover { background: #fde68a; }
-.um-btn--delete { background: #ffeaea; color: #e63946; }
-.um-btn--delete:hover { background: #fdd; }
+.um-btn--archive { background: #fff7ed; color: #b45309; }
+.um-btn--archive:hover { background: #fde68a; }
+.um-btn--restore { background: #e8f5ee; color: #1b7a4a; }
+.um-btn--restore:hover { background: #d1fae5; }
 
 .um-empty {
   display: flex;
@@ -1190,6 +1363,124 @@ function confirmDeleteUser() {
   transition: background 0.18s;
 }
 .um-delete-confirm-btn:hover { background: #c1121f; }
+.um-archive-confirm-btn {
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 32px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.um-archive-confirm-btn:hover { background: #d97706; }
+
+/* ── OTP Input ── */
+.um-otp-hint {
+  font-size: 0.85rem;
+  color: #666;
+  line-height: 1.6;
+  margin: 0 0 18px;
+}
+.otp-input-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.otp-input {
+  text-align: center;
+  letter-spacing: 0.5em;
+  font-size: 1.5rem;
+  font-weight: 700;
+  width: 290px;
+  padding: 12px 18px !important;
+}
+.otp-resend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.otp-resend-text { font-size: 0.83rem; color: #999; }
+.otp-resend-btn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: #2d6a4f;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.um-reset-confirm-btn {
+  background: #1b4332;
+  color: #fff;
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 32px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.um-reset-confirm-btn:hover { background: #2d6a4f; }
+.um-restore-confirm-btn {
+  background: #1b4332;
+  color: #fff;
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 32px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.um-restore-confirm-btn:hover { background: #2d6a4f; }
+
+/* ── View Tabs ── */
+.um-view-tabs {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.um-view-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1.5px solid #ececec;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.um-view-tab:hover { border-color: #2d6a4f; color: #2d6a4f; }
+.um-view-tab--on {
+  background: #1b4332;
+  border-color: #1b4332;
+  color: #fff;
+  font-weight: 600;
+}
+.um-view-tab-badge {
+  background: #e63946;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 1px 7px;
+  min-width: 18px;
+  text-align: center;
+}
 
 /* ── Sweet Alert ── */
 .swal-box {

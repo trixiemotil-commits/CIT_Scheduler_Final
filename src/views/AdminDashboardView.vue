@@ -287,19 +287,19 @@ const navItems = [
 const stats = [
   {
     label: 'Total Teachers', value: 24, sub: '',
-    icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
+    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
   },
   {
     label: 'Available Rooms', value: 24, sub: 'Classrooms and labs',
-    icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`
+    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`
   },
   {
     label: 'Scheduled Classes', value: 42, sub: 'This week',
-    icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`
+    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`
   },
   {
     label: 'Consultations', value: 42, sub: 'Per Week',
-    icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
+    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
   }
 ]
 
@@ -411,26 +411,21 @@ function toggleExpand(which) {
   const isCollapsing = expandedChart.value === which
   expandedChart.value = isCollapsing ? null : which
 
-  // Swap bar chart dataset based on expand/collapse
-  if (barChartInstance) {
-    const expanded = !isCollapsing && which === 'bar'
-    barChartInstance.data.labels   = expanded ? BAR_LABELS_FULL : BAR_LABELS_SHORT
-    barChartInstance.data.datasets[0].data = expanded ? BAR_DATA_FULL : BAR_DATA_SHORT
-    barChartInstance.options.scales.y.max  = expanded ? 28 : 24
-  }
+  // Destroy both charts, let the DOM re-layout, then recreate so canvases
+  // measure their new container size correctly.
+  if (lineChartInstance) { lineChartInstance.destroy(); lineChartInstance = null }
+  if (barChartInstance)  { barChartInstance.destroy();  barChartInstance  = null }
 
   nextTick(() => {
     setTimeout(() => {
-      lineChartInstance?.resize()
-      barChartInstance?.resize()
-      lineChartInstance?.update('none')
-      barChartInstance?.update('none')
-    }, 200)
+      createLineChart()
+      createBarChart()
+    }, 50)
   })
 }
 
-onMounted(() => {
-  // Line chart – Consultation Trends
+function createLineChart() {
+  if (lineChartInstance) { lineChartInstance.destroy(); lineChartInstance = null }
   lineChartInstance = new Chart(lineChartRef.value, {
     type: 'line',
     data: {
@@ -476,14 +471,17 @@ onMounted(() => {
       }
     }
   })
+}
 
-  // Bar chart – Teacher Workload
+function createBarChart() {
+  if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null }
+  const expanded = expandedChart.value === 'bar'
   barChartInstance = new Chart(barChartRef.value, {
     type: 'bar',
     data: {
-      labels: [...BAR_LABELS_SHORT],
+      labels: [...(expanded ? BAR_LABELS_FULL : BAR_LABELS_SHORT)],
       datasets: [{
-        data: [...BAR_DATA_SHORT],
+        data: [...(expanded ? BAR_DATA_FULL : BAR_DATA_SHORT)],
         backgroundColor: '#2d6a4f',
         borderRadius: 4,
         borderSkipped: false
@@ -515,13 +513,18 @@ onMounted(() => {
         x: { grid: { display: false }, ticks: { color: '#888', font: { size: 11 } } },
         y: {
           beginAtZero: true,
-          max: 24,
+          max: expanded ? 28 : 24,
           ticks: { stepSize: 6, color: '#888', font: { size: 12 } },
           grid: { color: '#f0f0f0' }
         }
       }
     }
   })
+}
+
+onMounted(() => {
+  createLineChart()
+  createBarChart()
 })
 
 function handleLogout() {
@@ -816,10 +819,11 @@ function confirmLogout() {
   margin-bottom: 32px;
 }
 .stat-card {
-  background: #fff;
   border-radius: 16px;
   padding: 26px 28px 22px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  box-shadow: 0 4px 18px rgba(27,67,50,0.18);
+  background: linear-gradient(135deg, #2d6a4f 0%, #081c15 100%);
+  color: #fff;
 }
 .stat-top {
   display: flex;
@@ -829,19 +833,19 @@ function confirmLogout() {
 }
 .stat-label {
   font-size: 0.88rem;
-  color: #666;
+  color: rgba(255,255,255,0.85);
   font-weight: 400;
 }
 .stat-icon { display: flex; align-items: center; }
 .stat-value {
   font-size: 2.8rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #fff;
   line-height: 1.1;
 }
 .stat-sub {
   font-size: 0.8rem;
-  color: #999;
+  color: rgba(255,255,255,0.7);
   margin-top: 4px;
 }
 
@@ -894,6 +898,7 @@ function confirmLogout() {
 .chart-wrap {
   flex: 1;
   min-height: 0;
+  height: 260px;
   position: relative;
 }
 

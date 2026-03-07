@@ -4,7 +4,7 @@
     <aside class="sidebar">
       <div class="sidebar-profile">
         <div class="avatar-wrap">
-          <img src="https://i.pravatar.cc/100?img=47" alt="Admin" class="avatar" />
+          <img src="https://i.pravatar.cc/100?img=15" alt="Admin" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
@@ -1262,6 +1262,8 @@ function confirmLogout() {
   flex-direction: column;
   align-items: center;
   padding: 28px 18px 24px;
+  position: sticky;
+  top: 0;
   height: 100vh;
   overflow-y: auto;
 }
@@ -1292,6 +1294,7 @@ function confirmLogout() {
   padding: 11px 16px; border-radius: 10px;
   font-size: 0.88rem; font-weight: 400; color: #444;
   text-decoration: none;
+  cursor: pointer;
   transition: background 0.18s, color 0.18s;
 }
 .nav-item:hover { background: #f0faf3; color: #1b4332; }

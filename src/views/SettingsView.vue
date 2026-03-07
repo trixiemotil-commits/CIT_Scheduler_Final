@@ -63,7 +63,7 @@
                     v-model="passwordForm.current"
                     :type="showCurrent ? 'text' : 'password'"
                     class="settings-input"
-                    placeholder=""
+                    placeholder="Enter current password"
                   />
                   <button type="button" class="pw-eye" @click="showCurrent = !showCurrent">
                     <svg v-if="!showCurrent" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -74,7 +74,7 @@
               <div class="settings-group">
                 <label class="settings-label">OTP</label>
                 <div class="otp-wrap">
-                  <input v-model="passwordForm.otp" type="text" class="settings-input" placeholder="" maxlength="6" />
+                  <input v-model="passwordForm.otp" type="text" class="settings-input" placeholder="_ _ _ _ _ _" maxlength="6" />
                   <button type="button" class="otp-btn" @click="sendOtp">Send OTP</button>
                 </div>
               </div>
@@ -88,7 +88,7 @@
                     v-model="passwordForm.newPw"
                     :type="showNew ? 'text' : 'password'"
                     class="settings-input"
-                    placeholder=""
+                    placeholder="Enter new password"
                   />
                   <button type="button" class="pw-eye" @click="showNew = !showNew">
                     <svg v-if="!showNew" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -103,7 +103,7 @@
                     v-model="passwordForm.confirmPw"
                     :type="showConfirm ? 'text' : 'password'"
                     class="settings-input"
-                    placeholder=""
+                    placeholder="Confirm new password"
                   />
                   <button type="button" class="pw-eye" @click="showConfirm = !showConfirm">
                     <svg v-if="!showConfirm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -137,7 +137,7 @@
             <button
               class="toggle-switch"
               :class="{ 'toggle-switch--on': twoFactor }"
-              @click="twoFactor = !twoFactor"
+              @click="toggleTwoFactor"
               type="button"
               :aria-pressed="twoFactor"
             >
@@ -184,6 +184,23 @@
       </div>
     </main>
   </div>
+
+  <!-- ═══ Disable 2FA Confirm ═══ -->
+  <Teleport to="body">
+    <div v-if="showDisable2FAConfirm" class="swal-overlay">
+      <div class="swal-box">
+        <div class="swal-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h2 class="swal-title">Disable Two-Factor Authentication?</h2>
+        <p class="swal-sub">Are you sure you want to continue? Your account will be less secure without 2FA.</p>
+        <div class="swal-actions">
+          <button class="swal-cancel" @click="showDisable2FAConfirm = false">Cancel</button>
+          <button class="swal-continue" @click="confirmDisable2FA">Continue</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 
   <!-- ═══ Logout Confirm Modal ═══ -->
   <Teleport to="body">
@@ -297,6 +314,18 @@ function handleUpdatePassword() {
 
 /* ── Two-Factor Auth ── */
 const twoFactor = ref(false)
+const showDisable2FAConfirm = ref(false)
+function toggleTwoFactor() {
+  if (twoFactor.value) {
+    showDisable2FAConfirm.value = true
+  } else {
+    twoFactor.value = true
+  }
+}
+function confirmDisable2FA() {
+  twoFactor.value = false
+  showDisable2FAConfirm.value = false
+}
 
 /* ── FAQs ── */
 const openFaq = ref(null)
@@ -603,6 +632,75 @@ const faqs = [
   box-shadow: 0 4px 14px rgba(27,67,50,0.2);
 }
 .update-pw-btn:hover { background: #2d6a4f; }
+
+/* ── Disable 2FA SweetAlert ── */
+.swal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+}
+.swal-box {
+  background: #fff;
+  border-radius: 20px;
+  padding: 48px 44px 38px;
+  width: 480px;
+  max-width: 94vw;
+  text-align: center;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.swal-icon {
+  width: 84px; height: 84px;
+  background: #fff0f0;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 6px;
+}
+.swal-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0;
+}
+.swal-sub {
+  font-size: 0.97rem;
+  color: #888;
+  margin: 0;
+  line-height: 1.65;
+}
+.swal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  width: 100%;
+}
+.swal-cancel {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 8px;
+  border: 1.5px solid #e63946;
+  background: #fff;
+  color: #e63946;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.swal-cancel:hover { background: #fff0f0; }
+.swal-continue {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 8px;
+  border: none;
+  background: #1b4332;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.swal-continue:hover { background: #2d6a4f; }
 
 /* ── Toggle Switch ── */
 .toggle-switch {
