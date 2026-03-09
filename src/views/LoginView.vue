@@ -133,9 +133,11 @@ const signUp = reactive({ firstName: '', lastName: '', registeredId: '', email: 
 
 function handleLogin() {
   loginError.value = ''
-  const ok = login(signIn.email, signIn.password)
-  if (ok) {
+  const role = login(signIn.email, signIn.password)
+  if (role === 'admin') {
     router.push('/admin/dashboard')
+  } else if (role === 'teacher') {
+    router.push('/teacher/dashboard')
   } else {
     loginError.value = 'Invalid email or password.'
   }

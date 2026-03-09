@@ -4,16 +4,29 @@ export const ADMIN_ACCOUNT = {
   email: 'admin@gmail.com',
   password: 'Admin@1234',
   name: 'Admin Portal',
-  role: 'Admin Portal',
+  role: 'admin',
   avatar: null
 }
 
+export const TEACHER_ACCOUNT = {
+  email: 'teacher@gmail.com',
+  password: 'Teacher@1234',
+  name: 'Teachers Portal',
+  role: 'teacher',
+  avatar: 'https://i.pravatar.cc/100?img=47'
+}
+
+// Returns 'admin' | 'teacher' | null
 export function login(email, password) {
   if (email === ADMIN_ACCOUNT.email && password === ADMIN_ACCOUNT.password) {
-    localStorage.setItem('cit_user', JSON.stringify({ email, name: ADMIN_ACCOUNT.name, role: ADMIN_ACCOUNT.role }))
-    return true
+    localStorage.setItem('cit_user', JSON.stringify({ email, name: ADMIN_ACCOUNT.name, role: 'admin' }))
+    return 'admin'
   }
-  return false
+  if (email === TEACHER_ACCOUNT.email && password === TEACHER_ACCOUNT.password) {
+    localStorage.setItem('cit_user', JSON.stringify({ email, name: TEACHER_ACCOUNT.name, role: 'teacher', avatar: TEACHER_ACCOUNT.avatar }))
+    return 'teacher'
+  }
+  return null
 }
 
 export function logout() {
