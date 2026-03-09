@@ -16,6 +16,14 @@ export const TEACHER_ACCOUNT = {
   avatar: 'https://i.pravatar.cc/100?img=47'
 }
 
+export const STUDENT_ACCOUNT = {
+  email: 'student@gmail.com',
+  password: 'Student@1234',
+  name: 'Student Portal',
+  role: 'student',
+  avatar: null
+}
+
 // Returns 'admin' | 'teacher' | null
 export function login(email, password) {
   if (email === ADMIN_ACCOUNT.email && password === ADMIN_ACCOUNT.password) {
@@ -25,6 +33,10 @@ export function login(email, password) {
   if (email === TEACHER_ACCOUNT.email && password === TEACHER_ACCOUNT.password) {
     localStorage.setItem('cit_user', JSON.stringify({ email, name: TEACHER_ACCOUNT.name, role: 'teacher', avatar: TEACHER_ACCOUNT.avatar }))
     return 'teacher'
+  }
+  if (email === STUDENT_ACCOUNT.email && password === STUDENT_ACCOUNT.password) {
+    localStorage.setItem('cit_user', JSON.stringify({ email, name: STUDENT_ACCOUNT.name, role: 'student', avatar: null }))
+    return 'student'
   }
   return null
 }

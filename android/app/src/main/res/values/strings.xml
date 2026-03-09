@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CIT Scheduler</string>
+    <string name="title_activity_main">CIT Scheduler</string>
+    <string name="package_name">com.cit.scheduler</string>
+    <string name="custom_url_scheme">com.cit.scheduler</string>
+</resources>

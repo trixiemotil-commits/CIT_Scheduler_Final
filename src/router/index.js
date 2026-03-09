@@ -1,10 +1,17 @@
 import { isLoggedIn, getUser } from '@/auth.js'
+import StudentDashboardView     from '@/views/student/StudentDashboardView.vue'
+import StudentTeachersView      from '@/views/student/StudentTeachersView.vue'
+import StudentConsultationsView from '@/views/student/StudentConsultationsView.vue'
+import StudentProfileView       from '@/views/student/StudentProfileView.vue'
+import StudentSettingsView      from '@/views/student/StudentSettingsView.vue'
+import StudentNotificationsView from '@/views/student/StudentNotificationsView.vue'
 import AdminDashboardView from '@/views/admin/AdminDashboardView.vue'
 import AdminProfileView from '@/views/admin/AdminProfileView.vue'
 import TeacherDashboardView from '@/views/teacher/TeacherDashboardView.vue'
 import TeacherProfileView from '@/views/teacher/TeacherProfileView.vue'
 import TeacherScheduleView from '@/views/teacher/TeacherScheduleView.vue'
 import TeacherConsultationView from '@/views/teacher/TeacherConsultationView.vue'
+import TeacherSettingsView from '@/views/teacher/TeacherSettingsView.vue'
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
 import LoginView from '@/views/LoginView.vue'
 import NewScheduleWeekView from '@/views/admin/NewScheduleWeekView.vue'
@@ -31,7 +38,14 @@ const router = createRouter({
     { path: '/teacher/dashboard', name: 'teacher-dashboard', component: TeacherDashboardView, meta: { requiresAuth: true, role: 'teacher' } },
     { path: '/teacher/schedule',      name: 'teacher-schedule',      component: TeacherScheduleView,      meta: { requiresAuth: true, role: 'teacher' } },
     { path: '/teacher/consultation',  name: 'teacher-consultation',  component: TeacherConsultationView,  meta: { requiresAuth: true, role: 'teacher' } },
+    { path: '/teacher/settings',      name: 'teacher-settings',      component: TeacherSettingsView,      meta: { requiresAuth: true, role: 'teacher' } },
     { path: '/teacher/profile',       name: 'teacher-profile',       component: TeacherProfileView,       meta: { requiresAuth: true, role: 'teacher' } },
+    { path: '/student/dashboard',     name: 'student-dashboard',     component: StudentDashboardView,     meta: { requiresAuth: true, role: 'student' } },
+    { path: '/student/teachers',      name: 'student-teachers',      component: StudentTeachersView,      meta: { requiresAuth: true, role: 'student' } },
+    { path: '/student/consultations', name: 'student-consultations', component: StudentConsultationsView, meta: { requiresAuth: true, role: 'student' } },
+    { path: '/student/profile',       name: 'student-profile',       component: StudentProfileView,       meta: { requiresAuth: true, role: 'student' } },
+    { path: '/student/settings',      name: 'student-settings',      component: StudentSettingsView,      meta: { requiresAuth: true, role: 'student' } },
+    { path: '/student/notifications', name: 'student-notifications', component: StudentNotificationsView, meta: { requiresAuth: true, role: 'student' } },
   ]
 })
 
@@ -42,6 +56,7 @@ router.beforeEach((to, _from, next) => {
     const role = getUser()?.role
     if (role === 'teacher') next('/teacher/dashboard')
     else if (role === 'admin') next('/admin/dashboard')
+    else if (role === 'student') next('/student/dashboard')
     else next('/')
   } else {
     next()
