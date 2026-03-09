@@ -11,3 +11,25 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ── SweetAlert2 overrides ── */
+.swal-rounded { border-radius: 20px !important; }
+
+.swal2-popup,
+.swal2-popup *,
+.swal2-title,
+.swal2-html-container,
+.swal2-confirm,
+.swal2-cancel,
+.swal2-deny {
+  font-family: 'Poppins', sans-serif !important;
+}
+
+.swal-cancel-text {
+  background: none !important;
+  border: none !important;
+  color: #e63946 !important;
+  font-weight: 600 !important;
+  font-family: 'Poppins', sans-serif !important;
+}
+.swal-cancel-text:hover { background: #ffeaea !important; border-radius: 8px !important; }

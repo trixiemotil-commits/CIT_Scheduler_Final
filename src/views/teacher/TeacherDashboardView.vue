@@ -4,7 +4,7 @@
     <aside class="sidebar">
       <!-- Profile -->
       <div class="sidebar-profile">
-        <div class="avatar-wrap">
+        <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
           <img :src="user.avatar || 'https://i.pravatar.cc/100?img=47'" alt="Teacher" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
@@ -62,32 +62,47 @@
             <div class="notif-tabs">
               <button :class="['notif-tab', { active: notifTab === 'all' }]" @click="notifTab = 'all'">All</button>
               <button :class="['notif-tab', { active: notifTab === 'unread' }]" @click="notifTab = 'unread'">Unread</button>
-              <span class="notif-see-all">See all</span>
             </div>
             <div class="notif-list-wrap">
-              <template v-if="newNotifs.length">
-                <div class="notif-section-label">New</div>
-                <ul class="notif-list">
-                  <li v-for="n in newNotifs" :key="n.id" class="notif-item">
-                    <img :src="n.avatar" class="notif-avatar" alt="" />
-                    <span class="notif-text">{{ n.message }}</span>
-                    <span v-if="!n.read" class="notif-unread-dot"></span>
-                  </li>
-                </ul>
+              <!-- Unread tab: all unread items under a single New section -->
+              <template v-if="notifTab === 'unread'">
+                <template v-if="unreadNotifs.length">
+                  <div class="notif-section-label">New</div>
+                  <ul class="notif-list">
+                    <li v-for="n in unreadNotifs" :key="n.id" class="notif-item">
+                      <img :src="n.avatar" class="notif-avatar" alt="" />
+                      <span class="notif-text">{{ n.message }}</span>
+                      <span class="notif-unread-dot"></span>
+                    </li>
+                  </ul>
+                </template>
+                <div v-else class="notif-empty">No unread notifications</div>
               </template>
-              <template v-if="todayNotifs.length">
-                <div class="notif-section-label">Today</div>
-                <ul class="notif-list">
-                  <li v-for="n in todayNotifs" :key="n.id" class="notif-item">
-                    <img :src="n.avatar" class="notif-avatar" alt="" />
-                    <span class="notif-text">{{ n.message }}</span>
-                    <span v-if="!n.read" class="notif-unread-dot"></span>
-                  </li>
-                </ul>
+
+              <!-- All tab: split by New / today groups -->
+              <template v-else>
+                <template v-if="newNotifs.length">
+                  <div class="notif-section-label">New</div>
+                  <ul class="notif-list">
+                    <li v-for="n in newNotifs" :key="n.id" class="notif-item">
+                      <img :src="n.avatar" class="notif-avatar" alt="" />
+                      <span class="notif-text">{{ n.message }}</span>
+                      <span v-if="!n.read" class="notif-unread-dot"></span>
+                    </li>
+                  </ul>
+                </template>
+                <template v-if="todayNotifs.length">
+                  <div class="notif-section-label">today</div>
+                  <ul class="notif-list">
+                    <li v-for="n in todayNotifs" :key="n.id" class="notif-item">
+                      <img :src="n.avatar" class="notif-avatar" alt="" />
+                      <span class="notif-text">{{ n.message }}</span>
+                      <span v-if="!n.read" class="notif-unread-dot"></span>
+                    </li>
+                  </ul>
+                </template>
+                <div v-if="!newNotifs.length && !todayNotifs.length" class="notif-empty">No notifications</div>
               </template>
-              <div v-if="!newNotifs.length && !todayNotifs.length" class="notif-empty">
-                No notifications
-              </div>
             </div>
           </div>
         </div>
@@ -97,7 +112,7 @@
       <section class="stat-cards">
         <div class="stat-card">
           <div class="stat-left">
-            <div class="stat-label">Pending Consultation</div>
+            <div class="stat-label">Pending Requests</div>
             <div class="stat-value">24</div>
             <div class="stat-sub">Awaiting response</div>
           </div>
@@ -259,24 +274,24 @@ const navItems = [
 const showNotif = ref(false)
 const notifTab = ref('all')
 const notifications = ref([
-  { id: 1, avatar: 'https://i.pravatar.cc/100?img=12', message: 'A student requested a consultation.', read: false, group: 'new' },
-  { id: 2, avatar: 'https://i.pravatar.cc/100?img=15', message: 'Your schedule for Friday has been updated.', read: true, group: 'today' },
-  { id: 3, avatar: 'https://i.pravatar.cc/100?img=22', message: 'Reminder: Class at 7:00 AM tomorrow.', read: true, group: 'today' },
+  { id: 1, avatar: 'https://i.pravatar.cc/100?img=61', message: 'Teddy has submitted a consultation request.', read: false, group: 'new' },
+  { id: 2, avatar: 'https://i.pravatar.cc/100?img=52', message: 'Teddy has submitted a consultation request.', read: false, group: 'today' },
+  { id: 3, avatar: 'https://i.pravatar.cc/100?img=54', message: 'Teddy has submitted a consultation request.', read: false, group: 'today' },
+  { id: 4, avatar: 'https://i.pravatar.cc/100?img=56', message: 'Teddy has submitted a consultation request.', read: true,  group: 'today' },
+  { id: 5, avatar: 'https://i.pravatar.cc/100?img=58', message: 'Teddy has submitted a consultation request.', read: true,  group: 'today' },
 ])
-const visibleNotifs = computed(() =>
-  notifTab.value === 'unread' ? notifications.value.filter(n => !n.read) : notifications.value
-)
-const newNotifs   = computed(() => visibleNotifs.value.filter(n => n.group === 'new'))
-const todayNotifs = computed(() => visibleNotifs.value.filter(n => n.group === 'today'))
+const unreadNotifs = computed(() => notifications.value.filter(n => !n.read))
+const newNotifs    = computed(() => notifications.value.filter(n => n.group === 'new'))
+const todayNotifs  = computed(() => notifications.value.filter(n => n.group === 'today'))
 
 /* ── Today's Classes ── */
 const todayClasses = [
   { time: '7:00 AM – 9:00 AM',    subject: 'ITE 235 – Game Development',                      section: 'BSIT3 – South 2',       parallel: false, room: 'CL2',          roomColor: 'room-green' },
-  { time: '9:00 AM – 12:00 PM',   subject: 'ITE 293 – System Administration and Maintenance', section: 'BSIT3 – South 1 and 2', parallel: true,  room: 'CL3 and CL4',  roomColor: 'room-orange' },
-  { time: '1:00 PM – 3:00 PM',    subject: 'ITE 401 – Platform Technologies',                 section: 'BSIT3 – South 1 and 2', parallel: true,  room: 'CL2 and CL3',  roomColor: 'room-orange' },
+  { time: '9:00 AM – 12:00 PM',   subject: 'ITE 293 – System Administration and Maintenance', section: 'BSIT3 – South 1 and 2', parallel: true,  room: 'CL3 and CL4',  roomColor: 'room-green' },
+  { time: '1:00 PM – 3:00 PM',    subject: 'ITE 401 – Platform Technologies',                 section: 'BSIT3 – South 1 and 2', parallel: true,  room: 'CL2 and CL3',  roomColor: 'room-green' },
   { time: '3:00 PM – 4:00 PM',    subject: 'SSP 008 – Student Success Program',               section: 'BSIT2 – South 4',       parallel: false, room: 'Room 304',      roomColor: 'room-yellow' },
   { time: '5:00 PM – 6:00 PM',    subject: 'ITE 235 – Game Development',                      section: 'BSIT3 – South 3',       parallel: false, room: 'CL2',           roomColor: 'room-green' },
-  { time: '6:00 PM – 7:00 PM',    subject: 'ITE 401 – Platform Technologies',                 section: 'BSIT3 – South 4',       parallel: false, room: 'CL4',           roomColor: 'room-beige' },
+  { time: '6:00 PM – 7:00 PM',    subject: 'ITE 401 – Platform Technologies',                 section: 'BSIT3 – South 4',       parallel: false, room: 'CL4',           roomColor: 'room-green' },
 ]
 
 /* ── Logout ── */
@@ -296,6 +311,14 @@ function confirmLogout() {
   overflow: hidden;
   background: #f5f6f8;
   font-family: 'Poppins', sans-serif;
+}
+
+/* Force all form elements to inherit Poppins */
+.layout button,
+.layout input,
+.layout select,
+.layout textarea {
+  font-family: inherit;
 }
 
 /* ═══ SIDEBAR ═══ */
@@ -452,51 +475,43 @@ function confirmLogout() {
   z-index: 999;
   overflow: hidden;
 }
-.notif-panel-header { padding: 20px 20px 0; }
-.notif-panel-title { font-size: 1.15rem; font-weight: 700; color: #111; }
+.notif-panel-header { padding: 22px 22px 0; }
+.notif-panel-title { font-size: 1.4rem; font-weight: 700; color: #111; }
 .notif-tabs {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px 0;
+  padding: 14px 22px 0;
 }
 .notif-tab {
   background: none;
   border: none;
   font-family: inherit;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: 500;
-  color: #888;
+  color: #666;
   cursor: pointer;
-  padding: 5px 14px;
+  padding: 5px 18px;
   border-radius: 20px;
   transition: background 0.18s, color 0.18s;
 }
 .notif-tab.active { background: #1b4332; color: #fff; }
-.notif-see-all {
-  margin-left: auto;
-  font-size: 0.82rem;
-  color: #888;
-  cursor: pointer;
-  text-decoration: underline;
-}
-.notif-see-all:hover { color: #1b4332; }
-.notif-section-label { font-size: 0.82rem; font-weight: 600; color: #333; padding: 12px 20px 6px; }
-.notif-list-wrap { max-height: 280px; overflow-y: auto; padding-bottom: 8px; }
+.notif-section-label { font-size: 0.88rem; font-weight: 600; color: #333; padding: 14px 22px 6px; }
+.notif-list-wrap { max-height: 340px; overflow-y: auto; padding-bottom: 12px; }
 .notif-list { list-style: none; padding: 0; margin: 0; }
 .notif-empty { text-align: center; font-size: 0.85rem; color: #aaa; padding: 24px 20px; }
 .notif-item {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 22px;
   cursor: pointer;
   transition: background 0.15s;
 }
 .notif-item:hover { background: #f7faf8; }
-.notif-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-.notif-text { flex: 1; font-size: 0.85rem; color: #333; line-height: 1.45; }
-.notif-unread-dot { width: 10px; height: 10px; border-radius: 50%; background: #40916c; flex-shrink: 0; }
+.notif-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.notif-text { flex: 1; font-size: 0.9rem; color: #222; line-height: 1.5; padding-top: 2px; }
+.notif-unread-dot { width: 12px; height: 12px; border-radius: 50%; background: #40916c; flex-shrink: 0; margin-top: 6px; }
 
 /* ── Stat Cards ── */
 .stat-cards {
@@ -542,7 +557,7 @@ function confirmLogout() {
   height: 10px;
   border-radius: 50%;
 }
-.legend-dot.lecture    { background: #e8a020; }
+.legend-dot.lecture    { background: #e4c86e; }
 .legend-dot.laboratory { background: #40916c; }
 
 /* Table */
