@@ -127,6 +127,7 @@
       </div>
 
       <!-- Table -->
+      <div v-if="loadError" class="um-error-banner">{{ loadError }}</div>
       <div class="um-table-wrap">
         <table class="um-table">
           <thead>
@@ -140,6 +141,15 @@
             </tr>
           </thead>
           <tbody>
+            <tr v-if="isLoadingUsers">
+              <td colspan="6">
+                <div class="um-empty">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  <span>Loading users...</span>
+                </div>
+              </td>
+            </tr>
+            <template v-else>
             <tr v-for="user in filteredUsers" :key="user.id" class="um-row">
               <td>
                 <div class="um-user-cell">
@@ -194,6 +204,7 @@
                 </div>
               </td>
             </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -308,21 +319,21 @@
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Password <span class="form-required">*</span></label>
-                <input v-model="userForm.password" class="form-input" type="password" placeholder="Min. 6 characters" required />
+                <input v-model="userForm.password" class="form-input" type="password" placeholder="Min. 8 characters" required />
               </div>
               <div class="form-group">
                 <label class="form-label">Confirm Password <span class="form-required">*</span></label>
                 <input v-model="userForm.confirmPassword" class="form-input" type="password" placeholder="Re-enter password" required />
               </div>
             </div>
-            <div v-if="regPasswordError" class="um-pw-error">{{ regPasswordError }}</div>
           </template>
 
+          <div v-if="formError" class="um-pw-error">{{ formError }}</div>
           <div class="form-actions">
             <button type="button" class="um-cancel-btn" @click="showUserModal = false">Cancel</button>
-            <button type="submit" class="um-submit-btn">
+            <button type="submit" class="um-submit-btn" :disabled="isSavingUser">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              {{ editingUser ? 'Save Changes' : 'Register User' }}
+              {{ isSavingUser ? 'Saving...' : (editingUser ? 'Save Changes' : 'Register User') }}
             </button>
           </div>
         </form>
@@ -495,9 +506,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { RouterLink, useRouter, useRoute } from 'vue-router'
-import { logout } from '@/auth.js'
+import { getToken, logout } from '@/auth.js'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const router = useRouter()
 const route  = useRoute()
@@ -547,45 +560,163 @@ const searchQuery = ref('')
 const roleFilter  = ref('')
 
 /* ── Users Data ── */
-const users = ref([
-  { id: 1, name: 'Maria Santos',   email: 'maria.santos@cit.edu',   role: 'Admin',   department: 'CIT Department',    status: 'Active',   dateAdded: 'Jan 10, 2025', avatar: 'https://i.pravatar.cc/100?img=5'  },
-  { id: 2, name: 'Juan Dela Cruz', email: 'juan.delacruz@cit.edu',  role: 'Teacher', department: 'Computer Science',  status: 'Active',   dateAdded: 'Feb 3, 2025',  avatar: 'https://i.pravatar.cc/100?img=12' },
-  { id: 3, name: 'Ana Reyes',      email: 'ana.reyes@cit.edu',      role: 'Teacher', department: 'Information Tech.',  status: 'Active',   dateAdded: 'Feb 14, 2025', avatar: 'https://i.pravatar.cc/100?img=9'  },
-  { id: 4, name: 'Carlo Lim',      email: 'carlo.lim@cit.edu',      role: 'Student', department: 'Computer Science',   status: 'Inactive', dateAdded: 'Mar 1, 2025',  avatar: 'https://i.pravatar.cc/100?img=15' },
-  { id: 5, name: 'Rosa Mendoza',   email: 'rosa.mendoza@cit.edu',   role: 'Teacher', department: 'Computer Science',  status: 'Active',   dateAdded: 'Mar 22, 2025', avatar: 'https://i.pravatar.cc/100?img=20' },
-  { id: 6, name: 'Ben Torres',     email: 'ben.torres@cit.edu',     role: 'Admin',   department: 'CIT Department',    status: 'Active',   dateAdded: 'Apr 5, 2025',  avatar: 'https://i.pravatar.cc/100?img=33' },
-])
+const users = ref([])
+const isLoadingUsers = ref(false)
+const loadError = ref('')
 
 const filteredUsers = computed(() => {
   return users.value.filter(u => {
     const matchView   = activeView.value === 'archived' ? u.status === 'Archived' : u.status !== 'Archived'
-    const matchSearch = searchQuery.value === '' ||
-      u.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      u.department.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const query = searchQuery.value.trim().toLowerCase()
+    const department = (u.department || '').toLowerCase()
+    const matchSearch = query === '' ||
+      u.name.toLowerCase().includes(query) ||
+      u.email.toLowerCase().includes(query) ||
+      department.includes(query)
     const matchRole = roleFilter.value === '' || u.role === roleFilter.value
     return matchView && matchSearch && matchRole
   })
 })
 
+function formatDisplayDate(dateInput) {
+  if (!dateInput) return ''
+  const date = new Date(dateInput)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function fallbackAvatar(name) {
+  const safeName = encodeURIComponent((name || 'User').trim() || 'User')
+  return `https://ui-avatars.com/api/?name=${safeName}&background=DDECE5&color=1B4332`
+}
+
+function normalizeRoleLabel(role) {
+  const value = (role || '').toString().toLowerCase()
+  if (value === 'admin') return 'Admin'
+  if (value === 'teacher') return 'Teacher'
+  if (value === 'student') return 'Student'
+  return role || ''
+}
+
+function mapUserForUi(user) {
+  const firstName = user.firstName || ''
+  const lastName  = user.lastName || ''
+  const name = (user.name || `${firstName} ${lastName}`).trim() || 'New User'
+  return {
+    id: user.id || user._id,
+    name,
+    firstName,
+    lastName,
+    email: user.email || '',
+    role: normalizeRoleLabel(user.role || user.roleKey),
+    department: user.department || '',
+    status: user.status || 'Active',
+    dateAdded: formatDisplayDate(user.dateAdded || user.createdAt),
+    avatar: user.avatar || fallbackAvatar(name),
+    phone: user.phone || '',
+    studentId: user.studentId || '',
+  }
+}
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    logout()
+    router.push('/')
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {})
+    },
+    ...options
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      logout()
+      router.push('/')
+    }
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
+}
+
+async function fetchUsers() {
+  isLoadingUsers.value = true
+  loadError.value = ''
+  try {
+    const payload = await apiRequest('/users')
+    const list = Array.isArray(payload.users) ? payload.users : []
+    users.value = list.map(mapUserForUi)
+  } catch (error) {
+    loadError.value = error.message || 'Failed to load users.'
+  } finally {
+    isLoadingUsers.value = false
+  }
+}
+
+function trimValue(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function buildUserPayload(includePassword) {
+  const payload = {
+    firstName: trimValue(userForm.value.firstName),
+    lastName: trimValue(userForm.value.lastName),
+    email: trimValue(userForm.value.email),
+    role: userForm.value.role,
+    department: trimValue(userForm.value.department),
+    phone: trimValue(userForm.value.phone),
+    status: userForm.value.status || 'Active',
+  }
+
+  const studentId = trimValue(userForm.value.studentId)
+  if (studentId) {
+    payload.studentId = studentId
+  }
+
+  if (includePassword) {
+    payload.password = userForm.value.password
+  }
+
+  return payload
+}
+
+onMounted(fetchUsers)
+
 /* ── Add / Edit User ── */
 const showUserModal   = ref(false)
 const editingUser     = ref(null)
-const regPasswordError   = ref('')
+const formError       = ref('')
 const showRegisterConfirm = ref(false)
+const isSavingUser    = ref(false)
 const emptyForm = () => ({ firstName: '', lastName: '', email: '', phone: '', role: '', department: '', studentId: '', status: 'Active', password: '', confirmPassword: '' })
 const userForm  = ref(emptyForm())
 
 function openAddUser() {
   editingUser.value     = null
-  regPasswordError.value = ''
+  formError.value       = ''
   userForm.value        = emptyForm()
   showUserModal.value   = true
 }
 
 function openEditUser(user) {
   editingUser.value     = user
-  regPasswordError.value = ''
+  formError.value       = ''
   const parts = (user.name || '').split(' ')
   userForm.value = {
     firstName: parts[0] || '',
@@ -603,54 +734,54 @@ function openEditUser(user) {
 }
 
 function saveUser() {
+  formError.value = ''
+  const trimmedStudentId = (userForm.value.studentId || '').trim()
+
+  if (userForm.value.role === 'Student' && !trimmedStudentId) {
+    formError.value = 'Student ID is required for student accounts.'
+    return
+  }
+
   if (!editingUser.value) {
     if (userForm.value.password !== userForm.value.confirmPassword) {
-      regPasswordError.value = 'Passwords do not match.'
+      formError.value = 'Passwords do not match.'
       return
     }
-    if (userForm.value.password.length < 6) {
-      regPasswordError.value = 'Password must be at least 6 characters.'
+    if (!userForm.value.password || userForm.value.password.length < 8) {
+      formError.value = 'Password must be at least 8 characters.'
       return
     }
   }
-  regPasswordError.value = ''
   // Show sweet alert confirm before committing
   showRegisterConfirm.value = true
 }
 
-function confirmSaveUser() {
+async function confirmSaveUser() {
+  formError.value = ''
   showRegisterConfirm.value = false
-  const fullName = (userForm.value.firstName + ' ' + userForm.value.lastName).trim()
-  if (editingUser.value) {
-    const idx = users.value.findIndex(u => u.id === editingUser.value.id)
-    if (idx !== -1) {
-      users.value[idx] = {
-        ...users.value[idx],
-        name:       fullName,
-        email:      userForm.value.email,
-        phone:      userForm.value.phone,
-        role:       userForm.value.role,
-        department: userForm.value.department,
-        studentId:  userForm.value.studentId,
-        status:     userForm.value.status,
-      }
+  isSavingUser.value = true
+
+  try {
+    const payload = buildUserPayload(!editingUser.value)
+    if (editingUser.value) {
+      await apiRequest(`/users/${editingUser.value.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      })
+    } else {
+      await apiRequest('/users', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      })
     }
-  } else {
-    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-    users.value.push({
-      id:         Date.now(),
-      name:       fullName,
-      email:      userForm.value.email,
-      phone:      userForm.value.phone,
-      role:       userForm.value.role,
-      department: userForm.value.department,
-      studentId:  userForm.value.studentId,
-      status:     userForm.value.status,
-      dateAdded:  today,
-      avatar:     `https://i.pravatar.cc/100?img=${Math.floor(Math.random() * 70) + 1}`,
-    })
+
+    await fetchUsers()
+    showUserModal.value = false
+  } catch (error) {
+    formError.value = error.message || 'Failed to save user.'
+  } finally {
+    isSavingUser.value = false
   }
-  showUserModal.value = false
 }
 
 /* ── Reset Password ── */
@@ -988,6 +1119,20 @@ function confirmRestoreUser() {
   border-radius: 16px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.07);
   overflow: hidden;
+}
+.um-error-banner {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+.um-submit-btn[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 .um-table {
   width: 100%;

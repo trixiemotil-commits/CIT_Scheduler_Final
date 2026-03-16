@@ -1,25 +1,26 @@
-import { isLoggedIn, getUser } from '@/auth.js'
-import StudentDashboardView     from '@/views/student/StudentDashboardView.vue'
-import StudentTeachersView      from '@/views/student/StudentTeachersView.vue'
-import StudentConsultationsView from '@/views/student/StudentConsultationsView.vue'
-import StudentProfileView       from '@/views/student/StudentProfileView.vue'
-import StudentSettingsView      from '@/views/student/StudentSettingsView.vue'
-import StudentNotificationsView from '@/views/student/StudentNotificationsView.vue'
-import AdminDashboardView from '@/views/admin/AdminDashboardView.vue'
-import AdminProfileView from '@/views/admin/AdminProfileView.vue'
-import TeacherDashboardView from '@/views/teacher/TeacherDashboardView.vue'
-import TeacherProfileView from '@/views/teacher/TeacherProfileView.vue'
-import TeacherScheduleView from '@/views/teacher/TeacherScheduleView.vue'
-import TeacherConsultationView from '@/views/teacher/TeacherConsultationView.vue'
-import TeacherSettingsView from '@/views/teacher/TeacherSettingsView.vue'
+import { getUser, isLoggedIn } from '@/auth.js'
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
 import LoginView from '@/views/LoginView.vue'
+import AdminDashboardView from '@/views/admin/AdminDashboardView.vue'
+import AdminProfileView from '@/views/admin/AdminProfileView.vue'
+import EventsView from '@/views/admin/EventsView.vue'
 import NewScheduleWeekView from '@/views/admin/NewScheduleWeekView.vue'
 import ScheduleView from '@/views/admin/ScheduleView.vue'
-import EventsView from '@/views/admin/EventsView.vue'
+import SettingsView from '@/views/admin/SettingsView.vue'
 import TeacherAssignmentsView from '@/views/admin/TeacherAssignmentsView.vue'
 import UserManagementView from '@/views/admin/UserManagementView.vue'
-import SettingsView from '@/views/admin/SettingsView.vue'
+import StudentConsultationsView from '@/views/student/StudentConsultationsView.vue'
+import StudentDashboardView from '@/views/student/StudentDashboardView.vue'
+import StudentNotificationsView from '@/views/student/StudentNotificationsView.vue'
+import StudentProfileView from '@/views/student/StudentProfileView.vue'
+import StudentSettingsView from '@/views/student/StudentSettingsView.vue'
+import StudentTeachersView from '@/views/student/StudentTeachersView.vue'
+import TeacherConsultationView from '@/views/teacher/TeacherConsultationView.vue'
+import TeacherDashboardView from '@/views/teacher/TeacherDashboardView.vue'
+import TeacherEventsView from '@/views/teacher/TeacherEventsView.vue'
+import TeacherProfileView from '@/views/teacher/TeacherProfileView.vue'
+import TeacherScheduleView from '@/views/teacher/TeacherScheduleView.vue'
+import TeacherSettingsView from '@/views/teacher/TeacherSettingsView.vue'
 import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
@@ -37,6 +38,7 @@ const router = createRouter({
     { path: '/admin/profile',  name: 'admin-profile',  component: AdminProfileView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/teacher/dashboard', name: 'teacher-dashboard', component: TeacherDashboardView, meta: { requiresAuth: true, role: 'teacher' } },
     { path: '/teacher/schedule',      name: 'teacher-schedule',      component: TeacherScheduleView,      meta: { requiresAuth: true, role: 'teacher' } },
+    { path: '/teacher/events',        name: 'teacher-events',        component: TeacherEventsView,        meta: { requiresAuth: true, role: 'teacher' } },
     { path: '/teacher/consultation',  name: 'teacher-consultation',  component: TeacherConsultationView,  meta: { requiresAuth: true, role: 'teacher' } },
     { path: '/teacher/settings',      name: 'teacher-settings',      component: TeacherSettingsView,      meta: { requiresAuth: true, role: 'teacher' } },
     { path: '/teacher/profile',       name: 'teacher-profile',       component: TeacherProfileView,       meta: { requiresAuth: true, role: 'teacher' } },

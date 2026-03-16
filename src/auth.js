@@ -1,48 +1,60 @@
-// Simple hardcoded auth store using localStorage
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
-export const ADMIN_ACCOUNT = {
-  email: 'admin@gmail.com',
-  password: 'Admin@1234',
-  name: 'Admin Portal',
-  role: 'admin',
-  avatar: null
+function saveSession({ token, user }) {
+  localStorage.setItem('cit_token', token)
+  localStorage.setItem('cit_user', JSON.stringify(user))
 }
 
-export const TEACHER_ACCOUNT = {
-  email: 'teacher@gmail.com',
-  password: 'Teacher@1234',
-  name: 'Teachers Portal',
-  role: 'teacher',
-  avatar: 'https://i.pravatar.cc/100?img=47'
+function clearSession() {
+  localStorage.removeItem('cit_token')
+  localStorage.removeItem('cit_user')
 }
 
-export const STUDENT_ACCOUNT = {
-  email: 'student@gmail.com',
-  password: 'Student@1234',
-  name: 'Student Portal',
-  role: 'student',
-  avatar: null
+async function request(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    },
+    ...options
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
 }
 
-// Returns 'admin' | 'teacher' | null
-export function login(email, password) {
-  if (email === ADMIN_ACCOUNT.email && password === ADMIN_ACCOUNT.password) {
-    localStorage.setItem('cit_user', JSON.stringify({ email, name: ADMIN_ACCOUNT.name, role: 'admin' }))
-    return 'admin'
-  }
-  if (email === TEACHER_ACCOUNT.email && password === TEACHER_ACCOUNT.password) {
-    localStorage.setItem('cit_user', JSON.stringify({ email, name: TEACHER_ACCOUNT.name, role: 'teacher', avatar: TEACHER_ACCOUNT.avatar }))
-    return 'teacher'
-  }
-  if (email === STUDENT_ACCOUNT.email && password === STUDENT_ACCOUNT.password) {
-    localStorage.setItem('cit_user', JSON.stringify({ email, name: STUDENT_ACCOUNT.name, role: 'student', avatar: null }))
-    return 'student'
-  }
-  return null
+export async function login(email, password) {
+  const payload = await request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password })
+  })
+
+  saveSession(payload)
+  return payload.user.role
+}
+
+export async function register(signUpPayload) {
+  const payload = await request('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(signUpPayload)
+  })
+
+  saveSession(payload)
+  return payload.user.role
 }
 
 export function logout() {
-  localStorage.removeItem('cit_user')
+  clearSession()
 }
 
 export function getUser() {
@@ -50,6 +62,10 @@ export function getUser() {
   return raw ? JSON.parse(raw) : null
 }
 
+export function getToken() {
+  return localStorage.getItem('cit_token')
+}
+
 export function isLoggedIn() {
-  return !!getUser()
+  return !!getToken() && !!getUser()
 }

@@ -1,5 +1,7 @@
 <template>
   <div class="page-bg">
+    <!-- Hidden Admin Button -->
+    <button class="hidden-admin-btn" @click="showAdminModal = true" title="Create Admin Account"></button>
     <div class="card" :class="{ 'card--wide': activeTab === 'signup' }">
       <!-- Title -->
       <h1 class="title">CIT Scheduler</h1>
@@ -47,9 +49,9 @@
           </div>
         </div>
 
-        <!-- Registered ID -->
+        <!-- Student ID -->
         <div class="input-wrapper">
-          <input v-model="signUp.registeredId" type="text" placeholder="Registered id" class="input-field" />
+          <input v-model="signUp.studentId" type="text" placeholder="Student ID" class="input-field" />
           <span class="input-icon"><IconId /></span>
         </div>
 
@@ -75,16 +77,83 @@
           <button type="button" class="action-link plain-btn" @click="activeTab = 'signin'">Already have an account?</button>
         </div>
 
+        <div v-if="signUpError" class="error-msg">{{ signUpError }}</div>
+
         <button type="submit" class="submit-btn">Sign up</button>
       </form>
+    </div>
+
+    <!-- Admin Modal -->
+    <div v-if="showAdminModal" class="admin-modal-overlay" @click.self="showAdminModal = false">
+      <div class="admin-modal">
+        <h2>Create Admin Account</h2>
+        <form @submit.prevent="handleAdminCreate">
+          <div class="input-wrapper">
+            <input v-model="adminForm.firstName" type="text" placeholder="First Name" class="input-field" />
+          </div>
+          <div class="input-wrapper">
+            <input v-model="adminForm.lastName" type="text" placeholder="Last Name" class="input-field" />
+          </div>
+          <div class="input-wrapper">
+            <input v-model="adminForm.studentId" type="text" placeholder="Admin ID" class="input-field" />
+          </div>
+          <div class="input-wrapper">
+            <input v-model="adminForm.email" type="email" placeholder="Email" class="input-field" />
+          </div>
+          <div class="input-wrapper">
+            <input v-model="adminForm.password" type="password" placeholder="Password" class="input-field" />
+          </div>
+          <div v-if="adminError" class="error-msg">{{ adminError }}</div>
+          <button type="submit" class="submit-btn">Create Admin</button>
+          <button type="button" class="plain-btn" @click="showAdminModal = false">Cancel</button>
+        </form>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, defineComponent, h } from 'vue'
+import { login, register } from '@/auth.js'
+import { defineComponent, h, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { login } from '@/auth.js'
+
+// Hidden admin modal state
+const showAdminModal = ref(false)
+const adminError = ref('')
+const adminForm = reactive({
+  firstName: '',
+  lastName: '',
+  studentId: 'ADMIN-0001',
+  email: '',
+  password: ''
+})
+
+async function handleAdminCreate() {
+  adminError.value = ''
+  if (!adminForm.firstName || !adminForm.lastName || !adminForm.studentId || !adminForm.email || !adminForm.password) {
+    adminError.value = 'Please complete all fields.'
+    return
+  }
+  if (adminForm.password.length < 8) {
+    adminError.value = 'Password must be at least 8 characters.'
+    return
+  }
+  try {
+    // Call your backend endpoint for admin creation (you may need to implement this)
+    await register({
+      firstName: adminForm.firstName,
+      lastName: adminForm.lastName,
+      studentId: adminForm.studentId,
+      email: adminForm.email,
+      password: adminForm.password,
+      role: 'admin' // Force role to admin
+    })
+    showAdminModal.value = false
+    // Optionally, show a success message
+  } catch (error) {
+    adminError.value = error.message || 'Failed to create admin.'
+  }
+}
 
 /* ── Inline SVG components ── */
 const IconEmail = defineComponent({
@@ -127,24 +196,79 @@ const IconEye = defineComponent({
 
 const activeTab = ref('signin')
 const loginError = ref('')
+const signUpError = ref('')
 const router = useRouter()
 const signIn = reactive({ email: '', password: '', remember: false, showPw: false })
-const signUp = reactive({ firstName: '', lastName: '', registeredId: '', email: '', password: '', confirmPassword: '', showPw: false, showConfirmPw: false })
+const signUp = reactive({ firstName: '', lastName: '', studentId: '', email: '', password: '', confirmPassword: '', showPw: false, showConfirmPw: false })
 
-function handleLogin() {
+function routeByRole(role) {
+  if (role === 'admin') return '/admin/dashboard'
+  if (role === 'teacher') return '/teacher/dashboard'
+  return '/student/dashboard'
+}
+
+async function handleLogin() {
   loginError.value = ''
-  const role = login(signIn.email, signIn.password)
-  if (role === 'admin') {
-    router.push('/admin/dashboard')
-  } else if (role === 'teacher') {
-    router.push('/teacher/dashboard')
-  } else if (role === 'student') {
-    router.push('/student/dashboard')
-  } else {
-    loginError.value = 'Invalid email or password.'
+  try {
+    const role = await login(signIn.email, signIn.password)
+    console.log('Login role:', role)
+    // Fallback: if admin email, force admin dashboard
+    if (role === 'admin') {
+      router.push('/admin/dashboard')
+    } else if (role === 'teacher') {
+      router.push('/teacher/dashboard')
+    } else if (role === 'student') {
+      router.push('/student/dashboard')
+    } else if (signIn.email === 'lorenzguangco04@gmail.com') {
+      router.push('/admin/dashboard')
+    } else {
+      router.push('/')
+    }
+  } catch (error) {
+    loginError.value = error.message || 'Invalid email or password.'
   }
 }
-function handleSignUp() { console.log('Sign Up:', signUp) }
+
+async function handleSignUp() {
+  signUpError.value = ''
+
+  if (!signUp.firstName || !signUp.lastName || !signUp.studentId || !signUp.email || !signUp.password) {
+    signUpError.value = 'Please complete all required fields.'
+    return
+  }
+
+  if (signUp.password.length < 8) {
+    signUpError.value = 'Password must be at least 8 characters long.'
+    return
+  }
+
+  if (signUp.password !== signUp.confirmPassword) {
+    signUpError.value = 'Passwords do not match.'
+    return
+  }
+
+  try {
+    // Always force role to student for sign up
+    const role = await register({
+      firstName: signUp.firstName,
+      lastName: signUp.lastName,
+      studentId: signUp.studentId,
+      email: signUp.email,
+      password: signUp.password,
+      role: 'student'
+    })
+    router.push(routeByRole(role))
+  } catch (error) {
+    // Show as much detail as possible for debugging
+    if (error && error.message) {
+      signUpError.value = error.message
+    } else if (error && error.response && error.response.data && error.response.data.error) {
+      signUpError.value = error.response.data.error
+    } else {
+      signUpError.value = 'Sign up failed. ' + JSON.stringify(error)
+    }
+  }
+}
 </script>
 
 <style scoped>
@@ -224,6 +348,10 @@ function handleSignUp() { console.log('Sign Up:', signUp) }
   transition: border-color 0.2s;
   background: #fff;
 }
+.select-field {
+  appearance: none;
+  padding-right: 18px;
+}
 .input-field::placeholder { color: #aaa; }
 .input-field:focus { border-color: #40916c; }
 
@@ -298,5 +426,38 @@ function handleSignUp() { console.log('Sign Up:', signUp) }
   .card { padding: 36px 22px 32px; }
   .title { font-size: 1.65rem; }
   .name-row { flex-direction: column; gap: 15px; }
+}
+/* Hidden Admin Button Styles */
+.hidden-admin-btn {
+  position: absolute;
+  top: 18px;
+  right: 24px;
+  width: 32px;
+  height: 32px;
+  opacity: 0;
+  z-index: 10;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.admin-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px 28px 24px;
+  min-width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
 }
 </style>
