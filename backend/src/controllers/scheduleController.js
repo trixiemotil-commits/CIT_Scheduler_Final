@@ -352,9 +352,6 @@ async function createScheduleTable(req, res) {
     return res.status(500).json({ message: "Failed to create schedule table.", error: error.message });
   }
 }
-    return res.status(500).json({ message: "Failed to create schedule table.", error: error.message });
-  }
-}
 
 async function listSchedules(req, res) {
   try {
