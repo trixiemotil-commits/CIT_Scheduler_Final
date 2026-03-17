@@ -346,6 +346,7 @@ async function findConflict(doc, excludedIds = []) {
       return `Room ${doc.room} already has a schedule for that time (${roomConflict.timeIn} - ${roomConflict.timeOut}).`;
     }
   }
+  
 
   return null;
 }
