@@ -9,7 +9,7 @@
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
-        <div class="email">teacher@gmail.com</div>
+        <div class="email">{{ user.email || 'teacher@gmail.com' }}</div>
       </div>
 
       <!-- Nav -->
@@ -183,7 +183,12 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(cls, i) in todayClasses" :key="i">
+              <tr v-if="classesLoading || classesError || !todayClasses.length">
+                <td colspan="5" class="td-empty-state">
+                  {{ classesLoading ? 'Loading classes...' : (classesError || `No classes scheduled for ${todayDayName}.`) }}
+                </td>
+              </tr>
+              <tr v-else v-for="(cls, i) in todayClasses" :key="i">
                 <td class="td-time">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
                     <circle cx="12" cy="12" r="10"/>
@@ -232,8 +237,8 @@
 </template>
 
 <script setup>
-import { getUser, logout } from '@/auth.js'
-import { computed, ref } from 'vue'
+import { getToken, getUser, logout } from '@/auth.js'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 // v-click-outside directive
@@ -249,6 +254,7 @@ const router = useRouter()
 const route = useRoute()
 const currentRoute = computed(() => route.path)
 const user = getUser() || {}
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 /* ── Nav ── */
 const navItems = [
@@ -289,14 +295,171 @@ const newNotifs    = computed(() => notifications.value.filter(n => n.group === 
 const todayNotifs  = computed(() => notifications.value.filter(n => n.group === 'today'))
 
 /* ── Today's Classes ── */
-const todayClasses = [
-  { time: '7:00 AM – 9:00 AM',    subject: 'ITE 235 – Game Development',                      section: 'BSIT3 – South 2',       parallel: false, room: 'CL2',          roomColor: 'room-green' },
-  { time: '9:00 AM – 12:00 PM',   subject: 'ITE 293 – System Administration and Maintenance', section: 'BSIT3 – South 1 and 2', parallel: true,  room: 'CL3 and CL4',  roomColor: 'room-green' },
-  { time: '1:00 PM – 3:00 PM',    subject: 'ITE 401 – Platform Technologies',                 section: 'BSIT3 – South 1 and 2', parallel: true,  room: 'CL2 and CL3',  roomColor: 'room-green' },
-  { time: '3:00 PM – 4:00 PM',    subject: 'SSP 008 – Student Success Program',               section: 'BSIT2 – South 4',       parallel: false, room: 'Room 304',      roomColor: 'room-yellow' },
-  { time: '5:00 PM – 6:00 PM',    subject: 'ITE 235 – Game Development',                      section: 'BSIT3 – South 3',       parallel: false, room: 'CL2',           roomColor: 'room-green' },
-  { time: '6:00 PM – 7:00 PM',    subject: 'ITE 401 – Platform Technologies',                 section: 'BSIT3 – South 4',       parallel: false, room: 'CL4',           roomColor: 'room-green' },
-]
+const todayClasses = ref([])
+const classesLoading = ref(false)
+const classesError = ref('')
+const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const todayDayName = ref(dayNames[new Date().getDay()])
+let midnightRefreshTimer = null
+
+function getCurrentDayName() {
+  return dayNames[new Date().getDay()]
+}
+
+function millisUntilNextDay() {
+  const now = new Date()
+  const nextMidnight = new Date(now)
+  nextMidnight.setHours(24, 0, 0, 0)
+  return Math.max(1000, nextMidnight.getTime() - now.getTime())
+}
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    throw new Error(body.message || 'Failed to load classes.')
+  }
+
+  return body
+}
+
+function parseTimeToMinutes(value) {
+  const text = (value || '').toString().trim()
+  const match = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (!match) return Number.MAX_SAFE_INTEGER
+
+  let hour = Number(match[1])
+  const minute = Number(match[2])
+  const period = match[3].toUpperCase()
+
+  if (period === 'PM' && hour !== 12) hour += 12
+  if (period === 'AM' && hour === 12) hour = 0
+
+  return (hour * 60) + minute
+}
+
+function roomBadgeClass(room) {
+  return /^cl\.?/i.test((room || '').trim()) ? 'room-green' : 'room-yellow'
+}
+
+function mapTodayClasses(entries) {
+  const groups = new Map()
+
+  entries
+    .filter((entry) => entry.day === todayDayName.value)
+    .forEach((entry) => {
+      const groupKey = entry.parallel && entry.parallelGroupId
+        ? `parallel:${entry.parallelGroupId}`
+        : `single:${entry.id || `${entry.day}|${entry.timeIn}|${entry.timeOut}|${entry.section || ''}`}`
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          time: `${entry.timeIn} – ${entry.timeOut}`,
+          subject: entry.subject || 'Untitled Subject',
+          sectionSet: new Set(),
+          roomSet: new Set(),
+          parallel: Boolean(entry.parallel),
+          sortValue: parseTimeToMinutes(entry.timeIn),
+        })
+      }
+
+      const grouped = groups.get(groupKey)
+
+      if (entry.section) grouped.sectionSet.add(entry.section)
+      if (entry.room) grouped.roomSet.add(entry.room)
+
+      if (Array.isArray(entry.parallelSlots)) {
+        entry.parallelSlots.forEach((slot) => {
+          if (slot?.section) grouped.sectionSet.add(slot.section)
+          if (slot?.room) grouped.roomSet.add(slot.room)
+        })
+      }
+    })
+
+  return Array.from(groups.values())
+    .map((item) => {
+      const sections = Array.from(item.sectionSet)
+      const rooms = Array.from(item.roomSet)
+      return {
+        time: item.time,
+        subject: item.subject,
+        section: sections.length ? sections.join(', ') : 'N/A',
+        parallel: item.parallel,
+        room: rooms.length ? rooms.join(' and ') : 'TBA',
+        roomColor: roomBadgeClass(rooms[0] || ''),
+        sortValue: item.sortValue,
+      }
+    })
+    .sort((a, b) => a.sortValue - b.sortValue)
+}
+
+async function loadTodayClasses() {
+  classesLoading.value = true
+  classesError.value = ''
+  todayDayName.value = getCurrentDayName()
+
+  try {
+    const payload = await apiRequest('/schedules')
+    const entries = Array.isArray(payload.entries) ? payload.entries : []
+    todayClasses.value = mapTodayClasses(entries)
+  } catch (error) {
+    todayClasses.value = []
+    classesError.value = error.message || 'Unable to load classes.'
+  } finally {
+    classesLoading.value = false
+  }
+}
+
+function scheduleMidnightRefresh() {
+  if (midnightRefreshTimer) {
+    clearTimeout(midnightRefreshTimer)
+  }
+
+  midnightRefreshTimer = setTimeout(async () => {
+    await loadTodayClasses()
+    scheduleMidnightRefresh()
+  }, millisUntilNextDay())
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    loadTodayClasses()
+  }
+}
+
+onMounted(() => {
+  loadTodayClasses()
+  scheduleMidnightRefresh()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
+
+onBeforeUnmount(() => {
+  if (midnightRefreshTimer) {
+    clearTimeout(midnightRefreshTimer)
+    midnightRefreshTimer = null
+  }
+
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+})
 
 /* ── Logout ── */
 const showLogoutModal = ref(false)
@@ -596,6 +759,7 @@ function confirmLogout() {
 .class-table tbody tr:last-child { border-bottom: none; }
 .class-table tbody tr:hover { background: #f9fafb; }
 .class-table td { padding: 13px 16px; color: #333; text-align: center; vertical-align: middle; }
+.td-empty-state { text-align: center !important; color: #667085 !important; font-weight: 500; padding: 18px !important; }
 
 .td-time {
   display: flex;

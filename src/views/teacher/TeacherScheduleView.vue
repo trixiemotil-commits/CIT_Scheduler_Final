@@ -4,7 +4,7 @@
     <aside class="sidebar">
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
-          <img src="https://i.pravatar.cc/100?img=47" alt="Teacher" class="avatar" />
+          <img :src="userAvatar" alt="Teacher" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
@@ -46,7 +46,7 @@
         <div class="card-top">
           <div>
             <div class="card-title">My Teaching Schedule</div>
-            <div class="card-sub">Your weekly class schedule and room assignments</div>
+            <div class="card-sub">{{ loadError || (isLoading ? 'Loading your schedule...' : 'Your weekly class schedule and room assignments') }}</div>
           </div>
           <div class="filter-wrap">
             <select class="subject-select" v-model="selectedSubject">
@@ -211,17 +211,26 @@
 </template>
 
 <script setup>
-import { logout, getUser } from '@/auth.js'
-import { computed, ref } from 'vue'
+import { getToken, getUser, logout } from '@/auth.js'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 /* ── User ── */
 const user = computed(() => getUser())
 const userEmail = computed(() => user.value?.email || 'teacher@example.com')
+const userAvatar = computed(() => user.value?.avatar || 'https://i.pravatar.cc/100?img=47')
+const userName = computed(() => {
+  const fullName = typeof user.value?.name === 'string' ? user.value.name.trim() : ''
+  if (fullName) return fullName
+
+  const fromParts = `${user.value?.firstName || ''} ${user.value?.lastName || ''}`.trim()
+  return fromParts
+})
 
 /* ── Nav ── */
 const navItems = [
@@ -258,57 +267,167 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 const DAY_SHORT = { Monday: 'Monday', Tuesday: 'Tues', Wednesday: 'Wed', Thursday: 'Thurs', Friday: 'Fri', Saturday: 'Sat' }
 
 /* ── Schedule data ── */
-const scheduleData = [
-  {
-    day: 'Monday', start: '07:00', end: '09:00',
-    room: 'CL2', subject: 'Game Development', code: 'ITE 235',
-    section: 'BSIT3-S2', parallel: false, color: 'green',
-    teacher: 'Prof. Jhon', avatar: 'https://i.pravatar.cc/100?img=51'
-  },
-  {
-    day: 'Monday', start: '09:00', end: '12:00',
-    room: 'ROOM 401', subject: 'System Administration and Maintenance', code: 'ITE 293',
-    section: 'BSIT3-S2', parallel: false, color: 'yellow',
-    teacher: 'Prof. Jhon', avatar: 'https://i.pravatar.cc/100?img=51'
-  },
-  {
-    day: 'Monday', start: '13:00', end: '15:00',
-    room: 'Room 301', subject: 'Platform Technologies', code: 'ITE 401',
-    section: 'BSIT3-S2', parallel: true, color: 'yellow',
-    teacher: 'Prof. Jaylo', avatar: 'https://i.pravatar.cc/100?img=60',
-    parallelSections: [
-      { section: 'BSIT3-S2', room: '301' },
-      { section: 'BSIT3-S1', room: '301' }
-    ]
-  },
-  {
-    day: 'Monday', start: '15:00', end: '16:00',
-    room: 'Room 304', subject: 'Student Success Program', code: 'SSP 008',
-    section: 'BSIT2-S4', parallel: false, color: 'green',
-    teacher: 'Prof. Jhon', avatar: 'https://i.pravatar.cc/100?img=51'
-  },
-  {
-    day: 'Monday', start: '17:00', end: '18:00',
-    room: 'CL2', subject: 'Game Development', code: 'ITE 235',
-    section: 'BSIT3-S3', parallel: false, color: 'green',
-    teacher: 'Prof. Jhon', avatar: 'https://i.pravatar.cc/100?img=51'
-  },
-  {
-    day: 'Monday', start: '18:00', end: '19:00',
-    room: 'CL4', subject: 'Platform Technologies', code: 'ITE 401',
-    section: 'BSIT3-S4', parallel: false, color: 'green',
-    teacher: 'Prof. Jhon', avatar: 'https://i.pravatar.cc/100?img=51'
-  },
-]
+const scheduleData = ref([])
+const isLoading = ref(false)
+const loadError = ref('')
+
+function to24Hour(value) {
+  const normalized = (value || '').toString().trim()
+  const plainTime = normalized.match(/^(\d{2}):(\d{2})$/)
+  if (plainTime) {
+    return `${plainTime[1]}:${plainTime[2]}`
+  }
+
+  const match = normalized.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (!match) {
+    return ''
+  }
+
+  let hour = Number(match[1])
+  const minute = match[2]
+  const period = match[3].toUpperCase()
+
+  if (period === 'PM' && hour !== 12) hour += 12
+  if (period === 'AM' && hour === 12) hour = 0
+
+  return `${String(hour).padStart(2, '0')}:${minute}`
+}
+
+function scheduleColor(colorToken) {
+  return colorToken === 'color-yellow' ? 'yellow' : 'green'
+}
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Session expired. Please log in again.')
+    }
+
+    if (response.status === 403) {
+      throw new Error('You do not have permission to load schedules.')
+    }
+
+    throw new Error(body.message || 'Unable to load schedule.')
+  }
+
+  return body
+}
+
+function mapEntriesToSchedule(entries) {
+  const grouped = new Map()
+  const avatar = user.value?.avatar || 'https://i.pravatar.cc/100?img=47'
+
+  entries.forEach((entry) => {
+    const day = entry.day
+    const start = to24Hour(entry.timeIn)
+    const end = to24Hour(entry.timeOut)
+    if (!day || !start || !end) {
+      return
+    }
+
+    const baseRecord = {
+      day,
+      start,
+      end,
+      room: entry.room || '',
+      subject: entry.subject || 'Untitled Subject',
+      code: entry.subject || 'Untitled Subject',
+      section: entry.section || '',
+      parallel: Boolean(entry.parallel),
+      color: scheduleColor(entry.color),
+      teacher: entry.teacher || userName.value || 'Teacher',
+      avatar,
+      parallelSections: [],
+    }
+
+    if (baseRecord.parallel) {
+      const key = entry.parallelGroupId || `${day}|${start}|${end}|${baseRecord.subject}|${baseRecord.teacher}`
+      if (!grouped.has(key)) {
+        grouped.set(key, baseRecord)
+      }
+
+      const groupedEntry = grouped.get(key)
+      if (entry.section && !groupedEntry.parallelSections.some((slot) => slot.section === entry.section && slot.room === (entry.room || ''))) {
+        groupedEntry.parallelSections.push({
+          section: entry.section,
+          room: entry.room || '',
+        })
+      }
+
+      if (!groupedEntry.section) {
+        groupedEntry.section = entry.section || ''
+      }
+      if (!groupedEntry.room) {
+        groupedEntry.room = entry.room || ''
+      }
+      return
+    }
+
+    const key = `${day}|${start}|${end}|${entry.section || ''}|${baseRecord.subject}|${baseRecord.teacher}`
+    grouped.set(key, baseRecord)
+  })
+
+  return Array.from(grouped.values()).sort((a, b) => {
+    const byDay = DAYS.indexOf(a.day) - DAYS.indexOf(b.day)
+    if (byDay !== 0) return byDay
+    return a.start.localeCompare(b.start)
+  })
+}
+
+async function loadSchedule() {
+  isLoading.value = true
+  loadError.value = ''
+
+  try {
+    const teacherName = userName.value
+    if (!teacherName) {
+      scheduleData.value = []
+      return
+    }
+
+    const directPayload = await apiRequest(`/schedules?teacher=${encodeURIComponent(teacherName)}`)
+    const apiEntries = Array.isArray(directPayload.entries) ? directPayload.entries : []
+
+    scheduleData.value = mapEntriesToSchedule(apiEntries)
+  } catch (error) {
+    scheduleData.value = []
+    loadError.value = error.message || 'Unable to load schedule.'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(loadSchedule)
 
 /* ── Subject filter ── */
 const selectedSubject = ref('')
 const filteredClasses = computed(() =>
-  selectedSubject.value ? scheduleData.filter(c => c.code === selectedSubject.value) : scheduleData
+  selectedSubject.value ? scheduleData.value.filter(c => c.code === selectedSubject.value) : scheduleData.value
 )
 const subjectOptions = computed(() => {
   const seen = new Set()
-  return scheduleData.filter(c => { if (seen.has(c.code)) return false; seen.add(c.code); return true })
+  return scheduleData.value.filter(c => { if (seen.has(c.code)) return false; seen.add(c.code); return true })
 })
 
 /* ── Expand day column ── */
@@ -328,7 +447,9 @@ const tableMatrix = computed(() => {
 
       const cls = data.find(c => c.day === day && c.start === slot.start)
       if (cls) {
-        const span = ALL_STARTS.indexOf(cls.end) - ALL_STARTS.indexOf(cls.start)
+        const startIndex = ALL_STARTS.indexOf(cls.start)
+        const endIndex = ALL_STARTS.indexOf(cls.end)
+        const span = startIndex >= 0 && endIndex > startIndex ? endIndex - startIndex : 1
         for (let r = ri + 1; r < ri + span && r < TIME_SLOTS.length; r++) occupied[ci][r] = true
         return { type: 'start', cls, rowspan: span }
       }

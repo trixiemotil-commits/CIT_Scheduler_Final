@@ -71,20 +71,28 @@
           </div>
           <div class="info-grid">
             <div class="info-item">
-              <div class="info-label">Contact No.</div>
-              <div class="info-value">{{ profile.contact }}</div>
+              <div class="info-label">Name</div>
+              <div class="info-value">{{ profile.fullName }}</div>
             </div>
             <div class="info-item">
-              <div class="info-label">Gender</div>
-              <div class="info-value">{{ profile.gender }}</div>
+              <div class="info-label">Role</div>
+              <div class="info-value">{{ profile.role }}</div>
             </div>
             <div class="info-item">
               <div class="info-label">Employee ID</div>
               <div class="info-value">{{ profile.employeeId }}</div>
             </div>
             <div class="info-item">
-              <div class="info-label">Role</div>
-              <div class="info-value">{{ profile.role }}</div>
+              <div class="info-label">Email</div>
+              <div class="info-value">{{ profile.email }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Contact Number</div>
+              <div class="info-value">{{ profile.contact }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Status</div>
+              <div class="info-value">{{ profile.status }}</div>
             </div>
           </div>
         </div>
@@ -123,21 +131,27 @@
                 <input v-model="editForm.contact" class="edit-input" type="text" placeholder="09XXXXXXXXX" />
               </div>
               <div class="edit-field">
-                <label class="edit-label">Gender</label>
-                <div class="select-wrap">
-                  <select v-model="editForm.gender" class="edit-select">
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  <svg class="select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
+                <label class="edit-label">Status</label>
+                <input v-model="editForm.status" class="edit-input" type="text" disabled />
               </div>
             </div>
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Employee Id</label>
                 <input v-model="editForm.employeeId" class="edit-input" type="text" placeholder="000-000-000" />
+              </div>
+            </div>
+            <div class="edit-row two-col">
+              <div class="edit-field">
+                <label class="edit-label">Profile Photo</label>
+                <input class="edit-input" type="file" accept="image/*" @change="onAvatarSelected" />
+                <small class="photo-help">JPG, PNG, or WEBP. Max 5 MB.</small>
+              </div>
+              <div class="edit-field">
+                <label class="edit-label">Photo Preview</label>
+                <div class="photo-preview-wrap">
+                  <img :src="editForm.avatar || profile.avatar" alt="Preview" class="photo-preview" />
+                </div>
               </div>
             </div>
           </div>
@@ -173,15 +187,16 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { RouterLink, useRouter, useRoute } from 'vue-router'
-import { logout, getUser } from '@/auth.js'
+import { getToken, getUser, logout } from '@/auth.js'
 import Swal from 'sweetalert2'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
 const user = getUser() || {}
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const navItems = [
   {
@@ -204,14 +219,79 @@ const navItems = [
 
 /* ── Profile data ── */
 const profile = ref({
-  fullName:   'Sofia Smith',
-  email:      'teacher@gmail.com',
-  contact:    '09292000000',
-  gender:     'Female',
-  employeeId: '022-222-222',
-  role:       'Teacher',
+  fullName:   user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Teacher',
+  email:      user.email || 'teacher@gmail.com',
+  contact:    user.phone || 'N/A',
+  status:     user.status || 'Active',
+  employeeId: user.employeeId || user.studentId || 'N/A',
+  role:       ((user.role || 'teacher').toString().charAt(0).toUpperCase() + (user.role || 'teacher').toString().slice(1).toLowerCase()),
   avatar:     user.avatar || 'https://i.pravatar.cc/100?img=47'
 })
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    if (response.status === 413) {
+      throw new Error('Uploaded image is too large. Please choose a smaller photo.')
+    }
+
+    throw new Error(body.message || 'Failed to load profile.')
+  }
+
+  return body
+}
+
+function normalizeRoleLabel(role) {
+  const text = (role || '').toString().trim()
+  if (!text) return 'Teacher'
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
+}
+
+async function loadProfile() {
+  try {
+    const payload = await apiRequest('/auth/me')
+    const dbUser = payload.user || {}
+
+    profile.value = {
+      fullName: dbUser.name || `${dbUser.firstName || ''} ${dbUser.lastName || ''}`.trim() || 'Teacher',
+      email: dbUser.email || 'teacher@gmail.com',
+      contact: dbUser.phone || 'N/A',
+      status: dbUser.status || 'Active',
+      employeeId: dbUser.employeeId || dbUser.studentId || 'N/A',
+      role: normalizeRoleLabel(dbUser.role),
+      avatar: dbUser.avatar || user.avatar || 'https://i.pravatar.cc/100?img=47',
+    }
+  } catch (error) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Unable to load profile',
+      text: error.message || 'Please try again.',
+      confirmButtonColor: '#1b4332',
+    })
+  }
+}
+
+onMounted(loadProfile)
 
 /* ── Edit modal ── */
 const showEditModal = ref(false)
@@ -224,15 +304,96 @@ function openEdit() {
 function closeEdit() {
   showEditModal.value = false
 }
-function saveProfile() {
-  profile.value = { ...editForm.value }
-  closeEdit()
-  Swal.fire({
-    toast: true, position: 'top-end', icon: 'success',
-    title: 'Profile Updated', showConfirmButton: false,
-    timer: 2500, timerProgressBar: true,
-    background: '#1b4332', color: '#fff', iconColor: '#74c69d'
-  })
+
+function onAvatarSelected(event) {
+  const file = event.target?.files?.[0]
+  if (!file) return
+
+  const isImage = /^image\//.test(file.type)
+  if (!isImage) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Invalid image file',
+      text: 'Please select a valid image file.',
+      confirmButtonColor: '#1b4332',
+    })
+    return
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Image too large',
+      text: 'Please use an image smaller than 5 MB.',
+      confirmButtonColor: '#1b4332',
+    })
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = () => {
+    editForm.value.avatar = typeof reader.result === 'string' ? reader.result : editForm.value.avatar
+  }
+  reader.readAsDataURL(file)
+}
+
+async function saveProfile() {
+  const fullName = (editForm.value.fullName || '').trim()
+  const nameParts = fullName.split(/\s+/).filter(Boolean)
+  const firstName = nameParts.shift() || ''
+  const lastName = nameParts.join(' ') || ''
+
+  if (!firstName || !editForm.value.email) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Missing required fields',
+      text: 'Name and email are required.',
+      confirmButtonColor: '#1b4332',
+    })
+    return
+  }
+
+  try {
+    const payload = await apiRequest('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify({
+        firstName,
+        lastName,
+        email: editForm.value.email,
+        phone: editForm.value.contact === 'N/A' ? '' : (editForm.value.contact || ''),
+        employeeId: editForm.value.employeeId === 'N/A' ? '' : (editForm.value.employeeId || ''),
+        avatar: editForm.value.avatar || profile.value.avatar,
+      }),
+    })
+
+    const updatedUser = payload.user || {}
+    localStorage.setItem('cit_user', JSON.stringify(updatedUser))
+
+    profile.value = {
+      fullName: updatedUser.name || `${updatedUser.firstName || ''} ${updatedUser.lastName || ''}`.trim() || 'Teacher',
+      email: updatedUser.email || 'teacher@gmail.com',
+      contact: updatedUser.phone || 'N/A',
+      status: updatedUser.status || 'Active',
+      employeeId: updatedUser.employeeId || updatedUser.studentId || 'N/A',
+      role: normalizeRoleLabel(updatedUser.role),
+      avatar: updatedUser.avatar || user.avatar || 'https://i.pravatar.cc/100?img=47',
+    }
+
+    closeEdit()
+    Swal.fire({
+      toast: true, position: 'top-end', icon: 'success',
+      title: 'Profile Updated', showConfirmButton: false,
+      timer: 2500, timerProgressBar: true,
+      background: '#1b4332', color: '#fff', iconColor: '#74c69d'
+    })
+  } catch (error) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Unable to update profile',
+      text: error.message || 'Please try again.',
+      confirmButtonColor: '#1b4332',
+    })
+  }
 }
 
 /* ── Logout ── */
@@ -633,6 +794,27 @@ function confirmLogout() {
   border-color: #1b4332;
   background: #fff;
   box-shadow: 0 0 0 3px rgba(27,67,50,0.10);
+}
+.photo-help {
+  color: #64748b;
+  font-size: 0.74rem;
+  margin-top: 2px;
+}
+.photo-preview-wrap {
+  width: 100%;
+  height: 110px;
+  border: 1.5px solid #e4e4e7;
+  border-radius: 10px;
+  background: #f9fafb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.photo-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .select-arrow {
   position: absolute;

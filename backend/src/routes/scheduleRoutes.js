@@ -11,11 +11,12 @@ const {
 
 const router = express.Router();
 
+router.get("/tables", authRequired, authorizeRoles("admin", "teacher"), listScheduleTables);
+router.get("/", authRequired, authorizeRoles("admin", "teacher"), listSchedules);
+
 router.use(authRequired, authorizeRoles("admin"));
 
-router.get("/tables", listScheduleTables);
 router.post("/tables", createScheduleTable);
-router.get("/", listSchedules);
 router.post("/", createSchedule);
 router.post("/replace", replaceSchedule);
 router.post("/delete", deleteSchedule);

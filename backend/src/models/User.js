@@ -20,6 +20,12 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
+    employeeId: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+    },
     email: {
       type: String,
       required: true,

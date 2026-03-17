@@ -284,7 +284,7 @@
 </template>
 
 <script setup>
-import { getUser, logout } from '@/auth.js'
+import { getToken, getUser, logout } from '@/auth.js'
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -292,6 +292,36 @@ const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
 const user = getUser() || {}
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
+}
 
 /* ── Nav ── */
 const navItems = [
@@ -368,7 +398,7 @@ function onPwOtpBackspace(i) {
   if (!pwOtpCode.value[i] && i > 0) pwOtpRefs.value[i - 1]?.focus()
 }
 
-function handleUpdatePassword() {
+async function handleUpdatePassword() {
   pwError.value   = ''
   pwSuccess.value = ''
   const enteredOtp = pwOtpCode.value.join('')
@@ -385,14 +415,27 @@ function handleUpdatePassword() {
     return
   }
   if (passwordForm.value.newPw.length < 6) {
-    pwError.value = 'New password must be at least 6 characters.'
+    pwError.value = 'New password must be at least 8 characters.'
     return
   }
-  pwSuccess.value = 'Password updated successfully.'
-  passwordForm.value = { current: '', newPw: '', confirmPw: '' }
-  otpSent.value      = false
-  pwOtpCode.value    = ['', '', '', '', '', '']
-  setTimeout(() => { pwSuccess.value = '' }, 4000)
+
+  try {
+    await apiRequest('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        currentPassword: passwordForm.value.current,
+        newPassword: passwordForm.value.newPw,
+      }),
+    })
+
+    pwSuccess.value = 'Password updated successfully.'
+    passwordForm.value = { current: '', newPw: '', confirmPw: '' }
+    otpSent.value      = false
+    pwOtpCode.value    = ['', '', '', '', '', '']
+    setTimeout(() => { pwSuccess.value = '' }, 4000)
+  } catch (error) {
+    pwError.value = error.message || 'Unable to update password.'
+  }
 }
 
 /* ── Two-Factor Auth ── */

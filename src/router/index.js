@@ -52,10 +52,11 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
+  const role = (getUser()?.role || '').toString().toLowerCase()
+
   if (to.meta.requiresAuth && !isLoggedIn()) {
     next('/')
-  } else if (to.meta.role && getUser()?.role !== to.meta.role) {
-    const role = getUser()?.role
+  } else if (to.meta.role && role !== String(to.meta.role).toLowerCase()) {
     if (role === 'teacher') next('/teacher/dashboard')
     else if (role === 'admin') next('/admin/dashboard')
     else if (role === 'student') next('/student/dashboard')

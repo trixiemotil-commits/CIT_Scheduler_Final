@@ -1,5 +1,6 @@
 const ScheduleEntry = require("../models/ScheduleEntry");
 const ScheduleTable = require("../models/ScheduleTable");
+const User = require("../models/User");
 
 const YEAR_VALUES = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 const DAY_VALUES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -358,7 +359,27 @@ async function createScheduleTable(req, res) {
 async function listSchedules(req, res) {
   try {
     const tableLabel = normalizeString(req.query.tableLabel);
-    const filter = tableLabel ? { tableLabel } : {};
+    const teacher = normalizeString(req.query.teacher);
+    const filter = {};
+
+    if (tableLabel) {
+      filter.tableLabel = tableLabel;
+    }
+
+    if (req.user?.role === "teacher") {
+      const authUser = await User.findById(req.user.id).select("firstName lastName").lean();
+      const teacherName = authUser
+        ? `${normalizeString(authUser.firstName)} ${normalizeString(authUser.lastName)}`.trim()
+        : "";
+
+      if (!teacherName) {
+        return res.status(404).json({ message: "Teacher account not found." });
+      }
+
+      filter.teacher = teacherName;
+    } else if (teacher) {
+      filter.teacher = teacher;
+    }
 
     const entries = await ScheduleEntry.find(filter)
       .sort({ tableLabel: 1, day: 1, timeInMinutes: 1, section: 1 })
