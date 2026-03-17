@@ -228,8 +228,9 @@
           <div class="preview-header">
             <h2 class="preview-title">Week Preview</h2>
             <div class="sched-select-wrap">
-              <select class="sched-select" v-model="previewYear">
-                <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+              <select class="sched-select" v-model="previewTeacher">
+                <option value="">-- All Teachers --</option>
+                <option v-for="t in teacherOptions" :key="t" :value="t">{{ t }}</option>
               </select>
               <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
@@ -325,8 +326,8 @@ const navItems = [
   { name: 'Settings',     to: '/admin/settings',  icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>` },
 ]
 
-/* ── Preview year filter ── */
-const previewYear = ref(years[0])
+/* ── Preview teacher filter ── */
+const previewTeacher = ref('')
 
 /* ── Form state ── */
 const savedCount = ref(0)
@@ -365,7 +366,7 @@ function getEntriesForCell(rowHour, day) {
       return parts.length >= 4 &&
              parts[3] === day &&
              parts[2].startsWith(rowHour) &&
-             parts[0] === previewYear.value
+             parts[0] === previewTeacher.value
     })
     .map(([k, v]) => ({ ...v, _key: k }))
 }
@@ -393,10 +394,10 @@ function addEntry() {
     const groupId = `pg_${Date.now()}`
     form.parallelSlots.forEach((ps) => {
       const color = colorForRoom(ps.room) ?? 'color-green'
-      const key = `${form.year}|${ps.section}|${slot}|${form.day}`
+      const key = `${form.teacher}|${ps.section}|${slot}|${form.day}`
       entries[key] = {
         teacher: form.teacher, subject: form.subject,
-        room: ps.room, year: form.year, section: ps.section, slot,
+        room: ps.room, year: form.year, tableLabel: form.teacher, section: ps.section, slot,
         timeIn: form.timeIn, timeOut: form.timeOut,
         parallel: true, parallelGroupId: groupId,
         parallelCount: form.parallelCount,
@@ -406,9 +407,9 @@ function addEntry() {
     })
   } else {
     const color = colorForRoom(form.room) ?? 'color-green'
-    entries[`${form.year}|${form.section}|${slot}|${form.day}`] = {
+    entries[`${form.teacher}|${form.section}|${slot}|${form.day}`] = {
       teacher: form.teacher, subject: form.subject,
-      room: form.room, year: form.year, section: form.section, slot,
+      room: form.room, year: form.year, tableLabel: form.teacher, section: form.section, slot,
       timeIn: form.timeIn, timeOut: form.timeOut,
       parallel: false, parallelGroupId: null,
       parallelCount: 1, parallelSlots: [], color, addedAt,
@@ -416,7 +417,7 @@ function addEntry() {
   }
 
   savedCount.value++
-  previewYear.value = form.year
+  previewTeacher.value = form.teacher
   resetForm()
   showFlash.value = true
   setTimeout(() => { showFlash.value = false }, 2200)
