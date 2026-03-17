@@ -46,7 +46,7 @@ function colorForRoom(room) {
 function toClientTable(table) {
   return {
     id: table._id.toString(),
-    year: table.year,
+    teacher: table.teacher,
     label: table.label,
   };
 }
@@ -105,16 +105,10 @@ async function ensureDefaultTables() {
 }
 
 function sortTables(tables) {
-  return tables.sort((a, b) => {
-    const yearOrder = YEAR_VALUES.indexOf(a.year) - YEAR_VALUES.indexOf(b.year);
-    if (yearOrder !== 0) {
-      return yearOrder;
-    }
-    return a.label.localeCompare(b.label);
-  });
+  return tables.sort((a, b) => a.label.localeCompare(b.label));
 }
 
-async function ensureTableExists(tableLabel, year) {
+async function ensureTableExists(tableLabel) {
   const label = normalizeString(tableLabel);
   if (!label) {
     throw new Error("Table label is required.");
@@ -125,13 +119,8 @@ async function ensureTableExists(tableLabel, year) {
     return existing;
   }
 
-  const normalizedYear = normalizeString(year);
-  if (!YEAR_VALUES.includes(normalizedYear)) {
-    throw new Error("Year is required to create a new schedule table.");
-  }
-
   try {
-    return await ScheduleTable.create({ year: normalizedYear, label });
+    return await ScheduleTable.create({ teacher: label, label });
   } catch (error) {
     if (error?.code === 11000) {
       const retry = await ScheduleTable.findOne({ label });
@@ -158,17 +147,17 @@ function normalizeParallelSlots(parallelSlots) {
 }
 
 function buildEntryDocs(payload) {
-  const tableLabel = normalizeString(payload.tableLabel);
+  const teacher  = normalizeString(payload.teacher);
+  const tableLabel = teacher;  // schedules are stored per teacher
   const year = normalizeString(payload.baseYear || payload.year);
   const day = normalizeString(payload.day);
-  const teacher = normalizeString(payload.teacher);
   const subject = normalizeString(payload.subject);
   const timeIn = normalizeString(payload.timeIn);
   const timeOut = normalizeString(payload.timeOut);
   const timeInMinutes = parseTimeToMinutes(timeIn);
   const timeOutMinutes = parseTimeToMinutes(timeOut);
 
-  if (!tableLabel || !day || !teacher || !subject || !timeIn || !timeOut) {
+  if (!teacher || !day || !subject || !timeIn || !timeOut) {
     throw new Error("Missing required schedule fields.");
   }
 
@@ -292,49 +281,28 @@ async function getExcludedIds(oldDescriptor) {
 }
 
 async function findConflict(doc, excludedIds = []) {
+  // Overlap: same day, time windows intersect
   const overlapFilter = {
-    tableLabel: doc.tableLabel,
     day: doc.day,
     timeInMinutes: { $lt: doc.timeOutMinutes },
     timeOutMinutes: { $gt: doc.timeInMinutes },
   };
 
-  const sameSlotFilter = {
-    tableLabel: doc.tableLabel,
-    day: doc.day,
-    timeIn: doc.timeIn,
-    timeOut: doc.timeOut,
-  };
-
   if (excludedIds.length) {
     overlapFilter._id = { $nin: excludedIds };
-    sameSlotFilter._id = { $nin: excludedIds };
   }
 
-  const sameSlotConflict = await ScheduleEntry.findOne(sameSlotFilter).lean();
-
-  if (sameSlotConflict) {
-    return `There is already a schedule at ${sameSlotConflict.timeIn} - ${sameSlotConflict.timeOut} on ${sameSlotConflict.day}.`;
-  }
-
-  const sectionConflict = await ScheduleEntry.findOne({
-    ...overlapFilter,
-    section: doc.section,
-  }).lean();
-
-  if (sectionConflict) {
-    return `Section ${doc.section} already has a schedule for that time (${sectionConflict.timeIn} - ${sectionConflict.timeOut}).`;
-  }
-
+  // Rule 1: same teacher at the same time (any room)
   const teacherConflict = await ScheduleEntry.findOne({
     ...overlapFilter,
     teacher: doc.teacher,
   }).lean();
 
   if (teacherConflict) {
-    return `Teacher ${doc.teacher} already has a schedule for that time (${teacherConflict.timeIn} - ${teacherConflict.timeOut}).`;
+    return `Teacher ${doc.teacher} already has a class on ${doc.day} from ${teacherConflict.timeIn} to ${teacherConflict.timeOut}.`;
   }
 
+  // Rule 2: same room at the same time (any teacher)
   if (doc.room) {
     const roomConflict = await ScheduleEntry.findOne({
       ...overlapFilter,
@@ -342,7 +310,7 @@ async function findConflict(doc, excludedIds = []) {
     }).lean();
 
     if (roomConflict) {
-      return `Room ${doc.room} already has a schedule for that time (${roomConflict.timeIn} - ${roomConflict.timeOut}).`;
+      return `Room ${doc.room} is already occupied on ${doc.day} from ${roomConflict.timeIn} to ${roomConflict.timeOut}.`;
     }
   }
 
@@ -351,8 +319,6 @@ async function findConflict(doc, excludedIds = []) {
 
 async function listScheduleTables(_req, res) {
   try {
-    await ensureDefaultTables();
-
     const tables = await ScheduleTable.find();
     return res.json({ tables: sortTables(tables.map(toClientTable)) });
   } catch (error) {
@@ -363,48 +329,34 @@ async function listScheduleTables(_req, res) {
 
 async function createScheduleTable(req, res) {
   try {
-    await ensureDefaultTables();
-
-    const year = normalizeString(req.body.year);
-    if (!YEAR_VALUES.includes(year)) {
-      return res.status(400).json({ message: "Please select a valid year." });
+    const teacher = normalizeString(req.body.teacher || req.body.label);
+    if (!teacher) {
+      return res.status(400).json({ message: "Teacher name is required." });
     }
 
-    const requestedLabel = normalizeString(req.body.label);
-    let label = requestedLabel;
-
-    const existingTables = await ScheduleTable.find({ year }).select("label");
-    const existingLabels = new Set(existingTables.map((table) => table.label));
-
-    if (!label) {
-      label = year;
-      let suffix = 2;
-      while (existingLabels.has(label)) {
-        label = `${year} (${suffix})`;
-        suffix += 1;
-      }
-    }
+    const label = teacher;
 
     if (await ScheduleTable.exists({ label })) {
-      return res.status(409).json({ message: "A schedule table with this label already exists." });
+      return res.status(409).json({ message: "A schedule table for this teacher already exists." });
     }
 
-    const table = await ScheduleTable.create({ year, label });
+    const table = await ScheduleTable.create({ teacher, label });
     return res.status(201).json({ message: "Schedule table created.", table: toClientTable(table) });
   } catch (error) {
     if (error?.code === 11000) {
-      return res.status(409).json({ message: "A schedule table with this label already exists." });
+      return res.status(409).json({ message: "A schedule table for this teacher already exists." });
     }
 
     console.error("Failed to create schedule table:", error);
     return res.status(500).json({ message: "Failed to create schedule table.", error: error.message });
   }
 }
+    return res.status(500).json({ message: "Failed to create schedule table.", error: error.message });
+  }
+}
 
 async function listSchedules(req, res) {
   try {
-    await ensureDefaultTables();
-
     const tableLabel = normalizeString(req.query.tableLabel);
     const filter = tableLabel ? { tableLabel } : {};
 
@@ -422,7 +374,7 @@ async function listSchedules(req, res) {
 async function createSchedule(req, res) {
   try {
     const docs = buildEntryDocs(req.body || {});
-    await ensureTableExists(req.body.tableLabel, req.body.baseYear || req.body.year);
+    await ensureTableExists(docs[0].tableLabel);
 
     for (const doc of docs) {
       const conflictMessage = await findConflict(doc);
@@ -458,7 +410,7 @@ async function replaceSchedule(req, res) {
     }
 
     const docs = buildEntryDocs(next);
-    await ensureTableExists(next.tableLabel, next.baseYear || next.year);
+    await ensureTableExists(docs[0].tableLabel);
 
     const excludedIds = await getExcludedIds(oldDescriptor);
     for (const doc of docs) {

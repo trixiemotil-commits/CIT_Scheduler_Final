@@ -50,7 +50,7 @@
         <div class="sched-topbar">
           <div class="sched-topbar-left">
             <h2 class="sched-grid-title">Teacher Schedule Grid</h2>
-            <p class="sched-grid-sub" style="margin:4px 0 0">{{ selectedTeacher ? `Assigning schedule for ${selectedTeacher}` : 'Select a teacher to manage their schedule' }}</p>
+            <p class="sched-grid-sub" :class="{ 'teacher-selected': !!selectedTeacher }" style="margin:4px 0 0">{{ selectedTeacher ? `Showing schedule for Prof. ${selectedTeacher}` : 'Select a teacher from the dropdown to view their schedule' }}</p>
           </div>
           <div class="sched-topbar-right">
             <!-- Year filter selector -->
@@ -72,8 +72,8 @@
             <!-- Teacher filter selector -->
             <div class="sched-select-wrap teacher-select-wrap">
               <select class="sched-select teacher-select" v-model="selectedTeacher">
-                <option value="">-- Select Teacher --</option>
-                <option v-for="t in teacherOptions" :key="t" :value="t">{{ t }}</option>
+                <option value="">-- All Teachers --</option>
+                <option v-for="t in scheduledTeachers" :key="t" :value="t">Prof. {{ t }}</option>
               </select>
               <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
@@ -88,18 +88,15 @@
           </div>
         </div>
 
-        <!-- Pagination dots - show pages for selected year -->
+        <!-- Pagination: year filter chips -->
         <div class="sched-pagination">
-          <button class="page-arrow" @click="prevPage" :disabled="currentPage === 0">&#8249;</button>
           <span
-            v-for="pg in filteredPages"
-            :key="pg.realIndex"
+            v-for="y in ['All', ...years]"
+            :key="y"
             class="page-dot"
-            :class="{ active: pg.realIndex === currentPage }"
-            :title="pg.label"
-            @click="currentPage = pg.realIndex"
-          >{{ pg.year }}</span>
-          <button class="page-arrow" @click="nextPage" :disabled="currentPage === pages.length - 1">&#8250;</button>
+            :class="{ active: yearDropdown === y }"
+            @click="jumpToYear(y)"
+          >{{ y }}</span>
         </div>
 
         <!-- Grid -->
@@ -149,7 +146,7 @@
                     </template>
                     <!-- Empty cell -->
                     <template v-else>
-                      <span class="click-to-add">Click to add</span>
+                      <span class="click-to-add">{{ selectedTeacher ? 'Click to add' : '' }}</span>
                     </template>
                   </td>
                 </template>
@@ -218,13 +215,25 @@
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
               </div>
-            <!-- Year / Page -->
+            <!-- Teacher (locked if selected from topbar, dropdown otherwise) -->
+            <div class="form-row-inline">
+              <label class="form-label">Teacher</label>
+              <div v-if="selectedTeacher" class="form-value-locked">Prof. {{ selectedTeacher }}</div>
+              <div v-else class="form-select-wrap">
+                <select v-model="form.teacher" class="form-select">
+                  <option value="" disabled>Select Teacher</option>
+                  <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
+                </select>
+                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+            </div>
+            <!-- Year -->
             <div class="form-row-inline">
               <label class="form-label">Year</label>
               <div class="form-select-wrap">
                 <select v-model="form.year" class="form-select">
-                  <option value="" disabled>Select Page</option>
-                  <option v-for="pg in pages" :key="pg.label" :value="pg.label">{{ pg.label }}</option>
+                  <option value="" disabled>Select Year</option>
+                  <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
@@ -396,13 +405,25 @@
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
               </div>
-              <!-- Year / Page -->
+              <!-- Teacher (locked if selected from topbar, dropdown otherwise) -->
+              <div class="form-row-inline">
+                <label class="form-label">Teacher</label>
+                <div v-if="selectedTeacher" class="form-value-locked">Prof. {{ selectedTeacher }}</div>
+                <div v-else class="form-select-wrap">
+                  <select v-model="addForm.teacher" class="form-select">
+                    <option value="" disabled>Select Teacher</option>
+                    <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
+                  </select>
+                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </div>
+              <!-- Year -->
               <div class="form-row-inline">
                 <label class="form-label">Year</label>
                 <div class="form-select-wrap">
                   <select v-model="addForm.year" class="form-select">
-                    <option value="" disabled>Select Page</option>
-                    <option v-for="pg in pages" :key="pg.label" :value="pg.label">{{ pg.label }}</option>
+                    <option value="" disabled>Select Year</option>
+                    <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
                   </select>
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
@@ -623,46 +644,39 @@ const navItems = [
 
 /* ── Filters ── */
 
-/* ── Pagination — one page per year (multiples allowed) ── */
+/* ── Pagination — one page per teacher ── */
 const currentPage = ref(0)
 const pages = ref([
-  { year: '1st Year', label: '1st Year', section: 'BSIT1-S1' },
-  { year: '2nd Year', label: '2nd Year', section: 'BSIT2-S1' },
-  { year: '3rd Year', label: '3rd Year', section: 'BSIT3-S1' },
-  { year: '4th Year', label: '4th Year', section: 'BSIT4-S1' },
+  { label: 'All', section: 'All' },
 ])
-// filterYear = current page LABEL — unique key for grid data (so "1st Year (2)" ≠ "1st Year")
-const filterYear = ref(pages.value[0].label)
-// yearDropdown = base year selected in the dropdown — used only for paginator filtering
+// filterYear = current page LABEL (teacher name, or 'All')
+const filterYear = ref('All')
+// yearDropdown = secondary year filter for the grid
 const yearDropdown = ref('All')
 watch(currentPage, (i) => {
-  filterYear.value  = pages.value[i]?.label ?? filterYear.value
-  // Don't override yearDropdown if it's 'All'
-  if (yearDropdown.value !== 'All') {
-    yearDropdown.value = pages.value[i]?.year ?? yearDropdown.value
-  }
-  // Don't override filterSection if it's 'All'
-  if (filterSection.value !== 'All') {
-    filterSection.value = pages.value[i]?.section ?? filterSection.value
-  }
+  filterYear.value = pages.value[i]?.label ?? filterYear.value
 })
 const filterSection = ref('All')
 const selectedTeacher = ref('')
+watch(selectedTeacher, (teacher) => { jumpToTeacher(teacher) })
+
+// Only teachers who have at least one schedule entry (derived directly from entries)
+const scheduledTeachers = computed(() =>
+  [...new Set(Object.values(entries).map(e => e.teacher).filter(Boolean))].sort()
+)
 function prevPage() { if (currentPage.value > 0) currentPage.value-- }
 function nextPage() { if (currentPage.value < pages.value.length - 1) currentPage.value++ }
-// Jump to first page matching the selected year
+// Year dropdown just filters the grid — no page navigation
 function jumpToYear(year) {
   yearDropdown.value = year
-  if (year !== 'All') {
-    const idx = pages.value.findIndex(p => p.year === year)
-    if (idx >= 0) currentPage.value = idx
-  }
 }
-// Only show paginator chips for the currently-selected year (or all if 'All' is selected)
+// Teacher dropdown is a pure grid filter — no page navigation required
+function jumpToTeacher(_teacher) {
+  // selectedTeacher reactive ref drives getEntriesForCell directly
+}
+// Show all teacher pages
 const filteredPages = computed(() =>
-  pages.value
-    .map((pg, i) => ({ ...pg, realIndex: i }))
-    .filter(pg => yearDropdown.value === 'All' || pg.year === yearDropdown.value)
+  pages.value.map((pg, i) => ({ ...pg, realIndex: i }))
 )
 
 
@@ -687,35 +701,24 @@ function formatAddedAt(dateValue) {
 }
 
 function syncPagesFromApi(apiTables, preferredLabel = '') {
-  const fallback = years.map((year) => ({ year, label: year, section: sections[0] }))
-  const sorted = (Array.isArray(apiTables) && apiTables.length ? apiTables : fallback)
-    .map((table) => ({ year: table.year, label: table.label, section: table.section || sections[0] }))
-    .sort((a, b) => {
-      const byYear = years.indexOf(a.year) - years.indexOf(b.year)
-      if (byYear !== 0) return byYear
-      return a.label.localeCompare(b.label)
-    })
+  const sorted = Array.isArray(apiTables)
+    ? apiTables
+        .map((table) => ({ label: table.label, section: 'All' }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+    : []
 
-  pages.value = sorted
+  pages.value = [{ label: 'All', section: 'All' }, ...sorted]
 
   let nextIndex = 0
   if (preferredLabel) {
-    const preferredIndex = pages.value.findIndex((table) => table.label === preferredLabel)
+    const preferredIndex = pages.value.findIndex((p) => p.label === preferredLabel)
     if (preferredIndex >= 0) nextIndex = preferredIndex
   } else {
-    const previousIndex = pages.value.findIndex((table) => table.label === filterYear.value)
+    const previousIndex = pages.value.findIndex((p) => p.label === filterYear.value)
     if (previousIndex >= 0) nextIndex = previousIndex
   }
 
   currentPage.value = nextIndex
-  // Keep 'All' filters if they're already set
-  if (yearDropdown.value !== 'All') {
-    filterYear.value = pages.value[nextIndex]?.label || years[0]
-    yearDropdown.value = pages.value[nextIndex]?.year || years[0]
-  }
-  if (filterSection.value !== 'All') {
-    filterSection.value = pages.value[nextIndex]?.section || sections[0]
-  }
 }
 
 function syncEntriesFromApi(apiEntries) {
@@ -726,7 +729,7 @@ function syncEntriesFromApi(apiEntries) {
   }
 
   apiEntries.forEach((entry) => {
-    const tableLabel = entry.tableLabel || entry.year
+    const tableLabel = entry.tableLabel || entry.teacher
     const section = entry.section
     const day = entry.day
     const slot = `${entry.timeIn} - ${entry.timeOut}`
@@ -741,8 +744,8 @@ function syncEntriesFromApi(apiEntries) {
       teacher: entry.teacher,
       subject: entry.subject,
       room: entry.room,
-      year: tableLabel,
-      baseYear: entry.year,
+      year: entry.year,
+      tableLabel,
       section,
       day,
       slot,
@@ -764,8 +767,8 @@ function resolveBaseYear(tableLabel) {
 
 function buildSchedulePayload(source) {
   const payload = {
-    tableLabel: source.year,
-    baseYear: resolveBaseYear(source.year),
+    tableLabel: source.teacher,
+    baseYear: source.year,
     day: source.day,
     timeIn: source.timeIn,
     timeOut: source.timeOut,
@@ -803,11 +806,11 @@ function setVisibleSection(source) {
 }
 
 function buildOldDescriptor() {
-  const oldYear = form._oldYear || form.year
+  const oldTableLabel = form._oldTableLabel || form.teacher
 
   if (form._parallelGroupId) {
     return {
-      tableLabel: oldYear,
+      tableLabel: oldTableLabel,
       parallelGroupId: form._parallelGroupId,
     }
   }
@@ -815,7 +818,7 @@ function buildOldDescriptor() {
   const [oldTimeIn = '', oldTimeOut = ''] = (form._oldSlot || '').split(' - ')
 
   return {
-    tableLabel: oldYear,
+    tableLabel: oldTableLabel,
     section: form._oldSection,
     day: form._oldDay,
     timeIn: oldTimeIn,
@@ -857,16 +860,13 @@ function getEntriesForCell(rowHour, day) {
   const rowStart = parseTime(rowHour)
   const rowEnd   = rowStart + 60
 
-  // If no teacher selected, show nothing
-  if (!selectedTeacher.value) return []
-
-  // First, find the entry that belongs to the currently-viewed section and selected teacher
+  // Filter by selected teacher, year, section
   const sectionMatch = Object.entries(entries).find(([k, v]) => {
     const parts = k.split('|')
     if (parts.length < 4) return false
-    if (parts[0] !== filterYear.value) return false
+    if (selectedTeacher.value && v.teacher !== selectedTeacher.value) return false
+    if (yearDropdown.value !== 'All' && v.year !== yearDropdown.value) return false
     if (filterSection.value !== 'All' && parts[1] !== filterSection.value) return false
-    if (v.teacher !== selectedTeacher.value) return false
     if (parts[3] !== day) return false
     const t = parseTime(v.timeIn)
     return t >= rowStart && t < rowEnd
@@ -882,11 +882,11 @@ function getEntriesForCell(rowHour, day) {
       .filter(([k, v]) => {
         const parts = k.split('|')
         if (parts.length < 4) return false
-        if (parts[0] !== filterYear.value) return false
+        if (selectedTeacher.value && v.teacher !== selectedTeacher.value) return false
+        if (yearDropdown.value !== 'All' && v.year !== yearDropdown.value) return false
         if (filterSection.value !== 'All' && parts[1] !== filterSection.value) return false
         if (parts[3] !== day) return false
         if (v.parallelGroupId !== matchedEntry.parallelGroupId) return false
-        if (v.teacher !== selectedTeacher.value) return false
         const t = parseTime(v.timeIn)
         return t >= rowStart && t < rowEnd
       })
@@ -940,6 +940,7 @@ const form = reactive({
   timeOut: '',
   _oldSlot: '',
   _oldYear: '',
+  _oldTableLabel: '',
   _oldSection: '',
   _oldDay: '',
 })
@@ -972,16 +973,27 @@ watch(() => form.room, (val) => {
   if (auto) form.color = auto
 })
 
-function handleCellClick(slot, day) {
+async function handleCellClick(slot, day) {
   const cell = getEntriesForCell(slot, day)
   if (cell.length > 0) {
     openEditModal(slot, day, cell[0])
   } else {
+    if (!selectedTeacher.value) {
+      await Swal.fire({
+        icon: 'info', title: 'No Teacher Selected',
+        text: 'Please select a teacher from the dropdown first.',
+        confirmButtonText: 'OK', confirmButtonColor: '#1b4332', background: '#fff',
+        customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
+      })
+      return
+    }
     openAddModal(slot, day)
   }
 }
 
 function openAddModal(slot, day) {
+  yearDropdown.value     = 'All'
+  filterSection.value    = 'All'
   editMode.value         = false
   fromButton.value       = (slot === null && day === null)
   form.day               = day  ?? ''
@@ -992,14 +1004,15 @@ function openAddModal(slot, day) {
   form._oldYear          = ''
   form._oldSection       = ''
   form._oldDay           = ''
-  form.year              = filterYear.value || years[0]
-  form.section           = filterSection.value || sections[0]
+  form.year              = ''
+  form.section           = (filterSection.value !== 'All' ? filterSection.value : '') || ''
   form.teacher           = selectedTeacher.value || ''
   form.subject           = ''
   form.room              = ''
   form.parallel          = false
   form.parallelCount     = 2
   form._parallelGroupId  = null
+  form._oldTableLabel    = ''
   form.addedAt           = ''
   form.parallelSlots.splice(0, form.parallelSlots.length, ...buildSlots(2))
   form.color             = 'color-green'
@@ -1008,13 +1021,15 @@ function openAddModal(slot, day) {
 }
 
 function openEditModal(slot, day, e) {
+  yearDropdown.value     = 'All'
+  filterSection.value    = 'All'
   editMode.value         = true
   fromButton.value       = false
   form.slot              = slot
   form.day               = day
-  form.year              = e.year ?? filterYear.value
+  form.year              = e.year ?? ''
   form.section           = e.section ?? sections[0]
-  form.teacher           = e.teacher
+  form.teacher           = selectedTeacher.value || e.teacher
   form.subject           = e.subject
   form.room              = e.room ?? ''
   form.parallel          = e.parallel ?? false
@@ -1027,6 +1042,7 @@ function openEditModal(slot, day, e) {
   form.timeOut           = slotParts[1] || ''
   form._oldSlot          = e.slot || ''
   form._oldYear          = e.year ?? years[0]
+  form._oldTableLabel    = e.tableLabel ?? e.teacher ?? ''
   form._oldSection       = e.section ?? sections[0]
   form._oldDay           = day
   form.parallelSlots.splice(
@@ -1037,46 +1053,92 @@ function openEditModal(slot, day, e) {
   showSchedModal.value   = true
 }
 
-function checkScheduleConflict(payload) {
-  const newTimeIn = parseTime(payload.timeIn)
+// skipFilter(key, entry) → true means skip this existing entry (e.g. the one being edited)
+function checkScheduleConflict(payload, skipFilter = null) {
+  const newTimeIn  = parseTime(payload.timeIn)
   const newTimeOut = parseTime(payload.timeOut)
-  const conflicts = []
+  const conflicts  = []
+  const seen       = new Set()
 
-  // Check all existing entries for conflicts
+  // All rooms claimed by the new payload (covers parallel slots too)
+  const newRooms = payload.parallel
+    ? (payload.parallelSlots || []).map(s => s.room).filter(Boolean)
+    : [payload.room].filter(Boolean)
+
   Object.entries(entries).forEach(([key, entry]) => {
-    // Skip if it's the entry being edited
-    if (editMode.value) {
-      const oldTableLabel = form._oldYear || form.year
-      const oldSlotStart = form._oldSlot?.split(' - ')[0]
-      const oldSlotEnd = form._oldSlot?.split(' - ')[1]
-      const oldSection = form._oldSection
-      const oldDay = form._oldDay
-      
-      const expectedKey = `${oldTableLabel}|${oldSection}|${oldSlotStart || ''} - ${oldSlotEnd || ''}|${oldDay}`
-      if (key === expectedKey) return
+    if (skipFilter && skipFilter(key, entry)) return
+
+    const isSameDay     = entry.day === payload.day
+    const isTimeOverlap = newTimeIn < parseTime(entry.timeOut) && newTimeOut > parseTime(entry.timeIn)
+    if (!isSameDay || !isTimeOverlap) return
+
+    // ── Teacher conflict: same teacher teaching at the same time on the same day ──
+    if (entry.teacher === payload.teacher) {
+      const dedupKey = `teacher|${payload.teacher}|${entry.timeIn}|${entry.timeOut}`
+      if (!seen.has(dedupKey)) {
+        seen.add(dedupKey)
+        conflicts.push({
+          type: 'Teacher',
+          message: `${payload.teacher} is already assigned on ${payload.day}`,
+          detail: `${entry.timeIn} – ${entry.timeOut} · ${entry.subject} · ${entry.section}`,
+        })
+      }
     }
 
-    const existingTimeIn = parseTime(entry.timeIn)
-    const existingTimeOut = parseTime(entry.timeOut)
-
-    // Check time overlap on same day
-    const isSameDay = entry.day === payload.day
-    const isTimeOverlap = newTimeIn < existingTimeOut && newTimeOut > existingTimeIn
-
-    if (isSameDay && isTimeOverlap) {
-      // Check teacher conflict
-      if (entry.teacher === payload.teacher) {
-        conflicts.push(`Teacher "${payload.teacher}" already has a class on ${payload.day} from ${entry.timeIn} to ${entry.timeOut}`)
-      }
-
-      // Check room conflict (for non-parallel entries)
-      if (!payload.parallel && !entry.parallel && entry.room === payload.room) {
-        conflicts.push(`Room "${payload.room}" is already occupied on ${payload.day} from ${entry.timeIn} to ${entry.timeOut}`)
+    // ── Room conflict: same room occupied at the same time on the same day ──
+    for (const room of newRooms) {
+      if (room && room === entry.room) {
+        const dedupKey = `room|${room}|${entry.timeIn}|${entry.timeOut}`
+        if (!seen.has(dedupKey)) {
+          seen.add(dedupKey)
+          conflicts.push({
+            type: 'Room',
+            message: `${room} is already occupied on ${payload.day}`,
+            detail: `${entry.timeIn} – ${entry.timeOut} · ${entry.subject} · ${entry.teacher}`,
+          })
+        }
       }
     }
   })
 
   return conflicts
+}
+
+function buildConflictHtml(conflicts) {
+  return conflicts.map(c => `
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+      <span style="flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+        background:${c.type === 'Teacher' ? '#fff3cd' : '#fde8e8'};
+        color:${c.type === 'Teacher' ? '#856404' : '#c62828'};
+        font-size:0.7rem;font-weight:700;letter-spacing:.04em;
+        padding:2px 7px;border-radius:4px;margin-top:2px">${c.type.toUpperCase()}</span>
+      <div style="text-align:left;">
+        <div style="font-size:0.875rem;font-weight:600;color:#1a1a1a;">${c.message}</div>
+        <div style="font-size:0.78rem;color:#666;margin-top:1px;">${c.detail}</div>
+      </div>
+    </div>`).join('')
+}
+
+async function showConflictDialog(conflicts) {
+  return Swal.fire({
+    icon: 'warning',
+    title: '<span style="font-size:1.1rem;font-weight:700;">Schedule Conflict</span>',
+    html: `
+      <p style="font-size:0.83rem;color:#666;margin:0 0 12px;">The following conflicts were found. You can proceed anyway or go back to adjust.</p>
+      <div style="max-height:260px;overflow-y:auto;padding-right:2px;">
+        ${buildConflictHtml(conflicts)}
+      </div>`,
+    confirmButtonText: 'Proceed Anyway',
+    cancelButtonText: 'Go Back',
+    showCancelButton: true,
+    confirmButtonColor: '#e63946',
+    cancelButtonColor: '#6c757d',
+    background: '#fff',
+    customClass: {
+      popup: 'swal-cit-popup',
+      title: 'swal-cit-title',
+    },
+  })
 }
 
 async function saveEntry() {
@@ -1085,18 +1147,24 @@ async function saveEntry() {
 
   try {
     const payload = buildSchedulePayload(form)
-    
+
+    // Build a skip filter so we don't flag the entry currently being edited
+    const skipFilter = editMode.value
+      ? (key, entry) => {
+          // For parallel edits: skip all entries in the same parallel group
+          if (form._parallelGroupId && entry.parallelGroupId === form._parallelGroupId) return true
+          // For non-parallel edits: skip the specific entry by its key
+          const [oldTimeIn = '', oldTimeOut = ''] = (form._oldSlot || '').split(' - ')
+          const oldTableLabel = form._oldYear || form.year
+          const expectedKey = `${oldTableLabel}|${form._oldSection}|${oldTimeIn} - ${oldTimeOut}|${form._oldDay}`
+          return key === expectedKey
+        }
+      : null
+
     // Check for conflicts
-    const conflicts = checkScheduleConflict(payload)
+    const conflicts = checkScheduleConflict(payload, skipFilter)
     if (conflicts.length > 0) {
-      const result = await Swal.fire({
-        icon: 'warning',
-        title: 'Schedule Conflict Detected',
-        html: `<div style="text-align: left; font-size: 0.9rem;">${conflicts.map(c => `<p>• ${c}</p>`).join('')}</div>`,
-        confirmButtonText: 'Proceed Anyway',
-        cancelButtonText: 'Cancel',
-        showCancelButton: true,
-      })
+      const result = await showConflictDialog(conflicts)
       if (!result.isConfirmed) return
       await proceedWithSave(payload)
       return
@@ -1130,7 +1198,9 @@ async function proceedWithSave(payload) {
     }
 
     setVisibleSection(form)
-    await refreshScheduleData(form.year)
+    await refreshScheduleData(form.teacher)
+    yearDropdown.value   = 'All'
+    filterSection.value  = 'All'
     showSchedModal.value = false
   } catch (error) {
     await showScheduleError(error)
@@ -1147,6 +1217,8 @@ async function clearSlot() {
     })
 
     await refreshScheduleData(form._oldYear || form.year)
+    yearDropdown.value   = 'All'
+    filterSection.value  = 'All'
     showSchedModal.value = false
   } catch (error) {
     await showScheduleError(error, 'Unable to remove schedule')
@@ -1161,7 +1233,7 @@ const addTimeError   = ref('')
 
 const addForm = reactive({
   day: '', timeIn: '', timeOut: '',
-  year: years[0], section: sections[0],
+  year: '', section: '',
   teacher: '', subject: '', room: '',
   parallel: false, parallelCount: 2,
   parallelSlots: [{ section: '', room: '' }, { section: '', room: '' }],
@@ -1183,10 +1255,10 @@ watch([() => addForm.timeIn, () => addForm.timeOut], () => {
 })
 
 function openAddPanel() {
-  addForm.year = filterYear.value
+  addForm.year = ''
   addForm.day = ''; addForm.timeIn = ''; addForm.timeOut = ''
-  addForm.section = sections[0]
-  addForm.teacher = selectedTeacher.value; addForm.subject = ''; addForm.room = ''
+  addForm.section = ''
+  addForm.teacher = selectedTeacher.value || ''
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
     { section: '', room: '' }, { section: '', room: '' })
@@ -1197,8 +1269,8 @@ function openAddPanel() {
 
 function resetAddForm() {
   addForm.day = ''; addForm.timeIn = ''; addForm.timeOut = ''
-  addForm.year = filterYear.value; addForm.section = sections[0]
-  addForm.teacher = selectedTeacher.value; addForm.subject = ''; addForm.room = ''
+  addForm.year = ''; addForm.section = ''
+  addForm.teacher = selectedTeacher.value || ''; addForm.subject = ''; addForm.room = ''
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
     { section: '', room: '' }, { section: '', room: '' })
@@ -1215,15 +1287,30 @@ async function addEntry() {
   if (addForm.parallel && addForm.parallelSlots.every(ps => !ps.section)) return
 
   try {
-    await apiRequest('/schedules', {
-      method: 'POST',
-      body: JSON.stringify(buildSchedulePayload(addForm)),
-    })
+    const payload = buildSchedulePayload(addForm)
+
+    // Check for conflicts before saving
+    const conflicts = checkScheduleConflict(payload)
+    if (conflicts.length > 0) {
+      const result = await showConflictDialog(conflicts)
+      if (!result.isConfirmed) return
+      // User acknowledged — save and silently swallow any server-side 409 (already confirmed)
+      try {
+        await apiRequest('/schedules', { method: 'POST', body: JSON.stringify(payload) })
+      } catch (e) {
+        if (e?.status !== 409) await showScheduleError(e)
+        return
+      }
+    } else {
+      await apiRequest('/schedules', { method: 'POST', body: JSON.stringify(payload) })
+    }
 
     setVisibleSection(addForm)
-    await refreshScheduleData(addForm.year)
+    await refreshScheduleData(addForm.teacher)
+    yearDropdown.value = 'All'
+    filterSection.value = 'All'
     addSavedCount.value++
-    const targetIdx = pages.value.findIndex(pg => pg.label === addForm.year)
+    const targetIdx = pages.value.findIndex(pg => pg.label === addForm.teacher)
     if (targetIdx >= 0) currentPage.value = targetIdx
     resetAddForm()
     addShowFlash.value = true
@@ -1514,7 +1601,25 @@ function confirmLogout() {
   flex-wrap: wrap;
 }
 .sched-grid-title { font-size: 1.65rem; font-weight: 700; color: #111; margin: 0 0 2px; }
-.sched-grid-sub   { font-size: 0.82rem; color: #888; margin: 0; }
+.sched-grid-sub {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0;
+  font-weight: 400;
+  transition: all 0.3s ease;
+}
+
+/* When teacher is selected */
+.sched-grid-sub.teacher-selected {
+  font-size: 0.92rem;
+  color: #1b4332;
+  font-weight: 600;
+  background: linear-gradient(120deg, #e8f5e9 0%, #e1f5fe 100%);
+  padding: 10px 14px;
+  border-left: 4px solid #40916c;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(64, 145, 108, 0.15);
+}
 .sched-topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
 /* Selects */
@@ -1767,6 +1872,13 @@ function confirmLogout() {
   display: flex; align-items: center; justify-content: center;
   height: 100%; text-align: center; font-size: 0.75rem; color: #aaa;
   user-select: none; padding: 8px;
+}
+.form-value-locked {
+  display: flex; align-items: center;
+  padding: 6px 12px; border-radius: 8px;
+  background: #f0f4f2; border: 1px solid #d0e0d8;
+  font-size: 0.875rem; color: #1b4332; font-weight: 600;
+  min-width: 0; flex: 1;
 }
 
 /* Entry colors */
