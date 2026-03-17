@@ -50,13 +50,20 @@
         <div class="sched-topbar">
           <div class="sched-topbar-left">
             <h2 class="sched-grid-title">Teacher Schedule Grid</h2>
-            <p class="sched-grid-sub" style="margin:4px 0 0">Managing Schedule for {{ pages[currentPage]?.label ?? yearDropdown }}</p>
+            <p class="sched-grid-sub" style="margin:4px 0 0">Managing Schedule for {{ pages[currentPage]?.label ?? tableDropdown }}</p>
           </div>
           <div class="sched-topbar-right">
             <!-- Year filter selector -->
             <div class="sched-select-wrap">
               <select class="sched-select" :value="yearDropdown" @change="jumpToYear($event.target.value)">
                 <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+              </select>
+              <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+            <!-- Schedule table selector (updates when new table is added) -->
+            <div class="sched-select-wrap">
+              <select class="sched-select" :value="tableDropdown" @change="jumpToTable($event.target.value)">
+                <option v-for="pg in filteredPages" :key="pg.realIndex" :value="pg.label">{{ pg.label }}</option>
               </select>
               <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
@@ -589,19 +596,67 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, watch } from 'vue'
-import { RouterLink, useRouter, useRoute } from 'vue-router'
-import { logout } from '@/auth.js'
+import { getToken, logout } from '@/auth.js'
 import {
-  entries, years, sections, days, timeSlots, timeOptions,
-  teacherOptions, subjectOptions, roomOptions,
-  colorForRoom, getRowspan, parseTime,
+  colorForRoom,
+  days,
+  entries,
+  getRowspan, parseTime,
+  roomOptions,
+  sections,
+  subjectOptions,
+  teacherOptions,
+  timeOptions,
+  timeSlots,
+  years,
 } from '@/composables/useSchedule.js'
 import Swal from 'sweetalert2'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    logout()
+    router.push('/')
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      logout()
+      router.push('/')
+    }
+
+    const error = new Error(body.message || 'Request failed.')
+    error.status = response.status
+    error.code = body.code
+    throw error
+  }
+
+  return body
+}
 
 /* ── Nav ── */
 const navItems = [
@@ -627,13 +682,21 @@ const pages = ref([
 const filterYear = ref(pages.value[0].label)
 // yearDropdown = base year selected in the dropdown — used only for paginator filtering
 const yearDropdown = ref(pages.value[0].year)
+// tableDropdown = selected schedule-table label in topbar selector
+const tableDropdown = ref(pages.value[0].label)
 watch(currentPage, (i) => {
   filterYear.value  = pages.value[i]?.label ?? filterYear.value
   yearDropdown.value = pages.value[i]?.year  ?? yearDropdown.value
+  tableDropdown.value = pages.value[i]?.label ?? tableDropdown.value
 })
 const filterSection = ref(sections[0])
 function prevPage() { if (currentPage.value > 0) currentPage.value-- }
 function nextPage() { if (currentPage.value < pages.value.length - 1) currentPage.value++ }
+function jumpToTable(label) {
+  tableDropdown.value = label
+  const idx = pages.value.findIndex((p) => p.label === label)
+  if (idx >= 0) currentPage.value = idx
+}
 // Jump to first page matching the selected year
 function jumpToYear(year) {
   yearDropdown.value = year
@@ -656,17 +719,204 @@ const suggestedLabel   = computed(() => {
   const count = pages.value.filter(p => p.year === newYearSelect.value).length
   return count === 0 ? newYearSelect.value : `${newYearSelect.value} (${count + 1})`
 })
-function addYearPage() {
+
+function resetEntriesStore() {
+  Object.keys(entries).forEach((key) => {
+    delete entries[key]
+  })
+}
+
+function formatAddedAt(dateValue) {
+  const date = new Date(dateValue)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return (
+    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+    ' ' +
+    date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  )
+}
+
+function syncPagesFromApi(apiTables, preferredLabel = '') {
+  const fallback = years.map((year) => ({ year, label: year }))
+  const sorted = (Array.isArray(apiTables) && apiTables.length ? apiTables : fallback)
+    .map((table) => ({ year: table.year, label: table.label }))
+    .sort((a, b) => {
+      const byYear = years.indexOf(a.year) - years.indexOf(b.year)
+      if (byYear !== 0) return byYear
+      return a.label.localeCompare(b.label)
+    })
+
+  pages.value = sorted
+
+  let nextIndex = 0
+  if (preferredLabel) {
+    const preferredIndex = pages.value.findIndex((table) => table.label === preferredLabel)
+    if (preferredIndex >= 0) nextIndex = preferredIndex
+  } else {
+    const previousIndex = pages.value.findIndex((table) => table.label === filterYear.value)
+    if (previousIndex >= 0) nextIndex = previousIndex
+  }
+
+  currentPage.value = nextIndex
+  filterYear.value = pages.value[nextIndex]?.label || years[0]
+  yearDropdown.value = pages.value[nextIndex]?.year || years[0]
+  tableDropdown.value = pages.value[nextIndex]?.label || years[0]
+}
+
+function syncEntriesFromApi(apiEntries) {
+  resetEntriesStore()
+
+  if (!Array.isArray(apiEntries)) {
+    return
+  }
+
+  apiEntries.forEach((entry) => {
+    const tableLabel = entry.tableLabel || entry.year
+    const section = entry.section
+    const day = entry.day
+    const slot = `${entry.timeIn} - ${entry.timeOut}`
+
+    if (!tableLabel || !section || !day || !entry.timeIn || !entry.timeOut) {
+      return
+    }
+
+    const key = `${tableLabel}|${section}|${slot}|${day}`
+
+    entries[key] = {
+      teacher: entry.teacher,
+      subject: entry.subject,
+      room: entry.room,
+      year: tableLabel,
+      baseYear: entry.year,
+      section,
+      day,
+      slot,
+      timeIn: entry.timeIn,
+      timeOut: entry.timeOut,
+      parallel: Boolean(entry.parallel),
+      parallelGroupId: entry.parallelGroupId || null,
+      parallelCount: entry.parallelCount || 1,
+      parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map((slotItem) => ({ ...slotItem })) : [],
+      color: entry.color || colorForRoom(entry.room) || 'color-green',
+      addedAt: formatAddedAt(entry.addedAt),
+    }
+  })
+}
+
+function resolveBaseYear(tableLabel) {
+  return pages.value.find((table) => table.label === tableLabel)?.year || years[0]
+}
+
+function buildSchedulePayload(source) {
+  const payload = {
+    tableLabel: source.year,
+    baseYear: resolveBaseYear(source.year),
+    day: source.day,
+    timeIn: source.timeIn,
+    timeOut: source.timeOut,
+    teacher: source.teacher,
+    subject: source.subject,
+    parallel: Boolean(source.parallel),
+    parallelCount: source.parallel ? source.parallelCount : 1,
+  }
+
+  if (source.parallel) {
+    payload.parallelSlots = source.parallelSlots.map((slot) => ({
+      section: slot.section,
+      room: slot.room,
+    }))
+  } else {
+    payload.section = source.section
+    payload.room = source.room
+  }
+
+  return payload
+}
+
+function setVisibleSection(source) {
+  if (source.parallel) {
+    const firstSection = source.parallelSlots.find((slot) => slot.section)?.section
+    if (firstSection) {
+      filterSection.value = firstSection
+    }
+    return
+  }
+
+  if (source.section) {
+    filterSection.value = source.section
+  }
+}
+
+function buildOldDescriptor() {
+  const oldYear = form._oldYear || form.year
+
+  if (form._parallelGroupId) {
+    return {
+      tableLabel: oldYear,
+      parallelGroupId: form._parallelGroupId,
+    }
+  }
+
+  const [oldTimeIn = '', oldTimeOut = ''] = (form._oldSlot || '').split(' - ')
+
+  return {
+    tableLabel: oldYear,
+    section: form._oldSection,
+    day: form._oldDay,
+    timeIn: oldTimeIn,
+    timeOut: oldTimeOut,
+  }
+}
+
+async function refreshScheduleData(preferredLabel = '') {
+  const [tablesPayload, schedulesPayload] = await Promise.all([
+    apiRequest('/schedules/tables'),
+    apiRequest('/schedules'),
+  ])
+
+  syncPagesFromApi(tablesPayload.tables, preferredLabel)
+  syncEntriesFromApi(schedulesPayload.entries)
+}
+
+async function showScheduleError(error, fallbackTitle = 'Unable to save schedule') {
+  const isConflict = error?.status === 409
+
+  await Swal.fire({
+    icon: isConflict ? 'error' : 'warning',
+    title: isConflict ? 'Schedule Conflict' : fallbackTitle,
+    html: `<span style="font-size:0.95rem;color:#444">${error?.message || 'Something went wrong. Please try again.'}</span>`,
+    confirmButtonText: 'Got it',
+    confirmButtonColor: isConflict ? '#e63946' : '#1b4332',
+    background: '#fff',
+    customClass: {
+      popup: 'swal-cit-popup',
+      title: 'swal-cit-title',
+      confirmButton: 'swal-cit-btn',
+    },
+  })
+}
+
+async function addYearPage() {
   if (!newYearSelect.value) return
+
   const label = newYearLabel.value.trim() || suggestedLabel.value
-  const newPage = { year: newYearSelect.value, label }
-  pages.value.push(newPage)
-  // Sort ascending by year order defined in `years` array
-  pages.value.sort((a, b) => years.indexOf(a.year) - years.indexOf(b.year))
-  currentPage.value = pages.value.findIndex(p => p.label === newPage.label)
-  newYearSelect.value = ''
-  newYearLabel.value  = ''
-  showAddYearModal.value = false
+
+  try {
+    const payload = await apiRequest('/schedules/tables', {
+      method: 'POST',
+      body: JSON.stringify({ year: newYearSelect.value, label }),
+    })
+
+    await refreshScheduleData(payload.table?.label || label)
+    newYearSelect.value = ''
+    newYearLabel.value = ''
+    showAddYearModal.value = false
+  } catch (error) {
+    await showScheduleError(error, 'Unable to create schedule table')
+  }
 }
 
 // Return entries for a given slot+day. For parallel entries all sections
@@ -715,11 +965,11 @@ function entryStyle(rowHour, entry) {
   if (!entry?.timeIn || !entry?.timeOut) return {}
   const rowStart   = parseTime(rowHour)
   const entryStart = parseTime(entry.timeIn)
-  const mins       = parseTime(entry.timeOut) - entryStart
+  const mins       = Math.max(1, parseTime(entry.timeOut) - entryStart)
   const offsetMins = entryStart - rowStart
   return {
     top:    (offsetMins / 60) * ROW_HEIGHT + 3 + 'px',
-    height: (mins       / 60) * ROW_HEIGHT + ROW_HEIGHT - 6 + 'px',
+    height: Math.max(24, (mins / 60) * ROW_HEIGHT - 6) + 'px',
   }
 }
 
@@ -849,111 +1099,53 @@ function openEditModal(slot, day, e) {
   showSchedModal.value   = true
 }
 
-function checkOverlap(room, day, timeIn, timeOut, excludeKey = null) {
-  if (!room) return null   // no room assigned → no room conflict possible
-  const newIn  = parseTime(timeIn)
-  const newOut = parseTime(timeOut)
-  for (const [k, v] of Object.entries(entries)) {
-    if (excludeKey && k === excludeKey) continue
-    if (v.room !== room) continue
-    const parts = k.split('|')
-    if (parts[3] !== day) continue
-    const exIn  = parseTime(v.timeIn)
-    const exOut = parseTime(v.timeOut)
-    if (newIn < exOut && exIn < newOut)
-      return `Room "${room}" is already used by "${v.subject}" (${v.section}) at ${v.timeIn} – ${v.timeOut}`
-  }
-  return null
-}
-
 async function saveEntry() {
   if (!form.teacher || !form.subject) return
-  form.slot = `${form.timeIn} - ${form.timeOut}`
+  if (form.parallel && form.parallelSlots.every((slotItem) => !slotItem.section)) return
 
-  let overlapMsg = null
-  if (form.parallel) {
-    const validSlots = form.parallelSlots.filter(ps => ps.section)
-    for (const ps of validSlots) {
-      const excludeKey = editMode.value
-        ? `${form._oldYear}|${ps.section}|${form._oldSlot}|${form._oldDay}`
-        : null
-      overlapMsg = overlapMsg || checkOverlap(ps.room, form.day, form.timeIn, form.timeOut, excludeKey)
+  try {
+    const payload = buildSchedulePayload(form)
+    if (editMode.value && form._oldDay) {
+      payload.day = form._oldDay
     }
-  } else {
-    const excludeKey = editMode.value
-      ? `${form._oldYear}|${form._oldSection}|${form._oldSlot}|${form._oldDay}`
-      : null
-    overlapMsg = checkOverlap(form.room, form.day, form.timeIn, form.timeOut, excludeKey)
-  }
-  if (overlapMsg) {
-    await Swal.fire({
-      icon: 'error',
-      title: 'Schedule Conflict',
-      html: `<span style="font-size:0.95rem;color:#444">${overlapMsg}</span>`,
-      confirmButtonText: 'Got it',
-      confirmButtonColor: '#e63946',
-      background: '#fff',
-      customClass: {
-        popup:  'swal-cit-popup',
-        title:  'swal-cit-title',
-        confirmButton: 'swal-cit-btn',
-      },
-    })
-    return
-  }
 
-  if (editMode.value) {
-    if (form._parallelGroupId) {
-      Object.keys(entries).forEach(k => {
-        if (entries[k].parallelGroupId === form._parallelGroupId) delete entries[k]
+    if (editMode.value) {
+      await apiRequest('/schedules/replace', {
+        method: 'POST',
+        body: JSON.stringify({
+          old: buildOldDescriptor(),
+          next: payload,
+        }),
       })
     } else {
-      delete entries[`${form._oldYear}|${form._oldSection}|${form._oldSlot}|${form._oldDay}`]
+      await apiRequest('/schedules', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
     }
-  }
 
-  const ts = form.addedAt || (() => {
-    const d = new Date()
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-           + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-  })()
-
-  if (form.parallel) {
-    const groupId = form._parallelGroupId || `pg_${Date.now()}`
-    form.parallelSlots.filter(ps => ps.section).forEach((ps) => {
-      const color = colorForRoom(ps.room) ?? 'color-green'
-      entries[`${form.year}|${ps.section}|${form.slot}|${form.day}`] = {
-        teacher: form.teacher, subject: form.subject,
-        room: ps.room, year: form.year, section: ps.section, slot: form.slot,
-        timeIn: form.timeIn, timeOut: form.timeOut,
-        parallel: true, parallelGroupId: groupId,
-        parallelCount: form.parallelCount,
-        parallelSlots: form.parallelSlots.map(s => ({ ...s })),
-        color, addedAt: ts,
-      }
-    })
-  } else {
-    const color = colorForRoom(form.room) ?? form.color
-    entries[`${form.year}|${form.section}|${form.slot}|${form.day}`] = {
-      teacher: form.teacher, subject: form.subject,
-      room: form.room, year: form.year, section: form.section, slot: form.slot,
-      timeIn: form.timeIn, timeOut: form.timeOut,
-      parallel: false, parallelGroupId: null,
-      parallelCount: 1, parallelSlots: [], color, addedAt: ts,
-    }
+    setVisibleSection(form)
+    await refreshScheduleData(form.year)
+    showSchedModal.value = false
+  } catch (error) {
+    await showScheduleError(error)
   }
-  showSchedModal.value = false
 }
 
-function clearSlot() {
-  if (form._parallelGroupId) {
-    Object.keys(entries).forEach(k => {
-      if (entries[k].parallelGroupId === form._parallelGroupId) delete entries[k]
+async function clearSlot() {
+  try {
+    await apiRequest('/schedules/delete', {
+      method: 'POST',
+      body: JSON.stringify({
+        old: buildOldDescriptor(),
+      }),
     })
-  } else {
-    delete entries[`${form._oldYear}|${form._oldSection}|${form._oldSlot}|${form._oldDay}`]
+
+    await refreshScheduleData(form._oldYear || form.year)
+    showSchedModal.value = false
+  } catch (error) {
+    await showScheduleError(error, 'Unable to remove schedule')
   }
-  showSchedModal.value = false
 }
 
 /* ── Add Schedule Panel ── */
@@ -1017,69 +1209,32 @@ async function addEntry() {
   if (!addFormValid.value) return
   if (addForm.parallel && addForm.parallelSlots.every(ps => !ps.section)) return
 
-  let overlapMsg = null
-  if (addForm.parallel) {
-    for (const ps of addForm.parallelSlots.filter(ps => ps.section)) {
-      overlapMsg = overlapMsg || checkOverlap(ps.room, addForm.day, addForm.timeIn, addForm.timeOut)
-    }
-  } else {
-    overlapMsg = checkOverlap(addForm.room, addForm.day, addForm.timeIn, addForm.timeOut)
-  }
-  if (overlapMsg) {
-    await Swal.fire({
-      icon: 'error',
-      title: 'Schedule Conflict',
-      html: `<span style="font-size:0.95rem;color:#444">${overlapMsg}</span>`,
-      confirmButtonText: 'Got it',
-      confirmButtonColor: '#e63946',
-      background: '#fff',
-      customClass: {
-        popup:  'swal-cit-popup',
-        title:  'swal-cit-title',
-        confirmButton: 'swal-cit-btn',
-      },
+  try {
+    await apiRequest('/schedules', {
+      method: 'POST',
+      body: JSON.stringify(buildSchedulePayload(addForm)),
     })
-    return
-  }
 
-  const slot = `${addForm.timeIn} - ${addForm.timeOut}`
-  const d = new Date()
-  const addedAt = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-               + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-
-  if (addForm.parallel) {
-    const groupId = `pg_${Date.now()}`
-    addForm.parallelSlots
-      .filter(ps => ps.section)
-      .forEach((ps) => {
-        const color = colorForRoom(ps.room) ?? 'color-green'
-        entries[`${addForm.year}|${ps.section}|${slot}|${addForm.day}`] = {
-          teacher: addForm.teacher, subject: addForm.subject,
-          room: ps.room, year: addForm.year, section: ps.section, slot,
-          timeIn: addForm.timeIn, timeOut: addForm.timeOut,
-          parallel: true, parallelGroupId: groupId,
-          parallelCount: addForm.parallelCount,
-          parallelSlots: addForm.parallelSlots.map(s => ({ ...s })),
-          color, addedAt,
-        }
-      })
-  } else {
-    const color = colorForRoom(addForm.room) ?? 'color-green'
-    entries[`${addForm.year}|${addForm.section}|${slot}|${addForm.day}`] = {
-      teacher: addForm.teacher, subject: addForm.subject,
-      room: addForm.room, year: addForm.year, section: addForm.section, slot,
-      timeIn: addForm.timeIn, timeOut: addForm.timeOut,
-      parallel: false, parallelGroupId: null,
-      parallelCount: 1, parallelSlots: [], color, addedAt,
-    }
+    setVisibleSection(addForm)
+    await refreshScheduleData(addForm.year)
+    addSavedCount.value++
+    const targetIdx = pages.value.findIndex(pg => pg.label === addForm.year)
+    if (targetIdx >= 0) currentPage.value = targetIdx
+    resetAddForm()
+    addShowFlash.value = true
+    setTimeout(() => { addShowFlash.value = false }, 2200)
+  } catch (error) {
+    await showScheduleError(error)
   }
-  addSavedCount.value++
-  const targetIdx = pages.value.findIndex(pg => pg.label === addForm.year)
-  if (targetIdx >= 0) currentPage.value = targetIdx
-  resetAddForm()
-  addShowFlash.value = true
-  setTimeout(() => { addShowFlash.value = false }, 2200)
 }
+
+onMounted(async () => {
+  try {
+    await refreshScheduleData(filterYear.value)
+  } catch (error) {
+    await showScheduleError(error, 'Unable to load schedules')
+  }
+})
 
 /* ── Print ── */
 function printSchedule() {

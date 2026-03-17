@@ -6,6 +6,7 @@ const connectDB = require("../config/db");
 const authRoutes = require("../routes/authRoutes");
 const rbacRoutes = require("../routes/rbacRoutes");
 const userRoutes = require("../routes/userRoutes");
+const scheduleRoutes = require("../routes/scheduleRoutes");
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -22,6 +23,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/rbac", rbacRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/schedules", scheduleRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" });
@@ -30,8 +32,20 @@ app.use((_req, res) => {
 async function startServer() {
   try {
     await connectDB();
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Backend server listening on port ${PORT}`);
+    });
+
+    server.on("error", (error) => {
+      if (error?.code === "EADDRINUSE") {
+        console.error(
+          `Port ${PORT} is already in use. Stop the existing backend process before starting a new one.`
+        );
+      } else {
+        console.error("Server failed to bind:", error.message);
+      }
+
+      process.exit(1);
     });
   } catch (error) {
     console.error("Failed to start backend:", error.message);
