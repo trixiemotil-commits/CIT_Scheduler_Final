@@ -8,7 +8,7 @@
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
-        <div class="email">teacher@gmail.com</div>
+        <div class="email">{{ userEmail }}</div>
       </div>
       <nav class="sidebar-nav">
         <RouterLink
@@ -211,13 +211,17 @@
 </template>
 
 <script setup>
-import { logout } from '@/auth.js'
+import { logout, getUser } from '@/auth.js'
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+
+/* ── User ── */
+const user = computed(() => getUser())
+const userEmail = computed(() => user.value?.email || 'teacher@example.com')
 
 /* ── Nav ── */
 const navItems = [
@@ -239,7 +243,7 @@ const navItems = [
   },
   {
     name: 'Settings', to: '/teacher/settings',
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1-2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
   }
 ]
 
@@ -524,13 +528,14 @@ function confirmLogout() {
   flex: 1;
   overflow: auto;
 }
+
 .sched-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: auto;
 }
 
-/* Header row */
+/* ─ Header: Time Column ─ */
 .th-time {
   background: #1b4332;
   color: #fff;
@@ -545,6 +550,8 @@ function confirmLogout() {
   z-index: 2;
   border-right: 1px solid #2d6a4f;
 }
+
+/* ─ Header: Day Columns ─ */
 .th-day {
   background: #1b4332;
   color: #fff;
@@ -557,14 +564,15 @@ function confirmLogout() {
   position: sticky;
   top: 0;
   z-index: 2;
-  transition: background 0.15s;
   border-left: 1px solid #2d6a4f;
   user-select: none;
+  transition: background 0.2s ease, width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .th-day:hover { background: #2d6a4f; }
 .th-day-active { background: #2d6a4f; }
 
-/* Time column */
+/* ─ Body: Time Column ─ */
 .td-time {
   background: #f9fafb;
   font-size: 0.78rem;
@@ -577,60 +585,129 @@ function confirmLogout() {
   vertical-align: middle;
 }
 
-/* Empty cell */
+/* ─ Body: Empty Cells ─ */
 .td-empty {
   border: 1px solid #e8e8e8;
   vertical-align: top;
   width: 120px;
   min-width: 120px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.td-empty.col-expanded { width: 300px; min-width: 300px; }
 
-/* Class cell base */
+.td-empty.col-expanded {
+  width: 300px;
+  min-width: 300px;
+}
+
+/* ─ Body: Class Cells ─ */
 .td-class {
-  border: 1px solid rgba(0,0,0,0.08);
-  vertical-align: top;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  vertical-align: middle;
   padding: 10px 12px;
   cursor: pointer;
-  transition: filter 0.15s;
   width: 120px;
   min-width: 120px;
   max-width: 120px;
+  transition: filter 0.2s ease, width 0.4s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1), padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.td-class:hover { filter: brightness(0.94); }
-.td-class.col-expanded { width: 300px; min-width: 300px; max-width: 300px; padding: 14px 16px; }
 
-/* Green cell */
-.cell-green { background: #1b4332; color: #fff; }
-/* Yellow cell */
-.cell-yellow { background: #e8a020; color: #fff; }
+.td-class:hover {
+  filter: brightness(0.94);
+}
 
-/* Compact view */
-.cell-room-sm    { font-size: 0.78rem; font-weight: 700; margin-bottom: 3px; text-align: right; }
-.cell-subject-sm { font-size: 0.75rem; line-height: 1.35; margin-bottom: 4px; text-align: right; }
-.cell-tag-sm     { font-size: 0.7rem; opacity: 0.85; text-align: right; }
+.td-class.col-expanded {
+  width: 300px;
+  min-width: 300px;
+  max-width: 300px;
+  padding: 14px 16px;
+}
 
-/* Expanded view */
-.cell-badge-row { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+/* ─ Cell Colors ─ */
+.cell-green {
+  background: #1b4332;
+  color: #fff;
+}
+
+.cell-yellow {
+  background: #e8a020;
+  color: #fff;
+}
+
+/* ─ Compact View: Text Styling ─ */
+.cell-room-sm {
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 3px;
+  text-align: left;
+}
+
+.cell-subject-sm {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.cell-tag-sm {
+  font-size: 0.7rem;
+  opacity: 0.85;
+  text-align: left;
+}
+
+/* ─ Expanded View: Badge ─ */
+.cell-badge-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 10px;
+}
+
 .cell-badge {
   font-size: 0.72rem;
   font-weight: 600;
   padding: 3px 10px;
   border-radius: 20px;
 }
-.badge-np { background: rgba(255,255,255,0.9); color: #1b4332; }
-.badge-p  { background: rgba(255,255,255,0.9); color: #e8a020; }
 
+.badge-np {
+  background: rgba(255, 255, 255, 0.9);
+  color: #1b4332;
+}
+
+.badge-p {
+  background: rgba(255, 255, 255, 0.9);
+  color: #e8a020;
+}
+
+/* ─ Expanded View: Info Lines ─ */
 .cell-exp-line {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
-.cell-exp-icon { flex-shrink: 0; opacity: 0.9; }
-.cell-exp-room    { font-size: 0.9rem; font-weight: 500; }
-.cell-exp-subject { font-size: 0.92rem; font-weight: 700; line-height: 1.3; }
-.cell-exp-section { font-size: 0.82rem; opacity: 0.85; margin-top: 4px; margin-left: 24px; }
+
+.cell-exp-icon {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.cell-exp-room {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.cell-exp-subject {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.cell-exp-section {
+  font-size: 0.82rem;
+  opacity: 0.85;
+  margin-top: 4px;
+  margin-left: 24px;
+}
 
 /* ── Modals — overlay ── */
 .modal-overlay {
