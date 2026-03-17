@@ -31,6 +31,7 @@ function toClientUser(user) {
     department: user.department || "",
     phone: user.phone || "",
     status: user.status || "Active",
+    employeeId: user.employeeId || "",
     studentId: user.studentId || "",
     avatar: user.avatar,
     dateAdded: user.createdAt,
@@ -76,6 +77,7 @@ async function createUser(req, res) {
       department = "",
       phone = "",
       status = "Active",
+      employeeId = "",
       studentId = "",
       avatar = null,
     } = req.body;
@@ -95,6 +97,7 @@ async function createUser(req, res) {
       return res.status(400).json({ message: roleError.message });
     }
     const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmployeeId = normalizeString(employeeId);
     const normalizedStudentId = normalizeString(studentId);
 
     if (normalizedRole === "student" && !normalizedStudentId) {
@@ -113,6 +116,13 @@ async function createUser(req, res) {
       }
     }
 
+    if (normalizedEmployeeId) {
+      const existingEmployee = await User.findOne({ employeeId: normalizedEmployeeId });
+      if (existingEmployee) {
+        return res.status(409).json({ message: "Employee ID already exists." });
+      }
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await User.create({
@@ -124,6 +134,7 @@ async function createUser(req, res) {
       department: normalizeString(department),
       phone: normalizeString(phone),
       status: sanitizeStatus(status),
+      employeeId: normalizedEmployeeId || undefined,
       studentId: normalizedStudentId || undefined,
       avatar: avatar || null,
     });
@@ -146,6 +157,7 @@ async function updateUser(req, res) {
       department = "",
       phone = "",
       status = "Active",
+      employeeId = "",
       studentId = "",
     } = req.body;
 
@@ -160,6 +172,7 @@ async function updateUser(req, res) {
       return res.status(400).json({ message: roleError.message });
     }
     const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmployeeId = normalizeString(employeeId);
     const normalizedStudentId = normalizeString(studentId);
 
     const user = await User.findById(id);
@@ -181,6 +194,13 @@ async function updateUser(req, res) {
       return res.status(400).json({ message: "Student ID is required for student accounts." });
     }
 
+    if (normalizedEmployeeId) {
+      const employeeOwner = await User.findOne({ employeeId: normalizedEmployeeId });
+      if (employeeOwner && employeeOwner.id !== id) {
+        return res.status(409).json({ message: "Employee ID already exists." });
+      }
+    }
+
     user.firstName = normalizeString(firstName);
     user.lastName = normalizeString(lastName);
     user.email = normalizedEmail;
@@ -188,6 +208,7 @@ async function updateUser(req, res) {
     user.department = normalizeString(department);
     user.phone = normalizeString(phone);
     user.status = sanitizeStatus(status);
+    user.employeeId = normalizedEmployeeId || undefined;
 
     if (normalizedStudentId) {
       user.studentId = normalizedStudentId;

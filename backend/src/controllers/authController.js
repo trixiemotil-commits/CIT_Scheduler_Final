@@ -19,6 +19,7 @@ function toSafeUser(user) {
     id: user._id,
     firstName: user.firstName,
     lastName: user.lastName,
+    employeeId: user.employeeId || user.studentId,
     studentId: user.studentId,
     email: user.email,
     role: user.role,
@@ -156,8 +157,102 @@ async function me(req, res) {
   }
 }
 
+function normalizeString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+async function updateMe(req, res) {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const firstName = normalizeString(req.body.firstName) || user.firstName;
+    const lastName = normalizeString(req.body.lastName) || user.lastName;
+    const email = normalizeString(req.body.email).toLowerCase() || user.email;
+    const phone = normalizeString(req.body.phone);
+    const employeeId = normalizeString(req.body.employeeId);
+    const avatar = normalizeString(req.body.avatar);
+
+    if (!firstName || !lastName || !email) {
+      return res.status(400).json({ message: "First name, last name, and email are required." });
+    }
+
+    const emailOwner = await User.findOne({ email });
+    if (emailOwner && emailOwner._id.toString() !== user._id.toString()) {
+      return res.status(409).json({ message: "Email already exists." });
+    }
+
+    if (employeeId) {
+      const idOwner = await User.findOne({ employeeId });
+      if (idOwner && idOwner._id.toString() !== user._id.toString()) {
+        return res.status(409).json({ message: "Employee ID already exists." });
+      }
+    }
+
+    if (avatar && !avatar.startsWith("data:image/") && !/^https?:\/\//i.test(avatar)) {
+      return res.status(400).json({ message: "Avatar must be a valid image URL or data URL." });
+    }
+
+    user.firstName = firstName;
+    user.lastName = lastName;
+    user.email = email;
+    user.phone = phone;
+    user.employeeId = employeeId || undefined;
+    if (avatar) {
+      user.avatar = avatar;
+    }
+
+    await user.save();
+
+    return res.status(200).json({ message: "Profile updated successfully.", user: toSafeUser(user) });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to update profile.", error: error.message });
+  }
+}
+
+async function changePassword(req, res) {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required." });
+    }
+
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ message: "New password must be at least 8 characters long." });
+    }
+
+    const user = await User.findById(req.user.id).select("+passwordHash");
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const matches = await bcrypt.compare(String(currentPassword), user.passwordHash);
+    if (!matches) {
+      return res.status(401).json({ message: "Current password is incorrect." });
+    }
+
+    const sameAsCurrent = await bcrypt.compare(String(newPassword), user.passwordHash);
+    if (sameAsCurrent) {
+      return res.status(400).json({ message: "New password must be different from your current password." });
+    }
+
+    user.passwordHash = await bcrypt.hash(String(newPassword), 10);
+    await user.save();
+
+    return res.status(200).json({ message: "Password changed successfully." });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to change password.", error: error.message });
+  }
+}
+
 module.exports = {
   register,
   login,
   me,
+  updateMe,
+  changePassword,
 };
