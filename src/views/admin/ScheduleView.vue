@@ -50,28 +50,33 @@
         <div class="sched-topbar">
           <div class="sched-topbar-left">
             <h2 class="sched-grid-title">Teacher Schedule Grid</h2>
-            <p class="sched-grid-sub" style="margin:4px 0 0">Managing Schedule for {{ pages[currentPage]?.label ?? tableDropdown }}</p>
+            <p class="sched-grid-sub" style="margin:4px 0 0">{{ selectedTeacher ? `Assigning schedule for ${selectedTeacher}` : 'Select a teacher to manage their schedule' }}</p>
           </div>
           <div class="sched-topbar-right">
             <!-- Year filter selector -->
             <div class="sched-select-wrap">
               <select class="sched-select" :value="yearDropdown" @change="jumpToYear($event.target.value)">
+                <option value="All">All Years</option>
                 <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
               </select>
               <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
-            <!-- Schedule table selector (updates when new table is added) -->
+            <!-- Section filter selector -->
             <div class="sched-select-wrap">
-              <select class="sched-select" :value="tableDropdown" @change="jumpToTable($event.target.value)">
-                <option v-for="pg in filteredPages" :key="pg.realIndex" :value="pg.label">{{ pg.label }}</option>
+              <select class="sched-select" v-model="filterSection">
+                <option value="All">All Sections</option>
+                <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
               </select>
               <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
-            <!-- New Schedule Table button -->
-            <button class="new-sched-btn" @click="showAddYearModal = true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              Add Schedule Table
-            </button>
+            <!-- Teacher filter selector -->
+            <div class="sched-select-wrap teacher-select-wrap">
+              <select class="sched-select teacher-select" v-model="selectedTeacher">
+                <option value="">-- Select Teacher --</option>
+                <option v-for="t in teacherOptions" :key="t" :value="t">{{ t }}</option>
+              </select>
+              <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
             <!-- Print -->
             <button class="icon-btn" title="Print" @click="printSchedule">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -83,7 +88,7 @@
           </div>
         </div>
 
-        <!-- Pagination dots -->
+        <!-- Pagination dots - show pages for selected year -->
         <div class="sched-pagination">
           <button class="page-arrow" @click="prevPage" :disabled="currentPage === 0">&#8249;</button>
           <span
@@ -93,7 +98,7 @@
             :class="{ active: pg.realIndex === currentPage }"
             :title="pg.label"
             @click="currentPage = pg.realIndex"
-          >{{ pg.label }}</span>
+          >{{ pg.year }}</span>
           <button class="page-arrow" @click="nextPage" :disabled="currentPage === pages.length - 1">&#8250;</button>
         </div>
 
@@ -155,37 +160,7 @@
       </div>
     </main>
 
-    <!-- ═══ Add Year Modal ═══ -->
-    <Teleport to="body">
-      <div v-if="showAddYearModal" class="modal-overlay" @click.self="showAddYearModal = false">
-        <div class="add-year-modal-box">
-          <h2 class="sched-modal-title" style="margin-bottom:8px">Add Schedule Table</h2>
-          <p class="sched-modal-sub" style="margin-bottom:20px">Select a year level, then optionally give it a custom label.</p>
-          <div class="form-select-wrap" style="margin-bottom:14px">
-            <select v-model="newYearSelect" class="form-select" style="width:100%">
-              <option value="" disabled>Select Year</option>
-              <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
-            </select>
-            <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-          <div style="margin-bottom:20px">
-            <input
-              v-model="newYearLabel"
-              class="form-select"
-              style="width:100%;box-sizing:border-box"
-              :placeholder="newYearSelect ? suggestedLabel : 'Select a year first'"
-            />
-          </div>
-          <div class="sched-modal-actions">
-            <button class="cancel-btn-text" @click="showAddYearModal = false">Cancel</button>
-            <button class="save-btn" @click="addYearPage" :disabled="!newYearSelect">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Page
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+
 
     <!-- ═══ Add / Edit Schedule Modal ═══ -->
     <Teleport to="body">
@@ -261,17 +236,6 @@
                 <select v-model="form.section" class="form-select">
                   <option value="" disabled>Select Section</option>
                   <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
-                </select>
-                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-              </div>
-            </div>
-            <!-- Teacher -->
-            <div class="form-row-inline">
-              <label class="form-label">Teacher</label>
-              <div class="form-select-wrap">
-                <select v-model="form.teacher" class="form-select">
-                  <option value="" disabled>Select Teacher</option>
-                  <option v-for="t in teacherOptions" :key="t" :value="t">{{ t }}</option>
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
@@ -469,17 +433,6 @@
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
               </div>
-              <!-- Teacher -->
-              <div class="form-row-inline">
-                <label class="form-label">Teacher</label>
-                <div class="form-select-wrap">
-                  <select v-model="addForm.teacher" class="form-select">
-                    <option value="" disabled>Select Teacher</option>
-                    <option v-for="t in teacherOptions" :key="t" :value="t">{{ t }}</option>
-                  </select>
-                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-              </div>
               <!-- Subject -->
               <div class="form-row-inline">
                 <label class="form-label">Subject</label>
@@ -673,52 +626,46 @@ const navItems = [
 /* ── Pagination — one page per year (multiples allowed) ── */
 const currentPage = ref(0)
 const pages = ref([
-  { year: '1st Year', label: '1st Year' },
-  { year: '2nd Year', label: '2nd Year' },
-  { year: '3rd Year', label: '3rd Year' },
-  { year: '4th Year', label: '4th Year' },
+  { year: '1st Year', label: '1st Year', section: 'BSIT1-S1' },
+  { year: '2nd Year', label: '2nd Year', section: 'BSIT2-S1' },
+  { year: '3rd Year', label: '3rd Year', section: 'BSIT3-S1' },
+  { year: '4th Year', label: '4th Year', section: 'BSIT4-S1' },
 ])
 // filterYear = current page LABEL — unique key for grid data (so "1st Year (2)" ≠ "1st Year")
 const filterYear = ref(pages.value[0].label)
 // yearDropdown = base year selected in the dropdown — used only for paginator filtering
-const yearDropdown = ref(pages.value[0].year)
-// tableDropdown = selected schedule-table label in topbar selector
-const tableDropdown = ref(pages.value[0].label)
+const yearDropdown = ref('All')
 watch(currentPage, (i) => {
   filterYear.value  = pages.value[i]?.label ?? filterYear.value
-  yearDropdown.value = pages.value[i]?.year  ?? yearDropdown.value
-  tableDropdown.value = pages.value[i]?.label ?? tableDropdown.value
+  // Don't override yearDropdown if it's 'All'
+  if (yearDropdown.value !== 'All') {
+    yearDropdown.value = pages.value[i]?.year ?? yearDropdown.value
+  }
+  // Don't override filterSection if it's 'All'
+  if (filterSection.value !== 'All') {
+    filterSection.value = pages.value[i]?.section ?? filterSection.value
+  }
 })
-const filterSection = ref(sections[0])
+const filterSection = ref('All')
+const selectedTeacher = ref('')
 function prevPage() { if (currentPage.value > 0) currentPage.value-- }
 function nextPage() { if (currentPage.value < pages.value.length - 1) currentPage.value++ }
-function jumpToTable(label) {
-  tableDropdown.value = label
-  const idx = pages.value.findIndex((p) => p.label === label)
-  if (idx >= 0) currentPage.value = idx
-}
 // Jump to first page matching the selected year
 function jumpToYear(year) {
   yearDropdown.value = year
-  const idx = pages.value.findIndex(p => p.year === year)
-  if (idx >= 0) currentPage.value = idx
+  if (year !== 'All') {
+    const idx = pages.value.findIndex(p => p.year === year)
+    if (idx >= 0) currentPage.value = idx
+  }
 }
-// Only show paginator chips for the currently-selected year
+// Only show paginator chips for the currently-selected year (or all if 'All' is selected)
 const filteredPages = computed(() =>
   pages.value
     .map((pg, i) => ({ ...pg, realIndex: i }))
-    .filter(pg => pg.year === yearDropdown.value)
+    .filter(pg => yearDropdown.value === 'All' || pg.year === yearDropdown.value)
 )
 
-// ── Add Year Modal ──
-const showAddYearModal = ref(false)
-const newYearSelect    = ref('')
-const newYearLabel     = ref('')
-const suggestedLabel   = computed(() => {
-  if (!newYearSelect.value) return ''
-  const count = pages.value.filter(p => p.year === newYearSelect.value).length
-  return count === 0 ? newYearSelect.value : `${newYearSelect.value} (${count + 1})`
-})
+
 
 function resetEntriesStore() {
   Object.keys(entries).forEach((key) => {
@@ -740,9 +687,9 @@ function formatAddedAt(dateValue) {
 }
 
 function syncPagesFromApi(apiTables, preferredLabel = '') {
-  const fallback = years.map((year) => ({ year, label: year }))
+  const fallback = years.map((year) => ({ year, label: year, section: sections[0] }))
   const sorted = (Array.isArray(apiTables) && apiTables.length ? apiTables : fallback)
-    .map((table) => ({ year: table.year, label: table.label }))
+    .map((table) => ({ year: table.year, label: table.label, section: table.section || sections[0] }))
     .sort((a, b) => {
       const byYear = years.indexOf(a.year) - years.indexOf(b.year)
       if (byYear !== 0) return byYear
@@ -761,9 +708,14 @@ function syncPagesFromApi(apiTables, preferredLabel = '') {
   }
 
   currentPage.value = nextIndex
-  filterYear.value = pages.value[nextIndex]?.label || years[0]
-  yearDropdown.value = pages.value[nextIndex]?.year || years[0]
-  tableDropdown.value = pages.value[nextIndex]?.label || years[0]
+  // Keep 'All' filters if they're already set
+  if (yearDropdown.value !== 'All') {
+    filterYear.value = pages.value[nextIndex]?.label || years[0]
+    yearDropdown.value = pages.value[nextIndex]?.year || years[0]
+  }
+  if (filterSection.value !== 'All') {
+    filterSection.value = pages.value[nextIndex]?.section || sections[0]
+  }
 }
 
 function syncEntriesFromApi(apiEntries) {
@@ -899,38 +851,22 @@ async function showScheduleError(error, fallbackTitle = 'Unable to save schedule
   })
 }
 
-async function addYearPage() {
-  if (!newYearSelect.value) return
-
-  const label = newYearLabel.value.trim() || suggestedLabel.value
-
-  try {
-    const payload = await apiRequest('/schedules/tables', {
-      method: 'POST',
-      body: JSON.stringify({ year: newYearSelect.value, label }),
-    })
-
-    await refreshScheduleData(payload.table?.label || label)
-    newYearSelect.value = ''
-    newYearLabel.value = ''
-    showAddYearModal.value = false
-  } catch (error) {
-    await showScheduleError(error, 'Unable to create schedule table')
-  }
-}
-
-// Return entries for a given slot+day. For parallel entries all sections
-// sharing the same parallelGroupId are returned so they render in one box.
+// ── Get entries for a specific cell ──
+// Entries sharing the same parallelGroupId are returned so they render in one box.
 function getEntriesForCell(rowHour, day) {
   const rowStart = parseTime(rowHour)
   const rowEnd   = rowStart + 60
 
-  // First, find the entry that belongs to the currently-viewed section
+  // If no teacher selected, show nothing
+  if (!selectedTeacher.value) return []
+
+  // First, find the entry that belongs to the currently-viewed section and selected teacher
   const sectionMatch = Object.entries(entries).find(([k, v]) => {
     const parts = k.split('|')
     if (parts.length < 4) return false
     if (parts[0] !== filterYear.value) return false
-    if (parts[1] !== filterSection.value) return false
+    if (filterSection.value !== 'All' && parts[1] !== filterSection.value) return false
+    if (v.teacher !== selectedTeacher.value) return false
     if (parts[3] !== day) return false
     const t = parseTime(v.timeIn)
     return t >= rowStart && t < rowEnd
@@ -947,8 +883,10 @@ function getEntriesForCell(rowHour, day) {
         const parts = k.split('|')
         if (parts.length < 4) return false
         if (parts[0] !== filterYear.value) return false
+        if (filterSection.value !== 'All' && parts[1] !== filterSection.value) return false
         if (parts[3] !== day) return false
         if (v.parallelGroupId !== matchedEntry.parallelGroupId) return false
+        if (v.teacher !== selectedTeacher.value) return false
         const t = parseTime(v.timeIn)
         return t >= rowStart && t < rowEnd
       })
@@ -1056,7 +994,7 @@ function openAddModal(slot, day) {
   form._oldDay           = ''
   form.year              = filterYear.value || years[0]
   form.section           = filterSection.value || sections[0]
-  form.teacher           = ''
+  form.teacher           = selectedTeacher.value || ''
   form.subject           = ''
   form.room              = ''
   form.parallel          = false
@@ -1099,12 +1037,79 @@ function openEditModal(slot, day, e) {
   showSchedModal.value   = true
 }
 
+function checkScheduleConflict(payload) {
+  const newTimeIn = parseTime(payload.timeIn)
+  const newTimeOut = parseTime(payload.timeOut)
+  const conflicts = []
+
+  // Check all existing entries for conflicts
+  Object.entries(entries).forEach(([key, entry]) => {
+    // Skip if it's the entry being edited
+    if (editMode.value) {
+      const oldTableLabel = form._oldYear || form.year
+      const oldSlotStart = form._oldSlot?.split(' - ')[0]
+      const oldSlotEnd = form._oldSlot?.split(' - ')[1]
+      const oldSection = form._oldSection
+      const oldDay = form._oldDay
+      
+      const expectedKey = `${oldTableLabel}|${oldSection}|${oldSlotStart || ''} - ${oldSlotEnd || ''}|${oldDay}`
+      if (key === expectedKey) return
+    }
+
+    const existingTimeIn = parseTime(entry.timeIn)
+    const existingTimeOut = parseTime(entry.timeOut)
+
+    // Check time overlap on same day
+    const isSameDay = entry.day === payload.day
+    const isTimeOverlap = newTimeIn < existingTimeOut && newTimeOut > existingTimeIn
+
+    if (isSameDay && isTimeOverlap) {
+      // Check teacher conflict
+      if (entry.teacher === payload.teacher) {
+        conflicts.push(`Teacher "${payload.teacher}" already has a class on ${payload.day} from ${entry.timeIn} to ${entry.timeOut}`)
+      }
+
+      // Check room conflict (for non-parallel entries)
+      if (!payload.parallel && !entry.parallel && entry.room === payload.room) {
+        conflicts.push(`Room "${payload.room}" is already occupied on ${payload.day} from ${entry.timeIn} to ${entry.timeOut}`)
+      }
+    }
+  })
+
+  return conflicts
+}
+
 async function saveEntry() {
   if (!form.teacher || !form.subject) return
   if (form.parallel && form.parallelSlots.every((slotItem) => !slotItem.section)) return
 
   try {
     const payload = buildSchedulePayload(form)
+    
+    // Check for conflicts
+    const conflicts = checkScheduleConflict(payload)
+    if (conflicts.length > 0) {
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Schedule Conflict Detected',
+        html: `<div style="text-align: left; font-size: 0.9rem;">${conflicts.map(c => `<p>• ${c}</p>`).join('')}</div>`,
+        confirmButtonText: 'Proceed Anyway',
+        cancelButtonText: 'Cancel',
+        showCancelButton: true,
+      })
+      if (!result.isConfirmed) return
+      await proceedWithSave(payload)
+      return
+    }
+
+    await proceedWithSave(payload)
+  } catch (error) {
+    await showScheduleError(error)
+  }
+}
+
+async function proceedWithSave(payload) {
+  try {
     if (editMode.value && form._oldDay) {
       payload.day = form._oldDay
     }
@@ -1181,7 +1186,7 @@ function openAddPanel() {
   addForm.year = filterYear.value
   addForm.day = ''; addForm.timeIn = ''; addForm.timeOut = ''
   addForm.section = sections[0]
-  addForm.teacher = ''; addForm.subject = ''; addForm.room = ''
+  addForm.teacher = selectedTeacher.value; addForm.subject = ''; addForm.room = ''
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
     { section: '', room: '' }, { section: '', room: '' })
@@ -1193,7 +1198,7 @@ function openAddPanel() {
 function resetAddForm() {
   addForm.day = ''; addForm.timeIn = ''; addForm.timeOut = ''
   addForm.year = filterYear.value; addForm.section = sections[0]
-  addForm.teacher = ''; addForm.subject = ''; addForm.room = ''
+  addForm.teacher = selectedTeacher.value; addForm.subject = ''; addForm.room = ''
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
     { section: '', room: '' }, { section: '', room: '' })
@@ -1230,6 +1235,19 @@ async function addEntry() {
 
 onMounted(async () => {
   try {
+    // Fetch teachers from database (role=teacher)
+    const response = await apiRequest('/users?role=teacher')
+    if (response.users && Array.isArray(response.users)) {
+      const teachers = response.users
+        .filter(user => user.role === 'Teacher') // Ensure only Teacher role
+        .map(user => `${user.firstName} ${user.lastName}`.trim())
+        .filter(name => name.length > 0)
+      if (teachers.length > 0) {
+        teacherOptions.value = teachers
+        console.log('Loaded teachers:', teachers)
+      }
+    }
+    
     await refreshScheduleData(filterYear.value)
   } catch (error) {
     await showScheduleError(error, 'Unable to load schedules')
@@ -1515,6 +1533,46 @@ function confirmLogout() {
 }
 .sched-select:focus { border-color: #40916c; }
 .sched-select-arrow { position: absolute; right: 10px; pointer-events: none; color: #666; }
+
+/* Teacher Select - Prominent Styling (Matches App Theme) */
+.teacher-select-wrap {
+  padding: 3px 6px;
+  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f6 100%);
+  border-radius: 10px;
+  border: 2px solid #40916c;
+  box-shadow: 0 4px 12px rgba(64, 145, 108, 0.2);
+  transition: all 0.2s ease;
+}
+.teacher-select-wrap:hover {
+  border-color: #1b4332;
+  box-shadow: 0 6px 16px rgba(27, 67, 50, 0.25);
+  background: linear-gradient(135deg, #d4edda 0%, #e8f5e9 100%);
+}
+
+.teacher-select {
+  background: linear-gradient(to bottom, #f8fffe, #eef9f7);
+  border: 1px solid #40916c !important;
+  border-radius: 8px;
+  padding: 8px 32px 8px 13px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #1b4332;
+  box-shadow: inset 0 1px 3px rgba(27, 67, 50, 0.08);
+}
+.teacher-select:hover {
+  background: linear-gradient(to bottom, #f0fdf9, #e8faf6);
+  color: #1b4332;
+}
+.teacher-select:focus {
+  border-color: #1b4332 !important;
+  outline: 2px solid rgba(64, 145, 108, 0.4);
+  outline-offset: 1px;
+  color: #1b4332;
+}
+.teacher-select-wrap .sched-select-arrow {
+  color: #40916c;
+  font-weight: 600;
+}
 
 /* Buttons */
 .new-sched-btn {

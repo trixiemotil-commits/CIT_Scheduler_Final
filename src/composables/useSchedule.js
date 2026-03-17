@@ -1,4 +1,4 @@
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 
 /**
  * Shared schedule entries — singleton reactive object so both
@@ -26,10 +26,7 @@ export const timeOptions = [
   '4:00 PM','4:30 PM','5:00 PM','5:30 PM','6:00 PM','6:30 PM','7:00 PM',
 ]
 
-export const teacherOptions = [
-  'Prof. Jhon', 'Prof. Balong', 'Prof. Aira', 'Prof. Gab',
-  'Prof. Daniella', 'Prof. Jolo', 'Prof. Aj',
-]
+export const teacherOptions = ref([])
 
 export const subjectOptions = [
   'Data Structures', 'Networking', 'Operating Systems', 'Database Management',

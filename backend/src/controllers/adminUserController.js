@@ -49,8 +49,19 @@ function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-async function listUsers(_req, res) {
-  const users = await User.find().sort({ createdAt: -1 });
+async function listUsers(req, res) {
+  const { role } = req.query;
+  const query = {};
+  
+  // Filter by role if provided (case-insensitive)
+  if (role) {
+    const normalizedRole = role.toLowerCase();
+    if (normalizedRole === 'teacher' || normalizedRole === 'admin' || normalizedRole === 'student') {
+      query.role = normalizedRole;
+    }
+  }
+  
+  const users = await User.find(query).sort({ createdAt: -1 });
   return res.json({ users: users.map(toClientUser) });
 }
 
