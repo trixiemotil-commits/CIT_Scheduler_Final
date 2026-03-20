@@ -7,17 +7,25 @@ const ROLE_LABELS = {
   student: "Student",
 };
 
-const STATUS_VALUES = ["Active", "Inactive", "Archived"];
+const ACCOUNT_STATUS_VALUES = ["Active", "Inactive", "Archived"];
+const TEACHER_STATUS_VALUES = ["On School", "On Meeting", "On Leave"];
 
 function formatRole(role) {
   return ROLE_LABELS[role] || role;
 }
 
-function sanitizeStatus(status) {
-  if (STATUS_VALUES.includes(status)) {
+function sanitizeAccountStatus(status) {
+  if (ACCOUNT_STATUS_VALUES.includes(status)) {
     return status;
   }
   return "Active";
+}
+
+function sanitizeTeacherStatus(status) {
+  if (TEACHER_STATUS_VALUES.includes(status)) {
+    return status;
+  }
+  return "On School";
 }
 
 function toClientUser(user) {
@@ -30,7 +38,9 @@ function toClientUser(user) {
     role: formatRole(user.role),
     department: user.department || "",
     phone: user.phone || "",
-    status: user.status || "Active",
+    account_status: user.account_status || "Active",
+    teacher_status: user.teacher_status || (user.role === "teacher" ? "On School" : ""),
+    status: user.account_status || "Active",
     employeeId: user.employeeId || "",
     studentId: user.studentId || "",
     avatar: user.avatar,
@@ -76,7 +86,9 @@ async function createUser(req, res) {
       password,
       department = "",
       phone = "",
-      status = "Active",
+      account_status = "Active",
+      teacher_status = "On School",
+      status,
       employeeId = "",
       studentId = "",
       avatar = null,
@@ -133,7 +145,8 @@ async function createUser(req, res) {
       passwordHash,
       department: normalizeString(department),
       phone: normalizeString(phone),
-      status: sanitizeStatus(status),
+      account_status: sanitizeAccountStatus(account_status || status),
+      teacher_status: normalizedRole === "teacher" ? sanitizeTeacherStatus(teacher_status) : undefined,
       employeeId: normalizedEmployeeId || undefined,
       studentId: normalizedStudentId || undefined,
       avatar: avatar || null,
@@ -156,7 +169,9 @@ async function updateUser(req, res) {
       role,
       department = "",
       phone = "",
-      status = "Active",
+      account_status = "Active",
+      teacher_status = "On School",
+      status,
       employeeId = "",
       studentId = "",
     } = req.body;
@@ -207,7 +222,8 @@ async function updateUser(req, res) {
     user.role = normalizedRole;
     user.department = normalizeString(department);
     user.phone = normalizeString(phone);
-    user.status = sanitizeStatus(status);
+    user.account_status = sanitizeAccountStatus(account_status || status);
+    user.teacher_status = normalizedRole === "teacher" ? sanitizeTeacherStatus(teacher_status) : undefined;
     user.employeeId = normalizedEmployeeId || undefined;
 
     if (normalizedStudentId) {

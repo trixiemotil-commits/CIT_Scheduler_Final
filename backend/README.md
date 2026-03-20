@@ -41,11 +41,13 @@ npm run dev
 {
   "firstName": "Jane",
   "lastName": "Doe",
-  "registeredId": "2026-0001",
+  "studentId": "2026-0001",
   "email": "jane@example.com",
   "password": "Password123",
   "role": "student"
 }
 ```
+
+`registeredId` is also accepted for backward compatibility with older clients.
 
 Only `student` and `teacher` are allowed during public registration.

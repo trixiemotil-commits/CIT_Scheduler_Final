@@ -25,7 +25,9 @@ function toSafeUser(user) {
     role: user.role,
     department: user.department,
     phone: user.phone,
-    status: user.status,
+    account_status: user.account_status,
+    teacher_status: user.teacher_status,
+    status: user.account_status,
     avatar: user.avatar,
     name: `${user.firstName} ${user.lastName}`.trim(),
   };
@@ -38,25 +40,30 @@ async function register(req, res) {
       firstName,
       lastName,
       studentId,
+      registeredId,
       email,
       password
-    } = req.body;
+    } = req.body || {};
 
-    if (!firstName || !lastName || !studentId || !email || !password) {
+    const normalizedFirstName = normalizeString(firstName);
+    const normalizedLastName = normalizeString(lastName);
+    const normalizedEmail = normalizeString(email).toLowerCase();
+    const normalizedPassword = typeof password === "string" ? password : "";
+    const normalizedStudentId = normalizeString(studentId) || normalizeString(registeredId);
+
+    if (!normalizedFirstName || !normalizedLastName || !normalizedStudentId || !normalizedEmail || !normalizedPassword) {
       return res.status(400).json({ message: "Missing required registration fields." });
     }
 
 
-    if (password.length < 8) {
+    if (normalizedPassword.length < 8) {
       return res.status(400).json({ message: "Password must be at least 8 characters long." });
     }
-
-    const normalizedEmail = email.toLowerCase().trim();
 
     const existingUser = await User.findOne({
       $or: [
         { email: normalizedEmail },
-        { studentId: String(studentId).trim() }
+        { studentId: normalizedStudentId }
       ]
     });
 
@@ -68,9 +75,9 @@ async function register(req, res) {
 
     // Only allow student role via signup
     const user = await User.create({
-      firstName: String(firstName).trim(),
-      lastName: String(lastName).trim(),
-      studentId: String(studentId).trim(),
+      firstName: normalizedFirstName,
+      lastName: normalizedLastName,
+      studentId: normalizedStudentId,
       email: normalizedEmail,
       passwordHash,
       role: "student"

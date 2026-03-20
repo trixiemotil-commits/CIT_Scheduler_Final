@@ -9,7 +9,9 @@
           <div class="header-sub">{{ user.name }}</div>
         </div>
       </div>
-      <span class="status-badge active">Active</span>
+      <button class="header-notif-btn" @click="$router.push('/student/notifications')" aria-label="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </button>
     </div>
 
     <!-- Stats Grid -->
@@ -53,7 +55,16 @@
       <button class="cta-btn primary" @click="$router.push('/student/teachers')">Browse Teachers</button>
       <button class="cta-btn secondary" @click="$router.push('/student/consultations')">My Sessions</button>
     </div>
-
+    <div class="section-card events-card">
+      <div class="section-title">Recent Events</div>
+      <div v-for="event in recentEvents" :key="event.id" class="consult-row">
+        <div class="consult-info">
+          <div class="consult-name">{{ event.title }}</div>
+          <div class="consult-teacher">{{ event.date }} · {{ event.location }}</div>
+        </div>
+      </div>
+      <button class="view-events-btn" @click="$router.push('/student/events')">View All Events</button>
+    </div>
     <!-- Bottom Nav -->
     <BottomNav active="home" />
   </div>
@@ -71,6 +82,11 @@ const initials = computed(() => user.name?.split(' ').map(w => w[0]).join('').sl
 const { sessions, stats } = useStudentData()
 
 const recentConsultations = computed(() => sessions.value.slice(0, 4))
+
+const recentEvents = [
+  { id: 1, title: 'Faculty Meeting', date: 'Mar 10', location: 'Room 301' },
+  { id: 2, title: 'CIT Foundation Day', date: 'Mar 15', location: 'Auditorium' },
+]
 
 function badgeClass(status) {
   return { Approved: 'badge-green', Pending: 'badge-orange', Rejected: 'badge-red', Completed: 'badge-gray', Done: 'badge-gray' }[status] || 'badge-gray'
@@ -90,7 +106,7 @@ function formatDate(dateStr) {
   max-width: 430px;
   min-height: 100dvh;
   margin: 0 auto;
-  background: #f5f6f8;
+  background: #f3f5f7;
   display: flex;
   flex-direction: column;
   padding-bottom: 72px;
@@ -105,7 +121,7 @@ function formatDate(dateStr) {
   justify-content: space-between;
   background: #fff;
   padding: 16px 18px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #e4e7eb;
 }
 .header-left { display: flex; align-items: center; gap: 12px; }
 .avatar-sm {
@@ -119,23 +135,30 @@ function formatDate(dateStr) {
 }
 .header-title { font-weight: 700; font-size: 0.97rem; color: #1b4332; }
 .header-sub   { font-size: 0.78rem; color: #777; }
-.status-badge.active {
-  background: #d8f3e8; color: #1b7a4a;
-  font-size: 0.72rem; font-weight: 600;
-  padding: 4px 10px; border-radius: 20px;
+.header-notif-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #cfe4d6;
+  background: #fff;
+  color: #1b4332;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 
 /* Stats */
 .stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
   padding: 16px;
 }
 .stat-card {
   background: #fff;
   border-radius: 12px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-left: 4px solid;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
@@ -152,7 +175,7 @@ function formatDate(dateStr) {
   background: #fff;
   border-radius: 14px;
   margin: 0 16px;
-  padding: 16px;
+  padding: 14px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .section-title { font-weight: 700; font-size: 0.92rem; margin-bottom: 12px; color: #1b4332; }
@@ -194,5 +217,23 @@ function formatDate(dateStr) {
 }
 .cta-btn:active { opacity: 0.85; }
 .cta-btn.primary   { background: #1b4332; color: #fff; }
-.cta-btn.secondary { background: #f0faf3; color: #1b4332; border: 1.5px solid #c8ddd4; }
+.cta-btn.secondary { background: #e63946; color: #fff; border: 1.5px solid #e63946; }
+
+.events-card {
+  margin: 0 16px 16px;
+}
+
+.view-events-btn {
+  width: 100%;
+  margin-top: 10px;
+  border: 1.5px solid #b8ddc4;
+  background: #e6f3ea;
+  color: #1b4332;
+  border-radius: 10px;
+  padding: 11px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
 </style>

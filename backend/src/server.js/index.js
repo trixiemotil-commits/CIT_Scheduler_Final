@@ -7,6 +7,7 @@ const authRoutes = require("../routes/authRoutes");
 const rbacRoutes = require("../routes/rbacRoutes");
 const userRoutes = require("../routes/userRoutes");
 const scheduleRoutes = require("../routes/scheduleRoutes");
+const consultationRoutes = require("../routes/consultationRoutes");
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -24,8 +25,13 @@ app.use("/api/auth", authRoutes);
 app.use("/api/rbac", rbacRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/schedules", scheduleRoutes);
+app.use("/api/consultations", consultationRoutes);
 
 app.use((error, _req, res, next) => {
+  if (error instanceof SyntaxError && error?.status === 400 && "body" in error) {
+    return res.status(400).json({ message: "Invalid JSON payload." });
+  }
+
   if (error?.type === "entity.too.large") {
     return res.status(413).json({ message: "Uploaded image is too large. Please choose a smaller photo." });
   }

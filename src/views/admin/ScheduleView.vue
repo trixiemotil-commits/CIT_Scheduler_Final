@@ -77,6 +77,12 @@
               </select>
               <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
+            <!-- Consultation hours button (visible when a teacher is selected) -->
+            <button v-if="selectedTeacher" class="icon-btn consult-btn" title="Manage Consultation Hours" @click="openConsultModal">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>
+              </svg>
+            </button>
             <!-- Print -->
             <button class="icon-btn" title="Print" @click="printSchedule">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -113,11 +119,11 @@
                 <td class="td-time">{{ slot }}</td>
                 <template v-for="day in days" :key="day">
                   <td
-                    v-if="!isSpannedCell(slot, day)"
-                    :rowspan="getEntriesForCell(slot, day).length ? getRowspan(getEntriesForCell(slot, day)[0]) : 1"
+                    v-if="!isSpannedCell(slot, day) && !isConsultSpannedCell(slot, day)"
+                    :rowspan="getEntriesForCell(slot, day).length ? getRowspan(getEntriesForCell(slot, day)[0]) : (getConsultationForCell(slot, day) ? getConsultRowspan(getConsultationForCell(slot, day)) : 1)"
                     class="td-cell"
-                    :class="{ 'has-entry': getEntriesForCell(slot, day).length }"
-                    @click="handleCellClick(slot, day)"
+                    :class="{ 'has-entry': getEntriesForCell(slot, day).length, 'consult-cell': !getEntriesForCell(slot, day).length && !!getConsultationForCell(slot, day) }"
+                    @click="!getConsultationForCell(slot, day) || getEntriesForCell(slot, day).length ? handleCellClick(slot, day) : null"
                   >
                     <!-- Filled cell: ONE box, all sections inside -->
                     <template v-if="getEntriesForCell(slot, day).length">
@@ -146,7 +152,16 @@
                     </template>
                     <!-- Empty cell -->
                     <template v-else>
-                      <span class="click-to-add">{{ selectedTeacher ? 'Click to add' : '' }}</span>
+                      <template v-if="getConsultationForCell(slot, day)">
+                        <div
+                          class="sched-entry color-blue consult-entry"
+                          :style="consultEntryStyle(slot, getConsultationForCell(slot, day))"
+                        >
+                          <div class="entry-teacher">Consultation</div>
+                          <div class="entry-subject" style="font-size:0.72rem;opacity:0.9">{{ getConsultationForCell(slot, day).startTime }} – {{ getConsultationForCell(slot, day).endTime }}</div>
+                        </div>
+                      </template>
+                      <span v-else class="click-to-add">{{ selectedTeacher ? 'Click to add' : '' }}</span>
                     </template>
                   </td>
                 </template>
@@ -546,6 +561,101 @@
       </transition>
     </Teleport>
 
+    <!-- ═══ Consultation Management Modal ═══ -->
+    <Teleport to="body">
+      <div v-if="showConsultModal" class="modal-overlay" @click.self="showConsultModal = false">
+        <div class="sched-modal-box consult-modal-box">
+          <div class="sched-modal-header">
+            <div>
+              <div class="sched-modal-mode-badge badge-add">Consultation Hours</div>
+              <h2 class="sched-modal-title">Prof. {{ selectedTeacher }}</h2>
+              <p class="sched-modal-sub">
+                <span :class="consultWeeklyMins >= 240 ? 'limit-warning' : 'limit-ok'">
+                  {{ consultWeeklyMins }} / 240 min used this week
+                </span>
+              </p>
+            </div>
+            <button class="panel-close" @click="showConsultModal = false">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <!-- Existing slots list -->
+          <div v-if="consultationSlots.length" class="consult-slots-list">
+            <div v-for="cslot in consultationSlots" :key="cslot.id" class="consult-slot-item">
+              <div class="consult-slot-day">{{ cslot.dayOfWeek }}</div>
+              <div class="consult-slot-time">{{ cslot.startTime }} – {{ cslot.endTime }}</div>
+              <div class="consult-slot-dur">{{ cslot.durationMinutes }} min</div>
+              <div class="consult-slot-actions">
+                <button class="consult-edit-btn" @click="editConsultSlot(cslot)">Edit</button>
+                <button class="consult-del-btn" @click="deleteConsultSlot(cslot.id)">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="consult-empty">No consultation slots set for this teacher.</div>
+
+          <!-- Add / Edit form -->
+          <div class="sched-form" style="border-top:1px solid #eee;padding-top:12px;margin-top:4px;">
+            <div class="consult-form-title">{{ consultEditId ? 'Edit Slot' : 'Add New Slot' }}</div>
+            <div class="form-row-inline">
+              <label class="form-label">Day</label>
+              <div class="form-select-wrap">
+                <select v-model="consultForm.dayOfWeek" class="form-select">
+                  <option value="" disabled>Select Day</option>
+                  <option value="Monday">Monday</option>
+                  <option value="Tuesday">Tuesday</option>
+                  <option value="Wednesday">Wednesday</option>
+                  <option value="Thursday">Thursday</option>
+                  <option value="Friday">Friday</option>
+                  <option value="Saturday">Saturday</option>
+                </select>
+                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+            </div>
+            <div class="form-row-inline">
+              <label class="form-label">Start Time</label>
+              <div class="form-select-wrap">
+                <select v-model="consultForm.startTime" class="form-select">
+                  <option value="" disabled>Select Time</option>
+                  <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
+                </select>
+                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+            </div>
+            <div class="form-row-inline">
+              <label class="form-label">End Time</label>
+              <div class="form-select-wrap">
+                <select v-model="consultForm.endTime" class="form-select">
+                  <option value="" disabled>Select Time</option>
+                  <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
+                </select>
+                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+            </div>
+            <div v-if="consultTimeError" class="time-error" style="margin:0 24px 8px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {{ consultTimeError }}
+            </div>
+          </div>
+
+          <div class="sched-modal-actions">
+            <button v-if="consultEditId" class="cancel-btn-text" @click="consultEditId = null; Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })">Cancel Edit</button>
+            <button class="cancel-btn-text" @click="showConsultModal = false">Close</button>
+            <button
+              class="save-btn"
+              @click="saveConsultSlot"
+              :disabled="!consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || !!consultTimeError"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              {{ consultEditId ? 'Update' : 'Save Slot' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- ═══ Logout Confirm Modal ═══ -->
     <Teleport to="body">
       <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
@@ -592,6 +702,7 @@ const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const teacherUserMap = ref({})
 
 async function apiRequest(path, options = {}) {
   const token = getToken()
@@ -658,7 +769,133 @@ watch(currentPage, (i) => {
 })
 const filterSection = ref('All')
 const selectedTeacher = ref('')
-watch(selectedTeacher, (teacher) => { jumpToTeacher(teacher) })
+watch(selectedTeacher, (teacher) => {
+  jumpToTeacher(teacher)
+  fetchConsultationsForTeacher()
+})
+
+// ── Consultation availability ──
+const consultationSlots = ref([])
+
+async function fetchConsultationsForTeacher() {
+  if (!selectedTeacher.value) { consultationSlots.value = []; return }
+  try {
+    const res = await apiRequest(`/consultations?teacher=${encodeURIComponent(selectedTeacher.value)}`)
+    consultationSlots.value = res.consultations || []
+  } catch (_) { consultationSlots.value = [] }
+}
+
+function getConsultationForCell(rowHour, day) {
+  if (!selectedTeacher.value) return null
+  const rowStart = parseTime(rowHour)
+  const rowEnd   = rowStart + 60
+  return consultationSlots.value.find(c => {
+    if (c.dayOfWeek !== day) return false
+    const t = parseTime(c.startTime)
+    return t >= rowStart && t < rowEnd
+  }) ?? null
+}
+
+function consultEntryStyle(rowHour, consult) {
+  if (!consult?.startTime || !consult?.endTime) return {}
+  const rowStart     = parseTime(rowHour)
+  const consultStart = parseTime(consult.startTime)
+  const mins         = Math.max(1, parseTime(consult.endTime) - consultStart)
+  const offsetMins   = consultStart - rowStart
+  return {
+    top:    (offsetMins / 60) * ROW_HEIGHT + 3 + 'px',
+    height: Math.max(24, (mins / 60) * ROW_HEIGHT - 6) + 'px',
+  }
+}
+
+// Consultation management modal
+const showConsultModal  = ref(false)
+const consultEditId     = ref(null)
+const consultWeeklyMins = ref(0)
+const consultForm = reactive({ dayOfWeek: '', startTime: '', endTime: '' })
+const consultTimeError  = ref('')
+
+watch([() => consultForm.startTime, () => consultForm.endTime], () => {
+  if (consultForm.startTime && consultForm.endTime) {
+    consultTimeError.value = parseTime(consultForm.endTime) <= parseTime(consultForm.startTime)
+      ? 'End time must be after start time' : ''
+  } else { consultTimeError.value = '' }
+})
+
+async function openConsultModal() {
+  try {
+    const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
+    consultWeeklyMins.value = res.weeklyUsedMinutes || 0
+  } catch (_) { consultWeeklyMins.value = 0 }
+  await fetchConsultationsForTeacher()
+  consultEditId.value = null
+  Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
+  consultTimeError.value = ''
+  showConsultModal.value = true
+}
+
+function editConsultSlot(slot) {
+  consultEditId.value    = slot.id
+  consultForm.dayOfWeek  = slot.dayOfWeek
+  consultForm.startTime  = slot.startTime
+  consultForm.endTime    = slot.endTime
+  consultTimeError.value = ''
+}
+
+async function saveConsultSlot() {
+  if (!consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || consultTimeError.value) return
+  try {
+    const teacherUser = teacherUserMap.value[selectedTeacher.value]
+    const employeeId  = teacherUser?.employeeId || selectedTeacher.value
+    const payload = {
+      employeeId,
+      teacher:   selectedTeacher.value,
+      dayOfWeek: consultForm.dayOfWeek,
+      startTime: consultForm.startTime,
+      endTime:   consultForm.endTime,
+    }
+    if (consultEditId.value) {
+      await apiRequest(`/consultations/${consultEditId.value}`, { method: 'PUT', body: JSON.stringify(payload) })
+    } else {
+      await apiRequest('/consultations', { method: 'POST', body: JSON.stringify(payload) })
+    }
+    consultEditId.value = null
+    Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
+    consultTimeError.value = ''
+    await fetchConsultationsForTeacher()
+    const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
+    consultWeeklyMins.value = res.weeklyUsedMinutes || 0
+  } catch (error) {
+    await Swal.fire({
+      icon: 'error', title: 'Cannot Save Consultation',
+      html: `<span style="font-size:0.95rem;color:#444">${error?.message || 'Failed to save consultation slot.'}</span>`,
+      confirmButtonText: 'OK', confirmButtonColor: '#1b4332', background: '#fff',
+      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
+    })
+  }
+}
+
+async function deleteConsultSlot(id) {
+  const ok = await Swal.fire({
+    icon: 'warning', title: 'Remove Consultation Slot?', text: 'This slot will be permanently deleted.',
+    showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#e63946',
+    cancelButtonText: 'Cancel', cancelButtonColor: '#6c757d', background: '#fff',
+    customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title' },
+  })
+  if (!ok.isConfirmed) return
+  try {
+    await apiRequest(`/consultations/${id}`, { method: 'DELETE' })
+    if (consultEditId.value === id) {
+      consultEditId.value = null
+      Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
+    }
+    await fetchConsultationsForTeacher()
+    const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
+    consultWeeklyMins.value = res.weeklyUsedMinutes || 0
+  } catch (error) {
+    await Swal.fire({ icon: 'error', title: 'Error', text: error?.message || 'Failed to delete.', confirmButtonColor: '#1b4332', background: '#fff' })
+  }
+}
 
 // Only teachers who have at least one schedule entry (derived directly from entries)
 const scheduledTeachers = computed(() =>
@@ -918,6 +1155,22 @@ function isSpannedCell(slot, day) {
   for (let i = 0; i < slotIndex; i++) {
     const prev = getEntriesForCell(timeSlots[i], day)
     if (prev.length > 0 && i + getRowspan(prev[0]) > slotIndex) return true
+  }
+  return false
+}
+
+function getConsultRowspan(consult) {
+  if (!consult?.startTime || !consult?.endTime) return 1
+  return Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime)) / 60))
+}
+
+// Returns true if a prior row's consultation slot already spans into this cell
+function isConsultSpannedCell(slot, day) {
+  const slotIndex = timeSlots.indexOf(slot)
+  if (slotIndex <= 0) return false
+  for (let i = 0; i < slotIndex; i++) {
+    const consult = getConsultationForCell(timeSlots[i], day)
+    if (consult && i + getConsultRowspan(consult) > slotIndex) return true
   }
   return false
 }
@@ -1325,13 +1578,16 @@ onMounted(async () => {
     // Fetch teachers from database (role=teacher)
     const response = await apiRequest('/users?role=teacher')
     if (response.users && Array.isArray(response.users)) {
-      const teachers = response.users
-        .filter(user => user.role === 'Teacher') // Ensure only Teacher role
-        .map(user => `${user.firstName} ${user.lastName}`.trim())
-        .filter(name => name.length > 0)
+      const teachers = response.users.filter(user => user.role === 'Teacher')
       if (teachers.length > 0) {
         teacherOptions.value = teachers
-        console.log('Loaded teachers:', teachers)
+          .map(user => `${user.firstName} ${user.lastName}`.trim())
+          .filter(name => name.length > 0)
+        teachers.forEach(user => {
+          const name = `${user.firstName} ${user.lastName}`.trim()
+          if (name) teacherUserMap.value[name] = user
+        })
+        console.log('Loaded teachers:', teacherOptions.value)
       }
     }
     
@@ -1885,6 +2141,38 @@ function confirmLogout() {
 .color-green  { background: #1b4332; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
 .color-blue   { background: #4a90d9; color: #fff; }
+
+/* ── Consultation ── */
+.consult-entry { cursor: default; pointer-events: none; }
+.consult-cell  { cursor: default !important; }
+.consult-cell:hover { background: inherit !important; }
+.consult-btn { background: #4a90d9 !important; color: #fff !important; border-color: #4a90d9 !important; }
+.consult-btn:hover { background: #357abd !important; }
+.consult-modal-box { max-width: 480px; }
+.consult-slots-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 24px 12px; }
+.consult-slot-item {
+  display: flex; align-items: center; gap: 10px;
+  background: #f0f6ff; border: 1px solid #c8dff8; border-radius: 8px;
+  padding: 8px 12px;
+}
+.consult-slot-day  { font-weight: 700; font-size: 0.82rem; color: #1b4332; min-width: 36px; }
+.consult-slot-time { flex: 1; font-size: 0.82rem; color: #333; }
+.consult-slot-dur  { font-size: 0.78rem; color: #666; white-space: nowrap; }
+.consult-slot-actions { display: flex; gap: 6px; }
+.consult-edit-btn {
+  padding: 3px 10px; border-radius: 5px; border: 1px solid #4a90d9;
+  background: transparent; color: #4a90d9; font-size: 0.78rem; cursor: pointer;
+}
+.consult-edit-btn:hover { background: #e8f0fb; }
+.consult-del-btn {
+  padding: 3px 8px; border-radius: 5px; border: 1px solid #e63946;
+  background: transparent; color: #e63946; cursor: pointer; display: flex; align-items: center;
+}
+.consult-del-btn:hover { background: #fde8e8; }
+.consult-empty { padding: 8px 24px 12px; color: #888; font-size: 0.84rem; font-style: italic; }
+.consult-form-title { padding: 0 24px 8px; font-weight: 600; font-size: 0.88rem; color: #1b4332; }
+.limit-warning { color: #e63946; font-weight: 600; }
+.limit-ok { color: #1b4332; }
 .color-purple { background: #7b5ea7; color: #fff; }
 .color-red    { background: #e63946; color: #fff; }
 

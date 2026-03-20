@@ -1,6 +1,7 @@
 const ScheduleEntry = require("../models/ScheduleEntry");
 const ScheduleTable = require("../models/ScheduleTable");
 const User = require("../models/User");
+const ConsultationAvailability = require("../models/ConsultationAvailability");
 
 const YEAR_VALUES = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 const DAY_VALUES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -314,7 +315,16 @@ async function findConflict(doc, excludedIds = []) {
       return `Room ${doc.room} is already occupied on ${doc.day} from ${roomConflict.timeIn} to ${roomConflict.timeOut}.`;
     }
   }
-  
+
+  // Rule 3: teacher has a consultation slot that overlaps this class time
+  const consultSlots = await ConsultationAvailability.find({ teacher: doc.teacher, dayOfWeek: doc.day }).lean();
+  for (const slot of consultSlots) {
+    const slotStart = parseTimeToMinutes(slot.startTime);
+    const slotEnd   = parseTimeToMinutes(slot.endTime);
+    if (doc.timeInMinutes < slotEnd && doc.timeOutMinutes > slotStart) {
+      return `${doc.teacher} has a consultation slot on ${doc.day} from ${slot.startTime} to ${slot.endTime}. A class cannot be scheduled during consultation hours.`;
+    }
+  }
 
   return null;
 }

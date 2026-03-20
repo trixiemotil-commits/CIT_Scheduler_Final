@@ -26,28 +26,27 @@
 
     <!-- Teacher List -->
     <div class="teacher-list">
+      <div v-if="loadingTeachers" class="empty-state-card">Loading teachers...</div>
+      <div v-else-if="loadError" class="empty-state-card error">{{ loadError }}</div>
+      <div v-else-if="!filteredTeachers.length" class="empty-state-card">No teachers found.</div>
       <div v-for="t in filteredTeachers" :key="t.id" class="teacher-card">
         <div class="teacher-top">
           <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
           <div class="teacher-meta">
             <div class="teacher-name">{{ t.name }}</div>
             <div class="teacher-subject">{{ t.subject }}</div>
-            <div class="stars-row">
-              <span class="stars">★★★★</span>
-              <span class="rating">{{ t.rating }} ({{ t.reviews }})</span>
-            </div>
           </div>
           <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
         </div>
-        <div class="tags-row">
-          <span v-for="tag in t.tags" :key="tag" class="tag">{{ tag }}</span>
-        </div>
         <div class="teacher-footer">
-          <span class="price">${{ t.price }} / session</span>
-          <div class="footer-btns">
-            <button v-if="t.available" class="action-btn green" @click="openRequest(t)">Request</button>
-            <button class="action-btn outline" @click="openProfile(t)">View Profile</button>
-          </div>
+          <span class="price">&nbsp;</span>
+          <button
+            :class="['action-btn', t.available ? 'green' : 'disabled']"
+            :disabled="!t.available"
+            @click="openRequest(t)"
+          >
+            Request Consultations
+          </button>
         </div>
       </div>
     </div>
@@ -125,7 +124,7 @@
           </div>
           <div class="prof-row">
             <span class="prof-label">Consultation Fee</span>
-            <span class="prof-value">${{ selectedTeacher?.price }} / session</span>
+            <span class="prof-value">N/A</span>
           </div>
           <div class="prof-row">
             <span class="prof-label">Availability</span>
@@ -146,25 +145,98 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { getToken } from '@/auth.js'
 import BottomNav from '@/components/student/BottomNav.vue'
-import { useStudentData } from '@/composables/useStudentData.js'
 
-const { addSession } = useStudentData()
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const search       = ref('')
 const activeFilter = ref('All')
 const filters      = ['All', 'On School', 'On Meeting', 'On Leave']
+const loadingTeachers = ref(false)
+const loadError = ref('')
 
-const teachers = [
-  { id: 1, name: 'Ms. Lisa Johnson',  subject: 'Mathematics & Statistics', initials: 'J', color: '#e63946', status: 'On School',  available: true,  rating: 4.2, reviews: 38, tags: ['Algebra','Calculus','Stats'], price: 45 },
-  { id: 2, name: 'Mr. Robert Davis',  subject: 'Physics & Chemistry',      initials: 'D', color: '#3a86ff', status: 'On School',  available: true,  rating: 4.9, reviews: 65, tags: ['Physics','Chemistry'],        price: 60 },
-  { id: 3, name: 'Ms. Sarah Park',    subject: 'English & Literature',     initials: 'P', color: '#9b5de5', status: 'On Meeting', available: false, rating: 4.1, reviews: 29, tags: ['Writing','Grammar'],           price: 40 },
-  { id: 4, name: 'Mr. Tom Wilson',    subject: 'History & Geography',      initials: 'W', color: '#1b4332', status: 'On School',  available: true,  rating: 4.7, reviews: 51, tags: ['History','Geography'],         price: 50 },
-  { id: 5, name: 'Ms. Maria Santos',  subject: 'Biology & Science',        initials: 'S', color: '#f4a261', status: 'On Leave',   available: false, rating: 4.3, reviews: 22, tags: ['Biology','Lab'],               price: 45 },
-]
+const teachers = ref([])
 
-const filteredTeachers = computed(() => teachers.filter(t => {
+function initialsFor(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  return (parts[0][0] || '?').toUpperCase()
+}
+
+function colorForName(name) {
+  const palette = ['#e63946', '#3a86ff', '#2d6a4f', '#f4a261', '#9b5de5', '#00a896', '#577590']
+  const text = String(name || '')
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i)
+    hash |= 0
+  }
+  return palette[Math.abs(hash) % palette.length]
+}
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
+}
+
+function mapTeacher(teacher) {
+  const subjects = Array.isArray(teacher.subjects) ? teacher.subjects.filter(Boolean) : []
+  const resolvedStatus = teacher.status || teacher.teacher_status || 'On Leave'
+  return {
+    id: teacher.id,
+    employeeId: teacher.employeeId,
+    name: teacher.name,
+    subject: subjects.length ? subjects.join(', ') : 'No subject assigned',
+    initials: initialsFor(teacher.name),
+    color: colorForName(teacher.name),
+    status: resolvedStatus,
+    available: Boolean(teacher.available) && resolvedStatus === 'On School',
+    tags: subjects.slice(0, 3),
+    consultationSlots: Array.isArray(teacher.consultationSlots) ? teacher.consultationSlots : [],
+  }
+}
+
+async function loadTeachers() {
+  loadingTeachers.value = true
+  loadError.value = ''
+  try {
+    const payload = await apiRequest('/consultations/teachers')
+    teachers.value = (payload.teachers || []).map(mapTeacher)
+  } catch (error) {
+    teachers.value = []
+    loadError.value = error.message || 'Failed to load teachers.'
+  } finally {
+    loadingTeachers.value = false
+  }
+}
+
+const filteredTeachers = computed(() => teachers.value.filter(t => {
   const matchSearch = !search.value || t.name.toLowerCase().includes(search.value.toLowerCase()) || t.subject.toLowerCase().includes(search.value.toLowerCase())
   const matchFilter = activeFilter.value === 'All' || t.status === activeFilter.value
   return matchSearch && matchFilter
@@ -205,15 +277,33 @@ function submitRequest() {
   if (!reqForm.value.topic.trim()) { reqError.value = 'Please enter a topic.'; return }
   if (!reqForm.value.date)         { reqError.value = 'Please select a preferred date.'; return }
   if (!reqForm.value.time)         { reqError.value = 'Please select a preferred time.'; return }
-  addSession(selectedTeacher.value, reqForm.value.topic.trim(), reqForm.value.date, reqForm.value.time, reqForm.value.notes)
-  showReqModal.value = false
-  showToast(`Request sent to ${selectedTeacher.value.name}! 🎉`)
+
+  apiRequest('/consultations/requests', {
+    method: 'POST',
+    body: JSON.stringify({
+      teacherId: selectedTeacher.value.id,
+      topic: reqForm.value.topic.trim(),
+      date: reqForm.value.date,
+      time: reqForm.value.time,
+      notes: reqForm.value.notes || '',
+    }),
+  })
+    .then(() => {
+      showReqModal.value = false
+      showToast(`Request sent to ${selectedTeacher.value.name}.`)
+      return loadTeachers()
+    })
+    .catch((error) => {
+      reqError.value = error.message || 'Failed to send request.'
+    })
 }
 
 function showToast(msg) {
   toastMsg.value = msg
   setTimeout(() => { toastMsg.value = '' }, 3000)
 }
+
+onMounted(loadTeachers)
 </script>
 
 <style scoped>
@@ -266,6 +356,19 @@ function showToast(msg) {
 
 /* Teacher cards */
 .teacher-list { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 0; }
+.empty-state-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  color: #666;
+  border: 1px solid #ececec;
+}
+.empty-state-card.error {
+  color: #b23a48;
+  border-color: #f3c3ca;
+  background: #fff4f5;
+}
 .teacher-card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
 .teacher-top  { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
 .teacher-avatar {
@@ -276,10 +379,6 @@ function showToast(msg) {
 .teacher-meta { flex: 1; }
 .teacher-name    { font-weight: 700; font-size: 0.9rem; color: #111; }
 .teacher-subject { font-size: 0.77rem; color: #666; margin-top: 2px; }
-.stars-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
-.stars  { color: #f4a261; font-size: 0.85rem; letter-spacing: -1px; }
-.rating { font-size: 0.75rem; color: #888; }
-
 .status-pill {
   font-size: 0.7rem; font-weight: 600;
   padding: 3px 10px; border-radius: 20px;
@@ -289,16 +388,8 @@ function showToast(msg) {
 .pill-orange { background: #fff3e0; color: #b35e00; }
 .pill-gray   { background: #f0f0f0; color: #666; }
 
-.tags-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.tag {
-  background: #f4f6f9; border: 1px solid #e5e7eb;
-  border-radius: 6px; padding: 3px 10px;
-  font-size: 0.74rem; color: #555;
-}
-
 .teacher-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.price { font-size: 0.82rem; font-weight: 600; color: #1b4332; }
-.footer-btns { display: flex; gap: 8px; }
+.price { font-size: 0.82rem; font-weight: 600; color: #1b4332; min-width: 12px; }
 .action-btn {
   padding: 9px 14px; border-radius: 8px;
   border: none; font-family: inherit;
@@ -306,7 +397,11 @@ function showToast(msg) {
 }
 .action-btn:active { opacity: 0.8; }
 .action-btn.green   { background: #1b4332; color: #fff; }
-.action-btn.outline { background: #fff; color: #444; border: 1.5px solid #ddd; }
+.action-btn.disabled {
+  background: #7b8794;
+  color: #fff;
+  cursor: not-allowed;
+}
 
 /* ── Modals ── */
 .modal-overlay {

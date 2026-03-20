@@ -13,6 +13,7 @@ async function connectDB() {
   await dropStaleRegisteredIdIndex();
   await backfillRegisteredIds();
   await ensureSparseStudentIdIndex();
+  await migrateUserStatusFields();
 }
 
 async function dropStaleRegisteredIdIndex() {
@@ -93,6 +94,85 @@ async function ensureSparseStudentIdIndex() {
     const benignCodes = ["NamespaceNotFound", "IndexNotFound"];
     if (!benignCodes.includes(err.codeName) && ![26, 27].includes(err.code)) {
       console.warn("Failed to ensure sparse studentId index:", err.message);
+    }
+  }
+}
+
+async function migrateUserStatusFields() {
+  try {
+    const db = mongoose.connection.db;
+    if (!db) {
+      return;
+    }
+
+    const collections = await db.listCollections({ name: "users" }).toArray();
+    if (!collections.length) {
+      return;
+    }
+
+    const users = db.collection("users");
+
+    // Backfill account_status from legacy status or default to Active.
+    const accountResult = await users.updateMany(
+      {
+        $or: [
+          { account_status: { $exists: false } },
+          { account_status: null },
+          { account_status: "" },
+        ],
+      },
+      [
+        {
+          $set: {
+            account_status: {
+              $cond: {
+                if: { $in: ["$status", ["Active", "Inactive", "Archived"]] },
+                then: "$status",
+                else: "Active",
+              },
+            },
+          },
+        },
+      ]
+    );
+
+    // Set teacher_status only for teacher users when missing.
+    const teacherStatusResult = await users.updateMany(
+      {
+        role: "teacher",
+        $or: [
+          { teacher_status: { $exists: false } },
+          { teacher_status: null },
+          { teacher_status: "" },
+        ],
+      },
+      {
+        $set: {
+          teacher_status: "On School",
+        },
+      }
+    );
+
+    // Remove teacher_status for non-teacher accounts.
+    await users.updateMany(
+      { role: { $ne: "teacher" }, teacher_status: { $exists: true } },
+      { $unset: { teacher_status: "" } }
+    );
+
+    // Drop legacy status field once migrated.
+    await users.updateMany(
+      { status: { $exists: true } },
+      { $unset: { status: "" } }
+    );
+
+    const touched = (accountResult.modifiedCount || 0) + (teacherStatusResult.modifiedCount || 0);
+    if (touched > 0) {
+      console.log(`Migrated user status fields for ${touched} user record(s).`);
+    }
+  } catch (err) {
+    const benignCodes = ["NamespaceNotFound"];
+    if (!benignCodes.includes(err.codeName) && ![26].includes(err.code)) {
+      console.warn("Failed to migrate user status fields:", err.message);
     }
   }
 }

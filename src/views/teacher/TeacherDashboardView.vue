@@ -185,7 +185,7 @@
             <tbody>
               <tr v-if="classesLoading || classesError || !todayClasses.length">
                 <td colspan="5" class="td-empty-state">
-                  {{ classesLoading ? 'Loading classes...' : (classesError || `No classes scheduled for ${todayDayName}.`) }}
+                  {{ classesLoading ? 'Loading classes...' : (classesError || `No classes or consultation hours scheduled for ${todayDayName}.`) }}
                 </td>
               </tr>
               <tr v-else v-for="(cls, i) in todayClasses" :key="i">
@@ -196,16 +196,21 @@
                   </svg>
                   {{ cls.time }}
                 </td>
-                <td class="td-subject">{{ cls.subject }}</td>
-                <td class="td-section">{{ cls.section }}</td>
-                <td class="td-parallel">
-                  <span :class="['parallel-badge', cls.parallel ? 'badge-parallel' : 'badge-not']">
-                    {{ cls.parallel ? 'Parallel' : 'Not Parallel' }}
-                  </span>
+                <td v-if="cls.isConsultation" colspan="4" class="td-consultation-center">
+                  <span class="consultation-chip">Consultation Hours</span>
                 </td>
-                <td class="td-room">
-                  <span :class="['room-badge', cls.roomColor]">{{ cls.room }}</span>
-                </td>
+                <template v-else>
+                  <td class="td-subject">{{ cls.subject }}</td>
+                  <td class="td-section">{{ cls.section }}</td>
+                  <td class="td-parallel">
+                    <span :class="['parallel-badge', cls.parallel ? 'badge-parallel' : 'badge-not']">
+                      {{ cls.parallel ? 'Parallel' : 'Not Parallel' }}
+                    </span>
+                  </td>
+                  <td class="td-room">
+                    <span :class="['room-badge', cls.roomColor]">{{ cls.room }}</span>
+                  </td>
+                </template>
               </tr>
             </tbody>
           </table>
@@ -302,6 +307,16 @@ const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const todayDayName = ref(dayNames[new Date().getDay()])
 let midnightRefreshTimer = null
 
+function getTeacherName() {
+  const fullName = typeof user?.name === 'string' ? user.name.trim() : ''
+  if (fullName) {
+    return fullName
+  }
+
+  const combined = `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+  return combined
+}
+
 function getCurrentDayName() {
   return dayNames[new Date().getDay()]
 }
@@ -344,6 +359,11 @@ async function apiRequest(path, options = {}) {
 
 function parseTimeToMinutes(value) {
   const text = (value || '').toString().trim()
+  const plain = text.match(/^(\d{2}):(\d{2})$/)
+  if (plain) {
+    return (Number(plain[1]) * 60) + Number(plain[2])
+  }
+
   const match = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
   if (!match) return Number.MAX_SAFE_INTEGER
 
@@ -412,15 +432,42 @@ function mapTodayClasses(entries) {
     .sort((a, b) => a.sortValue - b.sortValue)
 }
 
+function mapTodayConsultations(slots) {
+  return (Array.isArray(slots) ? slots : [])
+    .filter((slot) => slot?.dayOfWeek === todayDayName.value)
+    .map((slot) => ({
+      time: `${slot.startTime} – ${slot.endTime}`,
+      subject: 'Consultation Hours',
+      section: '-',
+      parallel: false,
+      room: '-',
+      roomColor: 'room-green',
+      isConsultation: true,
+      sortValue: parseTimeToMinutes(slot.startTime),
+    }))
+}
+
 async function loadTodayClasses() {
   classesLoading.value = true
   classesError.value = ''
   todayDayName.value = getCurrentDayName()
 
   try {
-    const payload = await apiRequest('/schedules')
-    const entries = Array.isArray(payload.entries) ? payload.entries : []
-    todayClasses.value = mapTodayClasses(entries)
+    const teacherName = getTeacherName()
+    const [schedulePayload, consultPayload] = await Promise.all([
+      apiRequest('/schedules'),
+      teacherName
+        ? apiRequest(`/consultations?teacher=${encodeURIComponent(teacherName)}`).catch(() => ({ consultations: [] }))
+        : Promise.resolve({ consultations: [] }),
+    ])
+
+    const entries = Array.isArray(schedulePayload.entries) ? schedulePayload.entries : []
+    const consultations = Array.isArray(consultPayload.consultations) ? consultPayload.consultations : []
+
+    todayClasses.value = [
+      ...mapTodayClasses(entries),
+      ...mapTodayConsultations(consultations),
+    ].sort((a, b) => a.sortValue - b.sortValue)
   } catch (error) {
     todayClasses.value = []
     classesError.value = error.message || 'Unable to load classes.'
@@ -772,6 +819,22 @@ function confirmLogout() {
 }
 .td-subject { text-align: left; color: #222; font-weight: 500; }
 .td-section { color: #555; }
+.td-consultation-center {
+  text-align: center !important;
+}
+
+.consultation-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #e8f0fb;
+  border: 1px solid #4a90d9;
+  color: #2f6fb0;
+  font-size: 0.86rem;
+  font-weight: 500;
+}
 
 /* Parallel badge */
 .parallel-badge {

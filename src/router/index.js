@@ -11,6 +11,7 @@ import TeacherAssignmentsView from '@/views/admin/TeacherAssignmentsView.vue'
 import UserManagementView from '@/views/admin/UserManagementView.vue'
 import StudentConsultationsView from '@/views/student/StudentConsultationsView.vue'
 import StudentDashboardView from '@/views/student/StudentDashboardView.vue'
+import StudentEventsView from '@/views/student/StudentEventsView.vue'
 import StudentNotificationsView from '@/views/student/StudentNotificationsView.vue'
 import StudentProfileView from '@/views/student/StudentProfileView.vue'
 import StudentSettingsView from '@/views/student/StudentSettingsView.vue'
@@ -44,6 +45,7 @@ const router = createRouter({
     { path: '/teacher/profile',       name: 'teacher-profile',       component: TeacherProfileView,       meta: { requiresAuth: true, role: 'teacher' } },
     { path: '/student/dashboard',     name: 'student-dashboard',     component: StudentDashboardView,     meta: { requiresAuth: true, role: 'student' } },
     { path: '/student/teachers',      name: 'student-teachers',      component: StudentTeachersView,      meta: { requiresAuth: true, role: 'student' } },
+    { path: '/student/events',        name: 'student-events',        component: StudentEventsView,        meta: { requiresAuth: true, role: 'student' } },
     { path: '/student/consultations', name: 'student-consultations', component: StudentConsultationsView, meta: { requiresAuth: true, role: 'student' } },
     { path: '/student/profile',       name: 'student-profile',       component: StudentProfileView,       meta: { requiresAuth: true, role: 'student' } },
     { path: '/student/settings',      name: 'student-settings',      component: StudentSettingsView,      meta: { requiresAuth: true, role: 'student' } },

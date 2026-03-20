@@ -8,7 +8,6 @@
       <div style="width:32px"></div>
     </div>
 
-    <!-- User card -->
     <div class="user-card">
       <div class="user-avatar">{{ initials }}</div>
       <div class="user-info">
@@ -18,73 +17,45 @@
       <button class="profile-link" @click="$router.push('/student/profile')">Profile</button>
     </div>
 
-    <!-- Change Password -->
     <div class="section-card">
       <div class="section-title">Change Password</div>
-      <form @submit.prevent="handleUpdatePassword">
-        <!-- Current password + Send OTP -->
-        <div class="field-row-otp">
-          <div class="field-group" style="flex:1">
-            <label class="field-label">Current Password</label>
-            <div class="pw-wrap">
-              <input v-model="pwForm.current" :type="showCurrent?'text':'password'" class="field-input" placeholder="••••••••" :disabled="otpSent" />
-              <button type="button" class="eye-btn" @click="showCurrent=!showCurrent">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-            </div>
+      <form @submit.prevent="handleUpdatePassword" class="pw-form">
+        <div class="field-group">
+          <label class="field-label">Current Password</label>
+          <div class="pw-wrap">
+            <input v-model="pwForm.current" class="field-input" :type="showCurrent ? 'text' : 'password'" placeholder="Enter your current password" />
+            <button type="button" class="eye-btn" @click="showCurrent = !showCurrent" aria-label="Toggle current password visibility">
+              <svg v-if="showCurrent" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.89 1 12c.66-1.92 1.8-3.64 3.26-5"/><path d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path d="M9.88 5.09A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8a11.83 11.83 0 0 1-1.64 2.86"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
           </div>
-          <div class="otp-action">
-            <button v-if="!otpSent" type="button" class="send-otp-btn" @click="sendOtp">Send OTP</button>
-            <div v-else class="otp-sent-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Sent
-              <button type="button" class="resend-link" @click="resetOtp">Resend</button>
-            </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">New Password</label>
+          <div class="pw-wrap">
+            <input v-model="pwForm.newPw" class="field-input" :type="showNew ? 'text' : 'password'" placeholder="Enter your new password" />
+            <button type="button" class="eye-btn" @click="showNew = !showNew" aria-label="Toggle new password visibility">
+              <svg v-if="showNew" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.89 1 12c.66-1.92 1.8-3.64 3.26-5"/><path d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path d="M9.88 5.09A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8a11.83 11.83 0 0 1-1.64 2.86"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Confirm New Password</label>
+          <div class="pw-wrap">
+            <input v-model="pwForm.confirmPw" class="field-input" :type="showConfirm ? 'text' : 'password'" placeholder="Re-enter your new password " />
+            <button type="button" class="eye-btn" @click="showConfirm = !showConfirm" aria-label="Toggle confirm password visibility">
+              <svg v-if="showConfirm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.89 1 12c.66-1.92 1.8-3.64 3.26-5"/><path d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path d="M9.88 5.09A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8a11.83 11.83 0 0 1-1.64 2.86"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
           </div>
         </div>
 
-        <!-- OTP boxes -->
-        <template v-if="otpSent">
-          <label class="field-label">Enter OTP <span class="otp-hint">Sent to {{ maskedEmail }}</span></label>
-          <div class="otp-boxes">
-            <input
-              v-for="(_, i) in pwOtpCode" :key="i"
-              :ref="el => { if(el) otpRefs[i]=el }"
-              v-model="pwOtpCode[i]"
-              class="otp-box" type="text" maxlength="1" inputmode="numeric"
-              @input="onOtpInput(i)"
-              @keydown.backspace="onOtpBackspace(i)"
-            />
-          </div>
-
-          <div class="field-group">
-            <label class="field-label">New Password</label>
-            <div class="pw-wrap">
-              <input v-model="pwForm.newPw" :type="showNew?'text':'password'" class="field-input" placeholder="••••••••" />
-              <button type="button" class="eye-btn" @click="showNew=!showNew">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-            </div>
-          </div>
-          <div class="field-group">
-            <label class="field-label">Confirm New Password</label>
-            <div class="pw-wrap">
-              <input v-model="pwForm.confirmPw" :type="showConfirm?'text':'password'" class="field-input" placeholder="••••••••" />
-              <button type="button" class="eye-btn" @click="showConfirm=!showConfirm">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-            </div>
-          </div>
-        </template>
-
-        <div v-if="pwError"   class="msg msg-err">{{ pwError }}</div>
-        <div v-if="pwSuccess" class="msg msg-ok">{{ pwSuccess }}</div>
-
-        <button type="submit" class="update-btn" :disabled="!otpSent">Update Password</button>
+        <div v-if="pwError" class="msg msg-err">{{ pwError }}</div>
+        <button type="submit" class="update-btn">Update Password</button>
       </form>
     </div>
 
-    <!-- 2FA -->
     <div class="section-card">
       <div class="section-title">Two Factor Authentication</div>
       <div class="toggle-row">
@@ -93,31 +64,26 @@
           <div class="toggle-sub">Adds extra login security</div>
         </div>
         <label class="toggle-switch">
-          <input type="checkbox" v-model="twoFactor" @change="on2FAChange" />
+          <input type="checkbox" v-model="twoFactor" />
           <span class="toggle-slider"></span>
         </label>
       </div>
-      <div v-if="twoFactor" class="tfa-on-msg">✅ 2FA is <strong>ON</strong>. A verification code will be sent to your email at each login.</div>
+      <div :class="['twofa-msg', twoFactor ? 'msg-on' : 'msg-off']">
+        <span v-if="twoFactor">2FA is ON. A verification code will be sent to your email at each login.</span>
+        <span v-else>2FA is currently OFF. Turn it ON to receive a verification code via email each time you log in.</span>
+      </div>
+    </div>
 
-      <div class="toggle-row" style="margin-top:16px">
-        <div>
-          <div class="toggle-label">Email Notifications</div>
-          <div class="toggle-sub">Session updates by email</div>
+    <div v-if="showSuccessModal" class="modal-overlay" @click.self="showSuccessModal = false">
+      <div class="success-modal">
+        <div class="success-icon-wrap">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
         </div>
-        <label class="toggle-switch">
-          <input type="checkbox" v-model="emailNotif" />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div class="toggle-row" style="margin-top:12px">
-        <div>
-          <div class="toggle-label">Push Notifications</div>
-          <div class="toggle-sub">In-app alerts</div>
-        </div>
-        <label class="toggle-switch">
-          <input type="checkbox" v-model="pushNotif" />
-          <span class="toggle-slider"></span>
-        </label>
+        <div class="success-title">Success!</div>
+        <p class="success-text">Your password has been successfully updated. Keep it secure and do not share it with anyone.</p>
+        <button class="success-btn" @click="showSuccessModal = false">Continue</button>
       </div>
     </div>
 
@@ -130,185 +96,245 @@ import { ref, computed } from 'vue'
 import { getUser } from '@/auth.js'
 import BottomNav from '@/components/student/BottomNav.vue'
 
-const user     = getUser() || { name: 'Anna Cooper', email: 'anna.cooper@student.edu' }
-const initials = computed(() => user.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'A')
+const user = getUser() || { name: 'Anna Cooper', email: 'anna.cooper@student.edu' }
+const initials = computed(() => user.name?.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'A')
 
-const maskedEmail = computed(() => {
-  const email = user.email || 'student@gmail.com'
-  const [local, domain] = email.split('@')
-  return local.slice(0, 2) + '*'.repeat(Math.max(local.length - 2, 4)) + '@' + domain
-})
-
-/* Password */
-const pwForm      = ref({ current: '', newPw: '', confirmPw: '' })
+const pwForm = ref({ current: '', newPw: '', confirmPw: '' })
 const showCurrent = ref(false)
-const showNew     = ref(false)
+const showNew = ref(false)
 const showConfirm = ref(false)
-const pwError     = ref('')
-const pwSuccess   = ref('')
-const otpSent     = ref(false)
-const pwOtpCode   = ref(['','','','','',''])
-const otpRefs     = ref([])
-
-function sendOtp() {
-  if (!pwForm.value.current) { pwError.value = 'Please enter your current password first.'; return }
-  pwError.value = ''; otpSent.value = true; pwOtpCode.value = ['','','','','','']
-  pwSuccess.value = 'OTP sent to ' + maskedEmail.value
-  setTimeout(() => { pwSuccess.value = '' }, 4000)
-}
-function resetOtp() { otpSent.value = false; pwOtpCode.value = ['','','','','','']; pwForm.value.current = '' }
-function onOtpInput(i)    { if (pwOtpCode.value[i] && i < 5) otpRefs.value[i+1]?.focus() }
-function onOtpBackspace(i){ if (!pwOtpCode.value[i] && i > 0) otpRefs.value[i-1]?.focus() }
+const pwError = ref('')
+const pwSuccess = ref('')
+const showSuccessModal = ref(false)
+const twoFactor = ref(false)
 
 function handleUpdatePassword() {
-  pwError.value = ''; pwSuccess.value = ''
-  if (pwOtpCode.value.join('').length < 6) { pwError.value = 'Please enter the 6-digit OTP.'; return }
-  if (!pwForm.value.newPw || !pwForm.value.confirmPw) { pwError.value = 'Please fill in the new password fields.'; return }
-  if (pwForm.value.newPw !== pwForm.value.confirmPw)  { pwError.value = 'Passwords do not match.'; return }
-  if (pwForm.value.newPw.length < 6)                  { pwError.value = 'Password must be at least 6 characters.'; return }
-  pwSuccess.value = 'Password updated successfully.'
+  pwError.value = ''
+  pwSuccess.value = ''
+  if (!pwForm.value.current || !pwForm.value.newPw || !pwForm.value.confirmPw) {
+    pwError.value = 'Please complete all password fields.'
+    return
+  }
+  if (pwForm.value.newPw !== pwForm.value.confirmPw) {
+    pwError.value = 'New password and confirmation do not match.'
+    return
+  }
+  if (pwForm.value.newPw.length < 8) {
+    pwError.value = 'Password must be at least 8 characters long.'
+    return
+  }
   pwForm.value = { current: '', newPw: '', confirmPw: '' }
-  otpSent.value = false; pwOtpCode.value = ['','','','','','']
-  setTimeout(() => { pwSuccess.value = '' }, 4000)
+  pwSuccess.value = ''
+  showSuccessModal.value = true
 }
-
-/* 2FA */
-const twoFactor  = ref(false)
-const emailNotif = ref(true)
-const pushNotif  = ref(true)
-function on2FAChange() {}
 </script>
 
 <style scoped>
 .mobile-app {
-  max-width: 430px; min-height: 100dvh;
-  margin: 0 auto; background: #f5f6f8;
-  display: flex; flex-direction: column;
+  max-width: 430px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  background: #f3f5f7;
+  display: flex;
+  flex-direction: column;
   padding-bottom: 72px;
   padding-top: env(safe-area-inset-top, 0px);
   font-family: 'Poppins', sans-serif;
 }
 .app-header {
-  display: flex; align-items: center; justify-content: space-between;
-  background: #fff; padding: 16px 18px; border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  padding: 16px 18px;
+  border-bottom: 1px solid #e5e7eb;
 }
 .back-btn {
-  background: none; border: none; cursor: pointer;
-  color: #444; padding: 4px; display: flex; align-items: center;
-  border-radius: 6px; margin-left: -4px; transition: color 0.15s;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #444;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  margin-left: -4px;
 }
-.back-btn:hover { color: #1b4332; }
-.header-title { font-weight: 700; font-size: 1rem; color: #1b4332; }
+.header-title { font-weight: 700; font-size: 1rem; color: #23272c; }
 
-/* User card */
 .user-card {
-  background: #fff; margin: 14px 16px 0;
-  border-radius: 14px; padding: 14px;
-  display: flex; align-items: center; gap: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  background: #fff;
+  margin: 14px 16px 0;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e4e7eb;
 }
 .user-avatar {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: #1b4332; color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 0.95rem; flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #1b4332;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
 }
 .user-info { flex: 1; }
-.user-name  { font-weight: 700; font-size: 0.9rem; color: #111; }
-.user-email { font-size: 0.75rem; color: #777; }
+.user-name { font-weight: 700; font-size: 0.9rem; color: #181c20; }
+.user-email { font-size: 0.75rem; color: #85909b; }
 .profile-link {
-  background: #1b4332; color: #fff; border: none;
-  border-radius: 8px; padding: 7px 14px;
-  font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: inherit;
+  background: #1b4332;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 0.76rem;
+  font-weight: 600;
 }
 
-/* Section card */
 .section-card {
-  background: #fff; margin: 12px 16px 0;
-  border-radius: 14px; padding: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  background: #fff;
+  margin: 10px 16px 0;
+  border-radius: 12px;
+  border: 1px solid #e4e7eb;
+  padding: 14px;
 }
-.section-title { font-weight: 700; font-size: 0.92rem; color: #1b4332; margin-bottom: 14px; }
-
-/* Password form */
-.field-row-otp { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 12px; }
-.field-group   { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
-.field-label   { font-size: 0.78rem; font-weight: 600; color: #444; }
-.pw-wrap { position: relative; }
+.section-title { font-weight: 700; color: #262b30; margin-bottom: 12px; font-size: 1rem; }
+.pw-form { display: flex; flex-direction: column; gap: 10px; }
+.field-group { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 0.8rem; color: #606a75; font-weight: 600; }
 .field-input {
-  width: 100%; box-sizing: border-box;
-  padding: 10px 36px 10px 12px;
-  border: 1.5px solid #e5e7eb; border-radius: 8px;
-  font-size: 0.85rem; font-family: inherit; outline: none; background: #f9fafb;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d8dde3;
+  border-radius: 9px;
+  padding: 10px 38px 10px 12px;
+  background: #f8fafb;
+  font-size: 0.86rem;
+  font-family: inherit;
 }
-.field-input:focus { border-color: #2d6a4f; background: #fff; }
-.field-input:disabled { opacity: 0.6; }
+.pw-wrap {
+  position: relative;
+}
 .eye-btn {
-  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-  background: none; border: none; cursor: pointer; color: #888; padding: 0;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #77828f;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
 }
-
-.otp-action { flex-shrink: 0; padding-bottom: 1px; }
-.send-otp-btn {
-  background: #1b4332; color: #fff; border: none;
-  border-radius: 8px; padding: 10px 14px;
-  font-size: 0.8rem; font-weight: 600; white-space: nowrap;
-  cursor: pointer; font-family: inherit;
-}
-.otp-sent-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: #d8f3e8; color: #1b7a4a;
-  border-radius: 8px; padding: 8px 10px;
-  font-size: 0.78rem; font-weight: 600; white-space: nowrap;
-}
-.resend-link {
-  background: none; border: none; color: #1b4332;
-  font-size: 0.75rem; font-weight: 600; text-decoration: underline;
-  cursor: pointer; padding: 0; margin-left: 2px;
-}
-
-.otp-boxes { display: flex; gap: 8px; margin-bottom: 12px; }
-.otp-box {
-  width: 40px; height: 40px; text-align: center;
-  font-size: 1rem; font-weight: 700;
-  border: 1.5px solid #e5e7eb; border-radius: 8px;
-  background: #f9fafb; color: #1b4332; outline: none;
-}
-.otp-box:focus { border-color: #2d6a4f; background: #fff; box-shadow: 0 0 0 2px rgba(45,106,79,0.15); }
-.otp-hint { font-weight: 400; font-size: 0.72rem; color: #888; margin-left: 6px; }
-
-.msg { font-size: 0.8rem; font-weight: 500; padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; }
-.msg-err { background: #ffeaea; color: #e63946; }
-.msg-ok  { background: #d8f3e8; color: #1b7a4a; }
-
 .update-btn {
-  width: 100%; padding: 13px; border: none; border-radius: 10px;
-  background: #1b4332; color: #fff;
-  font-family: inherit; font-weight: 700; font-size: 0.88rem;
-  cursor: pointer; transition: opacity 0.15s;
+  border: none;
+  background: #1b4332;
+  color: #fff;
+  border-radius: 9px;
+  padding: 11px;
+  font-weight: 700;
+  margin-top: 2px;
 }
-.update-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.msg { font-size: 0.78rem; padding: 8px 10px; border-radius: 8px; }
+.msg-err { color: #d0414f; background: #fff1f3; }
+.msg-ok { color: #1b4332; background: #eaf7ee; }
 
-/* 2FA toggles */
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
-.toggle-label { font-size: 0.88rem; font-weight: 600; color: #111; }
-.toggle-sub   { font-size: 0.75rem; color: #888; margin-top: 2px; }
-.tfa-on-msg {
-  background: #d8f3e8; color: #1b7a4a;
-  font-size: 0.78rem; padding: 8px 12px;
-  border-radius: 8px; margin-top: 10px;
-}
-.toggle-switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+.toggle-label { font-size: 0.9rem; font-weight: 600; color: #23282d; }
+.toggle-sub { font-size: 0.75rem; color: #8a949f; margin-top: 1px; }
+.toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
 .toggle-switch input { opacity: 0; width: 0; height: 0; }
 .toggle-slider {
-  position: absolute; cursor: pointer; inset: 0;
-  background: #ccc; border-radius: 26px; transition: 0.2s;
+  position: absolute;
+  inset: 0;
+  background: #9aa3ad;
+  border-radius: 24px;
+  transition: 0.2s;
 }
 .toggle-slider::before {
-  content: ''; position: absolute;
-  height: 20px; width: 20px; left: 3px; bottom: 3px;
-  background: #fff; border-radius: 50%; transition: 0.2s;
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.2s;
 }
 .toggle-switch input:checked + .toggle-slider { background: #1b4332; }
 .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+.twofa-msg {
+  margin-top: 12px;
+  font-size: 0.76rem;
+  border-radius: 8px;
+  padding: 10px;
+  line-height: 1.45;
+}
+.msg-on { background: #e7f6eb; color: #1b4332; border: 1px solid #1b4332; }
+.msg-off { background: #fff1f1; color: #e14d56; border: 1px solid #f3c3c7; }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(0, 0, 0, 0.34);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.success-modal {
+  width: min(320px, 100%);
+  background: #fff;
+  border: 2px solid #1b4332;
+  border-radius: 14px;
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.2);
+  padding: 18px 16px 16px;
+  text-align: center;
+}
+.success-icon-wrap {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 10px;
+  border: 4px solid #1b4332;
+  color: #1b4332;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.success-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #161b20;
+  margin-bottom: 8px;
+}
+.success-text {
+  margin: 0;
+  color: #5e6975;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+.success-btn {
+  margin-top: 14px;
+  border: none;
+  background: #1b4332;
+  color: #fff;
+  border-radius: 999px;
+  padding: 9px 22px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
 </style>

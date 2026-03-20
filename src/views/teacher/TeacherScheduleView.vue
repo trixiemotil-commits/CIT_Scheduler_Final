@@ -52,7 +52,7 @@
             <select class="subject-select" v-model="selectedSubject">
               <option value="">All Subject</option>
               <option v-for="opt in subjectOptions" :key="opt.code" :value="opt.code">
-                {{ opt.code }}
+                {{ opt.label }}
               </option>
             </select>
             <svg class="select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -119,6 +119,31 @@
                       <div class="cell-exp-section">{{ cell.cls.section }}</div>
                     </template>
                   </td>
+                  <!-- Consultation cell -->
+                  <td
+                    v-else-if="cell.type === 'consult'"
+                    :rowspan="cell.rowspan"
+                    :class="['td-class', 'cell-blue', { 'col-expanded': expandedDay === DAYS[ci] }]"
+                  >
+                    <template v-if="expandedDay !== DAYS[ci]">
+                      <div class="cell-room-sm">Consultation</div>
+                      <div class="cell-subject-sm">{{ formatTimeRange12(cell.consult.start, cell.consult.end) }}</div>
+                      <div class="cell-tag-sm">Office Hours</div>
+                    </template>
+                    <template v-else>
+                      <div class="cell-badge-row">
+                        <span class="cell-badge badge-consult">Consultation</span>
+                      </div>
+                      <div class="cell-exp-line">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cell-exp-icon">
+                          <circle cx="12" cy="12" r="9"/>
+                          <polyline points="12 7 12 12 15 15"/>
+                        </svg>
+                        <strong class="cell-exp-subject">Consultation Hours</strong>
+                      </div>
+                      <div class="cell-exp-section">{{ formatTimeRange12(cell.consult.start, cell.consult.end) }}</div>
+                    </template>
+                  </td>
                   <!-- Empty cell -->
                   <td
                     v-else-if="cell.type === 'empty'"
@@ -160,7 +185,7 @@
               <circle cx="12" cy="12" r="10"/>
               <polyline points="12 6 12 12 16 14"/>
             </svg>
-            <span>{{ selectedClass.start }}–{{ selectedClass.end }}</span>
+            <span>{{ formatTimeRange12(selectedClass.start, selectedClass.end) }}</span>
           </div>
         </div>
       </div>
@@ -261,13 +286,14 @@ const ALL_STARTS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:
 const TIME_SLOTS = ALL_STARTS.slice(0, -1).map((s, i) => ({
   start: s,
   end:   ALL_STARTS[i + 1],
-  label: `${s}-${ALL_STARTS[i + 1]}`
+  label: `${formatTime12(s)}-${formatTime12(ALL_STARTS[i + 1])}`
 }))
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_SHORT = { Monday: 'Monday', Tuesday: 'Tues', Wednesday: 'Wed', Thursday: 'Thurs', Friday: 'Fri', Saturday: 'Sat' }
 
 /* ── Schedule data ── */
 const scheduleData = ref([])
+const consultationData = ref([])
 const isLoading = ref(false)
 const loadError = ref('')
 
@@ -293,8 +319,86 @@ function to24Hour(value) {
   return `${String(hour).padStart(2, '0')}:${minute}`
 }
 
+function formatTime12(value) {
+  const normalized = to24Hour(value)
+  if (!normalized) {
+    return value || ''
+  }
+
+  const [hourRaw, minute] = normalized.split(':').map(Number)
+  const suffix = hourRaw >= 12 ? 'pm' : 'am'
+  const hour12 = (hourRaw % 12) || 12
+  return `${hour12}:${String(minute).padStart(2, '0')} ${suffix}`
+}
+
+function formatTimeRange12(start, end) {
+  const start12 = formatTime12(start)
+  const end12 = formatTime12(end)
+  if (!start12 && !end12) {
+    return ''
+  }
+  return `${start12}-${end12}`
+}
+
 function scheduleColor(colorToken) {
   return colorToken === 'color-yellow' ? 'yellow' : 'green'
+}
+
+function timeToMinutes(value) {
+  const hhmm = to24Hour(value)
+  if (!hhmm) {
+    return Number.NaN
+  }
+
+  const [hour, minute] = hhmm.split(':').map(Number)
+  if (Number.isNaN(hour) || Number.isNaN(minute)) {
+    return Number.NaN
+  }
+
+  return (hour * 60) + minute
+}
+
+function dayLabel(day) {
+  const normalized = (day || '').toString().trim().toLowerCase()
+  return DAYS.find((d) => d.toLowerCase() === normalized) || ''
+}
+
+function slotIndexFromMinutes(totalMinutes) {
+  if (Number.isNaN(totalMinutes)) {
+    return -1
+  }
+
+  const hour = Math.floor(totalMinutes / 60)
+  return ALL_STARTS.findIndex((start) => Number(start.slice(0, 2)) === hour)
+}
+
+function mapConsultationsToSchedule(consultations) {
+  if (!Array.isArray(consultations)) {
+    return []
+  }
+
+  return consultations
+    .map((slot) => {
+      const day = dayLabel(slot.dayOfWeek)
+      const startMinutes = timeToMinutes(slot.startTime)
+      const endMinutes = timeToMinutes(slot.endTime)
+      const startIndex = slotIndexFromMinutes(startMinutes)
+      const endIndex = slotIndexFromMinutes(endMinutes)
+
+      if (!day || startIndex < 0 || endIndex <= startIndex) {
+        return null
+      }
+
+      return {
+        id: slot.id,
+        day,
+        start: to24Hour(slot.startTime),
+        end: to24Hour(slot.endTime),
+        startIndex,
+        rowspan: endIndex - startIndex,
+      }
+    })
+    .filter(Boolean)
 }
 
 async function apiRequest(path, options = {}) {
@@ -403,15 +507,22 @@ async function loadSchedule() {
     const teacherName = userName.value
     if (!teacherName) {
       scheduleData.value = []
+      consultationData.value = []
       return
     }
 
-    const directPayload = await apiRequest(`/schedules?teacher=${encodeURIComponent(teacherName)}`)
+    const [directPayload, consultationPayload] = await Promise.all([
+      apiRequest(`/schedules?teacher=${encodeURIComponent(teacherName)}`),
+      apiRequest(`/consultations?teacher=${encodeURIComponent(teacherName)}`).catch(() => ({ consultations: [] })),
+    ])
     const apiEntries = Array.isArray(directPayload.entries) ? directPayload.entries : []
+    const consultations = Array.isArray(consultationPayload.consultations) ? consultationPayload.consultations : []
 
     scheduleData.value = mapEntriesToSchedule(apiEntries)
+    consultationData.value = mapConsultationsToSchedule(consultations)
   } catch (error) {
     scheduleData.value = []
+    consultationData.value = []
     loadError.value = error.message || 'Unable to load schedule.'
   } finally {
     isLoading.value = false
@@ -422,12 +533,37 @@ onMounted(loadSchedule)
 
 /* ── Subject filter ── */
 const selectedSubject = ref('')
+const CONSULTATION_FILTER_CODE = '__consultation__'
+
 const filteredClasses = computed(() =>
-  selectedSubject.value ? scheduleData.value.filter(c => c.code === selectedSubject.value) : scheduleData.value
+  !selectedSubject.value
+    ? scheduleData.value
+    : selectedSubject.value === CONSULTATION_FILTER_CODE
+      ? []
+      : scheduleData.value.filter((c) => c.code === selectedSubject.value)
 )
+
+const filteredConsultations = computed(() => {
+  if (!selectedSubject.value) {
+    return consultationData.value
+  }
+  return selectedSubject.value === CONSULTATION_FILTER_CODE ? consultationData.value : []
+})
+
 const subjectOptions = computed(() => {
   const seen = new Set()
-  return scheduleData.value.filter(c => { if (seen.has(c.code)) return false; seen.add(c.code); return true })
+  const subjects = scheduleData.value
+    .filter((c) => {
+      if (seen.has(c.code)) return false
+      seen.add(c.code)
+      return true
+    })
+    .map((c) => ({ code: c.code, label: c.code }))
+
+  return [
+    ...subjects,
+    { code: CONSULTATION_FILTER_CODE, label: 'Consultation Hours' },
+  ]
 })
 
 /* ── Expand day column ── */
@@ -439,6 +575,7 @@ function toggleExpand(day) {
 /* ── Build table matrix (handles rowspan occupation) ── */
 const tableMatrix = computed(() => {
   const data = filteredClasses.value
+  const consultations = filteredConsultations.value
   const occupied = Array.from({ length: DAYS.length }, () => new Array(TIME_SLOTS.length).fill(false))
 
   return TIME_SLOTS.map((slot, ri) =>
@@ -453,6 +590,13 @@ const tableMatrix = computed(() => {
         for (let r = ri + 1; r < ri + span && r < TIME_SLOTS.length; r++) occupied[ci][r] = true
         return { type: 'start', cls, rowspan: span }
       }
+
+      const consult = consultations.find((slotItem) => slotItem.day === day && slotItem.startIndex === ri)
+      if (consult) {
+        for (let r = ri + 1; r < ri + consult.rowspan && r < TIME_SLOTS.length; r++) occupied[ci][r] = true
+        return { type: 'consult', consult, rowspan: consult.rowspan }
+      }
+
       return { type: 'empty' }
     })
   )
@@ -754,6 +898,11 @@ function confirmLogout() {
   color: #fff;
 }
 
+.cell-blue {
+  background: #4a90d9;
+  color: #fff;
+}
+
 /* ─ Compact View: Text Styling ─ */
 .cell-room-sm {
   font-size: 0.78rem;
@@ -797,6 +946,11 @@ function confirmLogout() {
 .badge-p {
   background: rgba(255, 255, 255, 0.9);
   color: #e8a020;
+}
+
+.badge-consult {
+  background: rgba(255, 255, 255, 0.92);
+  color: #2f6fb0;
 }
 
 /* ─ Expanded View: Info Lines ─ */

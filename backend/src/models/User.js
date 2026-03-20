@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
-const STATUS_VALUES = ["Active", "Inactive", "Archived"];
+const ACCOUNT_STATUS_VALUES = ["Active", "Inactive", "Archived"];
+const TEACHER_STATUS_VALUES = ["On School", "On Meeting", "On Leave"];
 
 const userSchema = new mongoose.Schema(
   {
@@ -52,10 +53,15 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
-    status: {
+    account_status: {
       type: String,
-      enum: STATUS_VALUES,
+      enum: ACCOUNT_STATUS_VALUES,
       default: "Active",
+    },
+    teacher_status: {
+      type: String,
+      enum: TEACHER_STATUS_VALUES,
+      default: undefined,
     },
     avatar: {
       type: String,
@@ -78,5 +84,15 @@ userSchema.path("studentId").validate(function (value) {
   }
   return true;
 }, "Student ID is required for student accounts.");
+
+userSchema.pre("validate", function onValidate() {
+  if (this.role === "teacher") {
+    if (!this.teacher_status) {
+      this.teacher_status = "On School";
+    }
+  } else {
+    this.teacher_status = undefined;
+  }
+});
 
 module.exports = mongoose.model("User", userSchema);

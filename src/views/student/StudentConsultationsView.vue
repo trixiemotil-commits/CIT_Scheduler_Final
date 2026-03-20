@@ -128,18 +128,13 @@
     </div>
 
     <!-- ══ CANCEL CONFIRMATION MODAL ══ -->
-    <div v-if="showCancel" class="modal-overlay" @click.self="showCancel = false">
-      <div class="modal-sheet">
-        <div class="modal-handle"></div>
-        <div class="modal-header"><span>Cancel Session</span><button class="modal-close" @click="showCancel = false">✕</button></div>
-        <div class="modal-body">
-          <div class="confirm-icon">🗑️</div>
-          <div class="confirm-text">Are you sure you want to cancel <strong>{{ activeSession?.subject }}</strong> with <strong>{{ activeSession?.teacher }}</strong>?</div>
-          <div class="confirm-sub">This action cannot be undone.</div>
-        </div>
-        <div class="modal-footer">
-          <button class="modal-cancel" @click="showCancel = false">Keep Session</button>
-          <button class="modal-danger" @click="confirmCancel">Yes, Cancel It</button>
+    <div v-if="showCancel" class="modal-overlay alert-overlay" @click.self="showCancel = false">
+      <div class="cancel-alert">
+        <div class="cancel-alert-icon">!</div>
+        <div class="cancel-alert-text">Are you sure you want to cancel your consultation to that teacher?</div>
+        <div class="cancel-alert-actions">
+          <button class="alert-cancel" @click="showCancel = false">Cancel</button>
+          <button class="alert-continue" @click="confirmCancel">Continue</button>
         </div>
       </div>
     </div>
@@ -431,6 +426,10 @@ function showToast(msg) {
   position: fixed; inset: 0; background: rgba(0,0,0,0.45);
   z-index: 100; display: flex; align-items: flex-end; justify-content: center;
 }
+.alert-overlay {
+  align-items: center;
+  backdrop-filter: blur(1.5px);
+}
 .modal-sheet {
   width: 100%; max-width: 430px; background: #fff;
   border-radius: 20px 20px 0 0;
@@ -461,6 +460,57 @@ function showToast(msg) {
   font-family: inherit; font-weight: 600; font-size: 0.88rem; cursor: pointer;
 }
 .full-btn { flex: 1; }
+
+/* Cancel alert */
+.cancel-alert {
+  width: 270px;
+  background: #fff;
+  border: 1px solid #6f7b85;
+  border-radius: 14px;
+  padding: 14px 12px 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+.cancel-alert-icon {
+  width: 48px;
+  height: 48px;
+  margin: 2px auto 10px;
+  border: 3px solid #f0c541;
+  border-radius: 14px;
+  color: #f0c541;
+  font-weight: 700;
+  font-size: 1.45rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cancel-alert-text {
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: #30343a;
+  margin-bottom: 10px;
+}
+.cancel-alert-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.alert-cancel,
+.alert-continue {
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.alert-cancel { color: #f4434f; }
+.alert-continue {
+  color: #fff;
+  background: #1b7741;
+  border-radius: 999px;
+  padding: 2px 12px;
+}
 
 /* Form fields */
 .field-group   { display: flex; flex-direction: column; gap: 6px; }

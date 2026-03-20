@@ -130,7 +130,12 @@ const adminForm = reactive({
 
 async function handleAdminCreate() {
   adminError.value = ''
-  if (!adminForm.firstName || !adminForm.lastName || !adminForm.studentId || !adminForm.email || !adminForm.password) {
+  const firstName = adminForm.firstName.trim()
+  const lastName = adminForm.lastName.trim()
+  const studentId = adminForm.studentId.trim()
+  const email = adminForm.email.trim().toLowerCase()
+
+  if (!firstName || !lastName || !studentId || !email || !adminForm.password) {
     adminError.value = 'Please complete all fields.'
     return
   }
@@ -141,10 +146,10 @@ async function handleAdminCreate() {
   try {
     // Call your backend endpoint for admin creation (you may need to implement this)
     await register({
-      firstName: adminForm.firstName,
-      lastName: adminForm.lastName,
-      studentId: adminForm.studentId,
-      email: adminForm.email,
+      firstName,
+      lastName,
+      studentId,
+      email,
       password: adminForm.password,
       role: 'admin' // Force role to admin
     })
@@ -232,7 +237,12 @@ async function handleLogin() {
 async function handleSignUp() {
   signUpError.value = ''
 
-  if (!signUp.firstName || !signUp.lastName || !signUp.studentId || !signUp.email || !signUp.password) {
+  const firstName = signUp.firstName.trim()
+  const lastName = signUp.lastName.trim()
+  const studentId = signUp.studentId.trim()
+  const email = signUp.email.trim().toLowerCase()
+
+  if (!firstName || !lastName || !studentId || !email || !signUp.password) {
     signUpError.value = 'Please complete all required fields.'
     return
   }
@@ -250,10 +260,10 @@ async function handleSignUp() {
   try {
     // Always force role to student for sign up
     const role = await register({
-      firstName: signUp.firstName,
-      lastName: signUp.lastName,
-      studentId: signUp.studentId,
-      email: signUp.email,
+      firstName,
+      lastName,
+      studentId,
+      email,
       password: signUp.password,
       role: 'student'
     })
