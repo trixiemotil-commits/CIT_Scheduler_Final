@@ -56,9 +56,42 @@ async function resolveTeacherStatus(userDoc) {
     return "On Leave";
   }
 
-  const directStatus = ["On School", "On Meeting", "On Leave"].includes(userDoc.teacher_status)
+  const directStatus = ["On School", "On Meeting", "On Leave", "Main Campus", "On Main Campus"].includes(userDoc.teacher_status)
     ? userDoc.teacher_status
     : "On School";
+
+  // Explicit meeting/leave flags should always win.
+  if (directStatus === "On Meeting" || directStatus === "On Leave") {
+    return directStatus;
+  }
+
+  const teacherName = normalizeTeacherFullName(userDoc);
+  if (!teacherName) {
+    return directStatus === "Main Campus" ? "On Main Campus" : directStatus;
+  }
+
+  const now = nowContext();
+  const activeEntry = await ScheduleEntry.findOne({
+    teacher: teacherName,
+    day: now.dayOfWeek,
+    timeInMinutes: { $lte: now.minutes },
+    timeOutMinutes: { $gt: now.minutes },
+  })
+    .select("campus color")
+    .lean();
+
+  if (activeEntry) {
+    const onMainCampus =
+      activeEntry.campus === "Main Campus" ||
+      activeEntry.color === "color-orange";
+
+    return onMainCampus ? "On Main Campus" : "On School";
+  }
+
+  if (directStatus === "Main Campus") {
+    return "On Main Campus";
+  }
+
   return directStatus;
 }
 
@@ -172,7 +205,7 @@ async function listTeachersForStudents(req, res) {
           avatar: teacherUser.avatar || null,
           department: teacherUser.department || "",
           status,
-          available: status === "On School" && availabilitySlots.length > 0,
+          available: ["On School", "On Main Campus"].includes(status) && availabilitySlots.length > 0,
           subjects: Array.isArray(scheduleSubjects) ? scheduleSubjects.filter(Boolean) : [],
           consultationSlots: availabilitySlots.map((slot) => ({
             id: slot._id.toString(),

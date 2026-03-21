@@ -37,7 +37,11 @@ function parseTimeToMinutes(value) {
   return hour * 60 + minute;
 }
 
-function colorForRoom(room) {
+function colorForSchedule(room, campus) {
+  if (campus === "Main Campus") {
+    return "color-orange";
+  }
+
   if (!room) {
     return "color-green";
   }
@@ -65,6 +69,7 @@ function toClientEntry(entry) {
     teacher: entry.teacher,
     subject: entry.subject,
     room: entry.room,
+    campus: entry.campus || "South Campus",
     parallel: entry.parallel,
     parallelGroupId: entry.parallelGroupId,
     parallelCount: entry.parallelCount,
@@ -154,6 +159,7 @@ function buildEntryDocs(payload) {
   const year = normalizeString(payload.baseYear || payload.year);
   const day = normalizeString(payload.day);
   const subject = normalizeString(payload.subject);
+  const campus = normalizeString(payload.campus) || "South Campus";
   const timeIn = normalizeString(payload.timeIn);
   const timeOut = normalizeString(payload.timeOut);
   const timeInMinutes = parseTimeToMinutes(timeIn);
@@ -201,11 +207,12 @@ function buildEntryDocs(payload) {
       teacher,
       subject,
       room: slot.room,
+      campus,
       parallel: true,
       parallelGroupId,
       parallelCount,
       parallelSlots: slots,
-      color: colorForRoom(slot.room),
+      color: colorForSchedule(slot.room, campus),
       addedAt,
     }));
   }
@@ -230,11 +237,12 @@ function buildEntryDocs(payload) {
       teacher,
       subject,
       room,
+      campus,
       parallel: false,
       parallelGroupId: null,
       parallelCount: 1,
       parallelSlots: [],
-      color: colorForRoom(room),
+      color: colorForSchedule(room, campus),
       addedAt,
     },
   ];

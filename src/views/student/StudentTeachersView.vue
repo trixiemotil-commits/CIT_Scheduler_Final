@@ -153,7 +153,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const search       = ref('')
 const activeFilter = ref('All')
-const filters      = ['All', 'On School', 'On Meeting', 'On Leave']
+const filters      = ['All', 'On School', 'On Main Campus', 'On Meeting', 'On Leave']
 const loadingTeachers = ref(false)
 const loadError = ref('')
 
@@ -174,6 +174,14 @@ function colorForName(name) {
     hash |= 0
   }
   return palette[Math.abs(hash) % palette.length]
+}
+
+function normalizeTeacherStatus(status) {
+  const normalized = String(status || '').trim()
+  if (normalized === 'Main Campus' || normalized === 'On Main Campus') {
+    return 'On Main Campus'
+  }
+  return normalized || 'On Leave'
 }
 
 async function apiRequest(path, options = {}) {
@@ -207,7 +215,7 @@ async function apiRequest(path, options = {}) {
 
 function mapTeacher(teacher) {
   const subjects = Array.isArray(teacher.subjects) ? teacher.subjects.filter(Boolean) : []
-  const resolvedStatus = teacher.status || teacher.teacher_status || 'On Leave'
+  const resolvedStatus = normalizeTeacherStatus(teacher.status || teacher.teacher_status)
   return {
     id: teacher.id,
     employeeId: teacher.employeeId,
@@ -216,7 +224,7 @@ function mapTeacher(teacher) {
     initials: initialsFor(teacher.name),
     color: colorForName(teacher.name),
     status: resolvedStatus,
-    available: Boolean(teacher.available) && resolvedStatus === 'On School',
+    available: Boolean(teacher.available) && ['On School', 'On Main Campus'].includes(resolvedStatus),
     tags: subjects.slice(0, 3),
     consultationSlots: Array.isArray(teacher.consultationSlots) ? teacher.consultationSlots : [],
   }
@@ -243,7 +251,12 @@ const filteredTeachers = computed(() => teachers.value.filter(t => {
 }))
 
 function statusClass(s) {
-  return { 'On School': 'pill-green', 'On Meeting': 'pill-orange', 'On Leave': 'pill-gray' }[s] || 'pill-gray'
+  return {
+    'On School': 'pill-green',
+    'On Main Campus': 'pill-orange',
+    'On Meeting': 'pill-orange',
+    'On Leave': 'pill-gray',
+  }[s] || 'pill-gray'
 }
 
 /* ── Modal state ── */

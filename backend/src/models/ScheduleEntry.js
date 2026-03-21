@@ -72,6 +72,11 @@ const scheduleEntrySchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    campus: {
+      type: String,
+      trim: true,
+      default: "South Campus",
+    },
     parallel: {
       type: Boolean,
       default: false,

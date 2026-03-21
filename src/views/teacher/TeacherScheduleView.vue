@@ -86,7 +86,11 @@
                   <td
                     v-if="cell.type === 'start'"
                     :rowspan="cell.rowspan"
-                    :class="['td-class', cell.cls.color === 'green' ? 'cell-green' : 'cell-yellow', { 'col-expanded': expandedDay === DAYS[ci] }]"
+                    :class="[
+                      'td-class',
+                      cell.cls.color === 'orange' ? 'cell-orange' : (cell.cls.color === 'yellow' ? 'cell-yellow' : 'cell-green'),
+                      { 'col-expanded': expandedDay === DAYS[ci] }
+                    ]"
                     @click="expandedDay === DAYS[ci] ? openModal(cell.cls) : toggleExpand(DAYS[ci])"
                   >
                     <!-- Compact view -->
@@ -340,8 +344,11 @@ function formatTimeRange12(start, end) {
   return `${start12}-${end12}`
 }
 
-function scheduleColor(colorToken) {
-  return colorToken === 'color-yellow' ? 'yellow' : 'green'
+function scheduleColor(colorToken, campus) {
+  if (campus === 'Main Campus') return 'orange'
+  if (colorToken === 'color-orange') return 'orange'
+  if (colorToken === 'color-yellow') return 'yellow'
+  return 'green'
 }
 
 function timeToMinutes(value) {
@@ -459,7 +466,7 @@ function mapEntriesToSchedule(entries) {
       code: entry.subject || 'Untitled Subject',
       section: entry.section || '',
       parallel: Boolean(entry.parallel),
-      color: scheduleColor(entry.color),
+      color: scheduleColor(entry.color, entry.campus),
       teacher: entry.teacher || userName.value || 'Teacher',
       avatar,
       parallelSections: [],
@@ -895,6 +902,11 @@ function confirmLogout() {
 
 .cell-yellow {
   background: #e8a020;
+  color: #fff;
+}
+
+.cell-orange {
+  background: #f4a261;
   color: #fff;
 }
 

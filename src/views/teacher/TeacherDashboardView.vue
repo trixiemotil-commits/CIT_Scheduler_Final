@@ -168,6 +168,7 @@
           <div class="legend">
             <span class="legend-item"><span class="legend-dot lecture"></span>Lecture</span>
             <span class="legend-item"><span class="legend-dot laboratory"></span>Laboratory</span>
+            <span class="legend-item"><span class="legend-dot main-campus"></span>Main Campus</span>
           </div>
         </div>
 
@@ -377,7 +378,11 @@ function parseTimeToMinutes(value) {
   return (hour * 60) + minute
 }
 
-function roomBadgeClass(room) {
+function roomBadgeClass(room, campus, colorToken) {
+  if (campus === 'Main Campus' || colorToken === 'color-orange') {
+    return 'room-orange'
+  }
+
   return /^cl\.?/i.test((room || '').trim()) ? 'room-green' : 'room-yellow'
 }
 
@@ -397,12 +402,16 @@ function mapTodayClasses(entries) {
           subject: entry.subject || 'Untitled Subject',
           sectionSet: new Set(),
           roomSet: new Set(),
+          hasMainCampus: entry.campus === 'Main Campus' || entry.color === 'color-orange',
           parallel: Boolean(entry.parallel),
           sortValue: parseTimeToMinutes(entry.timeIn),
         })
       }
 
       const grouped = groups.get(groupKey)
+      if (entry.campus === 'Main Campus' || entry.color === 'color-orange') {
+        grouped.hasMainCampus = true
+      }
 
       if (entry.section) grouped.sectionSet.add(entry.section)
       if (entry.room) grouped.roomSet.add(entry.room)
@@ -425,7 +434,7 @@ function mapTodayClasses(entries) {
         section: sections.length ? sections.join(', ') : 'N/A',
         parallel: item.parallel,
         room: rooms.length ? rooms.join(' and ') : 'TBA',
-        roomColor: roomBadgeClass(rooms[0] || ''),
+        roomColor: item.hasMainCampus ? 'room-orange' : roomBadgeClass(rooms[0] || ''),
         sortValue: item.sortValue,
       }
     })
@@ -773,6 +782,7 @@ function confirmLogout() {
 }
 .legend-dot.lecture    { background: #e4c86e; }
 .legend-dot.laboratory { background: #40916c; }
+.legend-dot.main-campus { background: #f4a261; }
 
 /* Table */
 .table-wrap {

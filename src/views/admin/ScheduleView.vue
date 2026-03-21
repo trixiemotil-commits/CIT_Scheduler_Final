@@ -256,7 +256,14 @@
             <!-- Section (only when not parallel; parallel uses per-slot sections) -->
             <div class="form-row-inline" v-if="!form.parallel">
               <label class="form-label">Section</label>
-              <div class="form-select-wrap">
+              <input
+                v-if="form.campus === 'Main Campus'"
+                v-model.trim="form.section"
+                type="text"
+                class="form-input"
+                placeholder="Enter Section"
+              />
+              <div v-else class="form-select-wrap">
                 <select v-model="form.section" class="form-select">
                   <option value="" disabled>Select Section</option>
                   <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
@@ -281,7 +288,14 @@
             <template v-if="!form.parallel">
               <div class="form-row-inline">
                 <label class="form-label">Room</label>
-                <div class="form-select-wrap">
+                <input
+                  v-if="form.campus === 'Main Campus'"
+                  v-model.trim="form.room"
+                  type="text"
+                  class="form-input"
+                  placeholder="Enter Room"
+                />
+                <div v-else class="form-select-wrap">
                   <select v-model="form.room" class="form-select">
                     <option value="" disabled>Select Room</option>
                     <option v-for="r in roomOptions" :key="r" :value="r">{{ r }}</option>
@@ -310,7 +324,14 @@
                 <div class="parallel-slot-divider">Slot {{ i + 1 }}</div>
                 <div class="form-row-inline">
                   <label class="form-label">Section {{ i + 1 }}</label>
-                  <div class="form-select-wrap">
+                  <input
+                    v-if="form.campus === 'Main Campus'"
+                    v-model.trim="ps.section"
+                    type="text"
+                    class="form-input"
+                    :placeholder="`Enter Section ${i + 1}`"
+                  />
+                  <div v-else class="form-select-wrap">
                     <select v-model="ps.section" class="form-select">
                       <option value="" disabled>Select Section</option>
                       <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
@@ -320,7 +341,14 @@
                 </div>
                 <div class="form-row-inline">
                   <label class="form-label">Room {{ i + 1 }}</label>
-                  <div class="form-select-wrap">
+                  <input
+                    v-if="form.campus === 'Main Campus'"
+                    v-model.trim="ps.room"
+                    type="text"
+                    class="form-input"
+                    :placeholder="`Enter Room ${i + 1}`"
+                  />
+                  <div v-else class="form-select-wrap">
                     <select v-model="ps.room" class="form-select">
                       <option value="" disabled>Select Room</option>
                       <option v-for="r in roomOptions" :key="r" :value="r">{{ r }}</option>
@@ -330,6 +358,24 @@
                 </div>
               </template>
             </template>
+
+            <div class="form-row-inline">
+              <label class="form-label">Campus</label>
+              <div class="campus-toggle" role="group" aria-label="Select campus">
+                <button
+                  type="button"
+                  class="campus-btn"
+                  :class="{ active: form.campus === 'South Campus' }"
+                  @click="form.campus = 'South Campus'"
+                >South Campus</button>
+                <button
+                  type="button"
+                  class="campus-btn"
+                  :class="{ active: form.campus === 'Main Campus' }"
+                  @click="form.campus = 'Main Campus'"
+                >Main Campus</button>
+              </div>
+            </div>
 
             <!-- Parallel toggle -->
             <div class="parallel-row">
@@ -461,7 +507,14 @@
               <!-- Section (not parallel) -->
               <div class="form-row-inline" v-if="!addForm.parallel">
                 <label class="form-label">Section</label>
-                <div class="form-select-wrap">
+                <input
+                  v-if="addForm.campus === 'Main Campus'"
+                  v-model.trim="addForm.section"
+                  type="text"
+                  class="form-input"
+                  placeholder="Enter Section"
+                />
+                <div v-else class="form-select-wrap">
                   <select v-model="addForm.section" class="form-select">
                     <option value="" disabled>Select Section</option>
                     <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
@@ -484,7 +537,14 @@
               <template v-if="!addForm.parallel">
                 <div class="form-row-inline">
                   <label class="form-label">Room</label>
-                  <div class="form-select-wrap">
+                  <input
+                    v-if="addForm.campus === 'Main Campus'"
+                    v-model.trim="addForm.room"
+                    type="text"
+                    class="form-input"
+                    placeholder="Enter Room"
+                  />
+                  <div v-else class="form-select-wrap">
                     <select v-model="addForm.room" class="form-select">
                       <option value="" disabled>Select Room</option>
                       <option v-for="r in roomOptions" :key="r" :value="r">{{ r }}</option>
@@ -510,7 +570,14 @@
                   <div class="parallel-slot-divider">Slot {{ i + 1 }}</div>
                   <div class="form-row-inline">
                     <label class="form-label">Section {{ i + 1 }}</label>
-                    <div class="form-select-wrap">
+                    <input
+                      v-if="addForm.campus === 'Main Campus'"
+                      v-model.trim="ps.section"
+                      type="text"
+                      class="form-input"
+                      :placeholder="`Enter Section ${i + 1}`"
+                    />
+                    <div v-else class="form-select-wrap">
                       <select v-model="ps.section" class="form-select">
                         <option value="" disabled>Select Section</option>
                         <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
@@ -520,7 +587,14 @@
                   </div>
                   <div class="form-row-inline">
                     <label class="form-label">Room {{ i + 1 }}</label>
-                    <div class="form-select-wrap">
+                    <input
+                      v-if="addForm.campus === 'Main Campus'"
+                      v-model.trim="ps.room"
+                      type="text"
+                      class="form-input"
+                      :placeholder="`Enter Room ${i + 1}`"
+                    />
+                    <div v-else class="form-select-wrap">
                       <select v-model="ps.room" class="form-select">
                         <option value="" disabled>Select Room</option>
                         <option v-for="r in roomOptions" :key="r" :value="r">{{ r }}</option>
@@ -530,6 +604,24 @@
                   </div>
                 </template>
               </template>
+
+              <div class="form-row-inline">
+                <label class="form-label">Campus</label>
+                <div class="campus-toggle" role="group" aria-label="Select campus">
+                  <button
+                    type="button"
+                    class="campus-btn"
+                    :class="{ active: addForm.campus === 'Main Campus' }"
+                    @click="addForm.campus = 'Main Campus'"
+                  >Main Campus</button>
+                  <button
+                    type="button"
+                    class="campus-btn"
+                    :class="{ active: addForm.campus === 'South Campus' }"
+                    @click="addForm.campus = 'South Campus'"
+                  >South Campus</button>
+                </div>
+              </div>
             </div>
 
             <div v-if="addTimeError" class="time-error">
@@ -937,6 +1029,18 @@ function formatAddedAt(dateValue) {
   )
 }
 
+function inferCampus(entry = {}) {
+  if (entry.campus === 'Main Campus' || entry.campus === 'South Campus') {
+    return entry.campus
+  }
+
+  if (entry.color === 'color-orange') {
+    return 'Main Campus'
+  }
+
+  return 'South Campus'
+}
+
 function syncPagesFromApi(apiTables, preferredLabel = '') {
   const sorted = Array.isArray(apiTables)
     ? apiTables
@@ -980,6 +1084,7 @@ function syncEntriesFromApi(apiEntries) {
     entries[key] = {
       teacher: entry.teacher,
       subject: entry.subject,
+      campus: inferCampus(entry),
       room: entry.room,
       year: entry.year,
       tableLabel,
@@ -992,7 +1097,7 @@ function syncEntriesFromApi(apiEntries) {
       parallelGroupId: entry.parallelGroupId || null,
       parallelCount: entry.parallelCount || 1,
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map((slotItem) => ({ ...slotItem })) : [],
-      color: entry.color || colorForRoom(entry.room) || 'color-green',
+      color: inferCampus(entry) === 'Main Campus' ? 'color-orange' : (entry.color || colorForRoom(entry.room) || 'color-green'),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -1006,6 +1111,7 @@ function buildSchedulePayload(source) {
   const payload = {
     tableLabel: source.teacher,
     baseYear: source.year,
+    campus: source.campus || 'South Campus',
     day: source.day,
     timeIn: source.timeIn,
     timeOut: source.timeOut,
@@ -1061,6 +1167,25 @@ function buildOldDescriptor() {
     timeIn: oldTimeIn,
     timeOut: oldTimeOut,
   }
+}
+
+function isEntryBeingEdited(entry) {
+  const oldDescriptor = buildOldDescriptor()
+
+  if (oldDescriptor.parallelGroupId) {
+    return (
+      entry.tableLabel === oldDescriptor.tableLabel &&
+      entry.parallelGroupId === oldDescriptor.parallelGroupId
+    )
+  }
+
+  return (
+    entry.tableLabel === oldDescriptor.tableLabel &&
+    entry.section === oldDescriptor.section &&
+    entry.day === oldDescriptor.day &&
+    entry.timeIn === oldDescriptor.timeIn &&
+    entry.timeOut === oldDescriptor.timeOut
+  )
 }
 
 async function refreshScheduleData(preferredLabel = '') {
@@ -1183,6 +1308,7 @@ const fromButton = ref(false)
 const form = reactive({
   slot: '', day: '', teacher: '', subject: '',
   year: '', section: '',
+  campus: 'South Campus',
   room: '', parallel: false,
   parallelCount: 2,
   parallelSlots: [],
@@ -1261,6 +1387,7 @@ function openAddModal(slot, day) {
   form.section           = (filterSection.value !== 'All' ? filterSection.value : '') || ''
   form.teacher           = selectedTeacher.value || ''
   form.subject           = ''
+  form.campus            = 'South Campus'
   form.room              = ''
   form.parallel          = false
   form.parallelCount     = 2
@@ -1284,6 +1411,7 @@ function openEditModal(slot, day, e) {
   form.section           = e.section ?? sections[0]
   form.teacher           = selectedTeacher.value || e.teacher
   form.subject           = e.subject
+  form.campus            = inferCampus(e)
   form.room              = e.room ?? ''
   form.parallel          = e.parallel ?? false
   form.parallelCount     = e.parallelCount ?? 2
@@ -1403,15 +1531,7 @@ async function saveEntry() {
 
     // Build a skip filter so we don't flag the entry currently being edited
     const skipFilter = editMode.value
-      ? (key, entry) => {
-          // For parallel edits: skip all entries in the same parallel group
-          if (form._parallelGroupId && entry.parallelGroupId === form._parallelGroupId) return true
-          // For non-parallel edits: skip the specific entry by its key
-          const [oldTimeIn = '', oldTimeOut = ''] = (form._oldSlot || '').split(' - ')
-          const oldTableLabel = form._oldYear || form.year
-          const expectedKey = `${oldTableLabel}|${form._oldSection}|${oldTimeIn} - ${oldTimeOut}|${form._oldDay}`
-          return key === expectedKey
-        }
+      ? (_key, entry) => isEntryBeingEdited(entry)
       : null
 
     // Check for conflicts
@@ -1487,6 +1607,7 @@ const addTimeError   = ref('')
 const addForm = reactive({
   day: '', timeIn: '', timeOut: '',
   year: '', section: '',
+  campus: 'South Campus',
   teacher: '', subject: '', room: '',
   parallel: false, parallelCount: 2,
   parallelSlots: [{ section: '', room: '' }, { section: '', room: '' }],
@@ -1511,6 +1632,7 @@ function openAddPanel() {
   addForm.year = ''
   addForm.day = ''; addForm.timeIn = ''; addForm.timeOut = ''
   addForm.section = ''
+  addForm.campus = 'South Campus'
   addForm.teacher = selectedTeacher.value || ''
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
@@ -1523,6 +1645,7 @@ function openAddPanel() {
 function resetAddForm() {
   addForm.day = ''; addForm.timeIn = ''; addForm.timeOut = ''
   addForm.year = ''; addForm.section = ''
+  addForm.campus = 'South Campus'
   addForm.teacher = selectedTeacher.value || ''; addForm.subject = ''; addForm.room = ''
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
@@ -2140,6 +2263,7 @@ function confirmLogout() {
 /* Entry colors */
 .color-green  { background: #1b4332; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
+.color-orange { background: #f4a261; color: #5a2d00; }
 .color-blue   { background: #4a90d9; color: #fff; }
 
 /* ── Consultation ── */
@@ -2219,7 +2343,42 @@ function confirmLogout() {
   transition: border-color 0.15s;
 }
 .form-select:focus { border-color: #40916c; }
+.form-input {
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  color: #333;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.form-input:focus { border-color: #40916c; }
 .sel-arrow { position: absolute; right: 12px; pointer-events: none; color: #666; }
+
+.campus-toggle {
+  display: inline-flex;
+  gap: 8px;
+}
+.campus-btn {
+  border: 1px solid #d4d4d4;
+  background: #f8f9fa;
+  color: #666;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.campus-btn.active {
+  background: #e8f5ee;
+  color: #1b4332;
+  border-color: #63b892;
+}
 
 .parallel-slot-divider {
   font-size: 0.78rem; font-weight: 700; color: #40916c;
