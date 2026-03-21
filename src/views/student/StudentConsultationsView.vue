@@ -20,7 +20,15 @@
 
     <!-- Sessions -->
     <div class="sessions-list">
-      <div v-if="filteredSessions.length === 0" class="empty-state">
+      <div v-if="isLoadingSessions" class="empty-state">
+        <div class="empty-icon">⏳</div>
+        <div>Loading sessions...</div>
+      </div>
+      <div v-else-if="sessionsError" class="empty-state">
+        <div class="empty-icon">⚠️</div>
+        <div>{{ sessionsError }}</div>
+      </div>
+      <div v-else-if="filteredSessions.length === 0" class="empty-state">
         <div class="empty-icon">📋</div>
         <div>No sessions found.</div>
       </div>
@@ -31,35 +39,40 @@
             <div class="session-subject">{{ s.subject }}</div>
             <div class="session-teacher">{{ s.teacher }}</div>
             <div class="session-info-row">
-              <span class="info-chip">📅 {{ formatDate(s.date) }}</span>
-              <span class="info-chip">🕐 {{ formatTime(s.time) }}</span>
-              <span class="info-chip">{{ s.duration }}</span>
+              <span class="info-chip">📅 {{ formatWeekday(s.date) }}, {{ formatDate(s.date) }}</span>
+              <span class="info-chip">🕐 {{ formatTimeRange(s.timeStart, s.timeEnd) }}</span>
+              <span class="info-chip" v-if="s.status === 'Approved' && s.ticketNumber">🎟 {{ s.ticketNumber }}</span>
+            </div>
+            <div v-if="s.status === 'Approved' && s.queuePosition" class="queue-row">
+              <span :class="['queue-chip', { 'queue-next': s.isNextInQueue }]">
+                {{ queueLineLabel(s) }}
+              </span>
+              <span v-if="queueWaitNote(s)" class="queue-note">{{ queueWaitNote(s) }}</span>
             </div>
           </div>
           <span :class="['status-pill', pillClass(s.status)]">{{ s.status }}</span>
         </div>
 
-        <!-- Rejection reason -->
-        <div v-if="s.status === 'Rejected' && s.reason" class="rejection-msg">
+        <!-- Reschedule reason -->
+        <div v-if="s.status === 'Reschedule' && s.reason" class="rejection-msg">
           ✖ {{ s.reason }}
         </div>
 
         <!-- Actions -->
         <div class="session-actions">
           <template v-if="s.status === 'Approved'">
-            <button class="act-btn outline" @click="openDetails(s)">View Details</button>
-            <button class="act-btn red" @click="openCancel(s)">Cancel</button>
+            <button class="act-btn outline full" @click="openDetails(s)">View Details</button>
           </template>
           <template v-else-if="s.status === 'Pending'">
             <button class="act-btn outline" @click="openEdit(s)">Edit</button>
             <button class="act-btn red" @click="openCancel(s)">Cancel</button>
           </template>
-          <template v-else-if="s.status === 'Rejected'">
-            <button class="act-btn green full" @click="openReschedule(s)">Reschedule</button>
+          <template v-else-if="s.status === 'Reschedule'">
+            <button class="act-btn green" @click="openEdit(s)">Reschedule</button>
+            <button class="act-btn red" @click="openCancel(s)">Cancel</button>
           </template>
           <template v-else-if="s.status === 'Completed'">
-            <button v-if="!s.reviewed" class="act-btn outline full" @click="openReview(s)">Leave a Review</button>
-            <div v-else class="reviewed-badge">✅ Reviewed</div>
+            <button class="act-btn outline full" @click="openDetails(s)">View Notes</button>
           </template>
         </div>
       </div>
@@ -79,10 +92,12 @@
             </div>
             <span :class="['status-pill', pillClass(activeSession.status)]">{{ activeSession.status }}</span>
           </div>
-          <div class="detail-row"><span class="detail-label">Date</span><span class="detail-val">{{ formatDate(activeSession.date) }}</span></div>
-          <div class="detail-row"><span class="detail-label">Time</span><span class="detail-val">{{ formatTime(activeSession.time) }}</span></div>
-          <div class="detail-row"><span class="detail-label">Duration</span><span class="detail-val">{{ activeSession.duration }}</span></div>
-          <div v-if="activeSession.notes" class="detail-row"><span class="detail-label">Notes</span><span class="detail-val">{{ activeSession.notes }}</span></div>
+          <div class="detail-row"><span class="detail-label">Date</span><span class="detail-val">{{ formatWeekday(activeSession.date) }}, {{ formatDate(activeSession.date) }}</span></div>
+          <div class="detail-row"><span class="detail-label">Time</span><span class="detail-val">{{ formatTimeRange(activeSession.timeStart, activeSession.timeEnd) }}</span></div>
+          <div v-if="detailNotes(activeSession)" class="detail-row">
+            <span class="detail-label">{{ detailNotesLabel(activeSession) }}</span>
+            <span class="detail-val">{{ detailNotes(activeSession) }}</span>
+          </div>
         </div>
         <div class="modal-footer">
           <button class="modal-cancel full-btn" @click="showDetails = false">Close</button>
@@ -101,28 +116,42 @@
             <div><div class="tp-name">{{ activeSession.subject }}</div><div class="tp-subj">{{ activeSession.teacher }}</div></div>
           </div>
           <div class="field-group">
-            <label class="field-label">Topic / Subject</label>
-            <input v-model="editForm.subject" class="field-input" type="text" />
-          </div>
-          <div class="form-row-2">
-            <div class="field-group">
-              <label class="field-label">Date</label>
-              <input v-model="editForm.date" class="field-input" type="date" :min="today" />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Time</label>
-              <input v-model="editForm.time" class="field-input" type="time" />
-            </div>
+            <label class="field-label">Subject</label>
+            <select v-model="editForm.subject" class="field-input">
+              <option value="" disabled>Select subject</option>
+              <option v-for="subject in activeSession?.subjectList || []" :key="subject" :value="subject">
+                {{ subject }}
+              </option>
+            </select>
           </div>
           <div class="field-group">
-            <label class="field-label">Notes <span class="optional">(optional)</span></label>
-            <textarea v-model="editForm.notes" class="field-input field-textarea" rows="3"></textarea>
+            <label class="field-label">Reason</label>
+            <select v-model="editForm.reason" class="field-input">
+              <option v-for="reason in CONSULTATION_REASONS" :key="reason" :value="reason">
+                {{ reason }}
+              </option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Consultation Schedule</label>
+            <select v-model="editForm.availabilityId" class="field-input">
+              <option value="" disabled>Select assigned availability</option>
+              <option v-for="slot in activeSession?.consultationSlots || []" :key="slot.id" :value="slot.id">
+                {{ formatSlotLabel(slot) }}
+              </option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Short Description <span class="optional">(optional)</span></label>
+            <textarea v-model="editForm.description" class="field-input field-textarea" rows="3" placeholder="Briefly describe your concern..."></textarea>
           </div>
           <div v-if="editError" class="msg-err">{{ editError }}</div>
         </div>
         <div class="modal-footer">
           <button class="modal-cancel" @click="showEdit = false">Cancel</button>
-          <button class="modal-submit" @click="saveEdit">Save Changes</button>
+          <button class="modal-submit" :disabled="isSavingEdit" @click="saveEdit">
+            {{ isSavingEdit ? 'Saving...' : 'Save Changes' }}
+          </button>
         </div>
       </div>
     </div>
@@ -210,13 +239,24 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 import BottomNav from '@/components/student/BottomNav.vue'
 import { useStudentData } from '@/composables/useStudentData.js'
 
-const { sessions, cancelSession, updateSession } = useStudentData()
+const { sessions, cancelSession, updateSession, isLoadingSessions, sessionsError, loadSessions } = useStudentData()
 
-const tabs       = ['All', 'Pending', 'Approved', 'Rejected']
+const AUTO_REFRESH_MS = 10000
+const CONSULTATION_REASONS = [
+  'Lesson Clarification',
+  'Assignment Assistance',
+  'Project Consultation',
+  'Exam Preparation',
+  'Grade Inquiry',
+  'Career Guidance',
+  'Other Academic Concern',
+]
+
+const tabs       = ['All', 'Pending', 'Approved', 'Reschedule', 'Completed', 'Cancelled']
 const activeTab  = ref('All')
 
 const filteredSessions = computed(() =>
@@ -224,7 +264,13 @@ const filteredSessions = computed(() =>
 )
 
 function pillClass(s) {
-  return { Approved: 'pill-green', Pending: 'pill-orange', Rejected: 'pill-red', Completed: 'pill-gray' }[s] || 'pill-gray'
+  return {
+    Approved: 'pill-green',
+    Pending: 'pill-orange',
+    Reschedule: 'pill-red',
+    Completed: 'pill-gray',
+    Cancelled: 'pill-gray',
+  }[s] || 'pill-gray'
 }
 
 function formatDate(dateStr) {
@@ -235,14 +281,147 @@ function formatDate(dateStr) {
   } catch { return dateStr }
 }
 
+function formatWeekday(dateStr) {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(`${dateStr}T00:00:00`)
+    return d.toLocaleDateString('en-US', { weekday: 'long' })
+  } catch {
+    return ''
+  }
+}
+
 function formatTime(timeStr) {
   if (!timeStr) return ''
+
+  const text = String(timeStr).trim()
+
+  const plainMatch = text.match(/^(\d{1,2}):(\d{2})$/)
+  if (plainMatch) {
+    const h = Number(plainMatch[1])
+    const m = Number(plainMatch[2])
+    if (Number.isNaN(h) || Number.isNaN(m)) return text
+    const ampm = h >= 12 ? 'PM' : 'AM'
+    const hour = h % 12 || 12
+    return `${hour}:${String(m).padStart(2, '0')} ${ampm}`
+  }
+
+  const ampmMatch = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (ampmMatch) {
+    const h = Number(ampmMatch[1])
+    const m = Number(ampmMatch[2])
+    const ap = ampmMatch[3].toUpperCase()
+    if (Number.isNaN(h) || Number.isNaN(m)) return text
+    return `${h}:${String(m).padStart(2, '0')} ${ap}`
+  }
+
   try {
-    const [h, m] = timeStr.split(':').map(Number)
+    const [h, m] = text.split(':').map(Number)
     const ampm = h >= 12 ? 'PM' : 'AM'
     const hour = h % 12 || 12
     return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`
-  } catch { return timeStr }
+  } catch { return text }
+}
+
+function formatTimeRange(start, end) {
+  const startText = formatTime(start)
+  const endText = formatTime(end)
+  if (startText && endText) return `${startText} - ${endText}`
+  if (startText) return startText
+  if (endText) return endText
+  return '--:--'
+}
+
+function ordinal(n) {
+  const v = Number(n)
+  if (!Number.isFinite(v) || v <= 0) return ''
+  const mod100 = v % 100
+  if (mod100 >= 11 && mod100 <= 13) return `${v}th`
+  const mod10 = v % 10
+  if (mod10 === 1) return `${v}st`
+  if (mod10 === 2) return `${v}nd`
+  if (mod10 === 3) return `${v}rd`
+  return `${v}th`
+}
+
+function parseStartDateTime(session) {
+  const dateText = String(session?.date || '').trim()
+  const timeText = String(session?.timeStart || '').trim()
+  if (!dateText || !timeText) return null
+
+  const dateMatch = dateText.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!dateMatch) return null
+
+  const timeMatch = timeText.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i)
+  if (!timeMatch) return null
+
+  let hour = Number(timeMatch[1])
+  const minute = Number(timeMatch[2])
+  const ampm = (timeMatch[3] || '').toUpperCase()
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null
+  if (ampm) {
+    if (ampm === 'PM' && hour !== 12) hour += 12
+    if (ampm === 'AM' && hour === 12) hour = 0
+  }
+
+  return new Date(
+    Number(dateMatch[1]),
+    Number(dateMatch[2]) - 1,
+    Number(dateMatch[3]),
+    hour,
+    minute,
+    0,
+    0
+  )
+}
+
+function hasConsultationStarted(session) {
+  const start = parseStartDateTime(session)
+  if (!start || Number.isNaN(start.getTime())) return false
+  return Date.now() >= start.getTime()
+}
+
+function queueLineLabel(session) {
+  const position = Number(session?.queuePosition)
+  if (!Number.isFinite(position) || position <= 0) {
+    return 'In queue'
+  }
+
+  const started = hasConsultationStarted(session)
+  if (!started) {
+    return `Queue #${position}`
+  }
+
+  if (position === 1) {
+    return 'Go to faculty now (Queue #1)'
+  }
+
+  if (position === 2) {
+    return 'You are next for consultation (1 ahead)'
+  }
+
+  return `Queue #${position}`
+}
+
+function queueWaitNote(session) {
+  if (hasConsultationStarted(session)) return ''
+  return 'Please wait for the start of consultation hours.'
+}
+
+function detailNotes(session) {
+  if (!session) return ''
+  if (session.status === 'Completed') {
+    return String(session.consultationNotes || '').trim()
+  }
+  return String(session.notes || '').trim()
+}
+
+function detailNotesLabel(session) {
+  if (session?.status === 'Completed') {
+    return 'Consultation Notes'
+  }
+  return 'Notes'
 }
 
 const today         = new Date().toISOString().split('T')[0]
@@ -255,31 +434,95 @@ function openDetails(s) { activeSession.value = s; showDetails.value = true }
 
 /* ── Edit Session ── */
 const showEdit  = ref(false)
-const editForm  = ref({ subject: '', date: '', time: '', notes: '' })
+const editForm  = ref({ subject: '', reason: CONSULTATION_REASONS[0], availabilityId: '', description: '' })
 const editError = ref('')
+const isSavingEdit = ref(false)
+
+function formatSlotLabel(slot) {
+  return `${slot.dayOfWeek} • ${slot.startTime} - ${slot.endTime}`
+}
+
 function openEdit(s) {
   activeSession.value = s
-  editForm.value = { subject: s.subject, date: s.date, time: s.time, notes: s.notes || '' }
+  editForm.value = {
+    subject: s.subject || (s.subjectList?.[0] || ''),
+    reason: s.reason || CONSULTATION_REASONS[0],
+    availabilityId: s.availabilityId || (s.consultationSlots?.[0]?.id || ''),
+    description: s.description || '',
+  }
   editError.value = ''
   showEdit.value  = true
 }
-function saveEdit() {
+async function saveEdit() {
+  if (isSavingEdit.value) return
   editError.value = ''
-  if (!editForm.value.subject.trim()) { editError.value = 'Topic cannot be empty.'; return }
-  if (!editForm.value.date)           { editError.value = 'Please select a date.'; return }
-  if (!editForm.value.time)           { editError.value = 'Please select a time.'; return }
-  updateSession(activeSession.value.id, { subject: editForm.value.subject.trim(), date: editForm.value.date, time: editForm.value.time, notes: editForm.value.notes })
-  showEdit.value = false
-  showToast('Session updated.')
+  if (!editForm.value.subject.trim()) { editError.value = 'Please select a subject.'; return }
+  if (!editForm.value.reason.trim()) { editError.value = 'Please select a reason.'; return }
+  if (!editForm.value.availabilityId) { editError.value = 'Please select consultation availability.'; return }
+
+  const hasDuplicatePending = sessions.value.some((item) => {
+    if (String(item.id) === String(activeSession.value.id)) {
+      return false
+    }
+
+    const sameTeacher = (item.employeeId && activeSession.value.employeeId)
+      ? String(item.employeeId) === String(activeSession.value.employeeId)
+      : String(item.teacher || '').trim().toLowerCase() === String(activeSession.value.teacher || '').trim().toLowerCase()
+
+    return sameTeacher
+      && item.status === 'Pending'
+      && String(item.availabilityId || '') === String(editForm.value.availabilityId)
+  })
+
+  if (hasDuplicatePending) {
+    editError.value = 'You already have a pending request for this teacher and consultation schedule. Please choose another time slot or another teacher.'
+    return
+  }
+
+  const notes = [
+    `Reason: ${editForm.value.reason}`,
+    editForm.value.description ? `Description: ${editForm.value.description.trim()}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  isSavingEdit.value = true
+  try {
+    await updateSession(
+      activeSession.value.id,
+      {
+        subject: editForm.value.subject.trim(),
+        availabilityId: editForm.value.availabilityId,
+        notes,
+        reason: editForm.value.reason,
+        description: editForm.value.description,
+      },
+      { requireBackend: true }
+    )
+
+    await loadSessions(true)
+    showEdit.value = false
+    showToast('Session updated. Queue position refreshed.')
+  } catch (error) {
+    editError.value = error.message || 'Failed to save changes. Please try again.'
+  } finally {
+    isSavingEdit.value = false
+  }
 }
 
 /* ── Cancel Confirmation ── */
 const showCancel = ref(false)
 function openCancel(s) { activeSession.value = s; showCancel.value = true }
-function confirmCancel() {
-  cancelSession(activeSession.value.id)
-  showCancel.value = false
-  showToast('Session cancelled.')
+async function confirmCancel() {
+  try {
+    await cancelSession(activeSession.value.id)
+    await loadSessions(true)
+    showCancel.value = false
+    showToast('Session cancelled.')
+  } catch (error) {
+    showCancel.value = false
+    showToast(error.message || 'Failed to cancel session.')
+  }
 }
 
 /* ── Reschedule ── */
@@ -332,6 +575,48 @@ function showToast(msg) {
   toastMsg.value = msg
   setTimeout(() => { toastMsg.value = '' }, 3000)
 }
+
+let autoRefreshTimer = null
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    loadSessions(true)
+  }
+}
+
+function onWindowFocus() {
+  loadSessions(true)
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+  }
+
+  autoRefreshTimer = setInterval(() => {
+    if (document.visibilityState !== 'visible') {
+      return
+    }
+    loadSessions(true)
+  }, AUTO_REFRESH_MS)
+}
+
+onMounted(() => {
+  loadSessions(true)
+  startAutoRefresh()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('focus', onWindowFocus)
+})
+
+onBeforeUnmount(() => {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+  }
+
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('focus', onWindowFocus)
+})
 </script>
 
 <style scoped>
@@ -358,19 +643,34 @@ function showToast(msg) {
 
 /* Tabs */
 .tabs-row {
-  display: flex; background: #fff;
+  display: flex;
+  gap: 8px;
+  background: #fff;
   border-bottom: 1px solid #eee;
-  padding: 0 16px;
+  padding: 10px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.tabs-row::-webkit-scrollbar { display: none; }
 .tab-btn {
-  flex: 1; padding: 12px 0;
-  background: none; border: none;
-  font-family: inherit; font-size: 0.82rem; font-weight: 500;
-  color: #888; cursor: pointer;
-  border-bottom: 2px solid transparent;
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
   transition: all 0.15s;
 }
-.tab-btn.active { color: #1b4332; font-weight: 700; border-bottom-color: #1b4332; }
+.tab-btn.active {
+  color: #fff;
+  font-weight: 700;
+  background: #1b4332;
+  border-color: #1b4332;
+}
 
 /* Sessions */
 .sessions-list { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px 0; }
@@ -393,6 +693,29 @@ function showToast(msg) {
 .session-teacher { font-size: 0.76rem; color: #666; margin: 2px 0 6px; }
 .session-info-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .info-chip { font-size: 0.73rem; color: #2d6a4f; background: #eef7f1; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
+.queue-row { margin-top: 6px; }
+.queue-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: #1f5138;
+  background: #e9f7ee;
+  border: 1px solid #cfe9da;
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+.queue-chip.queue-next {
+  color: #0b6b3a;
+  background: #d8f3e8;
+  border-color: #9fd6b4;
+}
+.queue-note {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.72rem;
+  color: #5f6b76;
+}
 
 .status-pill {
   font-size: 0.69rem; font-weight: 600;

@@ -36,6 +36,11 @@ const consultationRequestSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    consultationDate: {
+      type: Date,
+      required: false,
+      index: true,
+    },
     status: {
       type: String,
       enum: STATUS_VALUES,
@@ -49,5 +54,6 @@ const consultationRequestSchema = new mongoose.Schema(
 );
 
 consultationRequestSchema.index({ studentId: 1, employeeId: 1, requestDate: 1 });
+consultationRequestSchema.index({ employeeId: 1, consultationDate: 1 });
 
 module.exports = mongoose.model("ConsultationRequest", consultationRequestSchema);

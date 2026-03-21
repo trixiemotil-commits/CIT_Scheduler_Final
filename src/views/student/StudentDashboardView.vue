@@ -22,9 +22,9 @@
         <div class="stat-desc">sessions approved</div>
       </div>
       <div class="stat-card red">
-        <div class="stat-label">Rejected</div>
-        <div class="stat-num">{{ stats.rejected }}</div>
-        <div class="stat-desc">sessions rejected</div>
+        <div class="stat-label">Reschedule</div>
+        <div class="stat-num">{{ stats.reschedule }}</div>
+        <div class="stat-desc">needs reschedule</div>
       </div>
       <div class="stat-card blue">
         <div class="stat-label">Pending</div>
@@ -89,7 +89,14 @@ const recentEvents = [
 ]
 
 function badgeClass(status) {
-  return { Approved: 'badge-green', Pending: 'badge-orange', Rejected: 'badge-red', Completed: 'badge-gray', Done: 'badge-gray' }[status] || 'badge-gray'
+  return {
+    Approved: 'badge-green',
+    Pending: 'badge-orange',
+    Reschedule: 'badge-red',
+    Completed: 'badge-gray',
+    Cancelled: 'badge-gray',
+    Done: 'badge-gray',
+  }[status] || 'badge-gray'
 }
 
 function formatDate(dateStr) {

@@ -71,22 +71,34 @@
             </div>
           </div>
           <div class="field-group">
-            <label class="field-label">Topic / Subject</label>
-            <input v-model="reqForm.topic" class="field-input" type="text" placeholder="e.g. Algebra Chapter 3" />
-          </div>
-          <div class="form-row-2">
-            <div class="field-group">
-              <label class="field-label">Preferred Date</label>
-              <input v-model="reqForm.date" class="field-input" type="date" :min="today" />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Preferred Time</label>
-              <input v-model="reqForm.time" class="field-input" type="time" />
-            </div>
+            <label class="field-label">Subject</label>
+            <select v-model="reqForm.subject" class="field-input">
+              <option value="" disabled>Select subject</option>
+              <option v-for="subject in selectedTeacher?.subjectList || []" :key="subject" :value="subject">
+                {{ subject }}
+              </option>
+            </select>
           </div>
           <div class="field-group">
-            <label class="field-label">Notes <span class="optional">(optional)</span></label>
-            <textarea v-model="reqForm.notes" class="field-input field-textarea" placeholder="Any additional details..." rows="3"></textarea>
+            <label class="field-label">Reason</label>
+            <select v-model="reqForm.reason" class="field-input">
+              <option v-for="reason in CONSULTATION_REASONS" :key="reason" :value="reason">
+                {{ reason }}
+              </option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Consultation Schedule</label>
+            <select v-model="reqForm.availabilityId" class="field-input">
+              <option value="" disabled>Select assigned availability</option>
+              <option v-for="slot in selectedTeacher?.consultationSlots || []" :key="slot.id" :value="slot.id">
+                {{ formatSlotLabel(slot) }}
+              </option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Short Description <span class="optional">(optional)</span></label>
+            <textarea v-model="reqForm.description" class="field-input field-textarea" placeholder="Briefly describe your concern..." rows="3"></textarea>
           </div>
           <div v-if="reqError" class="msg-err">{{ reqError }}</div>
         </div>
@@ -145,17 +157,27 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 import { getToken } from '@/auth.js'
 import BottomNav from '@/components/student/BottomNav.vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const AUTO_REFRESH_MS = 30000
 
 const search       = ref('')
 const activeFilter = ref('All')
-const filters      = ['All', 'On School', 'On Main Campus', 'On Meeting', 'On Leave']
+const filters      = ['All', 'In School', 'On Main Campus', 'On-Meeting', 'On Leave']
 const loadingTeachers = ref(false)
 const loadError = ref('')
+const CONSULTATION_REASONS = [
+  'Lesson Clarification',
+  'Assignment Assistance',
+  'Project Consultation',
+  'Exam Preparation',
+  'Grade Inquiry',
+  'Career Guidance',
+  'Other Academic Concern',
+]
 
 const teachers = ref([])
 
@@ -178,10 +200,24 @@ function colorForName(name) {
 
 function normalizeTeacherStatus(status) {
   const normalized = String(status || '').trim()
+
+  if (normalized === 'On School' || normalized === 'In School') {
+    return 'In School'
+  }
+
+  if (normalized === 'On Meeting' || normalized === 'On-Meeting') {
+    return 'On-Meeting'
+  }
+
+  if (normalized === 'On Leave') {
+    return 'On Leave'
+  }
+
   if (normalized === 'Main Campus' || normalized === 'On Main Campus') {
     return 'On Main Campus'
   }
-  return normalized || 'On Leave'
+
+  return 'On Leave'
 }
 
 async function apiRequest(path, options = {}) {
@@ -216,6 +252,7 @@ async function apiRequest(path, options = {}) {
 function mapTeacher(teacher) {
   const subjects = Array.isArray(teacher.subjects) ? teacher.subjects.filter(Boolean) : []
   const resolvedStatus = normalizeTeacherStatus(teacher.status || teacher.teacher_status)
+  const consultationSlots = Array.isArray(teacher.consultationSlots) ? teacher.consultationSlots : []
   return {
     id: teacher.id,
     employeeId: teacher.employeeId,
@@ -224,9 +261,11 @@ function mapTeacher(teacher) {
     initials: initialsFor(teacher.name),
     color: colorForName(teacher.name),
     status: resolvedStatus,
-    available: Boolean(teacher.available) && ['On School', 'On Main Campus'].includes(resolvedStatus),
+    // Request button follows working status; selected slot is still validated in modal submit.
+    available: resolvedStatus === 'In School',
     tags: subjects.slice(0, 3),
-    consultationSlots: Array.isArray(teacher.consultationSlots) ? teacher.consultationSlots : [],
+    subjectList: subjects,
+    consultationSlots,
   }
 }
 
@@ -244,6 +283,31 @@ async function loadTeachers() {
   }
 }
 
+let autoRefreshTimer = null
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    loadTeachers()
+  }
+}
+
+function onWindowFocus() {
+  loadTeachers()
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+  }
+
+  autoRefreshTimer = setInterval(() => {
+    if (document.visibilityState !== 'visible') {
+      return
+    }
+    loadTeachers()
+  }, AUTO_REFRESH_MS)
+}
+
 const filteredTeachers = computed(() => teachers.value.filter(t => {
   const matchSearch = !search.value || t.name.toLowerCase().includes(search.value.toLowerCase()) || t.subject.toLowerCase().includes(search.value.toLowerCase())
   const matchFilter = activeFilter.value === 'All' || t.status === activeFilter.value
@@ -252,9 +316,9 @@ const filteredTeachers = computed(() => teachers.value.filter(t => {
 
 function statusClass(s) {
   return {
-    'On School': 'pill-green',
+    'In School': 'pill-green',
     'On Main Campus': 'pill-orange',
-    'On Meeting': 'pill-orange',
+    'On-Meeting': 'pill-orange',
     'On Leave': 'pill-gray',
   }[s] || 'pill-gray'
 }
@@ -264,13 +328,67 @@ const showReqModal     = ref(false)
 const showProfileModal = ref(false)
 const selectedTeacher  = ref(null)
 const toastMsg         = ref('')
-const today            = new Date().toISOString().split('T')[0]
 const reqError         = ref('')
-const reqForm          = ref({ topic: '', date: '', time: '', notes: '' })
+const reqForm          = ref({ subject: '', reason: CONSULTATION_REASONS[0], availabilityId: '', description: '' })
+
+function formatSlotLabel(slot) {
+  return `${slot.dayOfWeek} • ${slot.startTime} - ${slot.endTime}`
+}
+
+function to24Hour(value) {
+  const normalized = (value || '').toString().trim()
+  const plainTime = normalized.match(/^(\d{2}):(\d{2})$/)
+  if (plainTime) return `${plainTime[1]}:${plainTime[2]}`
+
+  const match = normalized.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (!match) return ''
+
+  let hour = Number(match[1])
+  const minute = match[2]
+  const period = match[3].toUpperCase()
+
+  if (period === 'PM' && hour !== 12) hour += 12
+  if (period === 'AM' && hour === 12) hour = 0
+
+  return `${String(hour).padStart(2, '0')}:${minute}`
+}
+
+function nextDateForDay(dayOfWeek, startTime) {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const targetIndex = days.indexOf(dayOfWeek)
+  const normalizedTime = to24Hour(startTime)
+  if (targetIndex < 0 || !normalizedTime) return ''
+
+  const [slotHour, slotMinute] = normalizedTime.split(':').map(Number)
+  const now = new Date()
+  const todayIndex = now.getDay()
+  let delta = (targetIndex - todayIndex + 7) % 7
+
+  if (delta === 0) {
+    const nowMinutes = (now.getHours() * 60) + now.getMinutes()
+    const slotMinutes = (slotHour * 60) + slotMinute
+    if (slotMinutes <= nowMinutes) {
+      delta = 7
+    }
+  }
+
+  const nextDate = new Date(now)
+  nextDate.setHours(0, 0, 0, 0)
+  nextDate.setDate(now.getDate() + delta)
+  const yyyy = nextDate.getFullYear()
+  const mm = String(nextDate.getMonth() + 1).padStart(2, '0')
+  const dd = String(nextDate.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
 
 function openRequest(t) {
   selectedTeacher.value = t
-  reqForm.value = { topic: '', date: '', time: '', notes: '' }
+  reqForm.value = {
+    subject: t.subjectList?.[0] || '',
+    reason: CONSULTATION_REASONS[0],
+    availabilityId: t.consultationSlots?.[0]?.id || '',
+    description: '',
+  }
   reqError.value = ''
   showReqModal.value = true
 }
@@ -287,18 +405,33 @@ function requestFromProfile() {
 
 function submitRequest() {
   reqError.value = ''
-  if (!reqForm.value.topic.trim()) { reqError.value = 'Please enter a topic.'; return }
-  if (!reqForm.value.date)         { reqError.value = 'Please select a preferred date.'; return }
-  if (!reqForm.value.time)         { reqError.value = 'Please select a preferred time.'; return }
+  if (!reqForm.value.subject) { reqError.value = 'Please select a subject.'; return }
+  if (!reqForm.value.reason) { reqError.value = 'Please select a reason.'; return }
+  if (!reqForm.value.availabilityId) { reqError.value = 'Please select consultation availability.'; return }
+
+  const slot = (selectedTeacher.value?.consultationSlots || []).find((item) => item.id === reqForm.value.availabilityId)
+  if (!slot) { reqError.value = 'Selected consultation availability is invalid.'; return }
+
+  const date = nextDateForDay(slot.dayOfWeek, slot.startTime)
+  const time = to24Hour(slot.startTime)
+  if (!date || !time) { reqError.value = 'Selected consultation availability is invalid.'; return }
+
+  const notes = [
+    `Reason: ${reqForm.value.reason}`,
+    reqForm.value.description ? `Description: ${reqForm.value.description.trim()}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   apiRequest('/consultations/requests', {
     method: 'POST',
     body: JSON.stringify({
       teacherId: selectedTeacher.value.id,
-      topic: reqForm.value.topic.trim(),
-      date: reqForm.value.date,
-      time: reqForm.value.time,
-      notes: reqForm.value.notes || '',
+      topic: reqForm.value.subject,
+      availabilityId: reqForm.value.availabilityId,
+      date,
+      time,
+      notes,
     }),
   })
     .then(() => {
@@ -316,7 +449,22 @@ function showToast(msg) {
   setTimeout(() => { toastMsg.value = '' }, 3000)
 }
 
-onMounted(loadTeachers)
+onMounted(() => {
+  loadTeachers()
+  startAutoRefresh()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('focus', onWindowFocus)
+})
+
+onBeforeUnmount(() => {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+  }
+
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('focus', onWindowFocus)
+})
 </script>
 
 <style scoped>

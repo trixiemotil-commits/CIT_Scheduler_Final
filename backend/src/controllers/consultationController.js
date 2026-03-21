@@ -39,12 +39,79 @@ function normalizeTeacherFullName(userDoc) {
   return `${userDoc.firstName || ""} ${userDoc.lastName || ""}`.trim();
 }
 
+async function findTeacherUserByIdentifier(identifier) {
+  const key = String(identifier || "").trim();
+  if (!key) return null;
+
+  // First, try the canonical employeeId lookup.
+  let teacherUser = await User.findOne({ role: "teacher", employeeId: key }).lean();
+  if (teacherUser) return teacherUser;
+
+  // Fallback for legacy records where full teacher name may be stored.
+  const teachers = await User.find({ role: "teacher" })
+    .select("role firstName lastName employeeId department account_status teacher_status avatar")
+    .lean();
+
+  const normalizedKey = key.toLowerCase();
+  return (
+    teachers.find((t) => normalizeTeacherFullName(t).toLowerCase() === normalizedKey)
+    || null
+  );
+}
+
 function nowContext() {
   const now = new Date();
   return {
     dayOfWeek: DAYS[now.getDay()],
     minutes: now.getHours() * 60 + now.getMinutes(),
   };
+}
+
+function nextDateForDay(dayOfWeek, timeStr) {
+  const targetIndex = DAYS.indexOf(dayOfWeek);
+  const timeMinutes = parseTimeToMinutes(timeStr);
+  if (targetIndex < 0 || timeMinutes === null) {
+    return null;
+  }
+
+  const now = new Date();
+  const currentIndex = now.getDay();
+  let delta = (targetIndex - currentIndex + 7) % 7;
+
+  // If slot is today but already passed, schedule the next week.
+  if (delta === 0) {
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    if (timeMinutes <= nowMinutes) {
+      delta = 7;
+    }
+  }
+
+  const candidate = new Date(now);
+  candidate.setHours(0, 0, 0, 0);
+  candidate.setDate(candidate.getDate() + delta);
+
+  // Persist consultationDate as date-only (UTC midnight) to avoid timezone day shifts.
+  return new Date(Date.UTC(
+    candidate.getFullYear(),
+    candidate.getMonth(),
+    candidate.getDate(),
+    0,
+    0,
+    0,
+    0
+  ));
+}
+
+function dateOnlyToUtc(dateStr) {
+  const match = String(dateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  return new Date(Date.UTC(year, monthIndex, day, 0, 0, 0, 0));
 }
 
 async function resolveTeacherStatus(userDoc) {
@@ -145,18 +212,123 @@ function toClient(doc) {
   };
 }
 
-function toClientRequest(doc) {
+function normalizeConsultationLogNote(noteText) {
+  const text = String(noteText || "").trim();
+  if (!text) return "";
+
+  const withPrefix = text.match(/(?:^|\s)Notes:\s*(.+)$/i);
+  if (withPrefix && withPrefix[1]) {
+    return withPrefix[1].trim();
+  }
+
+  if (/^Consultation request created\.?$/i.test(text)) {
+    return "";
+  }
+
+  if (/^Request status updated to\s+[A-Z_]+\.?$/i.test(text)) {
+    return "";
+  }
+
+  return text;
+}
+
+function toClientRequest(doc, studentMeta = null, availabilityMeta = null, consultationNotes = "") {
+  const idText = doc._id?.toString?.() || doc.id?.toString?.() || ""
+  const ticketSuffix = idText.slice(-6).toUpperCase()
+  const studentName = studentMeta
+    ? `${studentMeta.firstName || ""} ${studentMeta.lastName || ""}`.trim()
+    : ""
   return {
     id: doc._id.toString(),
+    ticketNumber: ticketSuffix ? `TKT-${ticketSuffix}` : null,
     studentId: doc.studentId?.toString?.() || doc.studentId,
+    studentName,
+    studentNumber: studentMeta?.studentId || "",
+    studentAvatar: studentMeta?.avatar || null,
     employeeId: doc.employeeId,
     availabilityId: doc.availabilityId?.toString?.() || doc.availabilityId,
     subject: doc.subject,
     purpose: doc.purpose,
     requestDate: doc.requestDate,
+    consultationDate: doc.consultationDate,
+    consultationDayOfWeek: availabilityMeta?.dayOfWeek || "",
+    consultationStartTime: availabilityMeta?.startTime || "",
+    consultationEndTime: availabilityMeta?.endTime || "",
+    consultationNotes: consultationNotes || "",
     status: doc.status,
     createdAt: doc.createdAt,
   };
+}
+
+async function enrichRequestsWithQueue(requests) {
+  const ACTIVE_QUEUE_STATUSES = ["APPROVED"];
+  const queueable = requests.filter(
+    (req) => req?.availabilityId && req?.consultationDate && ACTIVE_QUEUE_STATUSES.includes(req.status)
+  );
+
+  if (!queueable.length) {
+    return requests.map((req) => ({ ...req, queuePosition: null, queueTotal: null, isNextInQueue: false }));
+  }
+
+  const groups = new Map();
+  for (const req of queueable) {
+    const date = new Date(req.consultationDate);
+    if (Number.isNaN(date.getTime())) {
+      continue;
+    }
+    const dateKey = date.toISOString().slice(0, 10);
+    const key = `${req.employeeId}|${req.availabilityId}|${dateKey}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        employeeId: req.employeeId,
+        availabilityId: req.availabilityId,
+        consultationDate: date,
+      });
+    }
+  }
+
+  const queueDocsByKey = new Map();
+  for (const [key, info] of groups.entries()) {
+    const docs = await ConsultationRequest.find({
+      employeeId: info.employeeId,
+      availabilityId: info.availabilityId,
+      consultationDate: info.consultationDate,
+      status: { $in: ACTIVE_QUEUE_STATUSES },
+    })
+      .sort({ createdAt: 1, _id: 1 })
+      .select("_id")
+      .lean();
+
+    queueDocsByKey.set(key, docs.map((d) => d._id.toString()));
+  }
+
+  return requests.map((req) => {
+    const status = String(req.status || "").toUpperCase();
+    if (!ACTIVE_QUEUE_STATUSES.includes(status) || !req.availabilityId || !req.consultationDate) {
+      return { ...req, queuePosition: null, queueTotal: null, isNextInQueue: false };
+    }
+
+    const date = new Date(req.consultationDate);
+    if (Number.isNaN(date.getTime())) {
+      return { ...req, queuePosition: null, queueTotal: null, isNextInQueue: false };
+    }
+
+    const key = `${req.employeeId}|${req.availabilityId}|${date.toISOString().slice(0, 10)}`;
+    const queueIds = queueDocsByKey.get(key) || [];
+    const idx = queueIds.findIndex((id) => id === String(req.id));
+
+    if (idx < 0) {
+      return { ...req, queuePosition: null, queueTotal: queueIds.length || null, isNextInQueue: false };
+    }
+
+    const position = idx + 1;
+    return {
+      ...req,
+      queuePosition: position,
+      queueTotal: queueIds.length,
+      isNextInQueue: position === 1,
+    };
+  });
 }
 
 function toClientLog(doc) {
@@ -205,7 +377,7 @@ async function listTeachersForStudents(req, res) {
           avatar: teacherUser.avatar || null,
           department: teacherUser.department || "",
           status,
-          available: ["On School", "On Main Campus"].includes(status) && availabilitySlots.length > 0,
+          available: status === "On School" && availabilitySlots.length > 0,
           subjects: Array.isArray(scheduleSubjects) ? scheduleSubjects.filter(Boolean) : [],
           consultationSlots: availabilitySlots.map((slot) => ({
             id: slot._id.toString(),
@@ -231,9 +403,13 @@ async function createConsultationRequest(req, res) {
       return res.status(403).json({ message: "Only students can create consultation requests." });
     }
 
-    const { teacherId, topic, date, time, notes = "" } = req.body || {};
-    if (!teacherId || !topic || !date || !time) {
-      return res.status(400).json({ message: "teacherId, topic, date and time are required." });
+    const { teacherId, topic, availabilityId, date, time, notes = "" } = req.body || {};
+    if (!teacherId || !topic) {
+      return res.status(400).json({ message: "teacherId and topic are required." });
+    }
+
+    if (!availabilityId && (!date || !time)) {
+      return res.status(400).json({ message: "availabilityId is required (or provide date and time for legacy requests)." });
     }
 
     const teacherUser = await User.findById(teacherId).lean();
@@ -243,47 +419,87 @@ async function createConsultationRequest(req, res) {
 
     const teacherName = normalizeTeacherFullName(teacherUser);
     const teacherStatus = await resolveTeacherStatus(teacherUser);
-    if (teacherStatus === "On Leave") {
-      return res.status(409).json({ message: `${teacherName} is currently on leave and cannot accept consultation requests right now.` });
-    }
-    if (teacherStatus === "On Meeting") {
-      return res.status(409).json({ message: `${teacherName} is currently on a meeting. Please try again later.` });
-    }
-
-    const requestDate = new Date(`${date}T${time}:00`);
-    if (Number.isNaN(requestDate.getTime())) {
-      return res.status(400).json({ message: "Invalid date/time provided." });
-    }
-
-    const dayOfWeek = DAYS[requestDate.getDay()];
-    const requestMinutes = parseTimeToMinutes(time);
-    if (requestMinutes === null) {
-      return res.status(400).json({ message: "Invalid time provided." });
+    if (teacherStatus !== "On School") {
+      return res.status(409).json({
+        message: `${teacherName} can only accept consultation requests while on school status. Current status: ${teacherStatus}.`,
+      });
     }
 
     const lookupKeys = [teacherUser.employeeId, teacherName].filter(Boolean);
-    const slots = await ConsultationAvailability.find({
-      dayOfWeek,
-      $or: [
-        { employeeId: { $in: lookupKeys } },
-        { teacher: teacherName },
-      ],
-    }).lean();
+    let matchedSlot = null;
+    let consultationDate = null;
+    let requestMinutes = null;
 
-    const matchedSlot = slots.find((slot) => isRequestWithinAvailability(requestMinutes, slot.startTime, slot.endTime));
+    if (availabilityId) {
+      matchedSlot = await ConsultationAvailability.findOne({
+        _id: availabilityId,
+        $or: [
+          { employeeId: { $in: lookupKeys } },
+          { teacher: teacherName },
+        ],
+      }).lean();
+
+      if (matchedSlot) {
+        consultationDate = nextDateForDay(matchedSlot.dayOfWeek, matchedSlot.startTime);
+        requestMinutes = parseTimeToMinutes(matchedSlot.startTime);
+      }
+    } else {
+      consultationDate = dateOnlyToUtc(date);
+      if (!consultationDate || Number.isNaN(consultationDate.getTime())) {
+        return res.status(400).json({ message: "Invalid date/time provided." });
+      }
+
+      const dayOfWeek = DAYS[consultationDate.getDay()];
+      requestMinutes = parseTimeToMinutes(time);
+      if (requestMinutes === null) {
+        return res.status(400).json({ message: "Invalid time provided." });
+      }
+
+      const slots = await ConsultationAvailability.find({
+        dayOfWeek,
+        $or: [
+          { employeeId: { $in: lookupKeys } },
+          { teacher: teacherName },
+        ],
+      }).lean();
+
+      matchedSlot = slots.find((slot) => isRequestWithinAvailability(requestMinutes, slot.startTime, slot.endTime));
+    }
+
     if (!matchedSlot) {
       return res.status(409).json({
         message: "Requested time is outside the teacher's consultation hours for the selected day.",
       });
     }
 
+    if (!consultationDate || Number.isNaN(consultationDate.getTime()) || requestMinutes === null) {
+      return res.status(400).json({ message: "Selected consultation availability is invalid." });
+    }
+
+    const requestDate = new Date();
+
+    const teacherKey = teacherUser.employeeId || teacherName;
+    const existingPending = await ConsultationRequest.findOne({
+      studentId: req.user.id,
+      employeeId: teacherKey,
+      availabilityId: matchedSlot._id,
+      status: "PENDING",
+    }).lean();
+
+    if (existingPending) {
+      return res.status(409).json({
+        message: "You already have a pending request for this teacher and consultation schedule. Please choose another time slot or another teacher.",
+      });
+    }
+
     const requestDoc = await ConsultationRequest.create({
       studentId: req.user.id,
-      employeeId: teacherUser.employeeId || teacherName,
+      employeeId: teacherKey,
       availabilityId: matchedSlot._id,
       subject: String(topic).trim(),
       purpose: String(notes || "").trim(),
       requestDate,
+      consultationDate,
       status: "PENDING",
     });
 
@@ -311,15 +527,184 @@ async function listConsultationRequests(req, res) {
     const filter = {};
     if (req.user?.role === "student") {
       filter.studentId = req.user.id;
+    } else if (req.user?.role === "teacher") {
+      const teacherUser = await User.findById(req.user.id)
+        .select("firstName lastName employeeId")
+        .lean();
+
+      if (!teacherUser) {
+        return res.status(404).json({ message: "Teacher profile not found." });
+      }
+
+      const teacherName = normalizeTeacherFullName(teacherUser);
+      const teacherKeys = [teacherUser.employeeId, teacherName]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+
+      if (!teacherKeys.length) {
+        return res.status(400).json({ message: "Teacher profile is missing employee details." });
+      }
+
+      filter.employeeId = teacherKeys.length === 1
+        ? teacherKeys[0]
+        : { $in: teacherKeys };
     } else if (req.query.employeeId) {
       filter.employeeId = req.query.employeeId;
     }
 
     const docs = await ConsultationRequest.find(filter).sort({ createdAt: -1 }).lean();
-    return res.json({ requests: docs.map(toClientRequest) });
+
+    const studentIds = [...new Set(
+      docs
+        .map((doc) => String(doc.studentId || "").trim())
+        .filter(Boolean)
+    )];
+
+    const students = studentIds.length
+      ? await User.find({ _id: { $in: studentIds } })
+        .select("firstName lastName studentId avatar")
+        .lean()
+      : [];
+
+    const availabilityIds = [...new Set(
+      docs
+        .map((doc) => String(doc.availabilityId || "").trim())
+        .filter(Boolean)
+    )];
+
+    const availabilities = availabilityIds.length
+      ? await ConsultationAvailability.find({ _id: { $in: availabilityIds } })
+        .select("dayOfWeek startTime endTime")
+        .lean()
+      : [];
+
+    const studentById = new Map(
+      students.map((student) => [String(student._id), student])
+    );
+
+    const availabilityById = new Map(
+      availabilities.map((slot) => [String(slot._id), slot])
+    );
+
+    const requestIds = docs.map((doc) => doc._id).filter(Boolean);
+    const logs = requestIds.length
+      ? await ConsultationLog.find({ requestId: { $in: requestIds } })
+        .select("requestId notes createdAt")
+        .sort({ createdAt: -1 })
+        .lean()
+      : [];
+
+    const noteByRequestId = new Map();
+    for (const log of logs) {
+      const requestId = String(log.requestId || "");
+      if (!requestId || noteByRequestId.has(requestId)) {
+        continue;
+      }
+
+      const normalizedNote = normalizeConsultationLogNote(log.notes);
+      if (normalizedNote) {
+        noteByRequestId.set(requestId, normalizedNote);
+      }
+    }
+
+    const requests = docs.map((doc) =>
+      toClientRequest(
+        doc,
+        studentById.get(String(doc.studentId || "")) || null,
+        availabilityById.get(String(doc.availabilityId || "")) || null,
+        noteByRequestId.get(String(doc._id || "")) || ""
+      )
+    );
+    const withQueue = await enrichRequestsWithQueue(requests);
+    return res.json({ requests: withQueue });
   } catch (error) {
     console.error("listConsultationRequests error:", error);
     return res.status(500).json({ message: "Failed to fetch consultation requests.", error: error.message });
+  }
+}
+
+// PUT /api/consultations/requests/:id
+async function updateConsultationRequestByStudent(req, res) {
+  try {
+    if (req.user?.role !== "student") {
+      return res.status(403).json({ message: "Only students can edit consultation requests." });
+    }
+
+    const { id } = req.params;
+    const { topic, availabilityId, notes = "" } = req.body || {};
+
+    if (!topic || !availabilityId) {
+      return res.status(400).json({ message: "topic and availabilityId are required." });
+    }
+
+    const requestDoc = await ConsultationRequest.findById(id);
+    if (!requestDoc) {
+      return res.status(404).json({ message: "Consultation request not found." });
+    }
+
+    if (String(requestDoc.studentId) !== String(req.user.id)) {
+      return res.status(403).json({ message: "You can only edit your own consultation requests." });
+    }
+
+    const teacherUser = await findTeacherUserByIdentifier(requestDoc.employeeId);
+    if (!teacherUser) {
+      return res.status(404).json({ message: "Teacher not found for this request." });
+    }
+
+    const teacherName = normalizeTeacherFullName(teacherUser);
+    const teacherStatus = await resolveTeacherStatus(teacherUser);
+    if (teacherStatus !== "On School") {
+      return res.status(409).json({
+        message: `${teacherName} can only accept consultation requests while on school status. Current status: ${teacherStatus}.`,
+      });
+    }
+
+    const lookupKeys = [teacherUser.employeeId, teacherName].filter(Boolean);
+    const matchedSlot = await ConsultationAvailability.findOne({
+      _id: availabilityId,
+      $or: [
+        { employeeId: { $in: lookupKeys } },
+        { teacher: teacherName },
+      ],
+    }).lean();
+
+    if (!matchedSlot) {
+      return res.status(409).json({ message: "Selected consultation availability is invalid for this teacher." });
+    }
+
+    const consultationDate = nextDateForDay(matchedSlot.dayOfWeek, matchedSlot.startTime);
+    if (!consultationDate || Number.isNaN(consultationDate.getTime())) {
+      return res.status(400).json({ message: "Selected consultation availability is invalid." });
+    }
+
+    const existingPending = await ConsultationRequest.findOne({
+      _id: { $ne: requestDoc._id },
+      studentId: req.user.id,
+      employeeId: requestDoc.employeeId,
+      availabilityId: matchedSlot._id,
+      status: "PENDING",
+    }).lean();
+
+    if (existingPending) {
+      return res.status(409).json({
+        message: "You already have a pending request for this teacher and consultation schedule. Please choose another time slot or another teacher.",
+      });
+    }
+
+    const canonicalTeacherKey = teacherUser.employeeId || teacherName;
+
+    requestDoc.subject = String(topic).trim();
+    requestDoc.purpose = String(notes || "").trim();
+    requestDoc.employeeId = canonicalTeacherKey;
+    requestDoc.availabilityId = matchedSlot._id;
+    requestDoc.consultationDate = consultationDate;
+    requestDoc.status = "PENDING";
+    await requestDoc.save();
+
+    return res.json({ message: "Consultation request updated.", request: toClientRequest(requestDoc) });
+  } catch (error) {
+    console.error("updateConsultationRequestByStudent error:", error);
+    return res.status(500).json({ message: "Failed to update consultation request.", error: error.message });
   }
 }
 
@@ -328,6 +713,7 @@ async function updateConsultationRequestStatus(req, res) {
   try {
     const allowed = ["PENDING", "APPROVED", "RESCHED", "COMPLETED", "CANCELLED"];
     const nextStatus = String(req.body?.status || "").trim().toUpperCase();
+    const statusNotes = String(req.body?.notes || "").trim();
     if (!allowed.includes(nextStatus)) {
       return res.status(400).json({ message: "Invalid status." });
     }
@@ -337,16 +723,38 @@ async function updateConsultationRequestStatus(req, res) {
       return res.status(404).json({ message: "Consultation request not found." });
     }
 
+    const actorRole = req.user?.role;
+    if (actorRole === "student") {
+      if (String(requestDoc.studentId) !== String(req.user.id)) {
+        return res.status(403).json({ message: "You can only update your own consultation requests." });
+      }
+
+      if (nextStatus !== "CANCELLED") {
+        return res.status(403).json({ message: "Students are only allowed to cancel consultation requests." });
+      }
+
+      if (String(requestDoc.status || "").toUpperCase() === "APPROVED") {
+        return res.status(409).json({ message: "Approved consultation requests can no longer be cancelled by students." });
+      }
+    }
+
     requestDoc.status = nextStatus;
     await requestDoc.save();
 
     const reqDate = new Date(requestDoc.requestDate);
     const timeIn = minutesTo24h(reqDate.getHours() * 60 + reqDate.getMinutes());
+    const logNotes = [
+      `Request status updated to ${nextStatus}.`,
+      statusNotes ? `Notes: ${statusNotes}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
     await ConsultationLog.create({
       requestId: requestDoc._id,
       timeIn,
       timeOut: timeIn,
-      notes: `Request status updated to ${nextStatus}.`,
+      notes: logNotes,
     });
 
     return res.json({ message: "Consultation request updated.", request: toClientRequest(requestDoc) });
@@ -536,6 +944,7 @@ module.exports = {
   listTeachersForStudents,
   createConsultationRequest,
   listConsultationRequests,
+  updateConsultationRequestByStudent,
   updateConsultationRequestStatus,
   listConsultationLogs,
 };

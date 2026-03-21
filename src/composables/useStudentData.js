@@ -1,67 +1,296 @@
-// Shared reactive store for student sessions (persisted to localStorage)
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
+import { getToken } from '@/auth.js'
 
-const STORAGE_KEY = 'cit_student_sessions'
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
-function loadSessions() {
+const sessions = ref([])
+const isLoadingSessions = ref(false)
+const sessionsError = ref('')
+
+let hasLoadedSessions = false
+let inFlightLoad = null
+
+function initialsFor(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  return (parts[0][0] || '?').toUpperCase()
+}
+
+function colorForName(name) {
+  const palette = ['#e63946', '#3a86ff', '#2d6a4f', '#f4a261', '#9b5de5', '#00a896', '#577590']
+  const text = String(name || '')
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i)
+    hash |= 0
+  }
+  return palette[Math.abs(hash) % palette.length]
+}
+
+function mapStatusFromApi(status) {
+  const normalized = String(status || '').trim().toUpperCase()
+  if (normalized === 'APPROVED') return 'Approved'
+  if (normalized === 'RESCHED') return 'Reschedule'
+  if (normalized === 'COMPLETED') return 'Completed'
+  if (normalized === 'CANCELLED') return 'Cancelled'
+  return 'Pending'
+}
+
+function mapStatusToApi(status) {
+  const normalized = String(status || '').trim().toLowerCase()
+  if (normalized === 'approved') return 'APPROVED'
+  if (normalized === 'reschedule') return 'RESCHED'
+  if (normalized === 'completed') return 'COMPLETED'
+  if (normalized === 'cancelled') return 'CANCELLED'
+  return 'PENDING'
+}
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return [
-    { id: 1, subject: 'Math Consultation',  teacher: 'Ms. Lisa Johnson', teacherInitials: 'J', teacherColor: '#e63946', status: 'Approved',  date: '2026-06-12', time: '10:00', duration: '60 min', notes: '', reason: null,    reviewed: false },
-    { id: 2, subject: 'Science Review',     teacher: 'Mr. Robert Davis', teacherInitials: 'D', teacherColor: '#3a86ff', status: 'Pending',   date: '2026-06-15', time: '14:00', duration: '90 min', notes: '', reason: null,    reviewed: false },
-    { id: 3, subject: 'English Literature', teacher: 'Ms. Sarah Park',   teacherInitials: 'P', teacherColor: '#9b5de5', status: 'Rejected',  date: '2026-06-10', time: '15:00', duration: '60 min', notes: '', reason: 'Teacher unavailable on this date. Please reschedule.', reviewed: false },
-    { id: 4, subject: 'History Session',    teacher: 'Mr. Tom Wilson',   teacherInitials: 'W', teacherColor: '#1b4332', status: 'Completed', date: '2026-06-05', time: '13:00', duration: '60 min', notes: '', reason: null,    reviewed: false },
-  ]
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
 }
 
-function saveSessions(list) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)) } catch {}
+function normalizeDateOnly(isoLike) {
+  if (!isoLike) return ''
+  const raw = String(isoLike)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return ''
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
 }
 
-const sessions = ref(loadSessions())
-let nextId = sessions.value.reduce((max, s) => Math.max(max, s.id), 0) + 1
+function mapRequestToSession(requestDoc, teacherLookup, availabilityLookup) {
+  const availabilityMeta = availabilityLookup.get(String(requestDoc.availabilityId || '')) || null
+  const fallbackMeta = teacherLookup.get(requestDoc.employeeId) || null
+  const teacherMeta = availabilityMeta || fallbackMeta || null
+
+  const teacher = teacherMeta?.name || requestDoc.employeeId || 'Teacher'
+  const teacherColor = colorForName(teacher)
+  const consultationSlots = Array.isArray(teacherMeta?.consultationSlots) ? teacherMeta.consultationSlots : []
+  const matchedSlot = consultationSlots.find((slot) => String(slot.id) === String(requestDoc.availabilityId))
+  const subjectList = Array.isArray(teacherMeta?.subjects) ? teacherMeta.subjects.filter(Boolean) : []
+
+  const parsedReason = String(requestDoc.purpose || '')
+    .split('\n')
+    .find((line) => line.toLowerCase().startsWith('reason:'))
+  const parsedDescription = String(requestDoc.purpose || '')
+    .split('\n')
+    .find((line) => line.toLowerCase().startsWith('description:'))
+
+  return {
+    id: requestDoc.id,
+    employeeId: requestDoc.employeeId || '',
+    ticketNumber: requestDoc.ticketNumber || null,
+    subject: requestDoc.subject || 'Consultation',
+    teacher,
+    teacherInitials: initialsFor(teacher),
+    teacherColor,
+    status: mapStatusFromApi(requestDoc.status),
+    date: normalizeDateOnly(requestDoc.consultationDate || requestDoc.requestDate),
+    timeStart: matchedSlot?.startTime || '',
+    timeEnd: matchedSlot?.endTime || '',
+    time: matchedSlot?.startTime || '--:--',
+    duration: '60 min',
+    notes: requestDoc.purpose || '',
+    consultationNotes: requestDoc.consultationNotes || '',
+    reason: parsedReason ? parsedReason.replace(/^reason:\s*/i, '') : null,
+    description: parsedDescription ? parsedDescription.replace(/^description:\s*/i, '') : '',
+    reviewed: false,
+    subjectList: subjectList.length ? subjectList : [requestDoc.subject || 'Consultation'],
+    consultationSlots,
+    availabilityId: requestDoc.availabilityId,
+    queuePosition: Number.isFinite(Number(requestDoc.queuePosition)) ? Number(requestDoc.queuePosition) : null,
+    queueTotal: Number.isFinite(Number(requestDoc.queueTotal)) ? Number(requestDoc.queueTotal) : null,
+    isNextInQueue: Boolean(requestDoc.isNextInQueue),
+  }
+}
+
+async function loadSessions(force = false) {
+  if (hasLoadedSessions && !force) {
+    return sessions.value
+  }
+
+  if (inFlightLoad) {
+    return inFlightLoad
+  }
+
+  inFlightLoad = (async () => {
+    isLoadingSessions.value = true
+    sessionsError.value = ''
+
+    try {
+      const [requestsPayload, teachersPayload] = await Promise.all([
+        apiRequest('/consultations/requests'),
+        apiRequest('/consultations/teachers').catch(() => ({ teachers: [] })),
+      ])
+
+      const teachers = Array.isArray(teachersPayload.teachers) ? teachersPayload.teachers : []
+      const teacherLookup = new Map()
+      const availabilityLookup = new Map()
+
+      teachers
+        .filter((t) => t && t.name)
+        .forEach((t) => {
+          const meta = {
+            name: t.name,
+            subjects: Array.isArray(t.subjects) ? t.subjects : [],
+            consultationSlots: Array.isArray(t.consultationSlots) ? t.consultationSlots : [],
+          }
+
+          if (t.employeeId) {
+            teacherLookup.set(t.employeeId, meta)
+          }
+          teacherLookup.set(t.name, meta)
+
+          meta.consultationSlots.forEach((slot) => {
+            if (slot?.id) {
+              availabilityLookup.set(String(slot.id), meta)
+            }
+          })
+        })
+
+      const requests = Array.isArray(requestsPayload.requests) ? requestsPayload.requests : []
+      sessions.value = requests.map((r) => mapRequestToSession(r, teacherLookup, availabilityLookup))
+      hasLoadedSessions = true
+      return sessions.value
+    } catch (error) {
+      sessions.value = []
+      sessionsError.value = error.message || 'Failed to load consultation sessions.'
+      return sessions.value
+    } finally {
+      isLoadingSessions.value = false
+      inFlightLoad = null
+    }
+  })()
+
+  return inFlightLoad
+}
 
 const stats = computed(() => ({
-  approved:  sessions.value.filter(s => s.status === 'Approved').length,
-  rejected:  sessions.value.filter(s => s.status === 'Rejected').length,
-  pending:   sessions.value.filter(s => s.status === 'Pending').length,
-  completed: sessions.value.filter(s => s.status === 'Completed').length,
+  approved: sessions.value.filter((s) => s.status === 'Approved').length,
+  reschedule: sessions.value.filter((s) => s.status === 'Reschedule').length,
+  rejected: sessions.value.filter((s) => s.status === 'Reschedule').length,
+  pending: sessions.value.filter((s) => s.status === 'Pending').length,
+  completed: sessions.value.filter((s) => s.status === 'Completed').length,
+  cancelled: sessions.value.filter((s) => s.status === 'Cancelled').length,
 }))
 
 function addSession(teacher, topic, date, time, notes) {
-  const s = {
-    id: nextId++,
+  const localId = `local-${Date.now()}`
+  const created = {
+    id: localId,
     subject: topic,
     teacher: teacher.name,
     teacherInitials: teacher.initials,
     teacherColor: teacher.color,
     status: 'Pending',
-    date, time,
+    date,
+    time,
     duration: '60 min',
     notes,
     reason: null,
     reviewed: false,
   }
-  sessions.value.unshift(s)
-  saveSessions(sessions.value)
-  return s
+  sessions.value.unshift(created)
+  return created
 }
 
-function cancelSession(id) {
-  sessions.value = sessions.value.filter(s => s.id !== id)
-  saveSessions(sessions.value)
+async function cancelSession(id) {
+  await apiRequest(`/consultations/requests/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'CANCELLED' }),
+  })
+
+  const idx = sessions.value.findIndex((s) => s.id === id)
+  if (idx !== -1) {
+    sessions.value[idx] = { ...sessions.value[idx], status: 'Cancelled' }
+  }
 }
 
-function updateSession(id, changes) {
-  const idx = sessions.value.findIndex(s => s.id === id)
+async function updateSession(id, changes, options = {}) {
+  const requireBackend = Boolean(options.requireBackend)
+  const shouldUpdateRequestDetails =
+    Object.prototype.hasOwnProperty.call(changes || {}, 'subject') ||
+    Object.prototype.hasOwnProperty.call(changes || {}, 'availabilityId') ||
+    Object.prototype.hasOwnProperty.call(changes || {}, 'notes')
+
+  if (shouldUpdateRequestDetails) {
+    try {
+      await apiRequest(`/consultations/requests/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          topic: changes.subject,
+          availabilityId: changes.availabilityId,
+          notes: changes.notes || '',
+        }),
+      })
+    } catch (error) {
+      if (requireBackend) {
+        throw error
+      }
+    }
+  }
+
+  if (changes && Object.prototype.hasOwnProperty.call(changes, 'status')) {
+    const apiStatus = mapStatusToApi(changes.status)
+    try {
+      await apiRequest(`/consultations/requests/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: apiStatus }),
+      })
+    } catch (error) {
+      if (requireBackend) {
+        throw error
+      }
+    }
+  }
+
+  const idx = sessions.value.findIndex((s) => s.id === id)
   if (idx !== -1) {
     sessions.value[idx] = { ...sessions.value[idx], ...changes }
-    saveSessions(sessions.value)
   }
 }
 
 export function useStudentData() {
-  return { sessions, stats, addSession, cancelSession, updateSession }
+  if (!hasLoadedSessions && !inFlightLoad) {
+    loadSessions().catch(() => {})
+  }
+
+  return {
+    sessions,
+    stats,
+    isLoadingSessions,
+    sessionsError,
+    loadSessions,
+    addSession,
+    cancelSession,
+    updateSession,
+  }
 }

@@ -252,12 +252,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { getToken, logout } from '@/auth.js'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route = useRoute()
 const currentRoute = computed(() => route.path)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const showAddModal = ref(false)
 const showAreasDropdown = ref(false)
 const newTeacherName = ref('')
@@ -272,68 +274,93 @@ const itemsPerPage = 3
 
 const statusTabs = ['All', 'In School', 'On-Meeting', 'On-leave']
 
-const teachers = ref([
-  {
-    id: 1,
-    name: 'Prof. John',
-    college: 'College of Information Technology',
-    email: 'john.smith.au@phinmaed.com',
-    avatar: 'https://i.pravatar.cc/150?img=12',
-    status: 'In School',
-    designatedAreas: ['Data Structure'],
+const teachers = ref([])
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    logout()
+    router.push('/')
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      logout()
+      router.push('/')
+    }
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
+}
+
+function mapTeacherStatus(status) {
+  if (status === 'On Meeting') return 'On-Meeting'
+  if (status === 'On Leave') return 'On Leave'
+  return 'In School'
+}
+
+function mapTeacherStatusToApi(status) {
+  if (status === 'On-Meeting') return 'On Meeting'
+  if (status === 'On Leave') return 'On Leave'
+  return 'On School'
+}
+
+function mapTeacherFromApi(user) {
+  const firstName = (user.firstName || '').trim()
+  const lastName = (user.lastName || '').trim()
+  const fullName = `${firstName} ${lastName}`.trim()
+
+  return {
+    id: user.id,
+    firstName,
+    lastName,
+    role: 'teacher',
+    name: fullName || user.name || 'Prof. Teacher',
+    college: user.department || 'College of Information Technology',
+    email: user.email || '',
+    avatar: user.avatar || `https://i.pravatar.cc/150?u=${encodeURIComponent(user.id || user.email || fullName)}`,
+    status: mapTeacherStatus(user.teacher_status),
+    account_status: user.account_status || 'Active',
+    teacher_status: user.teacher_status || 'On School',
+    employeeId: user.employeeId || '',
+    studentId: user.studentId || '',
+    phone: user.phone || '',
+    department: user.department || '',
+    designatedAreas: user.department ? [user.department] : [],
     substituteTeacher: null,
-  },
-  {
-    id: 2,
-    name: 'Prof. John',
-    college: 'College of Information Technology',
-    email: 'john.smith.au@phinmaed.com',
-    avatar: 'https://i.pravatar.cc/150?img=33',
-    status: 'On Leave',
-    designatedAreas: ['Data Structure'],
-    substituteTeacher: 'Prof. Jhon',
-  },
-  {
-    id: 3,
-    name: 'Prof. John',
-    college: 'College of Information Technology',
-    email: 'john.smith.au@phinmaed.com',
-    avatar: 'https://i.pravatar.cc/150?img=45',
-    status: 'On-Meeting',
-    designatedAreas: ['Data Structure'],
-    substituteTeacher: null,
-  },
-  {
-    id: 4,
-    name: 'Prof. Maria',
-    college: 'College of Engineering',
-    email: 'maria.santos.au@phinmaed.com',
-    avatar: 'https://i.pravatar.cc/150?img=50',
-    status: 'In School',
-    designatedAreas: ['Database', 'OOP'],
-    substituteTeacher: null,
-  },
-  {
-    id: 5,
-    name: 'Prof. James',
-    college: 'College of Information Technology',
-    email: 'james.brown.au@phinmaed.com',
-    avatar: 'https://i.pravatar.cc/150?img=22',
-    status: 'On-Meeting',
-    designatedAreas: ['Web Development'],
-    substituteTeacher: null,
-  },
-  {
-    id: 6,
-    name: 'Prof. Sarah',
-    college: 'College of Information Technology',
-    email: 'sarah.jones.au@phinmaed.com',
-    avatar: 'https://i.pravatar.cc/150?img=35',
-    status: 'In School',
-    designatedAreas: ['Mobile Dev', 'UI/UX'],
-    substituteTeacher: null,
-  },
-])
+    _lastStatus: mapTeacherStatus(user.teacher_status),
+  }
+}
+
+async function loadTeachers() {
+  try {
+    const payload = await apiRequest('/users?role=teacher')
+    teachers.value = Array.isArray(payload.users)
+      ? payload.users.map(mapTeacherFromApi)
+      : []
+  } catch (error) {
+    teachers.value = []
+    console.error('Failed to load teachers:', error)
+  }
+}
 
 const filteredTeachers = computed(() => {
   if (activeTab.value === 'All') return teachers.value
@@ -393,13 +420,40 @@ const previousTeachers = () => {
   }
 }
 
-const updateTeacherStatus = (teacher) => {
-  // Handle status update
-  if (teacher.status === 'On Leave' && !teacher.substituteTeacher) {
-    // Automatically show the substitute dropdown when changing to On Leave
-    console.log('Please select a substitute teacher for On Leave status')
+const updateTeacherStatus = async (teacher) => {
+  const previousStatus = teacher._lastStatus || teacher.status
+
+  try {
+    const payload = {
+      firstName: teacher.firstName || teacher.name?.split(' ')[0] || '',
+      lastName: teacher.lastName || teacher.name?.split(' ').slice(1).join(' ') || 'Teacher',
+      email: teacher.email,
+      role: 'teacher',
+      department: teacher.department || teacher.college || '',
+      phone: teacher.phone || '',
+      account_status: teacher.account_status || 'Active',
+      teacher_status: mapTeacherStatusToApi(teacher.status),
+      employeeId: teacher.employeeId || '',
+      studentId: teacher.studentId || '',
+    }
+
+    const response = await apiRequest(`/users/${teacher.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+
+    if (response?.user) {
+      const mapped = mapTeacherFromApi(response.user)
+      Object.assign(teacher, mapped)
+      return
+    }
+
+    teacher._lastStatus = teacher.status
+  } catch (error) {
+    teacher.status = previousStatus
+    console.error('Failed to update teacher status:', error)
+    alert(error.message || 'Failed to update teacher status.')
   }
-  console.log('Teacher status updated:', teacher)
 }
 
 const getAvailableSubstitutes = (currentTeacher) => {
@@ -447,6 +501,8 @@ const addNewTeacher = () => {
   showAddModal.value = false
   console.log('New teacher added:', newTeacher)
 }
+
+onMounted(loadTeachers)
 </script>
 
 <style scoped>

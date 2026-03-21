@@ -10,6 +10,7 @@ const {
   listTeachersForStudents,
   createConsultationRequest,
   listConsultationRequests,
+  updateConsultationRequestByStudent,
   updateConsultationRequestStatus,
   listConsultationLogs,
 } = require("../controllers/consultationController");
@@ -17,7 +18,8 @@ const {
 router.get("/teachers", authRequired, authorizeRoles("student", "teacher", "admin"), listTeachersForStudents);
 router.post("/requests", authRequired, authorizeRoles("student"), createConsultationRequest);
 router.get("/requests", authRequired, authorizeRoles("student", "teacher", "admin"), listConsultationRequests);
-router.patch("/requests/:id/status", authRequired, authorizeRoles("teacher", "admin"), updateConsultationRequestStatus);
+router.put("/requests/:id", authRequired, authorizeRoles("student"), updateConsultationRequestByStudent);
+router.patch("/requests/:id/status", authRequired, authorizeRoles("student", "teacher", "admin"), updateConsultationRequestStatus);
 router.get("/logs", authRequired, authorizeRoles("student", "teacher", "admin"), listConsultationLogs);
 
 // GET  /api/consultations/summary?teacher=xxx&employeeId=xxx

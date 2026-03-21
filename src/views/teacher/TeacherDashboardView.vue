@@ -307,6 +307,8 @@ const classesError = ref('')
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const todayDayName = ref(dayNames[new Date().getDay()])
 let midnightRefreshTimer = null
+let autoRefreshTimer = null
+const AUTO_REFRESH_MS = 30000
 
 function getTeacherName() {
   const fullName = typeof user?.name === 'string' ? user.name.trim() : ''
@@ -502,10 +504,29 @@ function onVisibilityChange() {
   }
 }
 
+function onWindowFocus() {
+  loadTodayClasses()
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+  }
+
+  autoRefreshTimer = setInterval(() => {
+    if (document.visibilityState !== 'visible') {
+      return
+    }
+    loadTodayClasses()
+  }, AUTO_REFRESH_MS)
+}
+
 onMounted(() => {
   loadTodayClasses()
   scheduleMidnightRefresh()
+  startAutoRefresh()
   document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('focus', onWindowFocus)
 })
 
 onBeforeUnmount(() => {
@@ -514,7 +535,13 @@ onBeforeUnmount(() => {
     midnightRefreshTimer = null
   }
 
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+  }
+
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('focus', onWindowFocus)
 })
 
 /* ── Logout ── */

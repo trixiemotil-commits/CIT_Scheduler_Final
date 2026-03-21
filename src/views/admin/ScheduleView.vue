@@ -73,7 +73,7 @@
             <div class="sched-select-wrap teacher-select-wrap">
               <select class="sched-select teacher-select" v-model="selectedTeacher">
                 <option value="">-- All Teachers --</option>
-                <option v-for="t in scheduledTeachers" :key="t" :value="t">Prof. {{ t }}</option>
+                <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
               </select>
               <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
@@ -1706,6 +1706,7 @@ onMounted(async () => {
         teacherOptions.value = teachers
           .map(user => `${user.firstName} ${user.lastName}`.trim())
           .filter(name => name.length > 0)
+          .sort((a, b) => a.localeCompare(b))
         teachers.forEach(user => {
           const name = `${user.firstName} ${user.lastName}`.trim()
           if (name) teacherUserMap.value[name] = user

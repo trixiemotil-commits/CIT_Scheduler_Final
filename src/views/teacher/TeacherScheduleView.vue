@@ -241,13 +241,14 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const AUTO_REFRESH_MS = 30000
 
 /* ── User ── */
 const user = computed(() => getUser())
@@ -292,6 +293,8 @@ const TIME_SLOTS = ALL_STARTS.slice(0, -1).map((s, i) => ({
   end:   ALL_STARTS[i + 1],
   label: `${formatTime12(s)}-${formatTime12(ALL_STARTS[i + 1])}`
 }))
+const GRID_START_MINUTES = Number(ALL_STARTS[0].slice(0, 2)) * 60
+const GRID_END_MINUTES = Number(ALL_STARTS[ALL_STARTS.length - 1].slice(0, 2)) * 60
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_SHORT = { Monday: 'Monday', Tuesday: 'Tues', Wednesday: 'Wed', Thursday: 'Thurs', Friday: 'Fri', Saturday: 'Sat' }
 
@@ -370,13 +373,39 @@ function dayLabel(day) {
   return DAYS.find((d) => d.toLowerCase() === normalized) || ''
 }
 
-function slotIndexFromMinutes(totalMinutes) {
+function startSlotIndex(totalMinutes) {
   if (Number.isNaN(totalMinutes)) {
     return -1
   }
 
-  const hour = Math.floor(totalMinutes / 60)
-  return ALL_STARTS.findIndex((start) => Number(start.slice(0, 2)) === hour)
+  const clamped = Math.max(GRID_START_MINUTES, Math.min(totalMinutes, GRID_END_MINUTES - 1))
+  return Math.floor((clamped - GRID_START_MINUTES) / 60)
+}
+
+function endSlotIndex(totalMinutes) {
+  if (Number.isNaN(totalMinutes)) {
+    return -1
+  }
+
+  const clamped = Math.max(GRID_START_MINUTES + 1, Math.min(totalMinutes, GRID_END_MINUTES))
+  return Math.ceil((clamped - GRID_START_MINUTES) / 60)
+}
+
+function resolveGridSpan(startTime, endTime) {
+  const startMinutes = timeToMinutes(startTime)
+  const endMinutes = timeToMinutes(endTime)
+  const startIndex = startSlotIndex(startMinutes)
+  const endIndex = endSlotIndex(endMinutes)
+  const maxEndIndex = TIME_SLOTS.length
+
+  if (startIndex < 0 || endIndex <= startIndex) {
+    return null
+  }
+
+  return {
+    startIndex,
+    rowspan: Math.max(1, Math.min(maxEndIndex, endIndex) - startIndex),
+  }
 }
 
 function mapConsultationsToSchedule(consultations) {
@@ -387,12 +416,9 @@ function mapConsultationsToSchedule(consultations) {
   return consultations
     .map((slot) => {
       const day = dayLabel(slot.dayOfWeek)
-      const startMinutes = timeToMinutes(slot.startTime)
-      const endMinutes = timeToMinutes(slot.endTime)
-      const startIndex = slotIndexFromMinutes(startMinutes)
-      const endIndex = slotIndexFromMinutes(endMinutes)
+      const span = resolveGridSpan(slot.startTime, slot.endTime)
 
-      if (!day || startIndex < 0 || endIndex <= startIndex) {
+      if (!day || !span) {
         return null
       }
 
@@ -401,8 +427,8 @@ function mapConsultationsToSchedule(consultations) {
         day,
         start: to24Hour(slot.startTime),
         end: to24Hour(slot.endTime),
-        startIndex,
-        rowspan: endIndex - startIndex,
+        startIndex: span.startIndex,
+        rowspan: span.rowspan,
       }
     })
     .filter(Boolean)
@@ -453,7 +479,8 @@ function mapEntriesToSchedule(entries) {
     const day = entry.day
     const start = to24Hour(entry.timeIn)
     const end = to24Hour(entry.timeOut)
-    if (!day || !start || !end) {
+    const span = resolveGridSpan(start, end)
+    if (!day || !start || !end || !span) {
       return
     }
 
@@ -470,6 +497,8 @@ function mapEntriesToSchedule(entries) {
       teacher: entry.teacher || userName.value || 'Teacher',
       avatar,
       parallelSections: [],
+      startIndex: span.startIndex,
+      rowspan: span.rowspan,
     }
 
     if (baseRecord.parallel) {
@@ -536,7 +565,47 @@ async function loadSchedule() {
   }
 }
 
-onMounted(loadSchedule)
+let autoRefreshTimer = null
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    loadSchedule()
+  }
+}
+
+function onWindowFocus() {
+  loadSchedule()
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+  }
+
+  autoRefreshTimer = setInterval(() => {
+    if (document.visibilityState !== 'visible') {
+      return
+    }
+    loadSchedule()
+  }, AUTO_REFRESH_MS)
+}
+
+onMounted(() => {
+  loadSchedule()
+  startAutoRefresh()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('focus', onWindowFocus)
+})
+
+onBeforeUnmount(() => {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+  }
+
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('focus', onWindowFocus)
+})
 
 /* ── Subject filter ── */
 const selectedSubject = ref('')
@@ -589,11 +658,9 @@ const tableMatrix = computed(() => {
     DAYS.map((day, ci) => {
       if (occupied[ci][ri]) return { type: 'occupied' }
 
-      const cls = data.find(c => c.day === day && c.start === slot.start)
+      const cls = data.find((c) => c.day === day && c.startIndex === ri)
       if (cls) {
-        const startIndex = ALL_STARTS.indexOf(cls.start)
-        const endIndex = ALL_STARTS.indexOf(cls.end)
-        const span = startIndex >= 0 && endIndex > startIndex ? endIndex - startIndex : 1
+        const span = Math.max(1, Number(cls.rowspan) || 1)
         for (let r = ri + 1; r < ri + span && r < TIME_SLOTS.length; r++) occupied[ci][r] = true
         return { type: 'start', cls, rowspan: span }
       }

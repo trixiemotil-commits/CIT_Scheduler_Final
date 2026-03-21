@@ -62,7 +62,10 @@
 
         <!-- Request List -->
         <div class="request-list">
+          <div v-if="isLoadingRequests" class="empty-state">Loading consultation requests...</div>
+          <div v-else-if="requestsError" class="empty-state">{{ requestsError }}</div>
           <div
+            v-if="!isLoadingRequests && !requestsError"
             v-for="req in filteredRequests"
             :key="req.id"
             :class="['request-card', `border-${req.status}`]"
@@ -79,6 +82,10 @@
                   <span :class="['status-badge', `badge-${req.status}`]">{{ statusLabel(req.status) }}</span>
                 </div>
                 <div class="req-id">{{ req.studentId }}</div>
+                <div v-if="req.ticketNumber" class="req-ticket">Ticket: {{ req.ticketNumber }}</div>
+                <div v-if="req.status === 'approved' && req.queuePosition" class="req-queue">
+                  Queue #{{ req.queuePosition }}<span v-if="req.queueTotal"> of {{ req.queueTotal }}</span>
+                </div>
               </div>
               <div class="req-actions">
                 <!-- Pending actions -->
@@ -89,7 +96,7 @@
                   </button>
                   <button class="btn-reject" @click.stop="reject(req.id)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    Reject
+                    Resched
                   </button>
                 </template>
                 <!-- Approved actions -->
@@ -97,7 +104,7 @@
                   <button class="btn-edit" title="Edit" @click.stop="editReq(req.id)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   </button>
-                  <button class="btn-done" @click.stop="markDone(req.id)">
+                  <button v-if="Number(req.queuePosition) === 1" class="btn-done" @click.stop="openDoneModal(req.id)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     Done
                   </button>
@@ -113,11 +120,11 @@
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
               </svg>
-              {{ req.date }}
+              {{ req.schedule || req.date }}
             </div>
           </div>
 
-          <div v-if="filteredRequests.length === 0" class="empty-state">
+          <div v-if="!isLoadingRequests && !requestsError && filteredRequests.length === 0" class="empty-state">
             No {{ activeTab === 'all' ? '' : activeTab }} requests.
           </div>
         </div>
@@ -143,19 +150,43 @@
       </div>
     </Teleport>
 
-    <!-- ═══ Reject Consultation Modal ═══ -->
+    <!-- ═══ Mark Done Modal ═══ -->
+    <Teleport to="body">
+      <div v-if="showDoneModal" class="modal-overlay" @click.self="closeDoneModal">
+        <div class="done-modal">
+          <h2 class="done-modal-title">Mark Consultation as Done</h2>
+          <p class="done-modal-sub">Add optional notes about what happened during the consultation.</p>
+
+          <label class="done-label">Optional Notes</label>
+          <textarea
+            v-model="doneNotes"
+            class="done-textarea"
+            rows="4"
+            maxlength="500"
+            placeholder="Example: Discussed assignment requirements and gave implementation tips."
+          ></textarea>
+
+          <div class="done-modal-actions">
+            <button class="done-cancel-btn" @click="closeDoneModal">Cancel</button>
+            <button class="done-confirm-btn" @click="confirmDone">Mark as Done</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ═══ Resched Consultation Modal ═══ -->
     <Teleport to="body">
       <div v-if="showRejectModal" class="modal-overlay" @click.self="closeRejectModal">
         <div class="reject-modal">
-          <h2 class="reject-modal-title">Reject Consultation Request</h2>
-          <p class="reject-modal-sub">Provide a reason for rejecting this consultation request</p>
+          <h2 class="reject-modal-title">Resched Consultation Request</h2>
+          <p class="reject-modal-sub">Provide a reason for rescheduling this consultation request</p>
 
           <div class="reject-student-box">
             <div class="reject-student-name">{{ rejectTarget?.name }}</div>
             <div class="reject-student-subject">{{ rejectTarget?.subject }}</div>
           </div>
 
-          <label class="reject-label">Rejection Reason <span class="reject-required">*</span></label>
+          <label class="reject-label">Resched Reason <span class="reject-required">*</span></label>
           <div class="reject-select-wrap">
             <select class="reject-select" v-model="rejectionReason">
               <option value="" disabled>Select a reason...</option>
@@ -184,14 +215,14 @@
             <button class="reject-cancel-btn" @click="closeRejectModal">Cancel</button>
             <button class="reject-confirm-btn" @click="submitReject">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Reject request
+              Resched request
             </button>
           </div>
         </div>
       </div>
     </Teleport>
 
-    <!-- ═══ Confirm Reject Modal ═══ -->
+    <!-- ═══ Confirm Resched Modal ═══ -->
     <Teleport to="body">
       <div v-if="showConfirmModal" class="modal-overlay" @click.self="cancelConfirm">
         <div class="confirm-modal">
@@ -202,11 +233,11 @@
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
           </div>
-          <h3 class="confirm-modal-title">Reject Request</h3>
-          <p class="confirm-modal-text">Are you sure you want to reject this consultation request? This action cannot be undone.</p>
+          <h3 class="confirm-modal-title">Resched Request</h3>
+          <p class="confirm-modal-text">Are you sure you want to resched this consultation request?</p>
           <div class="confirm-modal-actions">
             <button class="confirm-cancel-btn" @click="cancelConfirm">Cancel</button>
-            <button class="confirm-ok-btn" @click="confirmReject">Yes, Reject</button>
+            <button class="confirm-ok-btn" @click="confirmReject">Yes, Resched</button>
           </div>
         </div>
       </div>
@@ -237,11 +268,15 @@
             <div class="detail-value detail-msg">{{ selectedRequest?.message }}</div>
           </div>
           <div class="detail-row">
-            <div class="detail-label">Requested</div>
-            <div class="detail-value">{{ selectedRequest?.date }}</div>
+            <div class="detail-label">Consultation Schedule</div>
+            <div class="detail-value">{{ selectedRequest?.schedule || selectedRequest?.date }}</div>
           </div>
-          <div v-if="selectedRequest?.status === 'rejected' && selectedRequest?.rejectionReason" class="detail-row">
-            <div class="detail-label detail-label-reject">Rejection Reason</div>
+          <div v-if="selectedRequest?.ticketNumber" class="detail-row">
+            <div class="detail-label">Ticket Number</div>
+            <div class="detail-value">{{ selectedRequest?.ticketNumber }}</div>
+          </div>
+          <div v-if="selectedRequest?.status === 'resched' && selectedRequest?.rejectionReason" class="detail-row">
+            <div class="detail-label detail-label-reject">Resched Reason</div>
             <div class="detail-value detail-reject-reason">{{ selectedRequest?.rejectionReason }}</div>
           </div>
         </div>
@@ -312,9 +347,9 @@
 </template>
 
 <script setup>
-import { getUser, logout } from '@/auth.js'
+import { getToken, getUser, logout } from '@/auth.js'
 import Swal from 'sweetalert2'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -347,61 +382,179 @@ const navItems = [
 ]
 
 /* ── Consultation requests ── */
-const requests = ref([
-  {
-    id: 1, name: 'Joshua Manuzon', studentId: '01-2014-035489', status: 'pending',
-    subject: 'Data Structures Assignment Help',
-    message: 'I need help understanding binary search trees and their implementation.',
-    date: '12/20/2025 at 14:00',
-    avatar: 'https://i.pravatar.cc/100?img=61'
-  },
-  {
-    id: 2, name: 'Rden Clamonte', studentId: '01-5555-444444', status: 'approved',
-    subject: 'Data Structures Assignment Help',
-    message: 'I need help understanding binary search trees and their implementation.',
-    date: '12/20/2025 at 14:00',
-    avatar: 'https://i.pravatar.cc/100?img=52'
-  },
-  {
-    id: 3, name: 'Teddy Guangco', studentId: '01-2222-444444', status: 'rejected',
-    subject: 'Data Structures Assignment Help',
-    message: 'I need help understanding binary search trees and their implementation.',
-    date: '12/20/2025 at 14:00',
-    avatar: 'https://i.pravatar.cc/100?img=54',
-    rejectionReason: 'Outside consultation scope'
-  },
-  {
-    id: 4, name: 'Maria Santos', studentId: '01-3333-112233', status: 'pending',
-    subject: 'Algorithm Complexity Questions',
-    message: 'Can we discuss Big O notation and time complexity analysis for my project?',
-    date: '12/21/2025 at 09:00',
-    avatar: 'https://i.pravatar.cc/100?img=44'
-  },
-  {
-    id: 5, name: 'Carlo Reyes', studentId: '01-4444-556677', status: 'completed',
-    subject: 'Final Project Requirements',
-    message: 'I would like to clarify the requirements for the final capstone project.',
-    date: '12/19/2025 at 11:00',
-    avatar: 'https://i.pravatar.cc/100?img=68'
-  },
-  {
-    id: 6, name: 'Lea Bautista', studentId: '01-6666-998877', status: 'completed',
-    subject: 'Grade Inquiry – ITE 235',
-    message: 'I have a question about my midterm exam score and how it was computed.',
-    date: '12/18/2025 at 10:30',
-    avatar: 'https://i.pravatar.cc/100?img=45'
-  },
-])
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
+const requests = ref([])
+const isLoadingRequests = ref(false)
+const requestsError = ref('')
+
+function mapStatusFromApi(status) {
+  const normalized = String(status || '').trim().toUpperCase()
+  if (normalized === 'APPROVED') return 'approved'
+  if (normalized === 'RESCHED') return 'resched'
+  if (normalized === 'COMPLETED') return 'completed'
+  if (normalized === 'CANCELLED') return 'cancelled'
+  return 'pending'
+}
+
+function mapStatusToApi(status) {
+  const normalized = String(status || '').trim().toLowerCase()
+  if (normalized === 'approved') return 'APPROVED'
+  if (normalized === 'resched') return 'RESCHED'
+  if (normalized === 'completed') return 'COMPLETED'
+  if (normalized === 'cancelled') return 'CANCELLED'
+  return 'PENDING'
+}
+
+function parseReschedReason(text) {
+  return String(text || '')
+    .split('\n')
+    .find((line) => line.toLowerCase().startsWith('resched reason:'))
+    ?.replace(/^resched reason:\s*/i, '') || ''
+}
+
+function formatRequestDate(consultationDate, requestDate) {
+  const raw = consultationDate || requestDate
+  if (!raw) return '--'
+
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return String(raw)
+
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function formatDateOnly(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function formatTimeLabel(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+
+  const plain = text.match(/^(\d{1,2}):(\d{2})$/)
+  if (plain) {
+    const hours = Number(plain[1])
+    const minutes = Number(plain[2])
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return text
+    const suffix = hours >= 12 ? 'PM' : 'AM'
+    const clock = hours % 12 || 12
+    return `${clock}:${String(minutes).padStart(2, '0')} ${suffix}`
+  }
+
+  const ampm = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (ampm) {
+    return `${Number(ampm[1])}:${ampm[2]} ${ampm[3].toUpperCase()}`
+  }
+
+  return text
+}
+
+function formatScheduleLabel(doc) {
+  const dateText = formatDateOnly(doc.consultationDate)
+  const dayText = String(doc.consultationDayOfWeek || '').trim()
+  const startText = formatTimeLabel(doc.consultationStartTime)
+  const endText = formatTimeLabel(doc.consultationEndTime)
+  const timeText = startText && endText ? `${startText} - ${endText}` : startText || endText
+
+  const parts = [dateText, dayText, timeText].filter(Boolean)
+  if (parts.length) return parts.join(' • ')
+  return formatRequestDate(doc.consultationDate, doc.requestDate)
+}
+
+function buildAvatar(name, avatarUrl) {
+  if (avatarUrl) return avatarUrl
+  const seed = encodeURIComponent(String(name || 'student'))
+  return `https://i.pravatar.cc/100?u=${seed}`
+}
+
+function mapRequest(doc) {
+  const parsedReason = parseReschedReason(doc.purpose)
+  const studentName = String(doc.studentName || '').trim() || 'Student'
+  return {
+    id: doc.id,
+    name: studentName,
+    studentId: doc.studentNumber || doc.studentId || '--',
+    ticketNumber: doc.ticketNumber || '',
+    status: mapStatusFromApi(doc.status),
+    subject: doc.subject || 'Consultation',
+    message: doc.purpose || 'No message provided.',
+    date: formatRequestDate(doc.consultationDate, doc.requestDate),
+    schedule: formatScheduleLabel(doc),
+    avatar: buildAvatar(studentName, doc.studentAvatar),
+    rejectionReason: parsedReason,
+    queuePosition: Number.isFinite(Number(doc.queuePosition)) ? Number(doc.queuePosition) : null,
+    queueTotal: Number.isFinite(Number(doc.queueTotal)) ? Number(doc.queueTotal) : null,
+  }
+}
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
+}
+
+async function loadRequests() {
+  isLoadingRequests.value = true
+  requestsError.value = ''
+
+  try {
+    const payload = await apiRequest('/consultations/requests')
+    const rows = Array.isArray(payload.requests) ? payload.requests : []
+    requests.value = rows.map(mapRequest)
+  } catch (error) {
+    requests.value = []
+    requestsError.value = error.message || 'Failed to load consultation requests.'
+  } finally {
+    isLoadingRequests.value = false
+  }
+}
 
 /* ── Active filter tab ── */
 const activeTab = ref('all')
 
 const tabs = computed(() => [
   { key: 'all',       label: 'All',       count: requests.value.length },
-  { key: 'pending',   label: 'Pending',   count: requests.value.filter(r => r.status === 'pending').length },
+  { key: 'pending',   label: 'Requested', count: requests.value.filter(r => r.status === 'pending').length },
   { key: 'approved',  label: 'Approved',  count: requests.value.filter(r => r.status === 'approved').length },
-  { key: 'rejected',  label: 'Rejected',  count: requests.value.filter(r => r.status === 'rejected').length },
+  { key: 'resched',   label: 'Resched',   count: requests.value.filter(r => r.status === 'resched').length },
   { key: 'completed', label: 'Completed', count: requests.value.filter(r => r.status === 'completed').length },
+  { key: 'cancelled', label: 'Cancelled', count: requests.value.filter(r => r.status === 'cancelled').length },
 ])
 
 const filteredRequests = computed(() =>
@@ -411,7 +564,31 @@ const filteredRequests = computed(() =>
 )
 
 function statusLabel(status) {
-  return status.charAt(0).toUpperCase() + status.slice(1)
+  const normalized = String(status || '').toLowerCase()
+  if (normalized === 'resched') return 'Resched'
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+}
+
+async function patchRequestStatus(id, nextStatus, successTitle = 'Status Updated', notes = '') {
+  await apiRequest(`/consultations/requests/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: mapStatusToApi(nextStatus), notes }),
+  })
+
+  await loadRequests()
+
+  Swal.fire({
+    toast: true,
+    position: 'top-end',
+    icon: 'success',
+    title: successTitle,
+    showConfirmButton: false,
+    timer: 2500,
+    timerProgressBar: true,
+    background: '#1b4332',
+    color: '#fff',
+    iconColor: '#74c69d',
+  })
 }
 
 /* ── Actions ── */
@@ -428,17 +605,15 @@ function cancelApprove() {
   pendingApproveId.value = null
 }
 
-function confirmApprove() {
+async function confirmApprove() {
   showApproveModal.value = false
-  const r = requests.value.find(r => r.id === pendingApproveId.value)
-  if (r) r.status = 'approved'
+  if (!pendingApproveId.value) return
+  try {
+    await patchRequestStatus(pendingApproveId.value, 'approved', 'Approve Successful')
+  } catch (error) {
+    Swal.fire('Unable to approve', error.message || 'Failed to update request status.', 'error')
+  }
   pendingApproveId.value = null
-  Swal.fire({
-    toast: true, position: 'top-end', icon: 'success',
-    title: 'Approve Successful', showConfirmButton: false,
-    timer: 2500, timerProgressBar: true,
-    background: '#1b4332', color: '#fff', iconColor: '#74c69d'
-  })
 }
 
 /* Reject flow — step 1: open reject modal */
@@ -482,33 +657,47 @@ function cancelConfirm() {
   pendingRejectTarget.value = null
 }
 
-function confirmReject() {
+async function confirmReject() {
   showConfirmModal.value = false
-  if (pendingRejectTarget.value) {
-    const r = requests.value.find(r => r.id === pendingRejectTarget.value.id)
-    if (r) {
-      r.status = 'rejected'
-      r.rejectionReason = rejectionReason.value === 'Other' ? otherReason.value : rejectionReason.value
-    }
+  if (!pendingRejectTarget.value?.id) {
+    pendingRejectTarget.value = null
+    return
   }
+
+  try {
+    await patchRequestStatus(pendingRejectTarget.value.id, 'resched', 'Resched Successful')
+  } catch (error) {
+    Swal.fire('Unable to resched', error.message || 'Failed to update request status.', 'error')
+  }
+
   pendingRejectTarget.value = null
-  Swal.fire({
-    toast: true, position: 'top-end', icon: 'success',
-    title: 'Reject Successful', showConfirmButton: false,
-    timer: 2500, timerProgressBar: true,
-    background: '#e63946', color: '#fff', iconColor: '#fff'
-  })
 }
 
-function markDone(id) {
-  const r = requests.value.find(r => r.id === id)
-  if (r) r.status = 'completed'
-  Swal.fire({
-    toast: true, position: 'top-end', icon: 'success',
-    title: 'Marked as Done', showConfirmButton: false,
-    timer: 2500, timerProgressBar: true,
-    background: '#1b4332', color: '#fff', iconColor: '#74c69d'
-  })
+const showDoneModal = ref(false)
+const doneTargetId = ref(null)
+const doneNotes = ref('')
+
+function openDoneModal(id) {
+  doneTargetId.value = id
+  doneNotes.value = ''
+  showDoneModal.value = true
+}
+
+function closeDoneModal() {
+  showDoneModal.value = false
+  doneTargetId.value = null
+  doneNotes.value = ''
+}
+
+async function confirmDone() {
+  if (!doneTargetId.value) return
+
+  try {
+    await patchRequestStatus(doneTargetId.value, 'completed', 'Marked as Done', doneNotes.value.trim())
+    closeDoneModal()
+  } catch (error) {
+    Swal.fire('Unable to mark done', error.message || 'Failed to update request status.', 'error')
+  }
 }
 
 /* ── Edit modal ── */
@@ -519,8 +708,9 @@ const editForm      = ref({ status: '' })
 const statusOptions = [
   { value: 'pending',   label: 'Pending'   },
   { value: 'approved',  label: 'Approved'  },
-  { value: 'rejected',  label: 'Rejected'  },
+  { value: 'resched',   label: 'Resched'   },
   { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 function editReq(id) {
@@ -538,7 +728,7 @@ function closeEditModal() {
 
 async function saveEdit() {
   if (!editTarget.value) return
-  if (editForm.value.status === 'rejected') {
+  if (editForm.value.status === 'resched') {
     const targetId = editTarget.value.id
     closeEditModal()
     reject(targetId)
@@ -557,15 +747,12 @@ async function saveEdit() {
     reverseButtons: false
   })
   if (!result.isConfirmed) return
-  const r = requests.value.find(r => r.id === editTarget.value.id)
-  if (r) r.status = editForm.value.status
-  closeEditModal()
-  Swal.fire({
-    toast: true, position: 'top-end', icon: 'success',
-    title: 'Status Updated', showConfirmButton: false,
-    timer: 2500, timerProgressBar: true,
-    background: '#1b4332', color: '#fff', iconColor: '#74c69d'
-  })
+  try {
+    await patchRequestStatus(editTarget.value.id, editForm.value.status, 'Status Updated')
+    closeEditModal()
+  } catch (error) {
+    Swal.fire('Unable to update', error.message || 'Failed to update request status.', 'error')
+  }
 }
 
 /* ── Detail Modal ── */
@@ -580,6 +767,10 @@ function closeDetail() {
   showDetailModal.value = false
   selectedRequest.value = null
 }
+
+onMounted(() => {
+  loadRequests()
+})
 
 /* ── Logout ── */
 const showLogoutModal = ref(false)
@@ -777,8 +968,9 @@ function confirmLogout() {
 
 .border-pending   { border-left-color: #e8a020; background: #fffdf5; }
 .border-approved  { border-left-color: #1b4332; background: #f6faf8; }
-.border-rejected  { border-left-color: #e63946; background: #fff8f8; }
+.border-resched   { border-left-color: #e63946; background: #fff8f8; }
 .border-completed { border-left-color: #74c69d; background: #f5fdf8; }
+.border-cancelled { border-left-color: #8d99ae; background: #f6f7f9; }
 
 /* Top row */
 .req-top {
@@ -808,6 +1000,8 @@ function confirmLogout() {
 }
 .req-name { font-size: 0.98rem; font-weight: 700; color: #111; }
 .req-id   { font-size: 0.8rem; color: #888; margin-top: 2px; }
+.req-ticket { font-size: 0.78rem; color: #2d6a4f; font-weight: 600; margin-top: 4px; }
+.req-queue { font-size: 0.78rem; color: #1b4332; font-weight: 600; margin-top: 4px; }
 
 /* Status badges */
 .status-badge {
@@ -819,8 +1013,9 @@ function confirmLogout() {
 }
 .badge-pending   { background: #fff0cc; color: #b06000; }
 .badge-approved  { background: #d8f3dc; color: #1b4332; }
-.badge-rejected  { background: #ffd6d8; color: #c1121f; }
+.badge-resched   { background: #ffd6d8; color: #c1121f; }
 .badge-completed { background: #d0f0e0; color: #2d6a4f; }
+.badge-cancelled { background: #e9ecef; color: #5c677d; }
 
 /* Action buttons */
 .req-actions {
@@ -1218,6 +1413,73 @@ function confirmLogout() {
   flex-shrink: 0;
 }
 
+/* ── Mark done modal ── */
+.done-modal {
+  width: 460px;
+  max-width: 94vw;
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.2);
+}
+.done-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111;
+}
+.done-modal-sub {
+  margin: 8px 0 16px;
+  color: #666;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.done-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #444;
+}
+.done-textarea {
+  width: 100%;
+  border: 1.5px solid #d9dde1;
+  border-radius: 10px;
+  padding: 11px 12px;
+  font-family: inherit;
+  font-size: 0.87rem;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.done-textarea:focus {
+  outline: none;
+  border-color: #1b4332;
+}
+.done-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+.done-cancel-btn,
+.done-confirm-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.done-cancel-btn {
+  background: #f1f1f1;
+  color: #555;
+}
+.done-confirm-btn {
+  background: #1b4332;
+  color: #fff;
+}
+
 /* ── Confirm Modal ── */
 .confirm-modal {
   width: 400px;
@@ -1459,13 +1721,15 @@ function confirmLogout() {
 /* Per-status dot + selected colour */
 .opt-pending   { color: #b06000; }
 .opt-approved  { color: #1b4332; }
-.opt-rejected  { color: #c1121f; }
+.opt-resched   { color: #c1121f; }
 .opt-completed { color: #2d6a4f; }
+.opt-cancelled { color: #5c677d; }
 
 .opt-pending.selected   { background: #fffdf5; }
 .opt-approved.selected  { background: #f6faf8; }
-.opt-rejected.selected  { background: #fff8f8; }
+.opt-resched.selected   { background: #fff8f8; }
 .opt-completed.selected { background: #f5fdf8; }
+.opt-cancelled.selected { background: #f4f5f7; }
 
 .opt-dot {
   width: 10px;
