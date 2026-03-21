@@ -94,7 +94,7 @@ function badgeClass(status) {
     Pending: 'badge-orange',
     Reschedule: 'badge-red',
     Completed: 'badge-gray',
-    Cancelled: 'badge-gray',
+    Cancelled: 'badge-red',
     Done: 'badge-gray',
   }[status] || 'badge-gray'
 }

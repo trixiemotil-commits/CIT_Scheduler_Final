@@ -154,6 +154,11 @@
     <Teleport to="body">
       <div v-if="showDoneModal" class="modal-overlay" @click.self="closeDoneModal">
         <div class="done-modal">
+          <div class="done-modal-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
           <h2 class="done-modal-title">Mark Consultation as Done</h2>
           <p class="done-modal-sub">Add optional notes about what happened during the consultation.</p>
 
@@ -165,6 +170,7 @@
             maxlength="500"
             placeholder="Example: Discussed assignment requirements and gave implementation tips."
           ></textarea>
+          <div class="done-note-count">{{ doneNotes.length }}/500</div>
 
           <div class="done-modal-actions">
             <button class="done-cancel-btn" @click="closeDoneModal">Cancel</button>
@@ -1418,67 +1424,96 @@ function confirmLogout() {
   width: 460px;
   max-width: 94vw;
   background: #fff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.2);
+  border-radius: 20px;
+  padding: 28px 28px 24px;
+  border: 1px solid #eef2f0;
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.16);
+}
+.done-modal-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #e9f7ef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
 }
 .done-modal-title {
   margin: 0;
-  font-size: 1.15rem;
+  text-align: center;
+  font-size: 1.28rem;
   font-weight: 700;
   color: #111;
 }
 .done-modal-sub {
-  margin: 8px 0 16px;
+  margin: 8px 0 18px;
   color: #666;
-  font-size: 0.86rem;
-  line-height: 1.45;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: center;
 }
 .done-label {
   display: block;
   margin-bottom: 6px;
-  font-size: 0.82rem;
+  font-size: 0.83rem;
   font-weight: 600;
   color: #444;
 }
 .done-textarea {
   width: 100%;
-  border: 1.5px solid #d9dde1;
-  border-radius: 10px;
-  padding: 11px 12px;
+  border: 1.5px solid #d7ddd9;
+  border-radius: 12px;
+  padding: 12px 13px;
   font-family: inherit;
-  font-size: 0.87rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #2b2f33;
+  background: #fbfcfb;
   resize: vertical;
   box-sizing: border-box;
+  min-height: 112px;
 }
 .done-textarea:focus {
   outline: none;
   border-color: #1b4332;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(27, 67, 50, 0.12);
+}
+.done-note-count {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 0.76rem;
+  color: #98a0a7;
 }
 .done-modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 18px;
 }
 .done-cancel-btn,
 .done-confirm-btn {
-  border: none;
+  border: 1px solid transparent;
   border-radius: 10px;
-  padding: 10px 16px;
+  padding: 10px 18px;
   font-family: inherit;
-  font-size: 0.84rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.16s ease;
 }
 .done-cancel-btn {
-  background: #f1f1f1;
+  background: #f3f4f5;
+  border-color: #e0e3e6;
   color: #555;
 }
+.done-cancel-btn:hover { background: #eceff1; }
 .done-confirm-btn {
   background: #1b4332;
   color: #fff;
 }
+.done-confirm-btn:hover { background: #245a42; }
 
 /* ── Confirm Modal ── */
 .confirm-modal {

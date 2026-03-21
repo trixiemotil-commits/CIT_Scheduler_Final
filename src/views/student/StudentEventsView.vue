@@ -47,6 +47,7 @@
     <Teleport to="body">
       <div v-if="showViewModal" class="modal-overlay" @click.self="showViewModal = false">
         <div class="ev-view-box" v-if="viewEvent">
+          <div class="ev-view-handle"></div>
           <div class="ev-view-hero">
             <div class="ev-view-hero-overlay"></div>
             <div class="ev-view-hero-content">
@@ -308,18 +309,27 @@ function formatDisplayTime(time24) {
   background: rgba(0, 0, 0, 0.52);
   backdrop-filter: blur(2px);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  padding: 12px;
+  padding: 0;
   z-index: 120;
 }
 
 .ev-view-box {
-  width: min(420px, calc(100vw - 20px));
-  border-radius: 16px;
+  width: min(430px, 100vw);
+  max-height: 92dvh;
+  overflow-y: auto;
+  border-radius: 22px 22px 0 0;
   background: #fff;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
-  overflow: hidden;
+  box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.24);
+}
+
+.ev-view-handle {
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  background: #d1d5db;
+  margin: 10px auto 8px;
 }
 
 .ev-view-hero {

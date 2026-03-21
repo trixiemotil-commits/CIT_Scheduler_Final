@@ -319,7 +319,7 @@ function statusClass(s) {
     'In School': 'pill-green',
     'On Main Campus': 'pill-orange',
     'On-Meeting': 'pill-orange',
-    'On Leave': 'pill-gray',
+    'On Leave': 'pill-red',
   }[s] || 'pill-gray'
 }
 
@@ -547,6 +547,7 @@ onBeforeUnmount(() => {
 }
 .pill-green  { background: #d8f3e8; color: #1b7a4a; }
 .pill-orange { background: #fff3e0; color: #b35e00; }
+.pill-red    { background: #ffeaea; color: #e63946; }
 .pill-gray   { background: #f0f0f0; color: #666; }
 
 .teacher-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
