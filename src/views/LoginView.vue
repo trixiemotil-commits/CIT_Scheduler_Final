@@ -73,10 +73,19 @@
           <button type="button" class="input-icon icon-btn" @click="signUp.showConfirmPw = !signUp.showConfirmPw"><IconEye :open="signUp.showConfirmPw" /></button>
         </div>
 
+        <ul class="password-requirements">
+          <li :class="{ pass: signUpPasswordChecks.minLength }">Has at least 8 characters</li>
+          <li :class="{ pass: signUpPasswordChecks.uppercase }">Includes at least one uppercase letter</li>
+          <li :class="{ pass: signUpPasswordChecks.lowercase }">Includes at least one lowercase letter</li>
+          <li :class="{ pass: signUpPasswordChecks.number }">Includes at least one number</li>
+          <li :class="{ pass: signUpPasswordChecks.special }">Includes at least one special character</li>
+        </ul>
+
         <div class="row-end">
           <button type="button" class="action-link plain-btn" @click="activeTab = 'signin'">Already have an account?</button>
         </div>
 
+        <div v-if="signUpSuccess" class="success-msg">{{ signUpSuccess }}</div>
         <div v-if="signUpError" class="error-msg">{{ signUpError }}</div>
 
         <button type="submit" class="submit-btn">Sign up</button>
@@ -114,12 +123,13 @@
 
 <script setup>
 import { login, register } from '@/auth.js'
-import { defineComponent, h, reactive, ref } from 'vue'
+import { computed, defineComponent, h, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 // Hidden admin modal state
 const showAdminModal = ref(false)
 const adminError = ref('')
+const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
 const adminForm = reactive({
   firstName: '',
   lastName: '',
@@ -139,8 +149,8 @@ async function handleAdminCreate() {
     adminError.value = 'Please complete all fields.'
     return
   }
-  if (adminForm.password.length < 8) {
-    adminError.value = 'Password must be at least 8 characters.'
+  if (!STRONG_PASSWORD_REGEX.test(adminForm.password)) {
+    adminError.value = 'Password must be 8+ chars with uppercase, lowercase, number, and special character.'
     return
   }
   try {
@@ -202,9 +212,21 @@ const IconEye = defineComponent({
 const activeTab = ref('signin')
 const loginError = ref('')
 const signUpError = ref('')
+const signUpSuccess = ref('')
 const router = useRouter()
 const signIn = reactive({ email: '', password: '', remember: false, showPw: false })
 const signUp = reactive({ firstName: '', lastName: '', studentId: '', email: '', password: '', confirmPassword: '', showPw: false, showConfirmPw: false })
+
+const signUpPasswordChecks = computed(() => {
+  const password = String(signUp.password || '')
+  return {
+    minLength: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /\d/.test(password),
+    special: /[^A-Za-z\d]/.test(password),
+  }
+})
 
 function routeByRole(role) {
   if (role === 'admin') return '/admin/dashboard'
@@ -236,6 +258,7 @@ async function handleLogin() {
 
 async function handleSignUp() {
   signUpError.value = ''
+  signUpSuccess.value = ''
 
   const firstName = signUp.firstName.trim()
   const lastName = signUp.lastName.trim()
@@ -247,8 +270,8 @@ async function handleSignUp() {
     return
   }
 
-  if (signUp.password.length < 8) {
-    signUpError.value = 'Password must be at least 8 characters long.'
+  if (!STRONG_PASSWORD_REGEX.test(signUp.password)) {
+    signUpError.value = 'Password must be 8+ chars with uppercase, lowercase, number, and special character.'
     return
   }
 
@@ -258,8 +281,7 @@ async function handleSignUp() {
   }
 
   try {
-    // Always force role to student for sign up
-    const role = await register({
+    await register({
       firstName,
       lastName,
       studentId,
@@ -267,7 +289,11 @@ async function handleSignUp() {
       password: signUp.password,
       role: 'student'
     })
-    router.push(routeByRole(role))
+    signUpSuccess.value = 'Account created successfully. Your account is pending admin approval.'
+    signUp.password = ''
+    signUp.confirmPassword = ''
+    signIn.email = email
+    activeTab.value = 'signin'
   } catch (error) {
     // Show as much detail as possible for debugging
     if (error && error.message) {
@@ -411,6 +437,45 @@ async function handleSignUp() {
   color: #e63946;
   text-align: center;
   margin-top: -4px;
+}
+.success-msg {
+  font-size: 0.86rem;
+  color: #1b7a4a;
+  text-align: center;
+  margin-top: -4px;
+}
+
+.password-requirements {
+  list-style: none;
+  padding: 0;
+  margin: -2px 2px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.password-requirements li {
+  font-size: 0.82rem;
+  color: #6b7280;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.password-requirements li::before {
+  content: '○';
+  color: #9ca3af;
+  line-height: 1;
+}
+
+.password-requirements li.pass {
+  color: #166534;
+}
+
+.password-requirements li.pass::before {
+  content: '✓';
+  color: #16a34a;
 }
 
 /* Submit */

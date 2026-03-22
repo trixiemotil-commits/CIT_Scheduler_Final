@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const ACCOUNT_STATUS_VALUES = ["Active", "Inactive", "Archived"];
+const ACCOUNT_STATUS_VALUES = ["Pending", "Active", "Inactive", "Denied", "Archived"];
 const TEACHER_STATUS_VALUES = ["On School", "On Meeting", "On Leave"];
 
 const userSchema = new mongoose.Schema(
@@ -56,7 +56,7 @@ const userSchema = new mongoose.Schema(
     account_status: {
       type: String,
       enum: ACCOUNT_STATUS_VALUES,
-      default: "Active",
+      default: "Pending",
     },
     teacher_status: {
       type: String,

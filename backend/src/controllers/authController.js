@@ -2,6 +2,8 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+
 function signToken(user) {
   return jwt.sign(
     {
@@ -33,6 +35,24 @@ function toSafeUser(user) {
   };
 }
 
+function isStrongPassword(password) {
+  return STRONG_PASSWORD_REGEX.test(String(password || ""));
+}
+
+function getAccountStatusMessage(status) {
+  const normalized = String(status || "");
+  if (normalized === "Pending") {
+    return "Your account is pending approval. Please wait for admin approval before logging in.";
+  }
+  if (normalized === "Denied") {
+    return "Your account registration was denied. Please contact the administrator.";
+  }
+  if (normalized === "Archived") {
+    return "Your account is archived. Please contact the administrator.";
+  }
+  return "Your account is currently inactive. Please contact the administrator.";
+}
+
 async function register(req, res) {
   try {
 
@@ -56,8 +76,10 @@ async function register(req, res) {
     }
 
 
-    if (normalizedPassword.length < 8) {
-      return res.status(400).json({ message: "Password must be at least 8 characters long." });
+    if (!isStrongPassword(normalizedPassword)) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+      });
     }
 
     const existingUser = await User.findOne({
@@ -80,14 +102,12 @@ async function register(req, res) {
       studentId: normalizedStudentId,
       email: normalizedEmail,
       passwordHash,
-      role: "student"
+      role: "student",
+      account_status: "Pending",
     });
 
-    const token = signToken(user);
-
     return res.status(201).json({
-      message: "Account created successfully.",
-      token,
+      message: "Account created successfully and is pending approval.",
       user: toSafeUser(user),
     });
   } catch (error) {
@@ -136,6 +156,10 @@ async function login(req, res) {
 
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password." });
+    }
+
+    if (user.account_status !== "Active") {
+      return res.status(403).json({ message: getAccountStatusMessage(user.account_status) });
     }
 
     const token = signToken(user);
@@ -228,8 +252,10 @@ async function changePassword(req, res) {
       return res.status(400).json({ message: "Current password and new password are required." });
     }
 
-    if (String(newPassword).length < 8) {
-      return res.status(400).json({ message: "New password must be at least 8 characters long." });
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({
+        message: "New password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+      });
     }
 
     const user = await User.findById(req.user.id).select("+passwordHash");

@@ -97,6 +97,7 @@
                     <template v-if="expandedDay !== DAYS[ci]">
                       <div class="cell-room-sm">{{ cell.cls.room }}</div>
                       <div class="cell-subject-sm">{{ cell.cls.subject }}</div>
+                      <div v-if="cell.cls.color === 'orange'" class="cell-campus-sm">Main Campus</div>
                       <div class="cell-tag-sm">{{ cell.cls.parallel ? 'Parallel' : 'Non-parallel' }}</div>
                     </template>
                     <!-- Expanded view -->
@@ -105,6 +106,7 @@
                         <span :class="['cell-badge', cell.cls.parallel ? 'badge-p' : 'badge-np']">
                           {{ cell.cls.parallel ? 'Parallel' : 'Non-parallel' }}
                         </span>
+                        <span v-if="cell.cls.color === 'orange'" class="cell-badge badge-campus">Main Campus</span>
                       </div>
                       <div class="cell-exp-line">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cell-exp-icon">
@@ -132,6 +134,15 @@
                     <template v-if="expandedDay !== DAYS[ci]">
                       <div class="cell-room-sm">Consultation</div>
                       <div class="cell-subject-sm">{{ formatTimeRange12(cell.consult.start, cell.consult.end) }}</div>
+                      <div class="consult-approved-chip" title="Approved consultation requests">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="consult-approved-icon">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                          <circle cx="9" cy="7" r="4"/>
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                        <span>{{ cell.consult.approvedCount }}</span>
+                      </div>
                       <div class="cell-tag-sm">Office Hours</div>
                     </template>
                     <template v-else>
@@ -146,6 +157,15 @@
                         <strong class="cell-exp-subject">Consultation Hours</strong>
                       </div>
                       <div class="cell-exp-section">{{ formatTimeRange12(cell.consult.start, cell.consult.end) }}</div>
+                      <div class="consult-approved-chip consult-approved-chip-expanded" title="Approved consultation requests">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="consult-approved-icon">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                          <circle cx="9" cy="7" r="4"/>
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                        <span>{{ cell.consult.approvedCount }} approved</span>
+                      </div>
                     </template>
                   </td>
                   <!-- Empty cell -->
@@ -347,7 +367,12 @@ function formatTimeRange12(start, end) {
   return `${start12}-${end12}`
 }
 
-function scheduleColor(colorToken, campus) {
+function isGreenComlabRoom(room) {
+  return /(\b406\b|\b407\b|\b408\b|\b409\b|comlab|\bcl\b)/i.test(String(room || ''))
+}
+
+function scheduleColor(colorToken, campus, room) {
+  if (isGreenComlabRoom(room)) return 'green'
   if (campus === 'Main Campus') return 'orange'
   if (colorToken === 'color-orange') return 'orange'
   if (colorToken === 'color-yellow') return 'yellow'
@@ -408,7 +433,21 @@ function resolveGridSpan(startTime, endTime) {
   }
 }
 
-function mapConsultationsToSchedule(consultations) {
+function buildApprovedCountByAvailability(requests) {
+  const counts = {}
+  if (!Array.isArray(requests)) return counts
+
+  requests.forEach((requestDoc) => {
+    const status = String(requestDoc?.status || '').trim().toUpperCase()
+    const availabilityId = String(requestDoc?.availabilityId || '').trim()
+    if (status !== 'APPROVED' || !availabilityId) return
+    counts[availabilityId] = (counts[availabilityId] || 0) + 1
+  })
+
+  return counts
+}
+
+function mapConsultationsToSchedule(consultations, approvedCountByAvailability = {}) {
   if (!Array.isArray(consultations)) {
     return []
   }
@@ -427,6 +466,7 @@ function mapConsultationsToSchedule(consultations) {
         day,
         start: to24Hour(slot.startTime),
         end: to24Hour(slot.endTime),
+        approvedCount: Number(approvedCountByAvailability[slot.id] || 0),
         startIndex: span.startIndex,
         rowspan: span.rowspan,
       }
@@ -493,7 +533,7 @@ function mapEntriesToSchedule(entries) {
       code: entry.subject || 'Untitled Subject',
       section: entry.section || '',
       parallel: Boolean(entry.parallel),
-      color: scheduleColor(entry.color, entry.campus),
+      color: scheduleColor(entry.color, entry.campus, entry.room),
       teacher: entry.teacher || userName.value || 'Teacher',
       avatar,
       parallelSections: [],
@@ -547,15 +587,18 @@ async function loadSchedule() {
       return
     }
 
-    const [directPayload, consultationPayload] = await Promise.all([
+    const [directPayload, consultationPayload, requestPayload] = await Promise.all([
       apiRequest(`/schedules?teacher=${encodeURIComponent(teacherName)}`),
       apiRequest(`/consultations?teacher=${encodeURIComponent(teacherName)}`).catch(() => ({ consultations: [] })),
+      apiRequest('/consultations/requests').catch(() => ({ requests: [] })),
     ])
     const apiEntries = Array.isArray(directPayload.entries) ? directPayload.entries : []
     const consultations = Array.isArray(consultationPayload.consultations) ? consultationPayload.consultations : []
+    const requests = Array.isArray(requestPayload.requests) ? requestPayload.requests : []
+    const approvedCountByAvailability = buildApprovedCountByAvailability(requests)
 
     scheduleData.value = mapEntriesToSchedule(apiEntries)
-    consultationData.value = mapConsultationsToSchedule(consultations)
+    consultationData.value = mapConsultationsToSchedule(consultations, approvedCountByAvailability)
   } catch (error) {
     scheduleData.value = []
     consultationData.value = []
@@ -969,12 +1012,12 @@ function confirmLogout() {
 
 .cell-yellow {
   background: #e8a020;
-  color: #fff;
+  color: #251500;
 }
 
 .cell-orange {
   background: #f4a261;
-  color: #fff;
+  color: #2e1700;
 }
 
 .cell-blue {
@@ -1003,6 +1046,41 @@ function confirmLogout() {
   text-align: left;
 }
 
+.cell-campus-sm {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin: 1px 0 4px;
+  text-align: left;
+}
+
+.consult-approved-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 2px 0 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  width: fit-content;
+}
+
+.consult-approved-chip-expanded {
+  margin-top: 8px;
+  margin-left: 24px;
+  font-size: 0.74rem;
+}
+
+.consult-approved-icon {
+  opacity: 0.95;
+  flex-shrink: 0;
+}
+
 /* ─ Expanded View: Badge ─ */
 .cell-badge-row {
   display: flex;
@@ -1015,6 +1093,12 @@ function confirmLogout() {
   font-weight: 600;
   padding: 3px 10px;
   border-radius: 20px;
+}
+
+.badge-campus {
+  background: rgba(255, 255, 255, 0.86);
+  color: #6e2f00;
+  margin-left: 6px;
 }
 
 .badge-np {
@@ -1061,6 +1145,73 @@ function confirmLogout() {
   opacity: 0.85;
   margin-top: 4px;
   margin-left: 24px;
+}
+
+.cell-yellow .cell-room-sm,
+.cell-yellow .cell-subject-sm,
+.cell-yellow .cell-tag-sm,
+.cell-yellow .cell-exp-room,
+.cell-yellow .cell-exp-subject,
+.cell-yellow .cell-exp-section,
+.cell-orange .cell-room-sm,
+.cell-orange .cell-subject-sm,
+.cell-orange .cell-tag-sm,
+.cell-orange .cell-exp-room,
+.cell-orange .cell-exp-subject,
+.cell-orange .cell-exp-section {
+  color: inherit;
+  opacity: 1;
+}
+
+.cell-yellow .cell-tag-sm,
+.cell-orange .cell-tag-sm {
+  font-weight: 700;
+}
+
+.cell-yellow .cell-exp-icon,
+.cell-orange .cell-exp-icon {
+  color: rgba(0, 0, 0, 0.72);
+  opacity: 1;
+}
+
+.cell-yellow .cell-badge,
+.cell-orange .cell-badge {
+  background: rgba(255, 255, 255, 0.82);
+  color: #2b2b2b;
+}
+
+.cell-blue .cell-room-sm,
+.cell-blue .cell-subject-sm,
+.cell-blue .cell-tag-sm,
+.cell-blue .cell-exp-room,
+.cell-blue .cell-exp-subject,
+.cell-blue .cell-exp-section {
+  color: #ffffff;
+  opacity: 1;
+}
+
+.cell-blue .cell-room-sm {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.cell-blue .cell-subject-sm {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.cell-blue .cell-tag-sm {
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.cell-blue .cell-exp-icon {
+  opacity: 1;
+}
+
+.cell-blue .consult-approved-chip {
+  background: rgba(17, 57, 103, 0.52);
+  border-color: rgba(255, 255, 255, 0.62);
 }
 
 /* ── Modals — overlay ── */

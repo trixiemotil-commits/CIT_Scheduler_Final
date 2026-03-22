@@ -58,6 +58,15 @@
           </button>
         </div>
         <div class="um-topbar-right">
+          <button
+            v-if="activeView === 'active' && pendingCount > 0"
+            class="um-approve-all-btn"
+            :disabled="isBulkApproving"
+            @click="approveAllPending"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/><path d="M22 10l-7 7"/></svg>
+            {{ isBulkApproving ? 'Approving...' : `Approve All (${pendingCount})` }}
+          </button>
           <div class="um-search-wrap">
             <span class="um-search-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -165,7 +174,7 @@
                 <span :class="['um-role-badge', `um-role-badge--${user.role.toLowerCase()}`]">{{ user.role }}</span>
               </td>
               <td>
-                <span :class="['um-status-badge', user.status === 'Active' ? 'um-status--active' : user.status === 'Archived' ? 'um-status--archived' : 'um-status--inactive']">
+                <span :class="['um-status-badge', statusClass(user.status)]">
                   <span class="um-status-dot"></span>
                   {{ user.status }}
                 </span>
@@ -174,18 +183,26 @@
               <td>
                 <div class="um-actions">
                   <template v-if="activeView === 'active'">
-                    <button class="um-btn um-btn--edit" @click="openEditUser(user)" title="Edit">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                      Edit
-                    </button>
-                    <button class="um-btn um-btn--reset" @click="openResetConfirm(user)" title="Reset Password">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                      Reset
-                    </button>
-                    <button class="um-btn um-btn--archive" @click="openArchiveUser(user)" title="Archive">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-                      Archive
-                    </button>
+                    <div class="um-actions-row">
+                      <button class="um-btn um-btn--edit" @click="openEditUser(user)" title="Edit">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Edit
+                      </button>
+                      <button class="um-btn um-btn--archive" @click="openArchiveUser(user)" title="Archive">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                        Archive
+                      </button>
+                    </div>
+                    <div v-if="user.status === 'Pending'" class="um-actions-row">
+                      <button class="um-btn um-btn--approve" @click="approveUser(user)" title="Approve">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        Approve
+                      </button>
+                      <button class="um-btn um-btn--deny" @click="denyUser(user)" title="Deny">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        Deny
+                      </button>
+                    </div>
                   </template>
                   <template v-else>
                     <button class="um-btn um-btn--restore" @click="openRestoreUser(user)" title="Restore">
@@ -262,12 +279,12 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Email Address <span class="form-required">*</span></label>
-              <input v-model="userForm.email" class="form-input" type="email" placeholder="e.g. juan@cit.edu" required />
+              <label class="form-label">PHINMA Email <span class="form-required">*</span></label>
+              <input v-model="userForm.email" class="form-input" type="email" placeholder="juan.delacruz.au@phinmaed.com" required />
             </div>
             <div class="form-group">
-              <label class="form-label">Phone Number</label>
-              <input v-model="userForm.phone" class="form-input" type="tel" placeholder="e.g. 09xx xxx xxxx" />
+              <label class="form-label">School ID Number <span class="form-required">*</span></label>
+              <input v-model="userForm.schoolId" class="form-input" type="text" placeholder="01-1234-123456" required />
             </div>
           </div>
 
@@ -278,7 +295,7 @@
             <span class="reg-section-line"></span>
           </div>
 
-          <div class="form-row">
+          <div class="form-row form-row--single">
             <div class="form-group">
               <label class="form-label">Role <span class="form-required">*</span></label>
               <select v-model="userForm.role" class="form-input" required>
@@ -288,22 +305,16 @@
                 <option value="Student">Student</option>
               </select>
             </div>
-            <div class="form-group">
-              <label class="form-label">{{ userForm.role === 'Student' ? 'Course / Program' : 'Department' }}</label>
-              <input v-model="userForm.department" class="form-input" type="text" :placeholder="userForm.role === 'Student' ? 'e.g. BS Computer Science' : 'e.g. CIT Department'" />
-            </div>
           </div>
 
-          <div class="form-row">
-            <div v-if="userForm.role === 'Student'" class="form-group">
-              <label class="form-label">Student ID</label>
-              <input v-model="userForm.studentId" class="form-input" type="text" placeholder="e.g. 2024-00001" />
-            </div>
+          <div v-if="editingUser" class="form-row form-row--single">
             <div class="form-group">
               <label class="form-label">Status</label>
               <select v-model="userForm.status" class="form-input">
+                <option value="Pending">Pending</option>
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
+                <option value="Denied">Denied</option>
               </select>
             </div>
           </div>
@@ -563,6 +574,12 @@ const roleFilter  = ref('')
 const users = ref([])
 const isLoadingUsers = ref(false)
 const loadError = ref('')
+const isBulkApproving = ref(false)
+const PHINMA_EMAIL_REGEX = /^[a-z0-9._%+-]+\.au@phinmaed\.com$/i
+
+const pendingCount = computed(() => {
+  return users.value.filter((u) => u.status === 'Pending').length
+})
 
 const filteredUsers = computed(() => {
   return users.value.filter(u => {
@@ -615,9 +632,19 @@ function mapUserForUi(user) {
     status: user.status || 'Active',
     dateAdded: formatDisplayDate(user.dateAdded || user.createdAt),
     avatar: user.avatar || fallbackAvatar(name),
+    schoolId: user.studentId || user.employeeId || '',
     phone: user.phone || '',
     studentId: user.studentId || '',
+    employeeId: user.employeeId || '',
   }
+}
+
+function statusClass(status) {
+  if (status === 'Active') return 'um-status--active'
+  if (status === 'Pending') return 'um-status--pending'
+  if (status === 'Denied') return 'um-status--denied'
+  if (status === 'Archived') return 'um-status--archived'
+  return 'um-status--inactive'
 }
 
 async function apiRequest(path, options = {}) {
@@ -674,19 +701,21 @@ function trimValue(value) {
 }
 
 function buildUserPayload(includePassword) {
+  const schoolId = trimValue(userForm.value.schoolId)
   const payload = {
     firstName: trimValue(userForm.value.firstName),
     lastName: trimValue(userForm.value.lastName),
     email: trimValue(userForm.value.email),
     role: userForm.value.role,
-    department: trimValue(userForm.value.department),
-    phone: trimValue(userForm.value.phone),
-    status: userForm.value.status || 'Active',
+    status: editingUser.value ? (userForm.value.status || 'Active') : 'Active',
   }
 
-  const studentId = trimValue(userForm.value.studentId)
-  if (studentId) {
-    payload.studentId = studentId
+  if (schoolId) {
+    if (userForm.value.role === 'Student') {
+      payload.studentId = schoolId
+    } else {
+      payload.employeeId = schoolId
+    }
   }
 
   if (includePassword) {
@@ -704,7 +733,7 @@ const editingUser     = ref(null)
 const formError       = ref('')
 const showRegisterConfirm = ref(false)
 const isSavingUser    = ref(false)
-const emptyForm = () => ({ firstName: '', lastName: '', email: '', phone: '', role: '', department: '', studentId: '', status: 'Active', password: '', confirmPassword: '' })
+const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', password: '', confirmPassword: '' })
 const userForm  = ref(emptyForm())
 
 function openAddUser() {
@@ -722,10 +751,8 @@ function openEditUser(user) {
     firstName: parts[0] || '',
     lastName:  parts.slice(1).join(' ') || '',
     email:      user.email,
-    phone:      user.phone || '',
+    schoolId:   user.schoolId || '',
     role:       user.role,
-    department: user.department,
-    studentId:  user.studentId || '',
     status:     user.status,
     password:   '',
     confirmPassword: '',
@@ -735,10 +762,16 @@ function openEditUser(user) {
 
 function saveUser() {
   formError.value = ''
-  const trimmedStudentId = (userForm.value.studentId || '').trim()
+  const trimmedSchoolId = (userForm.value.schoolId || '').trim()
+  const normalizedEmail = (userForm.value.email || '').trim().toLowerCase()
 
-  if (userForm.value.role === 'Student' && !trimmedStudentId) {
-    formError.value = 'Student ID is required for student accounts.'
+  if (!trimmedSchoolId) {
+    formError.value = 'School ID Number is required.'
+    return
+  }
+
+  if (!PHINMA_EMAIL_REGEX.test(normalizedEmail)) {
+    formError.value = 'PHINMA Email must end with .au@phinmaed.com.'
     return
   }
 
@@ -754,6 +787,49 @@ function saveUser() {
   }
   // Show sweet alert confirm before committing
   showRegisterConfirm.value = true
+}
+
+async function updateUserStatus(user, status) {
+  await apiRequest(`/users/${user.id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status })
+  })
+  await fetchUsers()
+}
+
+async function approveUser(user) {
+  try {
+    await updateUserStatus(user, 'Active')
+  } catch (error) {
+    loadError.value = error.message || 'Failed to approve user.'
+  }
+}
+
+async function denyUser(user) {
+  try {
+    await updateUserStatus(user, 'Denied')
+  } catch (error) {
+    loadError.value = error.message || 'Failed to deny user.'
+  }
+}
+
+async function approveAllPending() {
+  if (pendingCount.value === 0 || isBulkApproving.value) {
+    return
+  }
+
+  isBulkApproving.value = true
+  loadError.value = ''
+  try {
+    await apiRequest('/users/approve-all-pending', {
+      method: 'PATCH'
+    })
+    await fetchUsers()
+  } catch (error) {
+    loadError.value = error.message || 'Failed to approve pending users.'
+  } finally {
+    isBulkApproving.value = false
+  }
 }
 
 async function confirmSaveUser() {
@@ -1020,6 +1096,26 @@ function confirmRestoreUser() {
   align-items: center;
   gap: 10px;
 }
+.um-approve-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #14532d;
+  color: #fff;
+  border: none;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s, opacity 0.18s;
+}
+.um-approve-all-btn:hover { background: #166534; }
+.um-approve-all-btn[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 .um-search-wrap {
   position: relative;
   display: flex;
@@ -1199,7 +1295,9 @@ function confirmRestoreUser() {
   border-radius: 20px;
 }
 .um-status--active   { background: #d8f3e8; color: #1b7a4a; }
+.um-status--pending  { background: #fff7e0; color: #b45309; }
 .um-status--inactive { background: #ffeaea; color: #e63946; }
+.um-status--denied   { background: #fee2e2; color: #b91c1c; }
 .um-status--archived { background: #f3f4f6; color: #6b7280; }
 .um-status-dot {
   width: 7px; height: 7px;
@@ -1208,24 +1306,43 @@ function confirmRestoreUser() {
   flex-shrink: 0;
 }
 
-.um-actions { display: flex; gap: 6px; }
+.um-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 188px;
+}
+.um-actions-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+}
 .um-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   font-family: inherit;
   font-size: 0.77rem;
   font-weight: 500;
-  padding: 5px 11px;
+  padding: 6px 10px;
+  min-height: 34px;
   border-radius: 8px;
   border: none;
   cursor: pointer;
   transition: background 0.15s;
 }
+.um-actions-row .um-btn,
+.um-actions > .um-btn {
+  width: 100%;
+}
 .um-btn--edit   { background: #eef4fe; color: #2563eb; }
 .um-btn--edit:hover { background: #dceafd; }
-.um-btn--reset  { background: #fef3c7; color: #b45309; }
-.um-btn--reset:hover { background: #fde68a; }
+.um-btn--approve { background: #dcfce7; color: #166534; }
+.um-btn--approve:hover { background: #bbf7d0; }
+.um-btn--deny  { background: #fee2e2; color: #b91c1c; }
+.um-btn--deny:hover { background: #fecaca; }
 .um-btn--archive { background: #fff7ed; color: #b45309; }
 .um-btn--archive:hover { background: #fde68a; }
 .um-btn--restore { background: #e8f5ee; color: #1b7a4a; }
@@ -1333,6 +1450,9 @@ function confirmRestoreUser() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+.form-row--single {
+  grid-template-columns: 1fr;
 }
 .form-label {
   font-size: 0.78rem;
