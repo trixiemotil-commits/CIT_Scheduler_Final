@@ -239,13 +239,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import BottomNav from '@/components/student/BottomNav.vue'
 import { useStudentData } from '@/composables/useStudentData.js'
 
 const { sessions, cancelSession, updateSession, isLoadingSessions, sessionsError, loadSessions } = useStudentData()
 
-const AUTO_REFRESH_MS = 10000
 const CONSULTATION_REASONS = [
   'Lesson Clarification',
   'Assignment Assistance',
@@ -576,46 +575,8 @@ function showToast(msg) {
   setTimeout(() => { toastMsg.value = '' }, 3000)
 }
 
-let autoRefreshTimer = null
-
-function onVisibilityChange() {
-  if (document.visibilityState === 'visible') {
-    loadSessions(true)
-  }
-}
-
-function onWindowFocus() {
-  loadSessions(true)
-}
-
-function startAutoRefresh() {
-  if (autoRefreshTimer) {
-    clearInterval(autoRefreshTimer)
-  }
-
-  autoRefreshTimer = setInterval(() => {
-    if (document.visibilityState !== 'visible') {
-      return
-    }
-    loadSessions(true)
-  }, AUTO_REFRESH_MS)
-}
-
 onMounted(() => {
   loadSessions(true)
-  startAutoRefresh()
-  document.addEventListener('visibilitychange', onVisibilityChange)
-  window.addEventListener('focus', onWindowFocus)
-})
-
-onBeforeUnmount(() => {
-  if (autoRefreshTimer) {
-    clearInterval(autoRefreshTimer)
-    autoRefreshTimer = null
-  }
-
-  document.removeEventListener('visibilitychange', onVisibilityChange)
-  window.removeEventListener('focus', onWindowFocus)
 })
 </script>
 

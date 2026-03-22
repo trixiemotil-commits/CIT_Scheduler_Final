@@ -26,6 +26,8 @@ function toSafeUser(user) {
     email: user.email,
     role: user.role,
     department: user.department,
+    yearLevel: user.yearLevel,
+    section: user.section,
     phone: user.phone,
     account_status: user.account_status,
     teacher_status: user.teacher_status,
@@ -205,6 +207,9 @@ async function updateMe(req, res) {
     const email = normalizeString(req.body.email).toLowerCase() || user.email;
     const phone = normalizeString(req.body.phone);
     const employeeId = normalizeString(req.body.employeeId);
+    const studentId = normalizeString(req.body.studentId);
+    const yearLevel = normalizeString(req.body.yearLevel);
+    const section = normalizeString(req.body.section);
     const avatar = normalizeString(req.body.avatar);
 
     if (!firstName || !lastName || !email) {
@@ -223,6 +228,17 @@ async function updateMe(req, res) {
       }
     }
 
+    if (studentId) {
+      const idOwner = await User.findOne({ studentId });
+      if (idOwner && idOwner._id.toString() !== user._id.toString()) {
+        return res.status(409).json({ message: "Student ID already exists." });
+      }
+    }
+
+    if (yearLevel && !["1st Year", "2nd Year", "3rd Year", "4th Year"].includes(yearLevel)) {
+      return res.status(400).json({ message: "Invalid year level." });
+    }
+
     if (avatar && !avatar.startsWith("data:image/") && !/^https?:\/\//i.test(avatar)) {
       return res.status(400).json({ message: "Avatar must be a valid image URL or data URL." });
     }
@@ -232,6 +248,13 @@ async function updateMe(req, res) {
     user.email = email;
     user.phone = phone;
     user.employeeId = employeeId || undefined;
+    if (user.role === "student") {
+      if (studentId) {
+        user.studentId = studentId;
+      }
+      user.yearLevel = yearLevel || user.yearLevel || "";
+      user.section = section || user.section || "";
+    }
     if (avatar) {
       user.avatar = avatar;
     }

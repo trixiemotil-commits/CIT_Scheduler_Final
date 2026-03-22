@@ -48,15 +48,26 @@
           <div class="card-sub">Review and manage student consultation requests</div>
         </div>
 
-        <!-- Filter Tabs -->
-        <div class="filter-tabs">
+        <!-- Filter + bulk action row -->
+        <div class="controls-row">
+          <div class="filter-tabs">
+            <button
+              v-for="tab in tabs"
+              :key="tab.key"
+              :class="['filter-tab', { active: activeTab === tab.key }]"
+              @click="activeTab = tab.key"
+            >
+              {{ tab.label }}({{ tab.count }})
+            </button>
+          </div>
+
           <button
-            v-for="tab in tabs"
-            :key="tab.key"
-            :class="['filter-tab', { active: activeTab === tab.key }]"
-            @click="activeTab = tab.key"
+            v-if="pendingIncomingCount > 0"
+            class="btn-approve-all"
+            :disabled="isBulkApproving"
+            @click="approveAllIncoming"
           >
-            {{ tab.label }}({{ tab.count }})
+            {{ isBulkApproving ? 'Approving...' : 'Approve All' }}
           </button>
         </div>
 
@@ -569,6 +580,15 @@ const filteredRequests = computed(() =>
     : requests.value.filter(r => r.status === activeTab.value)
 )
 
+const pendingRequestIds = computed(() =>
+  requests.value
+    .filter((r) => r.status === 'pending' && r.id)
+    .map((r) => r.id)
+)
+
+const pendingIncomingCount = computed(() => pendingRequestIds.value.length)
+const isBulkApproving = ref(false)
+
 function statusLabel(status) {
   const normalized = String(status || '').toLowerCase()
   if (normalized === 'resched') return 'Resched'
@@ -620,6 +640,56 @@ async function confirmApprove() {
     Swal.fire('Unable to approve', error.message || 'Failed to update request status.', 'error')
   }
   pendingApproveId.value = null
+}
+
+async function approveAllIncoming() {
+  if (!pendingIncomingCount.value || isBulkApproving.value) return
+
+  const toApprove = [...pendingRequestIds.value]
+  const result = await Swal.fire({
+    title: 'Approve all incoming requests?',
+    text: `This will approve ${toApprove.length} pending consultation request(s).`,
+    icon: 'question',
+    showCancelButton: true,
+    cancelButtonText: 'Cancel',
+    confirmButtonText: 'Yes, approve all',
+    confirmButtonColor: '#1b4332',
+    customClass: { cancelButton: 'swal-cancel-text', popup: 'swal-rounded' },
+    reverseButtons: false,
+  })
+
+  if (!result.isConfirmed) return
+
+  isBulkApproving.value = true
+  try {
+    await Promise.all(
+      toApprove.map((id) =>
+        apiRequest(`/consultations/requests/${id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'APPROVED', notes: '' }),
+        })
+      )
+    )
+
+    await loadRequests()
+
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'success',
+      title: `${toApprove.length} request(s) approved`,
+      showConfirmButton: false,
+      timer: 2800,
+      timerProgressBar: true,
+      background: '#1b4332',
+      color: '#fff',
+      iconColor: '#74c69d',
+    })
+  } catch (error) {
+    Swal.fire('Unable to approve all', error.message || 'Failed to update all pending requests.', 'error')
+  } finally {
+    isBulkApproving.value = false
+  }
 }
 
 /* Reject flow — step 1: open reject modal */
@@ -925,7 +995,14 @@ function confirmLogout() {
 .card-title { font-size: 1.05rem; font-weight: 700; color: #111; }
 .card-sub   { font-size: 0.82rem; color: #888; margin-top: 2px; }
 
-/* ── Filter Tabs ── */
+/* ── Filter Controls ── */
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
 .filter-tabs {
   display: flex;
   align-items: center;
@@ -933,8 +1010,36 @@ function confirmLogout() {
   padding: 6px 8px;
   background: #f5f6f8;
   border-radius: 10px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
+  flex: 1;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.filter-tabs::-webkit-scrollbar { height: 0; }
+
+.btn-approve-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 150px;
+  padding: 11px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #2d6a4f;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.btn-approve-all:hover { background: #1b4332; }
+
+.btn-approve-all:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .filter-tab {

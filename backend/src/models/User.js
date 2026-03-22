@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const ACCOUNT_STATUS_VALUES = ["Pending", "Active", "Inactive", "Denied", "Archived"];
 const TEACHER_STATUS_VALUES = ["On School", "On Meeting", "On Leave"];
+const YEAR_LEVEL_VALUES = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 
 const userSchema = new mongoose.Schema(
   {
@@ -44,6 +45,16 @@ const userSchema = new mongoose.Schema(
       default: "student",
     },
     department: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    yearLevel: {
+      type: String,
+      enum: YEAR_LEVEL_VALUES,
+      default: "",
+    },
+    section: {
       type: String,
       trim: true,
       default: "",

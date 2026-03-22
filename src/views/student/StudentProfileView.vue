@@ -21,18 +21,20 @@
         accept="image/*"
         @change="onAvatarChange"
       />
-      <div class="profile-name">{{ user.name }}</div>
-      <div class="profile-email">{{ user.email }}</div>
-      <span class="active-badge">Active Student</span>
+      <div class="profile-name">{{ fullName }}</div>
+      <div class="profile-email">{{ user.email || '--' }}</div>
+      <span class="active-badge">{{ accountStatusLabel }} Student</span>
     </div>
 
     <div class="info-card">
       <div class="info-title">Personal Information</div>
-      <div class="info-row"><span class="info-label">Full Name</span><span class="info-val">{{ user.name }}</span></div>
-      <div class="info-row"><span class="info-label">Student ID</span><span class="info-val">STU-2024-0891</span></div>
-      <div class="info-row"><span class="info-label">Email</span><span class="info-val">{{ user.email }}</span></div>
-      <div class="info-row"><span class="info-label">Grade Level</span><span class="info-val">1st Year</span></div>
-      <div class="info-row"><span class="info-label">Section</span><span class="info-val">Section B</span></div>
+      <div class="info-row"><span class="info-label">Full Name</span><span class="info-val">{{ fullName }}</span></div>
+      <div class="info-row"><span class="info-label">Student ID</span><span class="info-val">{{ studentIdDisplay }}</span></div>
+      <div class="info-row"><span class="info-label">Email</span><span class="info-val">{{ user.email || '--' }}</span></div>
+      <div class="info-row"><span class="info-label">Year Level</span><span class="info-val">{{ yearLevelDisplay }}</span></div>
+      <div class="info-row"><span class="info-label">Section</span><span class="info-val">{{ sectionDisplay }}</span></div>
+      <div class="info-row"><span class="info-label">Department</span><span class="info-val">{{ user.department || '--' }}</span></div>
+      <div class="info-row"><span class="info-label">Role</span><span class="info-val">{{ roleLabel }}</span></div>
     </div>
 
     <div class="action-row">
@@ -61,17 +63,24 @@
             <input v-model="form.email" class="field-input" type="email" />
           </div>
           <div class="field-group">
-            <label class="field-label">Grade Level</label>
-            <input v-model="form.grade" class="field-input" type="text" />
+            <label class="field-label">Year Level</label>
+            <select v-model="form.yearLevel" class="field-select">
+              <option value="" disabled>Select Year Level</option>
+              <option v-for="opt in yearLevelOptions" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
           </div>
           <div class="field-group">
             <label class="field-label">Section</label>
-            <input v-model="form.section" class="field-input" type="text" />
+            <select v-model="form.section" class="field-select">
+              <option value="" disabled>Select Section</option>
+              <option v-for="opt in sectionOptions" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
           </div>
+          <div v-if="saveError" class="msg-err">{{ saveError }}</div>
         </div>
         <div class="modal-footer">
           <button class="modal-cancel" @click="showModal = false">Cancel</button>
-          <button class="modal-save" @click="saveProfile">Save Changes</button>
+          <button class="modal-save" :disabled="isSaving" @click="saveProfile">{{ isSaving ? 'Saving...' : 'Save Changes' }}</button>
         </div>
       </div>
     </div>
@@ -81,24 +90,98 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { getUser, logout } from '@/auth.js'
+import { ref, computed, onMounted } from 'vue'
+import { getUser, getToken, logout } from '@/auth.js'
 import { useRouter } from 'vue-router'
 import BottomNav from '@/components/student/BottomNav.vue'
 
 const router = useRouter()
-const user = ref(getUser() || { name: 'Anna Cooper', email: 'anna.cooper@student.edu', avatar: null })
-const initials = computed(() => user.value.name?.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'A')
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
+function normalizeUser(rawUser) {
+  const raw = rawUser || {}
+  const resolvedName = String(raw.name || `${raw.firstName || ''} ${raw.lastName || ''}`.trim()).trim()
+  return {
+    ...raw,
+    name: resolvedName || 'Student',
+  }
+}
+
+const user = ref(normalizeUser(getUser()))
+const fullName = computed(() => user.value.name || '--')
+const initials = computed(() => fullName.value.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'S')
+const studentIdDisplay = computed(() => user.value.studentId || user.value.employeeId || '--')
+const yearLevelDisplay = computed(() => user.value.yearLevel || user.value.grade || '--')
+const sectionDisplay = computed(() => user.value.section || '--')
+const roleLabel = computed(() => {
+  const role = String(user.value.role || 'student')
+  return role.charAt(0).toUpperCase() + role.slice(1)
+})
+const accountStatusLabel = computed(() => String(user.value.account_status || user.value.status || 'Active'))
+
+const yearLevelOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+const sectionOptions = ['South 1', 'South 2', 'South 3', 'South 4', 'South 5', 'South 6', 'South 7']
 
 const showModal = ref(false)
-const form = ref({ name: user.value.name, email: user.value.email, grade: '1st Year', section: 'Section B' })
+const form = ref({
+  name: fullName.value,
+  email: user.value.email || '',
+  yearLevel: user.value.yearLevel || user.value.grade || '',
+  section: user.value.section || '',
+})
 const avatarInput = ref(null)
+const isSaving = ref(false)
+const saveError = ref('')
+
+function splitFullName(fullName) {
+  const normalized = String(fullName || '').trim().replace(/\s+/g, ' ')
+  if (!normalized) {
+    return { firstName: '', lastName: '' }
+  }
+
+  const parts = normalized.split(' ')
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: parts[0] }
+  }
+
+  return {
+    firstName: parts.slice(0, -1).join(' '),
+    lastName: parts[parts.length - 1],
+  }
+}
 
 function persistUser() {
   try {
     localStorage.setItem('cit_user', JSON.stringify(user.value))
   } catch (_error) {
     // Ignore localStorage write failures to avoid breaking profile interactions.
+  }
+}
+
+async function fetchLatestProfile() {
+  const token = getToken()
+  if (!token) return
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/me`, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    if (!response.ok) return
+
+    const payload = await response.json()
+    if (!payload?.user) return
+
+    user.value = {
+      ...normalizeUser(payload.user),
+      grade: user.value.grade,
+      section: user.value.section,
+    }
+    persistUser()
+  } catch (_error) {
+    // Non-blocking profile refresh.
   }
 }
 
@@ -122,27 +205,82 @@ function onAvatarChange(event) {
 }
 
 function openEditModal() {
+  saveError.value = ''
   form.value = {
     ...form.value,
-    name: user.value.name || '',
+    name: fullName.value === '--' ? '' : fullName.value,
     email: user.value.email || '',
+    yearLevel: user.value.yearLevel || user.value.grade || '',
+    section: user.value.section || '',
   }
   showModal.value = true
 }
 
-function saveProfile() {
-  user.value = {
-    ...user.value,
-    name: form.value.name,
-    email: form.value.email,
+async function saveProfile() {
+  if (isSaving.value) return
+
+  saveError.value = ''
+  const { firstName, lastName } = splitFullName(form.value.name)
+  if (!firstName || !lastName) {
+    saveError.value = 'Please enter your full name.'
+    return
   }
-  persistUser()
-  showModal.value = false
+
+  if (!form.value.email) {
+    saveError.value = 'Email is required.'
+    return
+  }
+
+  isSaving.value = true
+  try {
+    const token = getToken()
+    if (!token) {
+      throw new Error('Session expired. Please log in again.')
+    }
+
+    const response = await fetch(`${API_BASE}/auth/me`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        firstName,
+        lastName,
+        email: form.value.email,
+        yearLevel: form.value.yearLevel,
+        section: form.value.section,
+        avatar: user.value.avatar || undefined,
+      }),
+    })
+
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(payload.message || 'Failed to save profile changes.')
+    }
+
+    user.value = {
+      ...normalizeUser(payload.user || user.value),
+      yearLevel: payload.user?.yearLevel || form.value.yearLevel,
+      grade: payload.user?.yearLevel || form.value.yearLevel,
+      section: payload.user?.section || form.value.section,
+    }
+    persistUser()
+    showModal.value = false
+  } catch (error) {
+    saveError.value = error.message || 'Failed to save profile changes.'
+  } finally {
+    isSaving.value = false
+  }
 }
 function doLogout() {
   logout()
   router.push('/')
 }
+
+onMounted(() => {
+  fetchLatestProfile()
+})
 </script>
 
 <style scoped>
@@ -380,6 +518,23 @@ function doLogout() {
   padding: 8px 10px;
   font-family: inherit;
   font-size: 0.95rem;
+}
+.field-select {
+  border: 1px solid #d2d8df;
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  background: #fff;
+}
+.modal-save:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.msg-err {
+  color: #be404a;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 .modal-footer {
   display: flex;

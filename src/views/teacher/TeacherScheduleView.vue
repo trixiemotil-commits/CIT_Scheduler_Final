@@ -98,6 +98,7 @@
                       <div class="cell-room-sm">{{ cell.cls.room }}</div>
                       <div class="cell-subject-sm">{{ cell.cls.subject }}</div>
                       <div v-if="cell.cls.color === 'orange'" class="cell-campus-sm">Main Campus</div>
+                      <div class="cell-tag-sm">{{ cell.cls.year || '--' }} • {{ cell.cls.section || '--' }}</div>
                       <div class="cell-tag-sm">{{ cell.cls.parallel ? 'Parallel' : 'Non-parallel' }}</div>
                     </template>
                     <!-- Expanded view -->
@@ -122,7 +123,7 @@
                         </svg>
                         <strong class="cell-exp-subject">{{ cell.cls.subject }}</strong>
                       </div>
-                      <div class="cell-exp-section">{{ cell.cls.section }}</div>
+                      <div class="cell-exp-section">{{ cell.cls.year || '--' }} • {{ cell.cls.section }}</div>
                     </template>
                   </td>
                   <!-- Consultation cell -->
@@ -204,6 +205,10 @@
             <span class="modal-key">Section:</span>
             <span class="modal-val">{{ selectedClass.section }}</span>
           </div>
+          <div class="modal-info-row">
+            <span class="modal-key">Year Level:</span>
+            <span class="modal-val">{{ selectedClass.year || '--' }}</span>
+          </div>
           <div class="modal-time-row">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"/>
@@ -226,6 +231,7 @@
             <div class="modal-teacher-info">
               <div class="modal-teacher-name">{{ selectedClass.teacher }}</div>
               <div class="modal-parallel-label">Parallel Schedule</div>
+              <div class="modal-year-line">{{ selectedClass.year || '--' }}</div>
             </div>
           </div>
           <div v-for="(sr, idx) in selectedClass.parallelSections" :key="idx" class="modal-section-row">
@@ -528,6 +534,7 @@ function mapEntriesToSchedule(entries) {
       day,
       start,
       end,
+      year: entry.year || '',
       room: entry.room || '',
       subject: entry.subject || 'Untitled Subject',
       code: entry.subject || 'Untitled Subject',
@@ -1344,6 +1351,12 @@ function confirmLogout() {
 }
 
 .modal-teacher-name { font-size: 1.1rem; font-weight: 700; color: #111; }
+
+.modal-year-line {
+  font-size: 0.78rem;
+  color: #5f6b76;
+  font-weight: 600;
+}
 
 .modal-parallel-label {
   display: inline-block;
