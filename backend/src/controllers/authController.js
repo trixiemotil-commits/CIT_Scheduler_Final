@@ -2,6 +2,8 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+
 function signToken(user) {
   return jwt.sign(
     {
@@ -24,6 +26,8 @@ function toSafeUser(user) {
     email: user.email,
     role: user.role,
     department: user.department,
+    yearLevel: user.yearLevel,
+    section: user.section,
     phone: user.phone,
     account_status: user.account_status,
     teacher_status: user.teacher_status,
@@ -31,6 +35,24 @@ function toSafeUser(user) {
     avatar: user.avatar,
     name: `${user.firstName} ${user.lastName}`.trim(),
   };
+}
+
+function isStrongPassword(password) {
+  return STRONG_PASSWORD_REGEX.test(String(password || ""));
+}
+
+function getAccountStatusMessage(status) {
+  const normalized = String(status || "");
+  if (normalized === "Pending") {
+    return "Your account is pending approval. Please wait for admin approval before logging in.";
+  }
+  if (normalized === "Denied") {
+    return "Your account registration was denied. Please contact the administrator.";
+  }
+  if (normalized === "Archived") {
+    return "Your account is archived. Please contact the administrator.";
+  }
+  return "Your account is currently inactive. Please contact the administrator.";
 }
 
 async function register(req, res) {
@@ -56,8 +78,10 @@ async function register(req, res) {
     }
 
 
-    if (normalizedPassword.length < 8) {
-      return res.status(400).json({ message: "Password must be at least 8 characters long." });
+    if (!isStrongPassword(normalizedPassword)) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+      });
     }
 
     const existingUser = await User.findOne({
@@ -80,14 +104,12 @@ async function register(req, res) {
       studentId: normalizedStudentId,
       email: normalizedEmail,
       passwordHash,
-      role: "student"
+      role: "student",
+      account_status: "Pending",
     });
 
-    const token = signToken(user);
-
     return res.status(201).json({
-      message: "Account created successfully.",
-      token,
+      message: "Account created successfully and is pending approval.",
       user: toSafeUser(user),
     });
   } catch (error) {
@@ -138,6 +160,10 @@ async function login(req, res) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
+    if (user.account_status !== "Active") {
+      return res.status(403).json({ message: getAccountStatusMessage(user.account_status) });
+    }
+
     const token = signToken(user);
 
     return res.status(200).json({
@@ -181,6 +207,9 @@ async function updateMe(req, res) {
     const email = normalizeString(req.body.email).toLowerCase() || user.email;
     const phone = normalizeString(req.body.phone);
     const employeeId = normalizeString(req.body.employeeId);
+    const studentId = normalizeString(req.body.studentId);
+    const yearLevel = normalizeString(req.body.yearLevel);
+    const section = normalizeString(req.body.section);
     const avatar = normalizeString(req.body.avatar);
 
     if (!firstName || !lastName || !email) {
@@ -199,6 +228,17 @@ async function updateMe(req, res) {
       }
     }
 
+    if (studentId) {
+      const idOwner = await User.findOne({ studentId });
+      if (idOwner && idOwner._id.toString() !== user._id.toString()) {
+        return res.status(409).json({ message: "Student ID already exists." });
+      }
+    }
+
+    if (yearLevel && !["1st Year", "2nd Year", "3rd Year", "4th Year"].includes(yearLevel)) {
+      return res.status(400).json({ message: "Invalid year level." });
+    }
+
     if (avatar && !avatar.startsWith("data:image/") && !/^https?:\/\//i.test(avatar)) {
       return res.status(400).json({ message: "Avatar must be a valid image URL or data URL." });
     }
@@ -208,6 +248,13 @@ async function updateMe(req, res) {
     user.email = email;
     user.phone = phone;
     user.employeeId = employeeId || undefined;
+    if (user.role === "student") {
+      if (studentId) {
+        user.studentId = studentId;
+      }
+      user.yearLevel = yearLevel || user.yearLevel || "";
+      user.section = section || user.section || "";
+    }
     if (avatar) {
       user.avatar = avatar;
     }
@@ -228,8 +275,10 @@ async function changePassword(req, res) {
       return res.status(400).json({ message: "Current password and new password are required." });
     }
 
-    if (String(newPassword).length < 8) {
-      return res.status(400).json({ message: "New password must be at least 8 characters long." });
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({
+        message: "New password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+      });
     }
 
     const user = await User.findById(req.user.id).select("+passwordHash");

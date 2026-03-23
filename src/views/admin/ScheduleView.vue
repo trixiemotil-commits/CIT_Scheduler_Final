@@ -50,17 +50,11 @@
         <div class="sched-topbar">
           <div class="sched-topbar-left">
             <h2 class="sched-grid-title">Teacher Schedule Grid</h2>
-            <p class="sched-grid-sub" :class="{ 'teacher-selected': !!selectedTeacher }" style="margin:4px 0 0">{{ selectedTeacher ? `Showing schedule for Prof. ${selectedTeacher}` : 'Select a teacher from the dropdown to view their schedule' }}</p>
+            <div class="sched-grid-meta" style="margin:4px 0 0">
+              <p class="sched-grid-sub" :class="{ 'teacher-selected': !!selectedTeacher }">{{ selectedTeacher ? `Showing schedule for Prof. ${selectedTeacher}` : 'Select a teacher from the dropdown to view their schedule' }}</p>
+            </div>
           </div>
           <div class="sched-topbar-right">
-            <!-- Year filter selector -->
-            <div class="sched-select-wrap">
-              <select class="sched-select" :value="yearDropdown" @change="jumpToYear($event.target.value)">
-                <option value="All">All Years</option>
-                <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
-              </select>
-              <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
             <!-- Section filter selector -->
             <div class="sched-select-wrap">
               <select class="sched-select" v-model="filterSection">
@@ -122,14 +116,14 @@
                     v-if="!isSpannedCell(slot, day) && !isConsultSpannedCell(slot, day)"
                     :rowspan="getEntriesForCell(slot, day).length ? getRowspan(getEntriesForCell(slot, day)[0]) : (getConsultationForCell(slot, day) ? getConsultRowspan(getConsultationForCell(slot, day)) : 1)"
                     class="td-cell"
-                    :class="{ 'has-entry': getEntriesForCell(slot, day).length, 'consult-cell': !getEntriesForCell(slot, day).length && !!getConsultationForCell(slot, day) }"
-                    @click="!getConsultationForCell(slot, day) || getEntriesForCell(slot, day).length ? handleCellClick(slot, day) : null"
+                    :class="{ 'has-entry': getEntriesForCell(slot, day).length, 'consult-cell': !getEntriesForCell(slot, day).length && !!getConsultationForCell(slot, day), 'readonly-entry-cell': getEntriesForCell(slot, day).length && !selectedTeacher }"
+                    @click="canInteractCell(slot, day) ? handleCellClick(slot, day) : null"
                   >
                     <!-- Filled cell: ONE box, all sections inside -->
                     <template v-if="getEntriesForCell(slot, day).length">
                       <div
                         class="sched-entry"
-                        :class="getEntriesForCell(slot, day)[0].color"
+                        :class="[getEntriesForCell(slot, day)[0].color, { 'entry-readonly': !selectedTeacher }]"
                         :style="entryStyle(slot, getEntriesForCell(slot, day)[0])"
                       >
                         <div class="entry-teacher">{{ getEntriesForCell(slot, day)[0].teacher }}</div>
@@ -147,7 +141,7 @@
                           </div>
                         </div>
                         <div v-if="getEntriesForCell(slot, day)[0].addedAt" class="entry-timestamp">Added: {{ getEntriesForCell(slot, day)[0].addedAt }}</div>
-                        <div class="entry-edit-hint">Click to edit</div>
+                        <div v-if="selectedTeacher" class="entry-edit-hint">Click to edit</div>
                       </div>
                     </template>
                     <!-- Empty cell -->
@@ -196,6 +190,19 @@
           </div>
 
           <div class="sched-form">
+            <!-- Teacher (locked if selected from topbar, dropdown otherwise) -->
+            <div class="form-row-inline" :class="{ 'schedule-for-row': selectedTeacher && !editMode }">
+              <label v-if="!(selectedTeacher && !editMode)" class="form-label">Teacher</label>
+              <div v-if="selectedTeacher && !editMode" class="schedule-for-text">Schedule for Prof. {{ selectedTeacher }}</div>
+              <div v-else-if="selectedTeacher" class="form-value-locked">Prof. {{ selectedTeacher }}</div>
+              <div v-else class="form-select-wrap">
+                <select v-model="form.teacher" class="form-select">
+                  <option value="" disabled>Select Teacher</option>
+                  <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
+                </select>
+                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+            </div>
             <!-- Day (only when opened from New Schedule button) -->
             <template v-if="fromButton && !editMode">
               <div class="form-row-inline">
@@ -209,39 +216,27 @@
                 </div>
               </div>
             </template>
-            <!-- Time In / Time Out (always shown) -->
+            <!-- Start / End of Class (always shown) -->
             <div class="form-row-inline">
-                <label class="form-label">Time In</label>
+                <label class="form-label">Start of Class</label>
                 <div class="form-select-wrap">
                   <select v-model="form.timeIn" class="form-select">
-                    <option value="" disabled>Select Time In</option>
+                    <option value="" disabled>Select Start of Class</option>
                     <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
                   </select>
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
               </div>
               <div class="form-row-inline">
-                <label class="form-label">Time Out</label>
+                <label class="form-label">End of Class</label>
                 <div class="form-select-wrap">
                   <select v-model="form.timeOut" class="form-select">
-                    <option value="" disabled>Select Time Out</option>
+                    <option value="" disabled>Select End of Class</option>
                     <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
                   </select>
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
               </div>
-            <!-- Teacher (locked if selected from topbar, dropdown otherwise) -->
-            <div class="form-row-inline">
-              <label class="form-label">Teacher</label>
-              <div v-if="selectedTeacher" class="form-value-locked">Prof. {{ selectedTeacher }}</div>
-              <div v-else class="form-select-wrap">
-                <select v-model="form.teacher" class="form-select">
-                  <option value="" disabled>Select Teacher</option>
-                  <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
-                </select>
-                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-              </div>
-            </div>
             <!-- Year -->
             <div class="form-row-inline">
               <label class="form-label">Year</label>
@@ -433,6 +428,18 @@
             </div>
 
             <div class="panel-form">
+              <!-- Teacher (locked if selected from topbar, dropdown otherwise) -->
+              <div class="form-row-inline" :class="{ 'schedule-for-row': selectedTeacher }">
+                <label v-if="!selectedTeacher" class="form-label">Teacher</label>
+                <div v-if="selectedTeacher" class="schedule-for-text">Schedule for Prof. {{ selectedTeacher }}</div>
+                <div v-else class="form-select-wrap">
+                  <select v-model="addForm.teacher" class="form-select">
+                    <option value="" disabled>Select Teacher</option>
+                    <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
+                  </select>
+                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </div>
               <!-- Day -->
               <div class="form-row-inline">
                 <label class="form-label">Day</label>
@@ -444,36 +451,24 @@
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
               </div>
-              <!-- Time In -->
+              <!-- Start of Class -->
               <div class="form-row-inline">
-                <label class="form-label">Time In</label>
+                <label class="form-label">Start of Class</label>
                 <div class="form-select-wrap">
                   <select v-model="addForm.timeIn" class="form-select">
-                    <option value="" disabled>Select Time In</option>
+                    <option value="" disabled>Select Start of Class</option>
                     <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
                   </select>
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
               </div>
-              <!-- Time Out -->
+              <!-- End of Class -->
               <div class="form-row-inline">
-                <label class="form-label">Time Out</label>
+                <label class="form-label">End of Class</label>
                 <div class="form-select-wrap">
                   <select v-model="addForm.timeOut" class="form-select">
-                    <option value="" disabled>Select Time Out</option>
+                    <option value="" disabled>Select End of Class</option>
                     <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
-                  </select>
-                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-              </div>
-              <!-- Teacher (locked if selected from topbar, dropdown otherwise) -->
-              <div class="form-row-inline">
-                <label class="form-label">Teacher</label>
-                <div v-if="selectedTeacher" class="form-value-locked">Prof. {{ selectedTeacher }}</div>
-                <div v-else class="form-select-wrap">
-                  <select v-model="addForm.teacher" class="form-select">
-                    <option value="" disabled>Select Teacher</option>
-                    <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
                   </select>
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
@@ -888,6 +883,15 @@ function getConsultationForCell(rowHour, day) {
   }) ?? null
 }
 
+function canInteractCell(slot, day) {
+  const hasEntry = getEntriesForCell(slot, day).length > 0
+  if (hasEntry && !selectedTeacher.value) {
+    return false
+  }
+
+  return !getConsultationForCell(slot, day) || hasEntry
+}
+
 function consultEntryStyle(rowHour, consult) {
   if (!consult?.startTime || !consult?.endTime) return {}
   const rowStart     = parseTime(rowHour)
@@ -1081,10 +1085,13 @@ function syncEntriesFromApi(apiEntries) {
 
     const key = `${tableLabel}|${section}|${slot}|${day}`
 
+    const inferredCampus = inferCampus(entry)
+    const roomBasedColor = colorForRoom(entry.room)
+
     entries[key] = {
       teacher: entry.teacher,
       subject: entry.subject,
-      campus: inferCampus(entry),
+      campus: inferredCampus,
       room: entry.room,
       year: entry.year,
       tableLabel,
@@ -1097,7 +1104,7 @@ function syncEntriesFromApi(apiEntries) {
       parallelGroupId: entry.parallelGroupId || null,
       parallelCount: entry.parallelCount || 1,
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map((slotItem) => ({ ...slotItem })) : [],
-      color: inferCampus(entry) === 'Main Campus' ? 'color-orange' : (entry.color || colorForRoom(entry.room) || 'color-green'),
+      color: inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || entry.color || 'color-green'),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -1334,7 +1341,7 @@ function buildSlots(count) {
 watch([() => form.timeIn, () => form.timeOut], () => {
   if (form.timeIn && form.timeOut) {
     modalTimeError.value = parseTime(form.timeOut) <= parseTime(form.timeIn)
-      ? 'Time Out must be after Time In' : ''
+      ? 'End of Class must be after Start of Class' : ''
   } else {
     modalTimeError.value = ''
   }
@@ -1355,6 +1362,15 @@ watch(() => form.room, (val) => {
 async function handleCellClick(slot, day) {
   const cell = getEntriesForCell(slot, day)
   if (cell.length > 0) {
+    if (!selectedTeacher.value) {
+      await Swal.fire({
+        icon: 'info', title: 'Select a Teacher',
+        text: 'Please select a specific teacher to edit an existing schedule.',
+        confirmButtonText: 'OK', confirmButtonColor: '#1b4332', background: '#fff',
+        customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
+      })
+      return
+    }
     openEditModal(slot, day, cell[0])
   } else {
     if (!selectedTeacher.value) {
@@ -1505,15 +1521,13 @@ async function showConflictDialog(conflicts) {
     icon: 'warning',
     title: '<span style="font-size:1.1rem;font-weight:700;">Schedule Conflict</span>',
     html: `
-      <p style="font-size:0.83rem;color:#666;margin:0 0 12px;">The following conflicts were found. You can proceed anyway or go back to adjust.</p>
+      <p style="font-size:0.83rem;color:#666;margin:0 0 12px;">The following conflicts were found. Please adjust your schedule before saving.</p>
       <div style="max-height:260px;overflow-y:auto;padding-right:2px;">
         ${buildConflictHtml(conflicts)}
       </div>`,
-    confirmButtonText: 'Proceed Anyway',
-    cancelButtonText: 'Go Back',
-    showCancelButton: true,
-    confirmButtonColor: '#e63946',
-    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'OK',
+    showCancelButton: false,
+    confirmButtonColor: '#1b4332',
     background: '#fff',
     customClass: {
       popup: 'swal-cit-popup',
@@ -1537,9 +1551,7 @@ async function saveEntry() {
     // Check for conflicts
     const conflicts = checkScheduleConflict(payload, skipFilter)
     if (conflicts.length > 0) {
-      const result = await showConflictDialog(conflicts)
-      if (!result.isConfirmed) return
-      await proceedWithSave(payload)
+      await showConflictDialog(conflicts)
       return
     }
 
@@ -1581,6 +1593,26 @@ async function proceedWithSave(payload) {
 }
 
 async function clearSlot() {
+  const confirmation = await Swal.fire({
+    icon: 'warning',
+    title: 'Clear this slot?',
+    text: 'This will remove the selected class schedule from the grid.',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, clear slot',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#e63946',
+    cancelButtonColor: '#6c757d',
+    background: '#fff',
+    customClass: {
+      popup: 'swal-cit-popup',
+      title: 'swal-cit-title',
+    },
+  })
+
+  if (!confirmation.isConfirmed) {
+    return
+  }
+
   try {
     await apiRequest('/schedules/delete', {
       method: 'POST',
@@ -1621,7 +1653,7 @@ watch(() => addForm.parallelCount, (val) => {
 watch([() => addForm.timeIn, () => addForm.timeOut], () => {
   if (addForm.timeIn && addForm.timeOut) {
     addTimeError.value = parseTime(addForm.timeOut) <= parseTime(addForm.timeIn)
-      ? 'Time Out must be after Time In'
+      ? 'End of Class must be after Start of Class'
       : ''
   } else {
     addTimeError.value = ''
@@ -1668,18 +1700,11 @@ async function addEntry() {
     // Check for conflicts before saving
     const conflicts = checkScheduleConflict(payload)
     if (conflicts.length > 0) {
-      const result = await showConflictDialog(conflicts)
-      if (!result.isConfirmed) return
-      // User acknowledged — save and silently swallow any server-side 409 (already confirmed)
-      try {
-        await apiRequest('/schedules', { method: 'POST', body: JSON.stringify(payload) })
-      } catch (e) {
-        if (e?.status !== 409) await showScheduleError(e)
-        return
-      }
-    } else {
-      await apiRequest('/schedules', { method: 'POST', body: JSON.stringify(payload) })
+      await showConflictDialog(conflicts)
+      return
     }
+
+    await apiRequest('/schedules', { method: 'POST', body: JSON.stringify(payload) })
 
     setVisibleSection(addForm)
     await refreshScheduleData(addForm.teacher)
@@ -2000,6 +2025,12 @@ function confirmLogout() {
   border-radius: 6px;
   box-shadow: 0 2px 8px rgba(64, 145, 108, 0.15);
 }
+.sched-grid-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .sched-topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
 /* Selects */
@@ -2112,6 +2143,7 @@ function confirmLogout() {
   width: 100%;
   overflow-x: auto;
   margin-top: 8px;
+  position: relative;
 }
 .sched-grid {
   width: 100%;
@@ -2179,6 +2211,12 @@ function confirmLogout() {
 }
 .td-cell:hover { background: #f7faf8; }
 .td-cell.has-entry { padding: 0; }
+.td-cell.readonly-entry-cell {
+  cursor: default;
+}
+.td-cell.readonly-entry-cell:hover {
+  background: inherit;
+}
 
 /* Entry card */
 .sched-entry {
@@ -2198,6 +2236,9 @@ function confirmLogout() {
   overflow: hidden;
 }
 .sched-entry:hover { filter: brightness(0.95); }
+.sched-entry.entry-readonly:hover {
+  filter: none;
+}
 
 .entry-teacher {
   font-size: 0.92rem; font-weight: 700; line-height: 1.2;
@@ -2259,6 +2300,26 @@ function confirmLogout() {
   background: #f0f4f2; border: 1px solid #d0e0d8;
   font-size: 0.875rem; color: #1b4332; font-weight: 600;
   min-width: 0; flex: 1;
+}
+.schedule-for-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  justify-self: center;
+  min-width: 0;
+  flex: 1;
+  width: min(100%, 520px);
+  min-height: 42px;
+  padding: 10px 14px;
+  border-left: 5px solid #2d8a59;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #e8f5ee 0%, #d7efe4 100%);
+  box-shadow: 0 6px 14px rgba(45, 138, 89, 0.14);
+  font-size: 0.94rem;
+  color: #145a3d;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 /* Entry colors */
@@ -2332,6 +2393,9 @@ function confirmLogout() {
 .form-row-inline {
   display: grid; grid-template-columns: 100px 1fr;
   align-items: center; gap: 12px;
+}
+.form-row-inline.schedule-for-row {
+  grid-template-columns: 1fr;
 }
 .form-label { font-size: 0.95rem; font-weight: 700; color: #111; }
 .form-select-wrap { position: relative; display: flex; align-items: center; }

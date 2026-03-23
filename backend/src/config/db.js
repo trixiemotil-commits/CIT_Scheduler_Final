@@ -126,9 +126,15 @@ async function migrateUserStatusFields() {
           $set: {
             account_status: {
               $cond: {
-                if: { $in: ["$status", ["Active", "Inactive", "Archived"]] },
+                if: { $in: ["$status", ["Pending", "Active", "Inactive", "Denied", "Archived"]] },
                 then: "$status",
-                else: "Active",
+                else: {
+                  $cond: {
+                    if: { $eq: ["$role", "student"] },
+                    then: "Pending",
+                    else: "Active",
+                  },
+                },
               },
             },
           },

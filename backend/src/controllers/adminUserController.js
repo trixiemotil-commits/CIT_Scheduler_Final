@@ -7,8 +7,10 @@ const ROLE_LABELS = {
   student: "Student",
 };
 
-const ACCOUNT_STATUS_VALUES = ["Active", "Inactive", "Archived"];
+const ACCOUNT_STATUS_VALUES = ["Pending", "Active", "Inactive", "Denied", "Archived"];
 const TEACHER_STATUS_VALUES = ["On School", "On Meeting", "On Leave"];
+const DEFAULT_DEPARTMENT = "College of Information Technology";
+const PHINMA_EMAIL_REGEX = /^[a-z0-9._%+-]+\.au@phinmaed\.com$/i;
 
 function formatRole(role) {
   return ROLE_LABELS[role] || role;
@@ -38,14 +40,18 @@ function toClientUser(user) {
     role: formatRole(user.role),
     department: user.department || "",
     phone: user.phone || "",
-    account_status: user.account_status || "Active",
+    account_status: user.account_status || fallbackAccountStatus(user.role),
     teacher_status: user.teacher_status || (user.role === "teacher" ? "On School" : ""),
-    status: user.account_status || "Active",
+    status: user.account_status || fallbackAccountStatus(user.role),
     employeeId: user.employeeId || "",
     studentId: user.studentId || "",
     avatar: user.avatar,
     dateAdded: user.createdAt,
   };
+
+function fallbackAccountStatus(role) {
+  return role === "student" ? "Pending" : "Active";
+}
 }
 
 function normalizeRole(role) {
@@ -58,6 +64,10 @@ function normalizeRole(role) {
 
 function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function isValidPhinmaEmail(email) {
+  return PHINMA_EMAIL_REGEX.test((email || "").trim());
 }
 
 async function listUsers(req, res) {
@@ -84,7 +94,6 @@ async function createUser(req, res) {
       email,
       role,
       password,
-      department = "",
       phone = "",
       account_status = "Active",
       teacher_status = "On School",
@@ -111,6 +120,10 @@ async function createUser(req, res) {
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedEmployeeId = normalizeString(employeeId);
     const normalizedStudentId = normalizeString(studentId);
+
+    if (!isValidPhinmaEmail(normalizedEmail)) {
+      return res.status(400).json({ message: "Email must end with .au@phinmaed.com." });
+    }
 
     if (normalizedRole === "student" && !normalizedStudentId) {
       return res.status(400).json({ message: "Student ID is required for student accounts." });
@@ -143,9 +156,9 @@ async function createUser(req, res) {
       email: normalizedEmail,
       role: normalizedRole,
       passwordHash,
-      department: normalizeString(department),
+      department: DEFAULT_DEPARTMENT,
       phone: normalizeString(phone),
-      account_status: sanitizeAccountStatus(account_status || status),
+      account_status: "Active",
       teacher_status: normalizedRole === "teacher" ? sanitizeTeacherStatus(teacher_status) : undefined,
       employeeId: normalizedEmployeeId || undefined,
       studentId: normalizedStudentId || undefined,
@@ -167,9 +180,8 @@ async function updateUser(req, res) {
       lastName,
       email,
       role,
-      department = "",
       phone = "",
-      account_status = "Active",
+      account_status,
       teacher_status = "On School",
       status,
       employeeId = "",
@@ -189,6 +201,10 @@ async function updateUser(req, res) {
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedEmployeeId = normalizeString(employeeId);
     const normalizedStudentId = normalizeString(studentId);
+
+    if (!isValidPhinmaEmail(normalizedEmail)) {
+      return res.status(400).json({ message: "Email must end with .au@phinmaed.com." });
+    }
 
     const user = await User.findById(id);
     if (!user) {
@@ -220,9 +236,12 @@ async function updateUser(req, res) {
     user.lastName = normalizeString(lastName);
     user.email = normalizedEmail;
     user.role = normalizedRole;
-    user.department = normalizeString(department);
+    user.department = DEFAULT_DEPARTMENT;
     user.phone = normalizeString(phone);
-    user.account_status = sanitizeAccountStatus(account_status || status);
+    const requestedStatus = normalizeString(account_status) || normalizeString(status);
+    if (requestedStatus) {
+      user.account_status = sanitizeAccountStatus(requestedStatus);
+    }
     user.teacher_status = normalizedRole === "teacher" ? sanitizeTeacherStatus(teacher_status) : undefined;
     user.employeeId = normalizedEmployeeId || undefined;
 
@@ -241,8 +260,54 @@ async function updateUser(req, res) {
   }
 }
 
+async function updateUserStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+    const rawStatus = normalizeString(status);
+
+    if (!ACCOUNT_STATUS_VALUES.includes(rawStatus)) {
+      return res.status(400).json({ message: "Invalid status value." });
+    }
+
+    const nextStatus = sanitizeAccountStatus(rawStatus);
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    user.account_status = nextStatus;
+    await user.save();
+
+    return res.json({ message: "User status updated.", user: toClientUser(user) });
+  } catch (error) {
+    console.error("Failed to update user status:", error);
+    return res.status(500).json({ message: "Failed to update user status.", error: error.message });
+  }
+}
+
+async function approveAllPendingUsers(req, res) {
+  try {
+    const result = await User.updateMany(
+      { account_status: "Pending" },
+      { $set: { account_status: "Active" } }
+    );
+
+    return res.json({
+      message: "Pending users approved.",
+      updatedCount: result.modifiedCount || 0,
+    });
+  } catch (error) {
+    console.error("Failed to approve pending users:", error);
+    return res.status(500).json({ message: "Failed to approve pending users.", error: error.message });
+  }
+}
+
 module.exports = {
   listUsers,
   createUser,
   updateUser,
+  updateUserStatus,
+  approveAllPendingUsers,
 };

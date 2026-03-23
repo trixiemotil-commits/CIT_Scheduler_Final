@@ -49,7 +49,9 @@ export async function register(signUpPayload) {
     body: JSON.stringify(signUpPayload)
   })
 
-  saveSession(payload)
+  if (payload.token && payload.user) {
+    saveSession(payload)
+  }
   return payload.user.role
 }
 

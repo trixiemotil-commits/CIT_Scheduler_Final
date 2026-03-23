@@ -357,7 +357,7 @@ async function listTeachersForStudents(req, res) {
           fullName,
         ].filter(Boolean);
 
-        const [availabilitySlots, scheduleSubjects, status] = await Promise.all([
+        const [availabilitySlots, scheduleEntries, status] = await Promise.all([
           ConsultationAvailability.find({
             $or: [
               { employeeId: { $in: lookupKeys } },
@@ -366,9 +366,29 @@ async function listTeachersForStudents(req, res) {
           })
             .sort({ dayOfWeek: 1, startTime: 1 })
             .lean(),
-          ScheduleEntry.find({ teacher: fullName }).distinct("subject"),
+          ScheduleEntry.find({ teacher: fullName })
+            .select("subject year section")
+            .lean(),
           resolveTeacherStatus(teacherUser),
         ]);
+
+        const subjectSet = new Set();
+        const yearSet = new Set();
+        const sectionSet = new Set();
+        const yearSectionSet = new Set();
+        const subjectAssignmentSet = new Set();
+
+        for (const entry of scheduleEntries) {
+          const subject = String(entry?.subject || "").trim();
+          const year = String(entry?.year || "").trim();
+          const section = String(entry?.section || "").trim();
+
+          if (subject) subjectSet.add(subject);
+          if (year) yearSet.add(year);
+          if (section) sectionSet.add(section);
+          if (year && section) yearSectionSet.add(`${year}||${section}`);
+          if (subject && year && section) subjectAssignmentSet.add(`${subject}||${year}||${section}`);
+        }
 
         return {
           id: teacherUser._id.toString(),
@@ -378,7 +398,17 @@ async function listTeachersForStudents(req, res) {
           department: teacherUser.department || "",
           status,
           available: status === "On School" && availabilitySlots.length > 0,
-          subjects: Array.isArray(scheduleSubjects) ? scheduleSubjects.filter(Boolean) : [],
+          subjects: Array.from(subjectSet),
+          assignedYears: Array.from(yearSet),
+          assignedSections: Array.from(sectionSet),
+          assignedYearSections: Array.from(yearSectionSet).map((pair) => {
+            const [year, section] = pair.split("||");
+            return { year, section };
+          }),
+          subjectAssignments: Array.from(subjectAssignmentSet).map((triple) => {
+            const [subject, year, section] = triple.split("||");
+            return { subject, year, section };
+          }),
           consultationSlots: availabilitySlots.map((slot) => ({
             id: slot._id.toString(),
             dayOfWeek: slot.dayOfWeek,

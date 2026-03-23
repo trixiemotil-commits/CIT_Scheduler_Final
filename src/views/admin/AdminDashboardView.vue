@@ -173,7 +173,7 @@
               <div class="modal-teacher-info">
                 <span class="modal-teacher-name">{{ selectedTeacher.name }}</span>
               </div>
-              <span class="modal-hours-badge">{{ selectedTeacher.totalHours }} Hours</span>
+              <span class="modal-hours-badge">{{ selectedTeacher.totalHours }} Hours/Week</span>
             </div>
 
             <!-- Schedule cards grid -->
@@ -198,7 +198,7 @@
                   <span class="modal-summary-val">{{ selectedTeacher.schedule.length }}</span>
                 </div>
                 <div class="modal-summary-item">
-                  <span class="modal-summary-key">Total Hours</span>
+                  <span class="modal-summary-key">Total Hours per Week</span>
                   <span class="modal-summary-val">{{ selectedTeacher.totalHours }}h</span>
                 </div>
                 <div class="modal-summary-item">
@@ -237,10 +237,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue'
-import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { logout } from '@/auth.js'
 import Chart from 'chart.js/auto'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 // v-click-outside directive
 const vClickOutside = {

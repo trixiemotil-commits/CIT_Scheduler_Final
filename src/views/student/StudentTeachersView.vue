@@ -34,7 +34,10 @@
           <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
           <div class="teacher-meta">
             <div class="teacher-name">{{ t.name }}</div>
-            <div class="teacher-subject">{{ t.subject }}</div>
+            <div class="teacher-subjects-clean">
+              <span v-for="subject in displayedSubjects(t)" :key="subject" class="subject-chip">{{ subject }}</span>
+              <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
+            </div>
           </div>
           <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
         </div>
@@ -67,7 +70,10 @@
             <div class="tp-avatar" :style="{ background: selectedTeacher?.color }">{{ selectedTeacher?.initials }}</div>
             <div>
               <div class="tp-name">{{ selectedTeacher?.name }}</div>
-              <div class="tp-subj">{{ selectedTeacher?.subject }}</div>
+              <div class="tp-subjects-clean">
+                <span v-for="subject in displayedSubjects(selectedTeacher)" :key="subject" class="subject-chip">{{ subject }}</span>
+                <span v-if="hiddenSubjectCount(selectedTeacher)" class="subject-chip more">+{{ hiddenSubjectCount(selectedTeacher) }} more</span>
+              </div>
             </div>
           </div>
           <div class="field-group">
@@ -121,7 +127,10 @@
           <div class="profile-hero">
             <div class="profile-avatar-lg" :style="{ background: selectedTeacher?.color }">{{ selectedTeacher?.initials }}</div>
             <div class="profile-hero-name">{{ selectedTeacher?.name }}</div>
-            <div class="profile-hero-subj">{{ selectedTeacher?.subject }}</div>
+            <div class="profile-subjects-clean">
+              <span v-for="subject in displayedSubjects(selectedTeacher)" :key="subject" class="subject-chip">{{ subject }}</span>
+              <span v-if="hiddenSubjectCount(selectedTeacher)" class="subject-chip more">+{{ hiddenSubjectCount(selectedTeacher) }} more</span>
+            </div>
             <div class="stars-row" style="justify-content:center;margin-top:6px">
               <span class="stars">★★★★</span>
               <span class="rating">{{ selectedTeacher?.rating }} ({{ selectedTeacher?.reviews }} reviews)</span>
@@ -157,12 +166,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
-import { getToken } from '@/auth.js'
+import { ref, computed, onMounted } from 'vue'
+import { getToken, getUser } from '@/auth.js'
 import BottomNav from '@/components/student/BottomNav.vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
-const AUTO_REFRESH_MS = 30000
 
 const search       = ref('')
 const activeFilter = ref('All')
@@ -180,6 +188,28 @@ const CONSULTATION_REASONS = [
 ]
 
 const teachers = ref([])
+const currentUser = computed(() => getUser() || {})
+const studentYearLevel = computed(() => String(currentUser.value.yearLevel || currentUser.value.grade || '').trim())
+const studentSection = computed(() => String(currentUser.value.section || '').trim())
+
+function normalizeSection(section) {
+  return String(section || '').trim().toLowerCase()
+}
+
+function hasMatchingAssignment(teacher) {
+  const year = studentYearLevel.value
+  const section = studentSection.value
+
+  if (!year || !section) {
+    return true
+  }
+
+  const pairs = Array.isArray(teacher.assignedYearSections) ? teacher.assignedYearSections : []
+  return pairs.some((pair) =>
+    String(pair?.year || '').trim() === year
+    && normalizeSection(pair?.section) === normalizeSection(section)
+  )
+}
 
 function initialsFor(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
@@ -251,20 +281,36 @@ async function apiRequest(path, options = {}) {
 
 function mapTeacher(teacher) {
   const subjects = Array.isArray(teacher.subjects) ? teacher.subjects.filter(Boolean) : []
+  const assignedYearSections = Array.isArray(teacher.assignedYearSections) ? teacher.assignedYearSections : []
+  const subjectAssignments = Array.isArray(teacher.subjectAssignments) ? teacher.subjectAssignments : []
   const resolvedStatus = normalizeTeacherStatus(teacher.status || teacher.teacher_status)
   const consultationSlots = Array.isArray(teacher.consultationSlots) ? teacher.consultationSlots : []
+
+  const matchedSubjects = (studentYearLevel.value && studentSection.value)
+    ? subjectAssignments
+      .filter((entry) =>
+        String(entry?.year || '').trim() === studentYearLevel.value
+        && normalizeSection(entry?.section) === normalizeSection(studentSection.value)
+      )
+      .map((entry) => String(entry?.subject || '').trim())
+      .filter(Boolean)
+    : []
+
+  const resolvedSubjects = matchedSubjects.length ? [...new Set(matchedSubjects)] : subjects
+
   return {
     id: teacher.id,
     employeeId: teacher.employeeId,
     name: teacher.name,
-    subject: subjects.length ? subjects.join(', ') : 'No subject assigned',
+    subject: resolvedSubjects.length ? resolvedSubjects.join(', ') : 'No subject assigned',
     initials: initialsFor(teacher.name),
     color: colorForName(teacher.name),
     status: resolvedStatus,
     // Request button follows working status; selected slot is still validated in modal submit.
     available: resolvedStatus === 'In School',
-    tags: subjects.slice(0, 3),
-    subjectList: subjects,
+    tags: resolvedSubjects.slice(0, 3),
+    subjectList: resolvedSubjects,
+    assignedYearSections,
     consultationSlots,
   }
 }
@@ -283,36 +329,22 @@ async function loadTeachers() {
   }
 }
 
-let autoRefreshTimer = null
-
-function onVisibilityChange() {
-  if (document.visibilityState === 'visible') {
-    loadTeachers()
-  }
-}
-
-function onWindowFocus() {
-  loadTeachers()
-}
-
-function startAutoRefresh() {
-  if (autoRefreshTimer) {
-    clearInterval(autoRefreshTimer)
-  }
-
-  autoRefreshTimer = setInterval(() => {
-    if (document.visibilityState !== 'visible') {
-      return
-    }
-    loadTeachers()
-  }, AUTO_REFRESH_MS)
-}
-
 const filteredTeachers = computed(() => teachers.value.filter(t => {
   const matchSearch = !search.value || t.name.toLowerCase().includes(search.value.toLowerCase()) || t.subject.toLowerCase().includes(search.value.toLowerCase())
   const matchFilter = activeFilter.value === 'All' || t.status === activeFilter.value
-  return matchSearch && matchFilter
+  const matchAssignment = hasMatchingAssignment(t)
+  return matchSearch && matchFilter && matchAssignment
 }))
+
+function displayedSubjects(teacher) {
+  const list = Array.isArray(teacher?.subjectList) ? teacher.subjectList : []
+  return list.slice(0, 4)
+}
+
+function hiddenSubjectCount(teacher) {
+  const list = Array.isArray(teacher?.subjectList) ? teacher.subjectList : []
+  return Math.max(0, list.length - 4)
+}
 
 function statusClass(s) {
   return {
@@ -451,19 +483,6 @@ function showToast(msg) {
 
 onMounted(() => {
   loadTeachers()
-  startAutoRefresh()
-  document.addEventListener('visibilitychange', onVisibilityChange)
-  window.addEventListener('focus', onWindowFocus)
-})
-
-onBeforeUnmount(() => {
-  if (autoRefreshTimer) {
-    clearInterval(autoRefreshTimer)
-    autoRefreshTimer = null
-  }
-
-  document.removeEventListener('visibilitychange', onVisibilityChange)
-  window.removeEventListener('focus', onWindowFocus)
 })
 </script>
 
@@ -539,7 +558,29 @@ onBeforeUnmount(() => {
 }
 .teacher-meta { flex: 1; }
 .teacher-name    { font-weight: 700; font-size: 0.9rem; color: #111; }
-.teacher-subject { font-size: 0.77rem; color: #666; margin-top: 2px; }
+.teacher-subjects-clean {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.subject-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #edf6f1;
+  border: 1px solid #d4e9de;
+  color: #1f5138;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.subject-chip.more {
+  background: #f5f6f8;
+  border-color: #e2e6ea;
+  color: #586572;
+}
 .status-pill {
   font-size: 0.7rem; font-weight: 600;
   padding: 3px 10px; border-radius: 20px;
@@ -620,7 +661,12 @@ onBeforeUnmount(() => {
   font-weight: 700; font-size: 1.1rem; flex-shrink: 0;
 }
 .tp-name { font-weight: 700; font-size: 0.9rem; color: #111; }
-.tp-subj { font-size: 0.75rem; color: #777; margin-top: 2px; }
+.tp-subjects-clean {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
 
 /* Profile hero */
 .profile-hero {
@@ -633,7 +679,13 @@ onBeforeUnmount(() => {
   font-weight: 700; font-size: 1.6rem; margin-bottom: 8px;
 }
 .profile-hero-name { font-weight: 700; font-size: 1rem; color: #111; }
-.profile-hero-subj { font-size: 0.8rem; color: #777; }
+.profile-subjects-clean {
+  margin-top: 4px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
 .prof-row {
   display: flex; flex-direction: column; gap: 5px;
   padding: 12px 0; border-bottom: 1px solid #f0f0f0;
