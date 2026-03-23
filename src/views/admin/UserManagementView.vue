@@ -62,7 +62,7 @@
             v-if="activeView === 'active' && pendingCount > 0"
             class="um-approve-all-btn"
             :disabled="isBulkApproving"
-            @click="approveAllPending"
+            @click="promptApproveAll"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/><path d="M22 10l-7 7"/></svg>
             {{ isBulkApproving ? 'Approving...' : `Approve All (${pendingCount})` }}
@@ -79,6 +79,14 @@
             <option value="Teacher">Teacher</option>
             <option value="Student">Student</option>
           </select>
+          <button class="um-print-btn" title="Print Users" @click="printUsersTable">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9"/>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+              <rect x="6" y="14" width="12" height="8"/>
+            </svg>
+            Print
+          </button>
           <button v-if="activeView === 'active'" class="um-add-btn" @click="openAddUser">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add User
@@ -137,6 +145,7 @@
 
       <!-- Table -->
       <div v-if="loadError" class="um-error-banner">{{ loadError }}</div>
+      <div v-else-if="autoRefreshNotice" class="um-info-banner">{{ autoRefreshNotice }}</div>
       <div class="um-table-wrap">
         <table class="um-table">
           <thead>
@@ -494,6 +503,19 @@
     </div>
   </Teleport>
 
+  <!-- ═══ Sweet Alert — Approve All Confirm ═══ -->
+  <Teleport to="body">
+    <div v-if="showApproveAllConfirm" class="modal-overlay">
+      <div class="swal-box">
+        <p class="swal-text">Approve all {{ pendingCount }} pending user account(s)?</p>
+        <div class="swal-actions">
+          <button class="swal-cancel" @click="showApproveAllConfirm = false">Cancel</button>
+          <button class="swal-continue" @click="confirmApproveAllPending">Approve All</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <!-- ═══ Logout Confirm Modal ═══ -->
   <Teleport to="body">
     <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
@@ -518,7 +540,7 @@
 
 <script setup>
 import { getToken, logout } from '@/auth.js'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -574,8 +596,12 @@ const roleFilter  = ref('')
 const users = ref([])
 const isLoadingUsers = ref(false)
 const loadError = ref('')
+const autoRefreshNotice = ref('')
 const isBulkApproving = ref(false)
 const PHINMA_EMAIL_REGEX = /^[a-z0-9._%+-]+\.au@phinmaed\.com$/i
+const AUTO_REFRESH_MS = 10000
+let autoRefreshTimer = null
+let autoRefreshNoticeTimer = null
 
 const pendingCount = computed(() => {
   return users.value.filter((u) => u.status === 'Pending').length
@@ -682,17 +708,66 @@ async function apiRequest(path, options = {}) {
   return body
 }
 
-async function fetchUsers() {
-  isLoadingUsers.value = true
-  loadError.value = ''
+async function fetchUsers(options = {}) {
+  const { silent = false } = options
+  if (!silent) {
+    isLoadingUsers.value = true
+    loadError.value = ''
+  }
+
+  const previousPendingCount = pendingCount.value
+
   try {
     const payload = await apiRequest('/users')
     const list = Array.isArray(payload.users) ? payload.users : []
     users.value = list.map(mapUserForUi)
+
+    if (silent) {
+      const currentPendingCount = pendingCount.value
+      if (currentPendingCount > previousPendingCount) {
+        const diff = currentPendingCount - previousPendingCount
+        autoRefreshNotice.value = `${diff} new pending student account${diff > 1 ? 's' : ''} detected.`
+        if (autoRefreshNoticeTimer) {
+          clearTimeout(autoRefreshNoticeTimer)
+        }
+        autoRefreshNoticeTimer = setTimeout(() => {
+          autoRefreshNotice.value = ''
+        }, 3500)
+      }
+    }
   } catch (error) {
-    loadError.value = error.message || 'Failed to load users.'
+    if (!silent) {
+      loadError.value = error.message || 'Failed to load users.'
+    }
   } finally {
-    isLoadingUsers.value = false
+    if (!silent) {
+      isLoadingUsers.value = false
+    }
+  }
+}
+
+function startAutoRefreshUsers() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+  }
+
+  autoRefreshTimer = setInterval(() => {
+    if (document.hidden) {
+      return
+    }
+    fetchUsers({ silent: true })
+  }, AUTO_REFRESH_MS)
+}
+
+function stopAutoRefreshUsers() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+  }
+
+  if (autoRefreshNoticeTimer) {
+    clearTimeout(autoRefreshNoticeTimer)
+    autoRefreshNoticeTimer = null
   }
 }
 
@@ -725,13 +800,21 @@ function buildUserPayload(includePassword) {
   return payload
 }
 
-onMounted(fetchUsers)
+onMounted(async () => {
+  await fetchUsers()
+  startAutoRefreshUsers()
+})
+
+onUnmounted(() => {
+  stopAutoRefreshUsers()
+})
 
 /* ── Add / Edit User ── */
 const showUserModal   = ref(false)
 const editingUser     = ref(null)
 const formError       = ref('')
 const showRegisterConfirm = ref(false)
+const showApproveAllConfirm = ref(false)
 const isSavingUser    = ref(false)
 const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', password: '', confirmPassword: '' })
 const userForm  = ref(emptyForm())
@@ -830,6 +913,82 @@ async function approveAllPending() {
   } finally {
     isBulkApproving.value = false
   }
+}
+
+function promptApproveAll() {
+  if (pendingCount.value === 0 || isBulkApproving.value) {
+    return
+  }
+  showApproveAllConfirm.value = true
+}
+
+async function confirmApproveAllPending() {
+  showApproveAllConfirm.value = false
+  await approveAllPending()
+}
+
+function printUsersTable() {
+  const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const rows = filteredUsers.value
+    .map((user) => {
+      const userInfo = `${esc(user.name)}${user.department ? `<br><span class="dept">${esc(user.department)}</span>` : ''}`
+      return `
+        <tr>
+          <td>${userInfo}</td>
+          <td>${esc(user.email)}</td>
+          <td>${esc(user.role)}</td>
+          <td>${esc(user.status)}</td>
+          <td>${esc(user.dateAdded)}</td>
+        </tr>`
+    })
+    .join('')
+
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  const viewLabel = activeView.value === 'archived' ? 'Archived Users' : 'All Users'
+  const roleLabel = roleFilter.value || 'All Roles'
+  const searchLabel = (searchQuery.value || '').trim() || 'None'
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Manage Users - ${esc(viewLabel)}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,sans-serif;padding:20px;font-size:12px;color:#1a1a2e;}
+    h2{font-size:18px;font-weight:700;margin-bottom:6px;color:#1b4332;}
+    .meta{font-size:11px;color:#4b5563;margin-bottom:12px;line-height:1.5;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th{background:#1b4332;color:#fff;padding:8px 6px;text-align:left;font-size:11px;font-weight:600;border:1px solid #0f2d21;}
+    td{border:1px solid #dfe5e2;padding:8px 6px;vertical-align:top;font-size:11px;word-wrap:break-word;}
+    .dept{color:#6b7280;font-size:10px;}
+    .empty{padding:12px;text-align:center;color:#6b7280;border:1px solid #dfe5e2;}
+    @media print { body{padding:8px;} }
+  </style>
+</head>
+<body>
+  <h2>Manage Users</h2>
+  <p class="meta">View: ${esc(viewLabel)} | Role Filter: ${esc(roleLabel)} | Search: ${esc(searchLabel)}<br>Printed on ${esc(today)}</p>
+  ${rows ? `<table>
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Date Added</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>` : '<div class="empty">No users found for current filters.</div>'}
+  <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<' + '/script>
+</body>
+</html>`
+
+  const printWindow = window.open('', '_blank', 'width=1000,height=700')
+  if (!printWindow) return
+  printWindow.document.write(html)
+  printWindow.document.close()
 }
 
 async function confirmSaveUser() {
@@ -1116,6 +1275,25 @@ function confirmRestoreUser() {
   opacity: 0.65;
   cursor: not-allowed;
 }
+.um-print-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #fff;
+  color: #14532d;
+  border: 1.5px solid #d1e7db;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+}
+.um-print-btn:hover {
+  background: #eff8f3;
+  border-color: #b9dac8;
+}
 .um-search-wrap {
   position: relative;
   display: flex;
@@ -1214,12 +1392,24 @@ function confirmRestoreUser() {
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-  overflow: hidden;
+  max-height: 62vh;
+  overflow-x: auto;
+  overflow-y: auto;
 }
 .um-error-banner {
   background: #fee2e2;
   border: 1px solid #fecaca;
   color: #b91c1c;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+.um-info-banner {
+  background: #e8f5ee;
+  border: 1px solid #b7dfca;
+  color: #1b7a4a;
   padding: 12px 16px;
   border-radius: 12px;
   font-size: 0.9rem;
@@ -1240,6 +1430,10 @@ function confirmRestoreUser() {
   border-bottom: 1.5px solid #efefef;
 }
 .um-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f7f8fa;
   text-align: left;
   font-size: 0.72rem;
   font-weight: 700;
