@@ -1,6 +1,7 @@
 import { getUser, isLoggedIn } from '@/auth.js'
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
 import LoginView from '@/views/LoginView.vue'
+import AddScheduleView from '@/views/admin/AddScheduleView.vue'
 import AdminDashboardView from '@/views/admin/AdminDashboardView.vue'
 import AdminProfileView from '@/views/admin/AdminProfileView.vue'
 import EventsView from '@/views/admin/EventsView.vue'
@@ -9,6 +10,7 @@ import ScheduleView from '@/views/admin/ScheduleView.vue'
 import SettingsView from '@/views/admin/SettingsView.vue'
 import TeacherAssignmentsView from '@/views/admin/TeacherAssignmentsView.vue'
 import UserManagementView from '@/views/admin/UserManagementView.vue'
+import ViewScheduleView from '@/views/admin/ViewScheduleView.vue'
 import StudentConsultationsView from '@/views/student/StudentConsultationsView.vue'
 import StudentDashboardView from '@/views/student/StudentDashboardView.vue'
 import StudentEventsView from '@/views/student/StudentEventsView.vue'
@@ -31,6 +33,8 @@ const router = createRouter({
     { path: '/forgot-password', name: 'forgot-password', component: ForgotPasswordView },
     { path: '/admin/dashboard', name: 'admin-dashboard', component: AdminDashboardView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/schedule', name: 'admin-schedule', component: ScheduleView, meta: { requiresAuth: true, role: 'admin' } },
+    { path: '/admin/schedule/view', name: 'admin-schedule-view', component: ViewScheduleView, meta: { requiresAuth: true, role: 'admin' } },
+    { path: '/admin/schedule/add', name: 'admin-schedule-add', component: AddScheduleView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/schedule/new-week', name: 'new-schedule-week', component: NewScheduleWeekView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/teachers', name: 'admin-teachers', component: TeacherAssignmentsView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/events', name: 'admin-events', component: EventsView, meta: { requiresAuth: true, role: 'admin' } },
