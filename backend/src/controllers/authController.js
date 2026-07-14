@@ -99,6 +99,13 @@ async function register(req, res) {
       return res.status(400).json({ message: "Missing required registration fields." });
     }
 
+    if (!normalizedEmail.endsWith('@phinmaed.com')) {
+      return res.status(400).json({ message: "Sign up is only allowed with a @phinmaed.com email address." });
+    }
+
+    if (!/^[0-9]{2}-[0-9]{4}-[0-9]{6}$/.test(normalizedStudentId)) {
+      return res.status(400).json({ message: "Student ID must be in the format 00-0000-000000 and only contain numbers and dashes." });
+    }
 
     if (!isStrongPassword(normalizedPassword)) {
       return res.status(400).json({
@@ -345,6 +352,116 @@ async function requestPasswordOtp(req, res) {
   }
 }
 
+async function requestPasswordReset(req, res) {
+  try {
+    const { email } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ message: "Email is required." });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail }).select("+email +passwordHash +passwordOtpHash +passwordOtpExpiresAt +passwordOtpLastSentAt +passwordOtpAttempts +account_status");
+
+    if (!user) {
+      return res.status(404).json({ message: "No account found with that email." });
+    }
+
+    if (user.account_status !== "Active") {
+      return res.status(403).json({ message: getAccountStatusMessage(user.account_status) });
+    }
+
+    const now = new Date();
+    if (user.passwordOtpLastSentAt && now - user.passwordOtpLastSentAt < PASSWORD_OTP_RESEND_DELAY_MS) {
+      return res.status(429).json({ message: "Please wait one minute before requesting another code." });
+    }
+
+    const code = crypto.randomInt(100000, 1000000).toString();
+    user.passwordOtpHash = hashOtp(code);
+    user.passwordOtpExpiresAt = new Date(now.getTime() + PASSWORD_OTP_LIFETIME_MS);
+    user.passwordOtpLastSentAt = now;
+    user.passwordOtpAttempts = 0;
+    await user.save();
+
+    try {
+      await sendPasswordOtpEmail({ to: user.email, code });
+    } catch (mailError) {
+      clearPasswordOtp(user);
+      await user.save();
+      console.error("Password reset OTP email failed:", mailError.message);
+      if (mailError.code === "MAIL_NOT_CONFIGURED") {
+        return res.status(503).json({ message: mailError.message });
+      }
+      return res.status(503).json({ message: "Unable to send the OTP email. Please try again later." });
+    }
+
+    return res.status(200).json({ message: `OTP sent to ${maskEmail(user.email)}.` });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to send password reset OTP.", error: error.message });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const { email, otp, newPassword } = req.body || {};
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "Email, OTP, and new password are required." });
+    }
+
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({
+        message: "New password must be at least 8 characters and include uppercase, lowercase, number, and special character.",
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail }).select("+passwordHash +passwordOtpHash +passwordOtpExpiresAt +passwordOtpAttempts");
+
+    if (!user) {
+      return res.status(404).json({ message: "No account found with that email." });
+    }
+
+    if (!/^[0-9]{6}$/.test(String(otp)) || !user.passwordOtpHash || !user.passwordOtpExpiresAt) {
+      return res.status(400).json({ message: "Request a new OTP and enter the 6-digit code." });
+    }
+
+    if (user.passwordOtpExpiresAt < new Date()) {
+      clearPasswordOtp(user);
+      await user.save();
+      return res.status(400).json({ message: "This OTP has expired. Request a new one." });
+    }
+
+    const enteredOtpHash = hashOtp(String(otp));
+    const otpMatches = crypto.timingSafeEqual(
+      Buffer.from(enteredOtpHash, "hex"),
+      Buffer.from(user.passwordOtpHash, "hex")
+    );
+
+    if (!otpMatches) {
+      user.passwordOtpAttempts += 1;
+      if (user.passwordOtpAttempts >= PASSWORD_OTP_MAX_ATTEMPTS) {
+        clearPasswordOtp(user);
+        await user.save();
+        return res.status(429).json({ message: "Too many incorrect codes. Request a new OTP." });
+      }
+      await user.save();
+      return res.status(401).json({ message: "The OTP is incorrect." });
+    }
+
+    const sameAsCurrent = await bcrypt.compare(String(newPassword), user.passwordHash);
+    if (sameAsCurrent) {
+      return res.status(400).json({ message: "New password must be different from your current password." });
+    }
+
+    user.passwordHash = await bcrypt.hash(String(newPassword), 10);
+    clearPasswordOtp(user);
+    await user.save();
+
+    return res.status(200).json({ message: "Password reset successfully." });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to reset password.", error: error.message });
+  }
+}
+
 async function changePassword(req, res) {
   try {
     const { currentPassword, newPassword, otp } = req.body || {};
@@ -417,4 +534,6 @@ module.exports = {
   updateMe,
   requestPasswordOtp,
   changePassword,
+  requestPasswordReset,
+  resetPassword,
 };

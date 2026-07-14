@@ -13,7 +13,10 @@
           </svg>
         </div>
         <h2 class="step-title">Step 1: Verify Your Email</h2>
-        <p class="step-desc">Enter the email address linked to your account. We'll send a 4-digit verification code.</p>
+        <p class="step-desc">Enter the email address linked to your account. We'll send a 6-digit verification code.</p>
+
+        <div v-if="error" class="error-msg">{{ error }}</div>
+        <div v-if="message" class="success-msg">{{ message }}</div>
 
         <form class="form" @submit.prevent="goToStep2">
           <div class="input-wrapper">
@@ -26,7 +29,7 @@
               required
             />
           </div>
-          <button type="submit" class="submit-btn">CONTINUE</button>
+          <button type="submit" class="submit-btn" :disabled="isSending">{{ isSending ? 'SENDING...' : 'CONTINUE' }}</button>
           <RouterLink to="/" class="cancel-link">Cancel</RouterLink>
         </form>
       </template>
@@ -42,7 +45,10 @@
           </svg>
         </div>
         <h2 class="step-title">Step 2: OTP</h2>
-        <p class="step-desc">Enter the email address linked to your account. We'll send a 4-digit verification code.</p>
+        <p class="step-desc">Enter the 6-digit verification code sent to your email.</p>
+
+        <div v-if="error" class="error-msg">{{ error }}</div>
+        <div v-if="message" class="success-msg">{{ message }}</div>
 
         <form class="form" @submit.prevent="goToStep3">
           <div class="pin-row">
@@ -62,6 +68,7 @@
             />
           </div>
           <button type="submit" class="submit-btn">CONTINUE</button>
+          <button type="button" class="plain-btn" @click="goToStep2" :disabled="isSending">RESEND CODE</button>
           <RouterLink to="/" class="cancel-link">Cancel</RouterLink>
         </form>
       </template>
@@ -132,7 +139,9 @@
             <span>{{ passwordsMatch ? 'Passwords match' : 'Passwords do not match' }}</span>
           </div>
 
-          <button type="submit" class="submit-btn" :disabled="!canReset">RESET PASSWORD</button>
+          <div v-if="error" class="error-msg">{{ error }}</div>
+          <div v-if="message" class="success-msg">{{ message }}</div>
+          <button type="submit" class="submit-btn" :disabled="isResetting || !canReset">{{ isResetting ? 'RESETTING...' : 'RESET PASSWORD' }}</button>
           <RouterLink to="/" class="cancel-link">Cancel</RouterLink>
         </form>
       </template>
@@ -142,7 +151,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, defineComponent, h, nextTick } from 'vue'
+import { requestPasswordReset, resetPassword } from '@/auth.js'
+import { computed, defineComponent, h, nextTick, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 /* ── Eye icon ── */
@@ -167,6 +177,10 @@ const EyeIcon = defineComponent({
 
 const step = ref(1)
 const email = ref('')
+const error = ref('')
+const message = ref('')
+const isSending = ref(false)
+const isResetting = ref(false)
 
 /* ── PIN ── */
 const pinDigits = reactive(['', '', '', '', '', ''])
@@ -174,7 +188,6 @@ const pinRefs = reactive([])
 const otp = computed(() => pinDigits.join(''))
 
 function onPinInput(i) {
-  // Allow only numeric
   pinDigits[i] = pinDigits[i].replace(/\D/g, '').slice(0, 1)
   if (pinDigits[i] && i < 5) {
     nextTick(() => pinRefs[i + 1]?.focus())
@@ -197,26 +210,70 @@ const showNew = ref(false)
 const showConfirm = ref(false)
 
 const requirements = [
-  { label: 'Has at least 8 characters',           test: () => newPassword.value.length >= 8 },
+  { label: 'Has at least 8 characters', test: () => newPassword.value.length >= 8 },
   { label: 'Includes at least one uppercase letter', test: () => /[A-Z]/.test(newPassword.value) },
   { label: 'Includes at least one lowercase letter', test: () => /[a-z]/.test(newPassword.value) },
-  { label: 'Includes at least one number',          test: () => /\d/.test(newPassword.value) },
+  { label: 'Includes at least one number', test: () => /[0-9]/.test(newPassword.value) },
   { label: 'Includes at least one special character', test: () => /[^A-Za-z0-9]/.test(newPassword.value) }
 ]
 
 const passwordsMatch = computed(() => newPassword.value === confirmPassword.value && newPassword.value !== '')
 const allRequirementsMet = computed(() => requirements.every(r => r.test()))
-const canReset = computed(() => allRequirementsMet.value && passwordsMatch.value)
+const canReset = computed(() => allRequirementsMet.value && passwordsMatch.value && otp.value.length === 6)
 const router = useRouter()
 
-function goToStep2() { step.value = 2 }
+async function goToStep2() {
+  error.value = ''
+  message.value = ''
+
+  if (!email.value.trim()) {
+    error.value = 'Please enter your registered email address.'
+    return
+  }
+
+  isSending.value = true
+  try {
+    const response = await requestPasswordReset(email.value.trim())
+    message.value = response.message
+    step.value = 2
+  } catch (err) {
+    error.value = err.message || 'Unable to send OTP. Please try again.'
+  } finally {
+    isSending.value = false
+  }
+}
+
 function goToStep3() {
-  if (otp.value.length < 6) return
+  error.value = ''
+  if (otp.value.length < 6) {
+    error.value = 'Enter the full 6-digit code.'
+    return
+  }
   step.value = 3
 }
-function handleReset() {
-  if (canReset.value) {
-    router.push('/')
+
+async function handleReset() {
+  error.value = ''
+  message.value = ''
+
+  if (!canReset.value) {
+    error.value = 'Please complete the form and enter the 6-digit code.'
+    return
+  }
+
+  isResetting.value = true
+  try {
+    const response = await resetPassword({
+      email: email.value.trim(),
+      otp: otp.value,
+      newPassword: newPassword.value,
+    })
+    message.value = response.message || 'Password has been reset successfully.'
+    setTimeout(() => router.push('/'), 800)
+  } catch (err) {
+    error.value = err.message || 'Unable to reset password. Please try again.'
+  } finally {
+    isResetting.value = false
   }
 }
 </script>
@@ -310,6 +367,19 @@ function handleReset() {
   align-items: center;
   color: #888;
   pointer-events: none;
+}
+
+.error-msg {
+  font-size: 0.86rem;
+  color: #e63946;
+  text-align: center;
+  margin-top: -4px;
+}
+.success-msg {
+  font-size: 0.86rem;
+  color: #1b7a4a;
+  text-align: center;
+  margin-top: -4px;
 }
 .icon-btn {
   position: absolute;

@@ -55,6 +55,20 @@ export async function register(signUpPayload) {
   return payload.user.role
 }
 
+export async function requestPasswordReset(email) {
+  return request('/auth/request-password-reset', {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  })
+}
+
+export async function resetPassword({ email, otp, newPassword }) {
+  return request('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp, newPassword })
+  })
+}
+
 export function logout() {
   clearSession()
 }

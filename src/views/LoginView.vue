@@ -51,13 +51,13 @@
 
         <!-- Student ID -->
         <div class="input-wrapper">
-          <input v-model="signUp.studentId" type="text" placeholder="Student ID" class="input-field" />
+          <input v-model="signUp.studentId" type="text" placeholder="00-0000-000000" class="input-field" autocomplete="off" @input="onStudentIdInput" />
           <span class="input-icon"><IconId /></span>
         </div>
 
         <!-- Email -->
         <div class="input-wrapper">
-          <input v-model="signUp.email" type="email" placeholder="Enter your email" class="input-field" autocomplete="email" />
+          <input v-model="signUp.email" type="email" placeholder="cit.scheduler.au@phinmaed.com" class="input-field" autocomplete="email" />
           <span class="input-icon"><IconEmail /></span>
         </div>
 
@@ -270,6 +270,16 @@ async function handleSignUp() {
     return
   }
 
+  if (!/^[0-9]{2}-[0-9]{4}-[0-9]{6}$/.test(studentId)) {
+    signUpError.value = 'Student ID must use the format 00-0000-000000 and only include numbers and dashes.'
+    return
+  }
+
+  if (!email.endsWith('@phinmaed.com')) {
+    signUpError.value = 'Sign up is only allowed with a @phinmaed.com email address.'
+    return
+  }
+
   if (!STRONG_PASSWORD_REGEX.test(signUp.password)) {
     signUpError.value = 'Password must be 8+ chars with uppercase, lowercase, number, and special character.'
     return
@@ -304,6 +314,14 @@ async function handleSignUp() {
       signUpError.value = 'Sign up failed. ' + JSON.stringify(error)
     }
   }
+}
+
+function onStudentIdInput(event) {
+  const digits = event.target.value.replace(/\D/g, '').slice(0, 12)
+  const formatted = digits
+    .replace(/^(\d{2})(\d)/, '$1-$2')
+    .replace(/^(\d{2}-\d{4})(\d)/, '$1-$2')
+  signUp.studentId = formatted
 }
 </script>
 
