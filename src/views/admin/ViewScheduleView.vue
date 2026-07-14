@@ -120,12 +120,22 @@
         <!-- Step 2: Room -->
         <div v-else-if="!selectedRoom" class="step-container">
           <p class="step-hint">Select a room to view its weekly schedule</p>
-          <div class="room-grid">
-            <button v-for="room in currentFloorRooms" :key="room" class="room-card" :class="{ 'room-card-comlab': room.toLowerCase().includes('comlab') }" @click="selectedRoom = room">
+          <div class="teacher-search-wrap room-search-wrap">
+            <svg class="teacher-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input v-model.trim="roomSearchQuery" type="text" class="teacher-search-input" placeholder="Search room..." />
+          </div>
+          <div v-if="filteredCurrentFloorRooms.length" class="room-grid">
+            <button v-for="room in filteredCurrentFloorRooms" :key="room" class="room-card" :class="{ 'room-card-comlab': room.toLowerCase().includes('comlab') }" @click="selectedRoom = room">
               <svg class="room-card-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
               <div class="room-card-number">{{ room }}</div>
               <div class="room-card-floor">{{ selectedFloor }}</div>
             </button>
+          </div>
+          <div v-else class="empty-state small-empty-state">
+            <p>No rooms found for <strong>“{{ roomSearchQuery }}”</strong>.</p>
           </div>
         </div>
         <!-- Step 3: Room grid -->
@@ -191,11 +201,22 @@
           </div>
           <template v-else>
             <p class="step-hint">Select a teacher to view their weekly schedule</p>
-            <div class="teacher-grid">
-              <button v-for="t in teacherList" :key="t" class="teacher-card" @click="selectedTeacher = t">
-                <div class="teacher-avatar">{{ t.split(' ').map(w => w[0]).slice(0,2).join('') }}</div>
-                <div class="teacher-name">Prof. {{ t }}</div>
+            <div class="teacher-search-wrap">
+              <svg class="teacher-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="7"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input v-model.trim="teacherSearchQuery" type="text" class="teacher-search-input" placeholder="Search teacher name..." />
+            </div>
+            <div v-if="filteredTeacherList.length" class="teacher-grid">
+              <button v-for="teacher in filteredTeacherList" :key="teacher.name" class="teacher-card" @click="selectedTeacher = teacher.name">
+                <img v-if="teacher.avatar" :src="teacher.avatar" :alt="teacher.name" class="teacher-avatar-img" />
+                <div v-else class="teacher-avatar">{{ getTeacherInitials(teacher.name) }}</div>
+                <div class="teacher-name">Prof. {{ teacher.name }}</div>
               </button>
+            </div>
+            <div v-else class="empty-state small-empty-state">
+              <p>No teachers found for <strong>“{{ teacherSearchQuery }}”</strong>.</p>
             </div>
           </template>
         </div>
@@ -366,18 +387,42 @@ const floors = [
 
 const selectedFloor = ref(null)
 const selectedRoom  = ref(null)
+const roomSearchQuery = ref('')
 
 /* ── View Mode ── */
 const viewMode         = ref(null)   // null | 'room' | 'teacher'
 const selectedTeacher  = ref(null)
 const teacherList      = ref([])
+const teacherSearchQuery = ref('')
 const loadingTeachers  = ref(false)
+
+const filteredTeacherList = computed(() => {
+  const query = teacherSearchQuery.value.trim().toLowerCase()
+  if (!query) return teacherList.value
+  return teacherList.value.filter(teacher => teacher.name.toLowerCase().includes(query))
+})
 
 function resetAll() {
   viewMode.value        = null
   selectedFloor.value   = null
   selectedRoom.value    = null
   selectedTeacher.value = null
+}
+
+function getTeacherInitials(name = '') {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase() || 'T'
+}
+
+function getTeacherAvatar(name = '', avatar = '') {
+  if (avatar) return avatar
+  const safeName = encodeURIComponent(name || 'Teacher')
+  return `https://ui-avatars.com/api/?name=${safeName}&background=DDECE5&color=1B4332`
 }
 
 async function loadTeachers() {
@@ -388,9 +433,15 @@ async function loadTeachers() {
     if (res.users && Array.isArray(res.users)) {
       teacherList.value = res.users
         .filter(u => u.role === 'Teacher')
-        .map(u => `${u.firstName} ${u.lastName}`.trim())
-        .filter(n => n.length > 0)
-        .sort((a, b) => a.localeCompare(b))
+        .map(u => {
+          const name = `${u.firstName} ${u.lastName}`.trim()
+          return {
+            name,
+            avatar: getTeacherAvatar(name, u.avatar || ''),
+          }
+        })
+        .filter(teacher => teacher.name.length > 0)
+        .sort((a, b) => a.name.localeCompare(b.name))
     }
   } catch (_) {}
   loadingTeachers.value = false
@@ -498,6 +549,12 @@ const teacherHasNoEntries = computed(() => {
 const currentFloorRooms = computed(
   () => floors.find(f => f.label === selectedFloor.value)?.rooms ?? []
 )
+
+const filteredCurrentFloorRooms = computed(() => {
+  const query = roomSearchQuery.value.trim().toLowerCase()
+  if (!query) return currentFloorRooms.value
+  return currentFloorRooms.value.filter(room => room.toLowerCase().includes(query))
+})
 
 function formatAddedAt(dateValue) {
   const date = new Date(dateValue)
@@ -886,39 +943,71 @@ function printSchedule() {
 .mode-grid { display: flex; gap: 24px; flex-wrap: wrap; }
 .mode-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; width: 220px; padding: 32px 24px;
-  background: #fff; border: 2px solid #e0e0e0; border-radius: 16px;
+  gap: 12px; width: 260px; min-height: 220px; padding: 36px 28px;
+  background: #fff; border: 2px solid #e0e0e0; border-radius: 18px;
   cursor: pointer; transition: all 0.2s; font-family: inherit;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .mode-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(64,145,108,0.15); }
 .mode-icon-wrap {
-  width: 60px; height: 60px; border-radius: 50%;
+  width: 72px; height: 72px; border-radius: 50%;
   background: linear-gradient(135deg, #e8f5e9, #d4edda);
   display: flex; align-items: center; justify-content: center;
   color: #1b4332;
 }
-.mode-label { font-size: 1.05rem; font-weight: 700; color: #1b4332; }
-.mode-desc { font-size: 0.78rem; color: #888; text-align: center; line-height: 1.4; }
+.mode-label { font-size: 1.1rem; font-weight: 700; color: #1b4332; }
+.mode-desc { font-size: 0.85rem; color: #888; text-align: center; line-height: 1.4; }
 
 /* ── Teacher grid ── */
-.teacher-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+.teacher-search-wrap {
+  display: flex; align-items: center; gap: 10px;
+  width: min(420px, 100%);
+  padding: 12px 14px;
+  border: 1.5px solid #dce8e1;
+  border-radius: 999px;
+  background: #f8fcfa;
+  margin-bottom: 16px;
+}
+.teacher-search-icon { color: #40916c; flex-shrink: 0; }
+.teacher-search-input {
+  border: none; outline: none; background: transparent;
+  width: 100%; font-size: 0.95rem; color: #1b4332; font-family: inherit;
+}
+.teacher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+  max-width: 1200px;
+  width: 100%;
+}
 .teacher-card {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  width: 120px; padding: 16px 10px;
-  background: #fff; border: 1.5px solid #e0e0e0; border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px;
+  min-height: 230px; padding: 24px 18px;
+  background: #fff; border: 1.5px solid #e0e0e0; border-radius: 16px;
   cursor: pointer; transition: all 0.18s; font-family: inherit;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
 .teacher-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); box-shadow: 0 4px 14px rgba(64,145,108,0.14); }
+.teacher-avatar-img {
+  width: 88px; height: 88px; border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #dfeee6;
+  box-shadow: 0 4px 12px rgba(27, 67, 50, 0.12);
+}
 .teacher-avatar {
-  width: 44px; height: 44px; border-radius: 50%;
+  width: 88px; height: 88px; border-radius: 50%;
   background: linear-gradient(135deg, #1b4332, #40916c);
-  color: #fff; font-size: 0.9rem; font-weight: 700;
+  color: #fff; font-size: 1.15rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   letter-spacing: 0.03em;
 }
-.teacher-name { font-size: 0.75rem; font-weight: 600; color: #1b4332; text-align: center; line-height: 1.3; }
+.teacher-name { font-size: 0.95rem; font-weight: 600; color: #1b4332; text-align: center; line-height: 1.3; }
+.small-empty-state {
+  padding: 18px 20px; border-radius: 12px;
+  background: #f8fcfa; border: 1px dashed #cfe3d8;
+  color: #5d7a6d;
+}
 
 /* ── Step containers ── */
 .step-container {
@@ -944,11 +1033,12 @@ function printSchedule() {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 180px;
-  padding: 28px 20px;
+  width: 220px;
+  min-height: 190px;
+  padding: 32px 24px;
   background: #fff;
   border: 2px solid #e0e0e0;
-  border-radius: 16px;
+  border-radius: 18px;
   cursor: pointer;
   transition: all 0.2s;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -986,19 +1076,20 @@ function printSchedule() {
 .room-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 14px;
 }
 .room-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  width: 130px;
-  padding: 18px 12px;
+  gap: 8px;
+  width: 155px;
+  min-height: 140px;
+  padding: 20px 14px;
   background: #fff;
   border: 1.5px solid #e0e0e0;
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
   transition: all 0.18s;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);

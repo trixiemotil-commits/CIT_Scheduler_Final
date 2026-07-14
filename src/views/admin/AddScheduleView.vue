@@ -109,11 +109,22 @@
         </div>
         <template v-else>
           <p class="step-hint">Select a teacher to manage their schedule</p>
-          <div class="teacher-grid">
-            <button v-for="t in addTeacherList" :key="t" class="teacher-card" @click="selectedTeacher = t">
-              <div class="teacher-avatar">{{ t.split(' ').map(w => w[0]).slice(0,2).join('') }}</div>
-              <div class="teacher-name">Prof. {{ t }}</div>
+          <div class="teacher-search-wrap">
+            <svg class="teacher-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input v-model.trim="addTeacherSearchQuery" type="text" class="teacher-search-input" placeholder="Search teacher name..." />
+          </div>
+          <div v-if="filteredAddTeacherList.length" class="teacher-grid">
+            <button v-for="teacher in filteredAddTeacherList" :key="teacher.name" class="teacher-card" @click="selectedTeacher = teacher.name">
+              <img v-if="teacher.avatar" :src="teacher.avatar" :alt="teacher.name" class="teacher-avatar-img" />
+              <div v-else class="teacher-avatar">{{ getTeacherInitials(teacher.name) }}</div>
+              <div class="teacher-name">Prof. {{ teacher.name }}</div>
             </button>
+          </div>
+          <div v-else class="empty-state small-empty-state">
+            <p>No teachers found for <strong>“{{ addTeacherSearchQuery }}”</strong>.</p>
           </div>
         </template>
       </div>
@@ -133,12 +144,22 @@
       <!-- ── By Room: pick room ── -->
       <div v-else-if="addMode === 'room' && contextFloor && !contextRoom" class="step-container">
         <p class="step-hint">Select a room to assign schedules</p>
-        <div class="room-grid">
-          <button v-for="room in contextFloorRooms" :key="room" class="room-card" :class="{ 'room-card-comlab': room.toLowerCase().includes('comlab') }" @click="contextRoom = room">
+        <div class="teacher-search-wrap room-search-wrap">
+          <svg class="teacher-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input v-model.trim="roomSearchQuery" type="text" class="teacher-search-input" placeholder="Search room..." />
+        </div>
+        <div v-if="filteredContextFloorRooms.length" class="room-grid">
+          <button v-for="room in filteredContextFloorRooms" :key="room" class="room-card" :class="{ 'room-card-comlab': room.toLowerCase().includes('comlab') }" @click="contextRoom = room">
             <svg class="room-card-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
             <div class="room-card-number">{{ room }}</div>
             <div class="room-card-floor">{{ contextFloor }}</div>
           </button>
+        </div>
+        <div v-else class="empty-state small-empty-state">
+          <p>No rooms found for <strong>“{{ roomSearchQuery }}”</strong>.</p>
         </div>
       </div>
 
@@ -857,7 +878,37 @@ const contextFloorRooms = computed(
 )
 
 const addTeacherList     = ref([])
+const addTeacherSearchQuery = ref('')
+const roomSearchQuery = ref('')
 const loadingAddTeachers = ref(false)
+
+const filteredAddTeacherList = computed(() => {
+  const query = addTeacherSearchQuery.value.trim().toLowerCase()
+  if (!query) return addTeacherList.value
+  return addTeacherList.value.filter(teacher => teacher.name.toLowerCase().includes(query))
+})
+
+const filteredContextFloorRooms = computed(() => {
+  const query = roomSearchQuery.value.trim().toLowerCase()
+  if (!query) return contextFloorRooms.value
+  return contextFloorRooms.value.filter(room => room.toLowerCase().includes(query))
+})
+
+function getTeacherInitials(name = '') {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase() || 'T'
+}
+
+function getTeacherAvatar(name = '', avatar = '') {
+  if (avatar) return avatar
+  const safeName = encodeURIComponent(name || 'Teacher')
+  return `https://ui-avatars.com/api/?name=${safeName}&background=DDECE5&color=1B4332`
+}
 
 async function loadAddTeachers() {
   if (addTeacherList.value.length) return
@@ -867,9 +918,15 @@ async function loadAddTeachers() {
     if (res.users && Array.isArray(res.users)) {
       addTeacherList.value = res.users
         .filter(u => u.role === 'Teacher')
-        .map(u => `${u.firstName} ${u.lastName}`.trim())
-        .filter(n => n.length > 0)
-        .sort((a, b) => a.localeCompare(b))
+        .map(u => {
+          const name = `${u.firstName} ${u.lastName}`.trim()
+          return {
+            name,
+            avatar: getTeacherAvatar(name, u.avatar || ''),
+          }
+        })
+        .filter(teacher => teacher.name.length > 0)
+        .sort((a, b) => a.name.localeCompare(b.name))
     }
   } catch (_) {}
   loadingAddTeachers.value = false
@@ -1824,46 +1881,62 @@ onMounted(async () => {
 .mode-grid { display: flex; gap: 24px; flex-wrap: wrap; }
 .mode-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; width: 220px; padding: 32px 24px;
-  background: #fff; border: 2px solid #e0e0e0; border-radius: 16px;
+  gap: 12px; width: 260px; min-height: 220px; padding: 36px 28px;
+  background: #fff; border: 2px solid #e0e0e0; border-radius: 18px;
   cursor: pointer; transition: all 0.2s; font-family: inherit;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .mode-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(64,145,108,0.15); }
 .mode-icon-wrap {
-  width: 60px; height: 60px; border-radius: 50%;
+  width: 72px; height: 72px; border-radius: 50%;
   background: linear-gradient(135deg, #e8f5e9, #d4edda);
   display: flex; align-items: center; justify-content: center; color: #1b4332;
 }
-.mode-label { font-size: 1.05rem; font-weight: 700; color: #1b4332; }
-.mode-desc  { font-size: 0.78rem; color: #888; text-align: center; line-height: 1.4; }
+.mode-label { font-size: 1.1rem; font-weight: 700; color: #1b4332; }
+.mode-desc  { font-size: 0.85rem; color: #888; text-align: center; line-height: 1.4; }
 
 .step-container { display: flex; flex-direction: column; gap: 16px; }
 .step-hint { font-size: 0.9rem; color: #888; margin: 0; }
 
+.teacher-search-wrap {
+  display: flex; align-items: center; gap: 10px;
+  width: min(420px, 100%);
+  padding: 12px 14px;
+  border: 1.5px solid #dce8e1;
+  border-radius: 999px;
+  background: #f8fcfa;
+  margin-bottom: 16px;
+}
+.teacher-search-icon { color: #40916c; flex-shrink: 0; }
+.teacher-search-input {
+  border: none; outline: none; background: transparent;
+  width: 100%; font-size: 0.95rem; color: #1b4332; font-family: inherit;
+}
+.room-search-wrap { margin-bottom: 14px; }
+
 .floor-grid { display: flex; gap: 20px; flex-wrap: wrap; }
 .floor-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-  width: 160px; padding: 24px 16px;
-  background: #fff; border: 2px solid #e0e0e0; border-radius: 14px;
+  width: 220px; min-height: 190px; padding: 32px 24px;
+  background: #fff; border: 2px solid #e0e0e0; border-radius: 18px;
   cursor: pointer; transition: all 0.2s; font-family: inherit;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .floor-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); }
 .floor-number {
-  width: 46px; height: 46px; border-radius: 50%;
+  width: 54px; height: 54px; border-radius: 50%;
   background: linear-gradient(135deg, #1b4332, #40916c); color: #fff;
-  font-size: 1.3rem; font-weight: 700;
+  font-size: 1.4rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
-.floor-label { font-size: 0.9rem; font-weight: 600; color: #1b4332; }
-.floor-room-count { font-size: 0.72rem; color: #888; }
+.floor-label { font-size: 1rem; font-weight: 600; color: #1b4332; }
+.floor-room-count { font-size: 0.78rem; color: #888; }
 
-.room-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+.room-grid { display: flex; flex-wrap: wrap; gap: 14px; }
 .room-card {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  width: 120px; padding: 16px 10px;
-  background: #fff; border: 1.5px solid #e0e0e0; border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  width: 155px; min-height: 140px; padding: 20px 14px;
+  background: #fff; border: 1.5px solid #e0e0e0; border-radius: 14px;
   cursor: pointer; transition: all 0.18s; font-family: inherit;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
@@ -1872,25 +1945,32 @@ onMounted(async () => {
 .room-card-comlab:hover { border-color: #4a90d9; background: #e8f4ff; }
 .room-card-icon { color: #1b4332; opacity: 0.5; }
 .room-card-comlab .room-card-icon { color: #4a90d9; }
-.room-card-number { font-size: 0.9rem; font-weight: 700; color: #1b4332; text-align: center; }
-.room-card-floor { font-size: 0.68rem; color: #888; }
+.room-card-number { font-size: 1rem; font-weight: 700; color: #1b4332; text-align: center; }
+.room-card-floor { font-size: 0.72rem; color: #888; }
 
-.teacher-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+.teacher-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; max-width: 1200px; width: 100%; }
 .teacher-card {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  width: 120px; padding: 16px 10px;
-  background: #fff; border: 1.5px solid #e0e0e0; border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  min-height: 230px; padding: 24px 18px;
+  background: #fff; border: 1.5px solid #e0e0e0; border-radius: 16px;
   cursor: pointer; transition: all 0.18s; font-family: inherit;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
 .teacher-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); }
+.teacher-avatar-img {
+  width: 88px; height: 88px; border-radius: 50%; object-fit: cover;
+  border: 3px solid #dfeee6; box-shadow: 0 4px 12px rgba(27, 67, 50, 0.12);
+}
 .teacher-avatar {
-  width: 40px; height: 40px; border-radius: 50%;
+  width: 88px; height: 88px; border-radius: 50%;
   background: linear-gradient(135deg, #1b4332, #40916c); color: #fff;
-  font-size: 0.85rem; font-weight: 700;
+  font-size: 1.15rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
-.teacher-name { font-size: 0.72rem; font-weight: 600; color: #1b4332; text-align: center; line-height: 1.3; }
+.teacher-name { font-size: 0.95rem; font-weight: 600; color: #1b4332; text-align: center; line-height: 1.3; }
+.small-empty-state {
+  padding: 18px 20px; border-radius: 12px; background: #f8fcfa; border: 1px dashed #cfe3d8; color: #5d7a6d;
+}
 
 .loading-state { display: flex; align-items: center; gap: 10px; color: #40916c; font-size: 0.9rem; padding: 40px 0; justify-content: center; }
 .spin-icon { animation: spin 1s linear infinite; }
