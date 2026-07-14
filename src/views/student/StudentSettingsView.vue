@@ -56,23 +56,7 @@
       </form>
     </div>
 
-    <div class="section-card">
-      <div class="section-title">Two Factor Authentication</div>
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Enable 2FA</div>
-          <div class="toggle-sub">Adds extra login security</div>
-        </div>
-        <label class="toggle-switch">
-          <input type="checkbox" v-model="twoFactor" />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div :class="['twofa-msg', twoFactor ? 'msg-on' : 'msg-off']">
-        <span v-if="twoFactor">2FA is ON. A verification code will be sent to your email at each login.</span>
-        <span v-else>2FA is currently OFF. Turn it ON to receive a verification code via email each time you log in.</span>
-      </div>
-    </div>
+
 
     <div v-if="showSuccessModal" class="modal-overlay" @click.self="showSuccessModal = false">
       <div class="success-modal">
@@ -92,9 +76,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
 import { getUser } from '@/auth.js'
 import BottomNav from '@/components/student/BottomNav.vue'
+import { computed, ref } from 'vue'
 
 const user = getUser() || { name: 'Anna Cooper', email: 'anna.cooper@student.edu' }
 const initials = computed(() => user.name?.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'A')
@@ -106,7 +90,7 @@ const showConfirm = ref(false)
 const pwError = ref('')
 const pwSuccess = ref('')
 const showSuccessModal = ref(false)
-const twoFactor = ref(false)
+
 
 function handleUpdatePassword() {
   pwError.value = ''

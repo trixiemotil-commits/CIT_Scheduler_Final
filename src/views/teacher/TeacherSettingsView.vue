@@ -90,6 +90,7 @@
             <template v-if="otpSent">
               <div class="settings-group">
                 <label class="settings-label">Enter OTP <span class="otp-hint">Sent to {{ maskedEmail }}</span></label>
+                <span class="otp-hint">Expires in {{ formattedOtpTime }}</span>
                 <div class="otp-boxes-inline">
                   <input
                     v-for="(_, i) in pwOtpCode"
@@ -149,33 +150,7 @@
           </form>
         </div>
 
-        <!-- ── Two-Factor Authentication ── -->
-        <div class="settings-card">
-          <div class="settings-card-header settings-card-header--between">
-            <div class="settings-card-header-left">
-              <div class="settings-card-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              </div>
-              <div>
-                <h2 class="settings-card-title">Two-Factor Authentication</h2>
-                <p class="settings-card-sub">Add an extra layer of security to your account</p>
-              </div>
-            </div>
-            <button
-              class="toggle-switch"
-              :class="{ 'toggle-switch--on': twoFactor }"
-              @click="toggleTwoFactor"
-              type="button"
-              :aria-pressed="twoFactor"
-            >
-              <span class="toggle-thumb"></span>
-            </button>
-          </div>
-          <div v-if="twoFactor" class="tfa-note">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            Two-factor authentication is currently <strong>enabled</strong>. An OTP will be required on each login.
-          </div>
-        </div>
+
 
         <!-- ── FAQs ── -->
         <div class="settings-faq-section">
@@ -285,7 +260,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -365,6 +340,9 @@ const pwSuccess    = ref('')
 const otpSent      = ref(false)
 const pwOtpCode    = ref(['', '', '', '', '', ''])
 const pwOtpRefs    = ref([])
+const otpSecondsRemaining = ref(0)
+let otpTimer = null
+const formattedOtpTime = computed(() => `0:${String(otpSecondsRemaining.value).padStart(2, '0')}`)
 
 const maskedEmail = computed(() => {
   const email = user.email || 'teacher@gmail.com'
@@ -372,20 +350,49 @@ const maskedEmail = computed(() => {
   return local.slice(0, 2) + '*'.repeat(Math.max(local.length - 2, 4)) + '@' + domain
 })
 
-function sendOtp() {
+async function sendOtp() {
   if (!passwordForm.value.current) {
     pwError.value   = 'Please enter your current password first.'
     pwSuccess.value = ''
     return
   }
-  pwError.value   = ''
-  otpSent.value   = true
-  pwOtpCode.value = ['', '', '', '', '', '']
-  pwSuccess.value = 'OTP sent to ' + maskedEmail.value
-  setTimeout(() => { pwSuccess.value = '' }, 4000)
+  pwError.value = ''
+  pwSuccess.value = ''
+  try {
+    const response = await apiRequest('/auth/request-password-otp', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword: passwordForm.value.current }),
+    })
+    otpSent.value = true
+    pwOtpCode.value = ['', '', '', '', '', '']
+    startOtpTimer()
+    pwSuccess.value = response.message
+  } catch (error) {
+    pwError.value = error.message || 'Unable to send the OTP.'
+  }
+}
+
+function clearOtpTimer() {
+  if (otpTimer) clearInterval(otpTimer)
+  otpTimer = null
+  otpSecondsRemaining.value = 0
+}
+
+function startOtpTimer() {
+  clearOtpTimer()
+  otpSecondsRemaining.value = 60
+  otpTimer = setInterval(() => {
+    otpSecondsRemaining.value -= 1
+    if (otpSecondsRemaining.value <= 0) {
+      clearOtpTimer()
+      resetOtp()
+      pwError.value = 'OTP expired. Send a new code to continue.'
+    }
+  }, 1000)
 }
 
 function resetOtp() {
+  clearOtpTimer()
   otpSent.value      = false
   pwOtpCode.value    = ['', '', '', '', '', '']
   passwordForm.value.current = ''
@@ -424,6 +431,7 @@ async function handleUpdatePassword() {
       method: 'POST',
       body: JSON.stringify({
         currentPassword: passwordForm.value.current,
+        otp: enteredOtp,
         newPassword: passwordForm.value.newPw,
       }),
     })
@@ -431,6 +439,7 @@ async function handleUpdatePassword() {
     pwSuccess.value = 'Password updated successfully.'
     passwordForm.value = { current: '', newPw: '', confirmPw: '' }
     otpSent.value      = false
+    clearOtpTimer()
     pwOtpCode.value    = ['', '', '', '', '', '']
     setTimeout(() => { pwSuccess.value = '' }, 4000)
   } catch (error) {
@@ -438,57 +447,9 @@ async function handleUpdatePassword() {
   }
 }
 
-/* ── Two-Factor Auth ── */
-const twoFactor        = ref(false)
-const showTFAModal     = ref(false)
-const showDisableModal = ref(false)
-const tfaCode          = ref(['', '', '', '', '', ''])
-const otpRefs          = ref([])
+onUnmounted(clearOtpTimer)
 
-function toggleTwoFactor() {
-  if (twoFactor.value) {
-    showDisableModal.value = true
-  } else {
-    tfaCode.value = ['', '', '', '', '', '']
-    showTFAModal.value = true
-  }
-}
 
-function onOtpInput(i) {
-  const val = tfaCode.value[i]
-  if (val && i < 5) {
-    otpRefs.value[i + 1]?.focus()
-  }
-}
-
-function onOtpBackspace(i) {
-  if (!tfaCode.value[i] && i > 0) {
-    otpRefs.value[i - 1]?.focus()
-  }
-}
-
-function resendCode() {
-  tfaCode.value = ['', '', '', '', '', '']
-  otpRefs.value[0]?.focus()
-}
-
-function confirmEnableTFA() {
-  const code = tfaCode.value.join('')
-  if (code.length < 6) return
-  twoFactor.value    = true
-  showTFAModal.value = false
-  tfaCode.value      = ['', '', '', '', '', '']
-}
-
-function cancelTFA() {
-  showTFAModal.value = false
-  tfaCode.value      = ['', '', '', '', '', '']
-}
-
-function confirmDisableTFA() {
-  twoFactor.value        = false
-  showDisableModal.value = false
-}
 
 /* ── FAQs ── */
 const openFaq = ref(null)
@@ -497,10 +458,7 @@ const faqs = [
     q: 'How do I update my profile information?',
     a: 'You can update your profile information by clicking your profile image and navigating to the Personal Information section.'
   },
-  {
-    q: 'How does Two-Factor Authentication Work?',
-    a: 'Two-Factor Authentication (2FA) adds a second verification step when you log in. After entering your password, you will receive a one-time code on your registered email. Enter that code to complete the login.'
-  },
+
   {
     q: 'What should I do if I forgot my password?',
     a: 'On the login page, click the "Forgot Password?" link. Enter your registered email address and follow the instructions sent to your inbox to reset your password.'

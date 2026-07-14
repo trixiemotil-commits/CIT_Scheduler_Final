@@ -74,9 +74,10 @@
               <div class="settings-group">
                 <label class="settings-label">OTP</label>
                 <div class="otp-wrap">
-                  <input v-model="passwordForm.otp" type="text" class="settings-input" placeholder="_ _ _ _ _ _" maxlength="6" />
-                  <button type="button" class="otp-btn" @click="sendOtp">Send OTP</button>
+                  <input v-model="passwordForm.otp" type="text" inputmode="numeric" autocomplete="one-time-code" class="settings-input" placeholder="_ _ _ _ _ _" maxlength="6" @input="passwordForm.otp = passwordForm.otp.replace(/\D/g, '')" />
+                  <button type="button" class="otp-btn" :disabled="isSendingOtp || otpSecondsRemaining > 0" @click="sendOtp">{{ isSendingOtp ? 'Sending...' : otpSecondsRemaining > 0 ? `Expires in ${formattedOtpTime}` : 'Send OTP' }}</button>
                 </div>
+                <span v-if="otpSent" class="otp-expiry">Code expires in {{ formattedOtpTime }}.</span>
               </div>
             </div>
 
@@ -117,38 +118,12 @@
             <div v-if="pwSuccess" class="settings-msg settings-msg--success">{{ pwSuccess }}</div>
 
             <div class="settings-form-footer">
-              <button type="submit" class="update-pw-btn">Update Password</button>
+              <button type="submit" class="update-pw-btn" :disabled="isUpdatingPassword">{{ isUpdatingPassword ? 'Updating...' : 'Update Password' }}</button>
             </div>
           </form>
         </div>
 
-        <!-- ── Two-Factor Authentication ── -->
-        <div class="settings-card">
-          <div class="settings-card-header settings-card-header--between">
-            <div class="settings-card-header-left">
-              <div class="settings-card-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              </div>
-              <div>
-                <h2 class="settings-card-title">Two-Factor Authentication</h2>
-                <p class="settings-card-sub">Add an extra layer of security to your account</p>
-              </div>
-            </div>
-            <button
-              class="toggle-switch"
-              :class="{ 'toggle-switch--on': twoFactor }"
-              @click="toggleTwoFactor"
-              type="button"
-              :aria-pressed="twoFactor"
-            >
-              <span class="toggle-thumb"></span>
-            </button>
-          </div>
-          <div v-if="twoFactor" class="tfa-note">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            Two-factor authentication is currently <strong>enabled</strong>. An OTP will be required on each login.
-          </div>
-        </div>
+
 
         <!-- ── FAQs ── -->
         <div class="settings-faq-section">
@@ -185,22 +160,7 @@
     </main>
   </div>
 
-  <!-- ═══ Disable 2FA Confirm ═══ -->
-  <Teleport to="body">
-    <div v-if="showDisable2FAConfirm" class="swal-overlay">
-      <div class="swal-box">
-        <div class="swal-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        </div>
-        <h2 class="swal-title">Disable Two-Factor Authentication?</h2>
-        <p class="swal-sub">Are you sure you want to continue? Your account will be less secure without 2FA.</p>
-        <div class="swal-actions">
-          <button class="swal-cancel" @click="showDisable2FAConfirm = false">Cancel</button>
-          <button class="swal-continue" @click="confirmDisable2FA">Continue</button>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+
 
   <!-- ═══ Logout Confirm Modal ═══ -->
   <Teleport to="body">
@@ -225,13 +185,43 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { RouterLink, useRouter, useRoute } from 'vue-router'
-import { logout } from '@/auth.js'
+import { getToken, logout } from '@/auth.js'
+import { computed, onUnmounted, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
+}
 
 /* ── Nav ── */
 const navItems = [
@@ -277,55 +267,102 @@ const showConfirm  = ref(false)
 const pwError      = ref('')
 const pwSuccess    = ref('')
 const otpSent      = ref(false)
+const isSendingOtp = ref(false)
+const isUpdatingPassword = ref(false)
+const otpSecondsRemaining = ref(0)
+let otpTimer = null
+const formattedOtpTime = computed(() => `0:${String(otpSecondsRemaining.value).padStart(2, '0')}`)
 
-function sendOtp() {
+function clearOtpTimer() {
+  if (otpTimer) clearInterval(otpTimer)
+  otpTimer = null
+  otpSecondsRemaining.value = 0
+}
+
+function startOtpTimer() {
+  clearOtpTimer()
+  otpSecondsRemaining.value = 60
+  otpTimer = setInterval(() => {
+    otpSecondsRemaining.value -= 1
+    if (otpSecondsRemaining.value <= 0) {
+      clearOtpTimer()
+      otpSent.value = false
+      passwordForm.value.otp = ''
+      pwError.value = 'OTP expired. Send a new code to continue.'
+    }
+  }, 1000)
+}
+
+async function sendOtp() {
   if (!passwordForm.value.current) {
     pwError.value   = 'Please enter your current password first.'
     pwSuccess.value = ''
     return
   }
-  otpSent.value   = true
-  pwError.value   = ''
-  pwSuccess.value = 'OTP sent to your registered email.'
-  setTimeout(() => { pwSuccess.value = '' }, 4000)
+
+  pwError.value = ''
+  pwSuccess.value = ''
+  isSendingOtp.value = true
+  try {
+    const response = await apiRequest('/auth/request-password-otp', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword: passwordForm.value.current }),
+    })
+    passwordForm.value.otp = ''
+    otpSent.value = true
+    startOtpTimer()
+    pwSuccess.value = response.message
+  } catch (error) {
+    pwError.value = error.message || 'Unable to send the OTP.'
+  } finally {
+    isSendingOtp.value = false
+  }
 }
 
-function handleUpdatePassword() {
+async function handleUpdatePassword() {
   pwError.value   = ''
   pwSuccess.value = ''
-  if (!passwordForm.value.current || !passwordForm.value.newPw || !passwordForm.value.confirmPw) {
-    pwError.value = 'Please fill in all password fields.'
+  if (!passwordForm.value.current || !passwordForm.value.otp || !passwordForm.value.newPw || !passwordForm.value.confirmPw) {
+    pwError.value = 'Please fill in all password fields and the OTP.'
+    return
+  }
+  if (!/^\d{6}$/.test(passwordForm.value.otp)) {
+    pwError.value = 'Enter the 6-digit OTP sent to your email.'
     return
   }
   if (passwordForm.value.newPw !== passwordForm.value.confirmPw) {
     pwError.value = 'New passwords do not match.'
     return
   }
-  if (passwordForm.value.newPw.length < 6) {
-    pwError.value = 'New password must be at least 6 characters.'
+  if (passwordForm.value.newPw.length < 8) {
+    pwError.value = 'New password must be at least 8 characters.'
     return
   }
-  // In a real app: call API here
-  pwSuccess.value = 'Password updated successfully.'
-  passwordForm.value = { current: '', otp: '', newPw: '', confirmPw: '' }
-  otpSent.value = false
-  setTimeout(() => { pwSuccess.value = '' }, 4000)
-}
 
-/* ── Two-Factor Auth ── */
-const twoFactor = ref(false)
-const showDisable2FAConfirm = ref(false)
-function toggleTwoFactor() {
-  if (twoFactor.value) {
-    showDisable2FAConfirm.value = true
-  } else {
-    twoFactor.value = true
+  isUpdatingPassword.value = true
+  try {
+    const response = await apiRequest('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        currentPassword: passwordForm.value.current,
+        otp: passwordForm.value.otp,
+        newPassword: passwordForm.value.newPw,
+      }),
+    })
+    pwSuccess.value = response.message
+    passwordForm.value = { current: '', otp: '', newPw: '', confirmPw: '' }
+    otpSent.value = false
+    clearOtpTimer()
+  } catch (error) {
+    pwError.value = error.message || 'Unable to update password.'
+  } finally {
+    isUpdatingPassword.value = false
   }
 }
-function confirmDisable2FA() {
-  twoFactor.value = false
-  showDisable2FAConfirm.value = false
-}
+
+onUnmounted(clearOtpTimer)
+
+
 
 /* ── FAQs ── */
 const openFaq = ref(null)
@@ -334,10 +371,7 @@ const faqs = [
     q: 'How do I update my profile information?',
     a: 'You can update your profile information by navigating to your account settings. Click on your avatar or name in the sidebar to access profile options, then update the fields you want to change and save.'
   },
-  {
-    q: 'How does Two-Factor Authentication Work?',
-    a: 'Two-Factor Authentication (2FA) adds a second verification step when you log in. After entering your password, you will receive a one-time password (OTP) on your registered email or phone. You must enter this OTP to complete the login.'
-  },
+
   {
     q: 'What should I do if I forgot my password?',
     a: 'On the login page, click the "Forgot Password?" link. Enter your registered email address and follow the instructions sent to your inbox to reset your password.'
@@ -601,6 +635,9 @@ const faqs = [
   transition: background 0.15s, color 0.15s;
 }
 .otp-btn:hover { background: #1b4332; color: #fff; }
+.otp-btn:disabled,
+.update-pw-btn:disabled { cursor: not-allowed; opacity: 0.65; }
+.otp-expiry { font-size: 0.75rem; color: #b45309; font-weight: 500; }
 
 /* Messages */
 .settings-msg {

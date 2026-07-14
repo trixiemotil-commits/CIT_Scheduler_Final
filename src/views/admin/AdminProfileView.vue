@@ -71,10 +71,6 @@
           </div>
           <div class="info-grid">
             <div class="info-item">
-              <div class="info-label">Contact No.</div>
-              <div class="info-value">{{ profile.contact }}</div>
-            </div>
-            <div class="info-item">
               <div class="info-label">Gender</div>
               <div class="info-value">{{ profile.gender }}</div>
             </div>
@@ -105,6 +101,15 @@
             </button>
           </div>
           <div class="edit-modal-body">
+            <div class="avatar-editor">
+              <img :src="editForm.avatar || DEFAULT_AVATAR" class="avatar-editor-preview" alt="Profile picture preview" />
+              <div class="avatar-editor-details">
+                <span class="edit-label">Profile Picture</span>
+                <p>PNG, JPG, or WebP. Images are resized automatically.</p>
+                <button type="button" class="avatar-upload-btn" @click="avatarInput?.click()">Choose Photo</button>
+                <input ref="avatarInput" class="avatar-file-input" type="file" accept="image/png,image/jpeg,image/webp" @change="handleAvatarChange" />
+              </div>
+            </div>
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Full Name</label>
@@ -117,15 +122,12 @@
                 <input v-model="editForm.email" class="edit-input" type="email" placeholder="Email address" />
               </div>
             </div>
-            <div class="edit-row two-col">
-              <div class="edit-field">
-                <label class="edit-label">Contact No.</label>
-                <input v-model="editForm.contact" class="edit-input" type="text" placeholder="09XXXXXXXXX" />
-              </div>
+            <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Gender</label>
                 <div class="select-wrap">
                   <select v-model="editForm.gender" class="edit-select">
+                    <option value="Not specified">Not specified</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Other">Other</option>
@@ -137,13 +139,13 @@
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Employee Id</label>
-                <input v-model="editForm.employeeId" class="edit-input" type="text" placeholder="000-000-000" />
+                <input v-model="editForm.employeeId" class="edit-input" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="00-0000-000000" @input="formatEmployeeId" />
               </div>
             </div>
           </div>
           <div class="edit-modal-actions">
             <button class="edit-cancel-btn" @click="closeEdit">Cancel</button>
-            <button class="edit-save-btn" @click="saveProfile">Save Changes</button>
+            <button class="edit-save-btn" :disabled="isSaving" @click="saveProfile">{{ isSaving ? 'Saving...' : 'Save Changes' }}</button>
           </div>
         </div>
       </div>
@@ -173,15 +175,17 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { RouterLink, useRouter, useRoute } from 'vue-router'
-import { logout, getUser } from '@/auth.js'
+import { getToken, getUser, logout } from '@/auth.js'
 import Swal from 'sweetalert2'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
 const user = getUser() || {}
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const DEFAULT_AVATAR = 'https://i.pravatar.cc/100?img=15'
 
 const navItems = [
   {
@@ -212,18 +216,70 @@ const navItems = [
 
 /* â”€â”€ Profile data â”€â”€ */
 const profile = ref({
-  fullName:   'Jane Cooper',
-  email:      'admin@gmail.com',
-  contact:    '09292000000',
-  gender:     'Female',
-  employeeId: '011-111-111',
-  role:       'Admin',
-  avatar:     user.avatar || 'https://i.pravatar.cc/100?img=15'
+  fullName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+  email: user.email || '',
+  gender: user.gender || 'Not specified',
+  employeeId: user.employeeId || '',
+  role: user.role || 'admin',
+  avatar: user.avatar || DEFAULT_AVATAR
 })
+
+const isSaving = ref(false)
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
+}
+
+function setProfile(apiUser) {
+  profile.value = {
+    fullName: `${apiUser.firstName || ''} ${apiUser.lastName || ''}`.trim(),
+    email: apiUser.email || '',
+    gender: apiUser.gender || 'Not specified',
+    employeeId: apiUser.employeeId || '',
+    role: apiUser.role || 'admin',
+    avatar: apiUser.avatar || DEFAULT_AVATAR,
+  }
+}
+
+async function loadProfile() {
+  try {
+    const response = await apiRequest('/auth/me')
+    setProfile(response.user)
+    localStorage.setItem('cit_user', JSON.stringify(response.user))
+  } catch (error) {
+    Swal.fire({ icon: 'error', title: 'Unable to load profile', text: error.message })
+  }
+}
 
 /* â”€â”€ Edit modal â”€â”€ */
 const showEditModal = ref(false)
 const editForm = ref({})
+const avatarInput = ref(null)
 
 function openEdit() {
   editForm.value = { ...profile.value }
@@ -232,15 +288,98 @@ function openEdit() {
 function closeEdit() {
   showEditModal.value = false
 }
-function saveProfile() {
-  profile.value = { ...editForm.value }
-  closeEdit()
-  Swal.fire({
-    toast: true, position: 'top-end', icon: 'success',
-    title: 'Profile Updated', showConfirmButton: false,
-    timer: 2500, timerProgressBar: true,
-    background: '#1b4332', color: '#fff', iconColor: '#74c69d'
+
+function formatEmployeeId() {
+  const digits = String(editForm.value.employeeId || '').replace(/\D/g, '').slice(0, 12)
+  const parts = [digits.slice(0, 2), digits.slice(2, 6), digits.slice(6, 12)].filter(Boolean)
+  editForm.value.employeeId = parts.join('-')
+}
+
+async function handleAvatarChange(event) {
+  const [file] = event.target.files || []
+  if (!file) return
+
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    Swal.fire({ icon: 'warning', title: 'Unsupported image', text: 'Choose a PNG, JPG, or WebP image.' })
+    event.target.value = ''
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    Swal.fire({ icon: 'warning', title: 'Image too large', text: 'Choose an image smaller than 5 MB.' })
+    event.target.value = ''
+    return
+  }
+
+  try {
+    editForm.value.avatar = await resizeAvatar(file)
+  } catch (_error) {
+    Swal.fire({ icon: 'error', title: 'Unable to read image', text: 'Please choose a different image.' })
+  } finally {
+    event.target.value = ''
+  }
+}
+
+function resizeAvatar(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    const objectUrl = URL.createObjectURL(file)
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      const maxDimension = 512
+      const scale = Math.min(maxDimension / image.width, maxDimension / image.height, 1)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(image.width * scale))
+      canvas.height = Math.max(1, Math.round(image.height * scale))
+      const context = canvas.getContext('2d')
+      context.drawImage(image, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', 0.88))
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Invalid image file.'))
+    }
+    image.src = objectUrl
   })
+}
+
+async function saveProfile() {
+  const nameParts = editForm.value.fullName.trim().split(/\s+/)
+  if (nameParts.length < 2) {
+    Swal.fire({ icon: 'warning', title: 'Full name required', text: 'Enter both your first and last name.' })
+    return
+  }
+  if (editForm.value.employeeId && !/^\d{2}-\d{4}-\d{6}$/.test(editForm.value.employeeId)) {
+    Swal.fire({ icon: 'warning', title: 'Invalid employee ID', text: 'Use the format 00-0000-000000. Numbers and hyphens only.' })
+    return
+  }
+
+  isSaving.value = true
+  try {
+    const response = await apiRequest('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify({
+        firstName: nameParts[0],
+        lastName: nameParts.slice(1).join(' '),
+        email: editForm.value.email,
+        gender: editForm.value.gender === 'Not specified' ? '' : editForm.value.gender,
+        employeeId: editForm.value.employeeId,
+        avatar: editForm.value.avatar,
+      }),
+    })
+    setProfile(response.user)
+    localStorage.setItem('cit_user', JSON.stringify(response.user))
+    closeEdit()
+    Swal.fire({
+      toast: true, position: 'top-end', icon: 'success',
+      title: 'Profile Updated', showConfirmButton: false,
+      timer: 2500, timerProgressBar: true,
+      background: '#1b4332', color: '#fff', iconColor: '#74c69d'
+    })
+  } catch (error) {
+    Swal.fire({ icon: 'error', title: 'Unable to update profile', text: error.message })
+  } finally {
+    isSaving.value = false
+  }
 }
 
 /* â”€â”€ Logout â”€â”€ */
@@ -250,6 +389,8 @@ function confirmLogout() {
   logout()
   router.push('/')
 }
+
+onMounted(loadProfile)
 </script>
 
 <style scoped>
@@ -437,6 +578,7 @@ function confirmLogout() {
   align-self: center;
 }
 .edit-btn:hover { background: rgba(255,255,255,0.25); }
+.edit-save-btn:disabled { cursor: not-allowed; opacity: 0.65; }
 
 .card-body { padding: 16px 28px 30px; }
 
@@ -594,6 +736,39 @@ function confirmLogout() {
 
 .edit-row { display: flex; gap: 14px; }
 .edit-row.two-col .edit-field { flex: 1; }
+
+.avatar-editor {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+.avatar-editor-preview {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border: 2px solid #c8ddd4;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.avatar-editor-details { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.avatar-editor-details p { margin: 0; font-size: 0.72rem; color: #64748b; }
+.avatar-upload-btn {
+  margin-top: 3px;
+  padding: 6px 10px;
+  color: #1b4332;
+  background: #e8f5ee;
+  border: 1px solid #c8ddd4;
+  border-radius: 7px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.avatar-upload-btn:hover { background: #d8f0e2; }
+.avatar-file-input { display: none; }
 
 .edit-field { display: flex; flex-direction: column; gap: 5px; flex: 1; }
 .edit-label {

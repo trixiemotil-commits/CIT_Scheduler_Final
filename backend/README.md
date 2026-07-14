@@ -17,7 +17,14 @@ npm install
 MONGODB_URI=your_atlas_connection_string
 PORT=5000
 JWT_SECRET=your_long_random_secret
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=notifications@example.com
+SMTP_PASS=your_smtp_password
+SMTP_FROM="CIT Scheduler <notifications@example.com>"
 ```
+
+Use [backend/.env.example](.env.example) as the complete template. For Gmail, create a Google App Password and use `smtp.gmail.com` with port `587`.
 
 3. Start server:
 
@@ -31,6 +38,8 @@ npm run dev
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/auth/me` (Bearer token required)
+- `POST /api/auth/request-password-otp` (Bearer token required; body: `{ "currentPassword": "..." }`)
+- `POST /api/auth/change-password` (Bearer token required; body: `{ "currentPassword": "...", "otp": "123456", "newPassword": "..." }`)
 - `GET /api/rbac/admin` (admin only)
 - `GET /api/rbac/teacher` (teacher/admin)
 - `GET /api/rbac/student` (student/teacher/admin)
