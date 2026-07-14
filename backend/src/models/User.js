@@ -39,6 +39,22 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    passwordOtpHash: {
+      type: String,
+      default: null,
+    },
+    passwordOtpExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    passwordOtpLastSentAt: {
+      type: Date,
+      default: null,
+    },
+    passwordOtpAttempts: {
+      type: Number,
+      default: 0,
+    },
     role: {
       type: String,
       enum: ["admin", "teacher", "student"],
@@ -63,6 +79,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
+    },
+    gender: {
+      type: String,
+      enum: ["Male", "Female", "Other"],
+      default: undefined,
     },
     account_status: {
       type: String,

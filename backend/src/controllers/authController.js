@@ -1,8 +1,13 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { sendPasswordOtpEmail } = require("../config/mail");
 
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+const PASSWORD_OTP_LIFETIME_MS = 60 * 1000;
+const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
+const PASSWORD_OTP_MAX_ATTEMPTS = 5;
 
 function signToken(user) {
   return jwt.sign(
@@ -29,6 +34,7 @@ function toSafeUser(user) {
     yearLevel: user.yearLevel,
     section: user.section,
     phone: user.phone,
+    gender: user.gender,
     account_status: user.account_status,
     teacher_status: user.teacher_status,
     status: user.account_status,
@@ -39,6 +45,22 @@ function toSafeUser(user) {
 
 function isStrongPassword(password) {
   return STRONG_PASSWORD_REGEX.test(String(password || ""));
+}
+
+function hashOtp(code) {
+  return crypto.createHash("sha256").update(code).digest("hex");
+}
+
+function clearPasswordOtp(user) {
+  user.passwordOtpHash = null;
+  user.passwordOtpExpiresAt = null;
+  user.passwordOtpLastSentAt = null;
+  user.passwordOtpAttempts = 0;
+}
+
+function maskEmail(email) {
+  const [local = "", domain = ""] = String(email).split("@");
+  return `${local.slice(0, 2)}${"*".repeat(Math.max(local.length - 2, 2))}@${domain}`;
 }
 
 function getAccountStatusMessage(status) {
@@ -211,6 +233,7 @@ async function updateMe(req, res) {
     const yearLevel = normalizeString(req.body.yearLevel);
     const section = normalizeString(req.body.section);
     const avatar = normalizeString(req.body.avatar);
+    const gender = normalizeString(req.body.gender);
 
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ message: "First name, last name, and email are required." });
@@ -222,6 +245,9 @@ async function updateMe(req, res) {
     }
 
     if (employeeId) {
+      if (!/^\d{2}-\d{4}-\d{6}$/.test(employeeId)) {
+        return res.status(400).json({ message: "Employee ID must use the format 00-0000-000000." });
+      }
       const idOwner = await User.findOne({ employeeId });
       if (idOwner && idOwner._id.toString() !== user._id.toString()) {
         return res.status(409).json({ message: "Employee ID already exists." });
@@ -239,6 +265,10 @@ async function updateMe(req, res) {
       return res.status(400).json({ message: "Invalid year level." });
     }
 
+    if (gender && !["Male", "Female", "Other"].includes(gender)) {
+      return res.status(400).json({ message: "Invalid gender." });
+    }
+
     if (avatar && !avatar.startsWith("data:image/") && !/^https?:\/\//i.test(avatar)) {
       return res.status(400).json({ message: "Avatar must be a valid image URL or data URL." });
     }
@@ -247,6 +277,7 @@ async function updateMe(req, res) {
     user.lastName = lastName;
     user.email = email;
     user.phone = phone;
+    user.gender = gender || undefined;
     user.employeeId = employeeId || undefined;
     if (user.role === "student") {
       if (studentId) {
@@ -267,12 +298,59 @@ async function updateMe(req, res) {
   }
 }
 
+async function requestPasswordOtp(req, res) {
+  try {
+    const { currentPassword } = req.body || {};
+    if (!currentPassword) {
+      return res.status(400).json({ message: "Current password is required." });
+    }
+
+    const user = await User.findById(req.user.id).select("+passwordHash");
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const matches = await bcrypt.compare(String(currentPassword), user.passwordHash);
+    if (!matches) {
+      return res.status(401).json({ message: "Current password is incorrect." });
+    }
+
+    const now = new Date();
+    if (user.passwordOtpLastSentAt && now - user.passwordOtpLastSentAt < PASSWORD_OTP_RESEND_DELAY_MS) {
+      return res.status(429).json({ message: "Please wait one minute before requesting another code." });
+    }
+
+    const code = crypto.randomInt(100000, 1000000).toString();
+    user.passwordOtpHash = hashOtp(code);
+    user.passwordOtpExpiresAt = new Date(now.getTime() + PASSWORD_OTP_LIFETIME_MS);
+    user.passwordOtpLastSentAt = now;
+    user.passwordOtpAttempts = 0;
+    await user.save();
+
+    try {
+      await sendPasswordOtpEmail({ to: user.email, code });
+    } catch (mailError) {
+      clearPasswordOtp(user);
+      await user.save();
+      console.error("Password OTP email failed:", mailError.message);
+      if (mailError.code === "MAIL_NOT_CONFIGURED") {
+        return res.status(503).json({ message: mailError.message });
+      }
+      return res.status(503).json({ message: "Unable to send the OTP email. Please try again later." });
+    }
+
+    return res.status(200).json({ message: `OTP sent to ${maskEmail(user.email)}.` });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to send OTP.", error: error.message });
+  }
+}
+
 async function changePassword(req, res) {
   try {
-    const { currentPassword, newPassword } = req.body || {};
+    const { currentPassword, newPassword, otp } = req.body || {};
 
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Current password and new password are required." });
+    if (!currentPassword || !newPassword || !otp) {
+      return res.status(400).json({ message: "Current password, OTP, and new password are required." });
     }
 
     if (!isStrongPassword(newPassword)) {
@@ -291,12 +369,39 @@ async function changePassword(req, res) {
       return res.status(401).json({ message: "Current password is incorrect." });
     }
 
+    if (!/^\d{6}$/.test(String(otp)) || !user.passwordOtpHash || !user.passwordOtpExpiresAt) {
+      return res.status(400).json({ message: "Request a new OTP and enter the 6-digit code." });
+    }
+
+    if (user.passwordOtpExpiresAt < new Date()) {
+      clearPasswordOtp(user);
+      await user.save();
+      return res.status(400).json({ message: "This OTP has expired. Request a new one." });
+    }
+
+    const enteredOtpHash = hashOtp(String(otp));
+    const otpMatches = crypto.timingSafeEqual(
+      Buffer.from(enteredOtpHash, "hex"),
+      Buffer.from(user.passwordOtpHash, "hex")
+    );
+    if (!otpMatches) {
+      user.passwordOtpAttempts += 1;
+      if (user.passwordOtpAttempts >= PASSWORD_OTP_MAX_ATTEMPTS) {
+        clearPasswordOtp(user);
+        await user.save();
+        return res.status(429).json({ message: "Too many incorrect codes. Request a new OTP." });
+      }
+      await user.save();
+      return res.status(401).json({ message: "The OTP is incorrect." });
+    }
+
     const sameAsCurrent = await bcrypt.compare(String(newPassword), user.passwordHash);
     if (sameAsCurrent) {
       return res.status(400).json({ message: "New password must be different from your current password." });
     }
 
     user.passwordHash = await bcrypt.hash(String(newPassword), 10);
+    clearPasswordOtp(user);
     await user.save();
 
     return res.status(200).json({ message: "Password changed successfully." });
@@ -310,5 +415,6 @@ module.exports = {
   login,
   me,
   updateMe,
+  requestPasswordOtp,
   changePassword,
 };
