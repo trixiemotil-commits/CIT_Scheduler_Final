@@ -34,6 +34,11 @@
 
         <div v-if="loginError" class="error-msg">{{ loginError }}</div>
 
+        <!-- reCAPTCHA widget -->
+        <div v-if="siteKey" class="captcha-wrap">
+          <div ref="signinCaptchaRef"></div>
+        </div>
+
         <button type="submit" class="submit-btn">Login</button>
       </form>
 
@@ -88,6 +93,11 @@
         <div v-if="signUpSuccess" class="success-msg">{{ signUpSuccess }}</div>
         <div v-if="signUpError" class="error-msg">{{ signUpError }}</div>
 
+        <!-- sign up captcha -->
+        <div v-if="siteKey" class="captcha-wrap" v-show="activeTab === 'signup'">
+          <div ref="signupCaptchaRef"></div>
+        </div>
+
         <button type="submit" class="submit-btn">Sign up</button>
       </form>
     </div>
@@ -123,7 +133,7 @@
 
 <script setup>
 import { login, register } from '@/auth.js'
-import { computed, defineComponent, h, reactive, ref } from 'vue'
+import { computed, defineComponent, h, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 // Hidden admin modal state
@@ -214,6 +224,45 @@ const loginError = ref('')
 const signUpError = ref('')
 const signUpSuccess = ref('')
 const router = useRouter()
+const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || ''
+const signinCaptchaRef = ref(null)
+const signupCaptchaRef = ref(null)
+const signinWidgetId = ref(null)
+const signupWidgetId = ref(null)
+
+function renderRecaptcha(refEl, widgetRef) {
+  if (!siteKey) return
+  const el = refEl?.value
+  if (!el) return
+  try {
+    if (window.grecaptcha && typeof window.grecaptcha.render === 'function') {
+      // Always (re)render into the provided container to ensure widget appears
+      try {
+        widgetRef.value = window.grecaptcha.render(el, { sitekey: siteKey })
+      } catch (err) {
+        // If render throws (rare), clear and retry shortly
+        console.warn('grecaptcha.render failed, retrying', err)
+        widgetRef.value = null
+        setTimeout(() => renderRecaptcha(refEl, widgetRef), 300)
+      }
+    } else {
+      // Retry shortly if grecaptcha not loaded yet
+      setTimeout(() => renderRecaptcha(refEl, widgetRef), 300)
+    }
+  } catch (e) {
+    console.error('renderRecaptcha error', e)
+  }
+}
+
+function resetRecaptcha(widgetRef) {
+  try {
+    if (window.grecaptcha && widgetRef.value != null) {
+      window.grecaptcha.reset(widgetRef.value)
+    }
+  } catch (e) {
+    try { if (window.grecaptcha) window.grecaptcha.reset() } catch (_) {}
+  }
+}
 const signIn = reactive({ email: '', password: '', remember: false, showPw: false })
 const signUp = reactive({ firstName: '', lastName: '', studentId: '', email: '', password: '', confirmPassword: '', showPw: false, showConfirmPw: false })
 
@@ -237,7 +286,24 @@ function routeByRole(role) {
 async function handleLogin() {
   loginError.value = ''
   try {
-    const role = await login(signIn.email, signIn.password)
+    // Ensure reCAPTCHA response is present before sending credentials
+    let recaptchaToken = null
+    try {
+      if (window.grecaptcha && signinWidgetId.value != null) {
+        recaptchaToken = window.grecaptcha.getResponse(signinWidgetId.value)
+      } else if (window.grecaptcha) {
+        recaptchaToken = window.grecaptcha.getResponse()
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    if (!recaptchaToken) {
+      loginError.value = 'Please complete the reCAPTCHA verification.'
+      return
+    }
+
+    const role = await login(signIn.email, signIn.password, recaptchaToken)
     console.log('Login role:', role)
     // Fallback: if admin email, force admin dashboard
     if (role === 'admin') {
@@ -253,6 +319,7 @@ async function handleLogin() {
     }
   } catch (error) {
     loginError.value = error.message || 'Invalid email or password.'
+    try { resetRecaptcha(signinWidgetId) } catch (_) {}
   }
 }
 
@@ -291,13 +358,29 @@ async function handleSignUp() {
   }
 
   try {
+    // obtain recaptcha token from the signup widget
+    let recaptchaToken = null
+    try {
+      if (window.grecaptcha && signupWidgetId.value != null) {
+        recaptchaToken = window.grecaptcha.getResponse(signupWidgetId.value)
+      } else if (window.grecaptcha) {
+        recaptchaToken = window.grecaptcha.getResponse()
+      }
+    } catch (e) { /* ignore */ }
+
+    if (!recaptchaToken) {
+      signUpError.value = 'Please complete the reCAPTCHA verification.'
+      return
+    }
+
     await register({
       firstName,
       lastName,
       studentId,
       email,
       password: signUp.password,
-      role: 'student'
+      role: 'student',
+      recaptchaToken
     })
     signUpSuccess.value = 'Account created successfully. Your account is pending admin approval.'
     signUp.password = ''
@@ -323,6 +406,32 @@ function onStudentIdInput(event) {
     .replace(/^(\d{2}-\d{4})(\d)/, '$1-$2')
   signUp.studentId = formatted
 }
+
+// Render captcha widgets when component mounts and when activeTab changes
+onMounted(() => {
+  // render whichever tab is visible on load
+  nextTick(() => {
+    if (siteKey) renderRecaptcha(signinCaptchaRef, signinWidgetId)
+    if (siteKey && activeTab.value === 'signup') renderRecaptcha(signupCaptchaRef, signupWidgetId)
+  })
+})
+
+watch(activeTab, (val) => {
+  // when switching tabs, ensure the correct widget is rendered
+  nextTick(() => {
+    if (val === 'signin') {
+      // force re-render of signin widget into its (new) container
+      signinWidgetId.value = null
+      renderRecaptcha(signinCaptchaRef, signinWidgetId)
+      // reset signup widget if present
+      try { resetRecaptcha(signupWidgetId) } catch (_) {}
+    } else if (val === 'signup') {
+      signupWidgetId.value = null
+      renderRecaptcha(signupCaptchaRef, signupWidgetId)
+      try { resetRecaptcha(signinWidgetId) } catch (_) {}
+    }
+  })
+})
 </script>
 
 <style scoped>

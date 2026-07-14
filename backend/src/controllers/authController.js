@@ -4,6 +4,36 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { sendPasswordOtpEmail } = require("../config/mail");
 
+// Verify reCAPTCHA token with Google
+async function verifyRecaptcha(token, remoteIp = null) {
+  try {
+    const secret = process.env.RECAPTCHA_SECRET;
+    if (!secret) {
+      console.warn('RECAPTCHA_SECRET not configured; skipping verification (unsafe).');
+      return false;
+    }
+
+    const params = new URLSearchParams();
+    params.append('secret', secret);
+    params.append('response', token);
+    if (remoteIp) params.append('remoteip', remoteIp);
+
+    // Node 18+ provides global fetch; fallback quietly if not available
+    const fetcher = globalThis.fetch || (await import('node-fetch')).default;
+    const resp = await fetcher('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    const data = await resp.json();
+    return data && data.success === true;
+  } catch (err) {
+    console.error('verifyRecaptcha error:', err);
+    return false;
+  }
+}
+
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 const PASSWORD_OTP_LIFETIME_MS = 60 * 1000;
 const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
@@ -113,6 +143,17 @@ async function register(req, res) {
       });
     }
 
+    // verify reCAPTCHA on register as well
+    const recaptchaToken = req.body?.recaptchaToken
+    if (!recaptchaToken) {
+      return res.status(400).json({ message: "reCAPTCHA token is missing. Please complete the reCAPTCHA challenge." });
+    }
+
+    const recaptchaOk = await verifyRecaptcha(recaptchaToken, req.ip || null)
+    if (!recaptchaOk) {
+      return res.status(403).json({ message: "reCAPTCHA verification failed. Please try again." });
+    }
+
     const existingUser = await User.findOne({
       $or: [
         { email: normalizedEmail },
@@ -171,10 +212,20 @@ async function register(req, res) {
 
 async function login(req, res) {
   try {
-    const { email, password } = req.body;
+    const { email, password, recaptchaToken } = req.body || {};
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required." });
+    }
+
+    // Require reCAPTCHA token and verify it server-side
+    if (!recaptchaToken) {
+      return res.status(400).json({ message: "reCAPTCHA token is missing. Please complete the reCAPTCHA challenge." });
+    }
+
+    const recaptchaOk = await verifyRecaptcha(recaptchaToken, req.ip || null);
+    if (!recaptchaOk) {
+      return res.status(403).json({ message: "reCAPTCHA verification failed. Please try again." });
     }
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });

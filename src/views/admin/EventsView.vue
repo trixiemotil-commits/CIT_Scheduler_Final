@@ -5,11 +5,11 @@
       <!-- Profile -->
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
-          <img src="https://i.pravatar.cc/100?img=15" alt="Admin" class="avatar" />
+          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
-        <div class="email">admin@gmail.com</div>
+        <div class="email">{{ user.email || 'admin@gmail.com' }}</div>
       </div>
 
       <!-- Nav -->
@@ -400,7 +400,7 @@
 </template>
 
 <script setup>
-import { logout } from '@/auth.js'
+import { getUser, logout } from '@/auth.js'
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -417,6 +417,8 @@ const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
 
+
+const user = getUser() || {}
 /* ── Nav ── */
 const navItems = [
   {

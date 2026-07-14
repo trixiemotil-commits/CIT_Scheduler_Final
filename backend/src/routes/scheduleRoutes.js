@@ -7,12 +7,14 @@ const {
   createSchedule,
   replaceSchedule,
   deleteSchedule,
+  getAdminDashboardSummary,
 } = require("../controllers/scheduleController");
 
 const router = express.Router();
 
 router.get("/tables", authRequired, authorizeRoles("admin", "teacher"), listScheduleTables);
 router.get("/", authRequired, authorizeRoles("admin", "teacher"), listSchedules);
+router.get("/dashboard-summary", authRequired, authorizeRoles("admin"), getAdminDashboardSummary);
 
 router.use(authRequired, authorizeRoles("admin"));
 

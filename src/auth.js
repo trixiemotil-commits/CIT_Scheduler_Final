@@ -33,10 +33,13 @@ async function request(path, options = {}) {
   return body
 }
 
-export async function login(email, password) {
+export async function login(email, password, recaptchaToken = null) {
+  const body = { email, password }
+  if (recaptchaToken) body.recaptchaToken = recaptchaToken
+
   const payload = await request('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify(body)
   })
 
   saveSession(payload)

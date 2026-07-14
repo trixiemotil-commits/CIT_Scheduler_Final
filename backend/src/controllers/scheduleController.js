@@ -2,6 +2,7 @@ const ScheduleEntry = require("../models/ScheduleEntry");
 const ScheduleTable = require("../models/ScheduleTable");
 const User = require("../models/User");
 const ConsultationAvailability = require("../models/ConsultationAvailability");
+const ConsultationRequest = require("../models/ConsultationRequest");
 
 const YEAR_VALUES = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 const DAY_VALUES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -499,6 +500,68 @@ async function deleteSchedule(req, res) {
   }
 }
 
+function getCurrentDayName() {
+  const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return WEEK_DAYS[new Date().getDay()] || "Monday";
+}
+
+async function getAdminDashboardSummary(req, res) {
+  try {
+    const [availableTeachers, totalRooms, classesToday, activeConsultations] = await Promise.all([
+      User.countDocuments({
+        role: "teacher",
+        $or: [
+          { teacher_status: "On School" },
+          { teacher_status: { $exists: false } },
+        ],
+      }),
+      ScheduleEntry.aggregate([
+        {
+          $project: {
+            rooms: {
+              $setUnion: [
+                ["$room"],
+                {
+                  $map: {
+                    input: "$parallelSlots",
+                    as: "slot",
+                    in: "$$slot.room",
+                  },
+                },
+              ],
+            },
+          },
+        },
+        { $unwind: "$rooms" },
+        { $match: { rooms: { $ne: "" } } },
+        { $group: { _id: "$rooms" } },
+        { $count: "rooms" },
+      ]).then((results) => (results[0]?.rooms || 0)),
+      ScheduleEntry.countDocuments({ day: getCurrentDayName() }),
+      ConsultationRequest.countDocuments({ status: { $in: ["PENDING", "APPROVED", "RESCHED"] } }),
+    ]);
+
+    // Debug log to help diagnose missing data in admin dashboard
+    console.debug('getAdminDashboardSummary:', {
+      requester: req.user ? { id: req.user.id, role: req.user.role } : null,
+      availableTeachers,
+      totalRooms,
+      classesToday,
+      activeConsultations,
+    })
+
+    return res.json({
+      availableTeachers: Number(availableTeachers) || 0,
+      availableRooms: Number(totalRooms) || 0,
+      classesToday: Number(classesToday) || 0,
+      consultations: Number(activeConsultations) || 0,
+    });
+  } catch (error) {
+    console.error("getAdminDashboardSummary error:", error);
+    return res.status(500).json({ message: "Failed to load dashboard summary.", error: error.message });
+  }
+}
+
 module.exports = {
   listScheduleTables,
   createScheduleTable,
@@ -506,4 +569,5 @@ module.exports = {
   createSchedule,
   replaceSchedule,
   deleteSchedule,
+  getAdminDashboardSummary,
 };

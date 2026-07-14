@@ -8,7 +8,7 @@
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
-        <div class="email">teacher@gmail.com</div>
+        <div class="email">{{ user.email || 'teacher@gmail.com' }}</div>
       </div>
       <nav class="sidebar-nav">
         <RouterLink

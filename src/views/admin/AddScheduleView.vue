@@ -4,11 +4,11 @@
     <aside class="sidebar">
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
-          <img src="https://i.pravatar.cc/100?img=15" alt="Admin" class="avatar" />
+          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
-        <div class="email">admin@gmail.com</div>
+        <div class="email">{{ user.email || 'admin@gmail.com' }}</div>
       </div>
 
       <nav class="sidebar-nav">
@@ -784,7 +784,7 @@
 </template>
 
 <script setup>
-import { getToken, logout } from '@/auth.js'
+import { getToken, getUser, logout } from '@/auth.js'
 import {
     colorForRoom,
     days,
@@ -804,6 +804,8 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+
+const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const teacherUserMap = ref({})
 

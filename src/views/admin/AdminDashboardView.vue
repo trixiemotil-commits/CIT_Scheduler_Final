@@ -5,11 +5,11 @@
       <!-- Profile -->
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
-          <img src="https://i.pravatar.cc/100?img=15" alt="Admin" class="avatar" />
+          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
-        <div class="email">admin@gmail.com</div>
+        <div class="email">{{ user.email || 'admin@gmail.com' }}</div>
       </div>
 
       <!-- Nav -->
@@ -237,7 +237,7 @@
 </template>
 
 <script setup>
-import { logout } from '@/auth.js'
+import { getToken, getUser, logout } from '@/auth.js'
 import Chart from 'chart.js/auto'
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -254,7 +254,30 @@ const vClickOutside = {
 const router = useRouter()
 const route = useRoute()
 const currentRoute = computed(() => route.path)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try { body = await response.json() } catch (_error) { body = {} }
+
+  if (!response.ok) {
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
+}
+
+const user = getUser() || {}
 /* ── Nav ── */
 const navItems = [
   {
@@ -288,24 +311,36 @@ const navItems = [
 ]
 
 /* ── Stats ── */
-const stats = [
+const stats = ref([
   {
-    label: 'Total Teachers', value: 24, sub: '',
+    label: 'Available Teachers', value: 0, sub: 'On School status',
     icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
   },
   {
-    label: 'Available Rooms', value: 24, sub: 'Classrooms and labs',
+    label: 'Available Rooms', value: 0, sub: 'Distinct rooms in schedules',
     icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`
   },
   {
-    label: 'Scheduled Classes', value: 42, sub: 'This week',
+    label: 'Classes Today', value: 0, sub: 'Scheduled for today',
     icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`
   },
   {
-    label: 'Consultations', value: 42, sub: 'Per Week',
+    label: 'Active Consultations', value: 0, sub: 'Pending / Approved / Rescheduled',
     icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
   }
-]
+])
+
+async function loadDashboardSummary() {
+  try {
+    const payload = await apiRequest('/schedules/dashboard-summary')
+    stats.value[0].value = payload.availableTeachers
+    stats.value[1].value = payload.availableRooms
+    stats.value[2].value = payload.classesToday
+    stats.value[3].value = payload.consultations
+  } catch (error) {
+    console.error('Failed to load dashboard summary:', error)
+  }
+}
 
 /* ── Notifications ── */
 const showNotif = ref(false)
@@ -527,6 +562,7 @@ function createBarChart() {
 }
 
 onMounted(() => {
+  loadDashboardSummary()
   createLineChart()
   createBarChart()
 })
