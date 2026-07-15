@@ -807,16 +807,16 @@
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
 import {
-    colorForRoom,
-    days,
-    entries,
-    parseTime,
-    roomOptions,
-    sections,
-    subjectOptions,
-    teacherOptions,
-    timeOptions,
-    years,
+  colorForRoom,
+  days,
+  entries,
+  parseTime,
+  roomOptions,
+  sections,
+  subjectOptions,
+  teacherOptions,
+  timeOptions,
+  years,
 } from '@/composables/useSchedule.js'
 import Swal from 'sweetalert2'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
@@ -1696,10 +1696,16 @@ async function deleteConsultSlot(id) {
 function printSchedule() {
   const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
   const SLOTS = [
-    '7:00 AM','8:00 AM','9:00 AM','10:00 AM','11:00 AM',
-    '12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM',
-    '5:00 PM','6:00 PM','7:00 PM',
+    '7:00 AM','7:30 AM','8:00 AM','8:30 AM','9:00 AM','9:30 AM',
+    '10:00 AM','10:30 AM','11:00 AM','11:30 AM','12:00 PM','12:30 PM',
+    '1:00 PM','1:30 PM','2:00 PM','2:30 PM','3:00 PM','3:30 PM',
+    '4:00 PM','4:30 PM','5:00 PM','5:30 PM','6:00 PM','6:30 PM','7:00 PM',
   ]
+  const colorMap = {
+    'color-green': { bg: '#1b4332', fg: '#ffffff' }, 'color-yellow': { bg: '#e9c46a', fg: '#5a3e00' },
+    'color-orange': { bg: '#f4a261', fg: '#5a2d00' }, 'color-blue': { bg: '#4a90d9', fg: '#ffffff' },
+    'color-purple': { bg: '#7b5ea7', fg: '#ffffff' }, 'color-red': { bg: '#e63946', fg: '#ffffff' },
+  }
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   function toMins(t) {
     if (!t) return 0
@@ -1714,18 +1720,22 @@ function printSchedule() {
   const pageEntries = Object.entries(entries)
     .filter(([, v]) => !selectedTeacher.value || v.teacher === selectedTeacher.value)
     .map(([, v]) => v)
+  const filteredConsultations = selectedTeacher.value ? consultationSlots.value : []
   function entriesAt(si, day) {
     const from = slotMins[si]
-    const to   = si + 1 < slotMins.length ? slotMins[si + 1] : from + 60
+    const to   = si + 1 < slotMins.length ? slotMins[si + 1] : from + 30
     return pageEntries.filter(v => { if (v.day !== day) return false; const t = toMins(v.timeIn); return t >= from && t < to })
   }
   function rowspanFor(entry) {
     const startMins = toMins(entry.timeIn); const endMins = toMins(entry.timeOut)
-    const si = slotMins.findIndex((m, i) => { const next = i + 1 < slotMins.length ? slotMins[i + 1] : m + 60; return startMins >= m && startMins < next })
+    const si = slotMins.findIndex((m, i) => { const next = i + 1 < slotMins.length ? slotMins[i + 1] : m + 30; return startMins >= m && startMins < next })
     if (si < 0) return 1
     let span = 1
     for (let i = si + 1; i < SLOTS.length; i++) { if (slotMins[i] >= endMins) break; span++ }
     return Math.max(1, span)
+  }
+  function consultRowspanFor(consult) {
+    return rowspanFor({ timeIn: consult.startTime, timeOut: consult.endTime })
   }
   const occupied = Array.from({length: SLOTS.length}, () => Array(DAYS.length).fill(false))
   let bodyHTML = ''
@@ -1739,13 +1749,24 @@ function printSchedule() {
         const rs = rowspanFor(matched[0])
         for (let r = 1; r < rs; r++) { if (si + r < SLOTS.length) occupied[si + r][di] = true }
         const inner = matched.map(e => `<div class="entry-block"><span class="e-time">${esc(e.timeIn)} – ${esc(e.timeOut)}</span><span class="e-section">${esc(e.section)}</span><span class="e-teacher">${esc(e.teacher)}</span><span class="e-subject">${esc(e.subject)}</span><span class="e-room">${esc(e.room)}</span></div>`).join('<hr class="entry-sep">')
-        bodyHTML += `<td class="entry-cell" rowspan="${rs}">${inner}</td>`
-      } else { bodyHTML += '<td class="empty-cell"></td>' }
+        const clr = colorMap[matched[0].color] || { bg: '#eef1fb', fg: '#1a1a2e' }
+        bodyHTML += `<td class="entry-cell" rowspan="${rs}" style="background:${clr.bg};color:${clr.fg}">${inner}</td>`
+      } else {
+        const consult = filteredConsultations.find(c => c.dayOfWeek === DAYS[di] && toMins(c.startTime) >= slotMins[si] && toMins(c.startTime) < (si + 1 < slotMins.length ? slotMins[si + 1] : slotMins[si] + 30))
+        if (consult) {
+          const rs = consultRowspanFor(consult)
+          for (let r = 1; r < rs; r++) { if (si + r < SLOTS.length) occupied[si + r][di] = true }
+          bodyHTML += `<td class="entry-cell consultation-cell" rowspan="${rs}"><div class="entry-block"><span class="e-teacher">Consultation</span><span class="e-time">${esc(consult.startTime)} - ${esc(consult.endTime)}</span></div></td>`
+        } else {
+          bodyHTML += '<td class="empty-cell"></td>'
+        }
+      }
     }
     bodyHTML += '</tr>'
   }
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Schedule</title>
 <style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Segoe UI',Arial,sans-serif;padding:20px;font-size:11px;color:#1a1a2e;}h2{font-size:15px;font-weight:700;margin-bottom:3px;}.sub{font-size:10px;color:#666;margin-bottom:12px;}table{width:100%;border-collapse:collapse;table-layout:fixed;}th{background:#1a1a2e;color:#fff;padding:7px 6px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.04em;border:1px solid #0d0d1e;}th.time-hdr{width:72px;}td{border:1px solid #dde;vertical-align:top;padding:0;}td.time-col{background:#f0f2fa;font-size:10px;font-weight:600;color:#444;text-align:center;padding:5px 3px;width:72px;}td.empty-cell{background:#fafbff;}td.entry-cell{background:#eef1fb;padding:4px 5px;vertical-align:top;}.entry-block{padding:2px 0;}.entry-sep{border:none;border-top:1px dashed #c5cadf;margin:3px 0;}td.entry-cell span{display:block;line-height:1.45;}.e-time{font-size:9px;color:#888;margin-bottom:2px;}.e-section{font-weight:700;font-size:10px;color:#1a1a2e;}.e-teacher{font-size:10px;color:#333;}.e-subject{font-size:9.5px;color:#555;font-style:italic;}.e-room{font-size:9.5px;color:#777;}</style>
+<style>body,td,th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.entry-cell span{color:#fff!important;opacity:1!important;}.consultation-cell{background:#4a90d9!important;color:#fff!important;}</style>
 </head><body>
 <h2>Teacher Schedule${selectedTeacher.value ? ' — Prof. ' + esc(selectedTeacher.value) : ''}</h2>
 <p class="sub">Printed on ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</p>
@@ -1948,7 +1969,14 @@ onMounted(async () => {
 .room-card-number { font-size: 1rem; font-weight: 700; color: #1b4332; text-align: center; }
 .room-card-floor { font-size: 0.72rem; color: #888; }
 
-.teacher-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; max-width: 1200px; width: 100%; }
+.teacher-grid {
+  display: grid;
+  /* Keep filtered results in the same fixed three-column card layout. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 1200px;
+  width: 100%;
+}
 .teacher-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
   min-height: 230px; padding: 24px 18px;
@@ -1970,6 +1998,14 @@ onMounted(async () => {
 .teacher-name { font-size: 0.95rem; font-weight: 600; color: #1b4332; text-align: center; line-height: 1.3; }
 .small-empty-state {
   padding: 18px 20px; border-radius: 12px; background: #f8fcfa; border: 1px dashed #cfe3d8; color: #5d7a6d;
+}
+
+@media (max-width: 900px) {
+  .teacher-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .teacher-grid { grid-template-columns: 1fr; }
 }
 
 .loading-state { display: flex; align-items: center; gap: 10px; color: #40916c; font-size: 0.9rem; padding: 40px 0; justify-content: center; }

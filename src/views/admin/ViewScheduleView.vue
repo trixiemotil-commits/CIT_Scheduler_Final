@@ -72,15 +72,6 @@
             <template v-else-if="viewMode === 'teacher'">{{ selectedTeacher ? 'Weekly teacher schedule — read only' : 'Select a teacher to view their schedule' }}</template>
           </p>
         </div>
-        <div v-if="(viewMode === 'room' && selectedRoom) || (viewMode === 'teacher' && selectedTeacher)" class="header-right">
-          <button class="icon-btn" title="Print" @click="printSchedule">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9"/>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-              <rect x="6" y="14" width="12" height="8"/>
-            </svg>
-          </button>
-        </div>
       </header>
 
       <!-- ── Mode Selection ── -->
@@ -817,6 +808,7 @@ function printSchedule() {
   .e-section{font-size:9.5px;font-weight:600;margin-top:2px;}
   .e-time{font-size:8.5px;opacity:.7;margin-top:2px;}
 </style>
+<style>body,td,th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}td span{color:#fff!important;opacity:1!important;}</style>
 </head><body>
 <h2>${esc(title)}</h2>
 <p class="sub">${esc(sub)}</p>
@@ -975,7 +967,8 @@ function printSchedule() {
 }
 .teacher-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  /* Keep search results in their normal three-column slots instead of stretching. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
   max-width: 1200px;
   width: 100%;
@@ -1007,6 +1000,14 @@ function printSchedule() {
   padding: 18px 20px; border-radius: 12px;
   background: #f8fcfa; border: 1px dashed #cfe3d8;
   color: #5d7a6d;
+}
+
+@media (max-width: 900px) {
+  .teacher-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .teacher-grid { grid-template-columns: 1fr; }
 }
 
 /* ── Step containers ── */

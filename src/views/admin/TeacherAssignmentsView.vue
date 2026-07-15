@@ -248,12 +248,32 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
+        <div class="logout-modal-box" role="dialog" aria-modal="true" aria-labelledby="logout-modal-title">
+          <div class="logout-modal-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </div>
+          <h2 id="logout-modal-title" class="logout-modal-title">Log out?</h2>
+          <p class="logout-modal-sub">You will be returned to the login page.</p>
+          <div class="logout-modal-actions">
+            <button class="logout-cancel-btn" @click="showLogoutModal = false">Cancel</button>
+            <button class="logout-confirm-btn" @click="confirmLogout">Log out</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -262,6 +282,7 @@ const currentRoute = computed(() => route.path)
 
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const showLogoutModal = ref(false)
 const showAddModal = ref(false)
 const showAreasDropdown = ref(false)
 const newTeacherName = ref('')
@@ -273,6 +294,12 @@ const fileInput = ref(null)
 const activeTab = ref('All')
 const currentIndex = ref(0)
 const itemsPerPage = 3
+
+function confirmLogout() {
+  showLogoutModal.value = false
+  logout()
+  router.push('/')
+}
 
 const statusTabs = ['All', 'In School', 'On-Meeting', 'On-leave']
 
@@ -508,7 +535,24 @@ const addNewTeacher = () => {
   console.log('New teacher added:', newTeacher)
 }
 
-onMounted(loadTeachers)
+let teacherRefreshInterval
+
+function refreshTeachersWhenVisible() {
+  if (!document.hidden) loadTeachers()
+}
+
+onMounted(() => {
+  loadTeachers()
+  teacherRefreshInterval = window.setInterval(loadTeachers, 15000)
+  window.addEventListener('focus', loadTeachers)
+  document.addEventListener('visibilitychange', refreshTeachersWhenVisible)
+})
+
+onBeforeUnmount(() => {
+  window.clearInterval(teacherRefreshInterval)
+  window.removeEventListener('focus', loadTeachers)
+  document.removeEventListener('visibilitychange', refreshTeachersWhenVisible)
+})
 </script>
 
 <style scoped>
@@ -1033,6 +1077,35 @@ onMounted(loadTeachers)
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
   position: relative;
 }
+
+.logout-modal-box {
+  width: 360px;
+  max-width: 94vw;
+  padding: 36px 40px 32px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+.logout-modal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: #ffeaea;
+}
+
+.logout-modal-title { margin: 0; font-size: 1.45rem; color: #111; }
+.logout-modal-sub { margin: 8px 0 18px; color: #777; }
+.logout-modal-actions { display: flex; justify-content: center; gap: 20px; }
+.logout-cancel-btn, .logout-confirm-btn { border: none; border-radius: 10px; padding: 10px 22px; font: inherit; font-weight: 600; cursor: pointer; }
+.logout-cancel-btn { background: #ffeaea; color: #e63946; }
+.logout-confirm-btn { background: #1b4332; color: #fff; }
+.logout-confirm-btn:hover { background: #2d6a4f; }
 
 .modal-header {
   margin-bottom: 24px;
