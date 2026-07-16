@@ -133,11 +133,26 @@
       <div v-else-if="addMode === 'room' && !contextFloor" class="step-container">
         <p class="step-hint">Choose a floor to see available rooms</p>
         <div class="floor-grid">
-          <button v-for="floor in addFloors" :key="floor.label" class="floor-card" @click="contextFloor = floor.label">
-            <div class="floor-number">{{ floor.number }}</div>
-            <div class="floor-label">{{ floor.label }}</div>
-            <div class="floor-room-count">{{ floor.rooms.length }} rooms</div>
-          </button>
+          <div v-for="floor in addFloors" :key="floor.label" class="floor-card floor-card-expanded">
+            <div class="floor-card-header">
+              <div class="floor-number">{{ floor.number }}</div>
+              <div class="floor-card-meta">
+                <div class="floor-label">{{ floor.label }}</div>
+                <div class="floor-room-count">{{ floor.rooms.length }} rooms</div>
+              </div>
+            </div>
+            <div class="floor-room-buttons">
+              <button
+                v-for="room in floor.rooms"
+                :key="room"
+                type="button"
+                class="floor-room-btn"
+                @click="chooseRoomFromFloor(floor.label, room)"
+              >
+                {{ room }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -152,11 +167,17 @@
           <input v-model.trim="roomSearchQuery" type="text" class="teacher-search-input" placeholder="Search room..." />
         </div>
         <div v-if="filteredContextFloorRooms.length" class="room-grid">
-          <button v-for="room in filteredContextFloorRooms" :key="room" class="room-card" :class="{ 'room-card-comlab': room.toLowerCase().includes('comlab') }" @click="contextRoom = room">
-            <svg class="room-card-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-            <div class="room-card-number">{{ room }}</div>
-            <div class="room-card-floor">{{ contextFloor }}</div>
-          </button>
+          <template v-for="room in filteredContextFloorRooms" :key="room">
+            <button v-if="contextFloor === '2nd Floor'" type="button" class="room-card room-card-inline" @click="chooseRoomFromFloor(contextFloor, room)">
+              <div class="room-card-number">{{ room }}</div>
+              <div class="room-card-floor">{{ contextFloor }}</div>
+            </button>
+            <button v-else class="room-card" :class="{ 'room-card-comlab': room.toLowerCase().includes('comlab') }" @click="chooseRoomFromFloor(contextFloor, room)">
+              <svg class="room-card-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+              <div class="room-card-number">{{ room }}</div>
+              <div class="room-card-floor">{{ contextFloor }}</div>
+            </button>
+          </template>
         </div>
         <div v-else class="empty-state small-empty-state">
           <p>No rooms found for <strong>“{{ roomSearchQuery }}”</strong>.</p>
@@ -937,6 +958,11 @@ function resetAddMode() {
   selectedTeacher.value = ''
   contextFloor.value = null
   contextRoom.value  = null
+}
+
+function chooseRoomFromFloor(floorLabel, room) {
+  contextFloor.value = floorLabel
+  contextRoom.value = room
 }
 
 /* ── Room-context grid helpers (for room add mode) ── */
@@ -1944,6 +1970,47 @@ onMounted(async () => {
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .floor-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); }
+.floor-card-expanded {
+  width: 100%;
+  min-height: auto;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 24px 28px;
+}
+.floor-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.floor-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.floor-room-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+.floor-room-btn {
+  border: 1px solid #dce8e1;
+  background: #f8fcfa;
+  color: #1b4332;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: inherit;
+}
+.floor-room-btn:hover {
+  border-color: #40916c;
+  background: #e8f5ea;
+  transform: translateY(-1px);
+}
 .floor-number {
   width: 54px; height: 54px; border-radius: 50%;
   background: linear-gradient(135deg, #1b4332, #40916c); color: #fff;
@@ -1962,6 +2029,11 @@ onMounted(async () => {
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
 .room-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); }
+.room-card-inline {
+  min-height: 110px;
+  width: 130px;
+  justify-content: center;
+}
 .room-card-comlab { border-color: #c5e1f9; background: #f0f8ff; }
 .room-card-comlab:hover { border-color: #4a90d9; background: #e8f4ff; }
 .room-card-icon { color: #1b4332; opacity: 0.5; }
@@ -1971,15 +2043,16 @@ onMounted(async () => {
 
 .teacher-grid {
   display: grid;
-  /* Keep filtered results in the same fixed three-column card layout. */
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Responsive grid: auto-fit columns with a sensible min width for cards */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
-  max-width: 1200px;
   width: 100%;
+  max-width: 1200px;
 }
 .teacher-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-  min-height: 230px; padding: 24px 18px;
+  min-height: 180px; padding: 20px 16px;
+  width: 100%; box-sizing: border-box;
   background: #fff; border: 1.5px solid #e0e0e0; border-radius: 16px;
   cursor: pointer; transition: all 0.18s; font-family: inherit;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);

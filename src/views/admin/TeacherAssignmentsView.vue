@@ -784,11 +784,12 @@ onBeforeUnmount(() => {
 /* ════════════════════════ TEACHERS GRID/CAROUSEL ════════════════════════ */
 .teachers-carousel-wrap {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   justify-content: center;
   flex: 1;
   min-height: 0;
+  width: 100%;
 }
 
 .carousel-arrow {
@@ -814,16 +815,19 @@ onBeforeUnmount(() => {
 
 .teachers-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 20px;
   flex: 1;
   min-height: 300px;
+  width: 100%;
+  min-width: 0;
+  align-items: start;
 }
 
 /* ════════════════════════ TEACHER CARD ════════════════════════ */
 .teacher-card {
   border-radius: 12px;
-  padding: 28px 24px 24px;
+  padding: 24px 20px 20px;
   position: relative;
   overflow: hidden;
   border: 2px solid #e6e6e6;
@@ -832,7 +836,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  min-height: 560px;
+  min-height: 440px;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .teacher-card:hover {
