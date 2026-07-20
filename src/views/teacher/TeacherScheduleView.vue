@@ -22,6 +22,7 @@
           <span>{{ item.name }}</span>
         </RouterLink>
       </nav>
+      <RoleSwitchButton />
       <button class="logout-btn" @click="showLogoutModal = true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -34,64 +35,55 @@
 
     <!-- ═══════════════════ MAIN ═══════════════════ -->
     <main class="main">
-      <header class="main-header">
+      <header class="main-header teacher-main-header">
         <div>
           <h1 class="page-title">My Schedule</h1>
-          <p class="page-sub">View your teaching schedule and availability</p>
+          <p class="page-sub">View your weekly class and consultation schedule</p>
         </div>
       </header>
 
-      <!-- Schedule Card -->
-      <section class="schedule-card">
-        <div class="card-top">
-          <div>
-            <div class="card-title">My Teaching Schedule</div>
-            <div class="card-sub">{{ loadError || (isLoading ? 'Loading your schedule...' : 'Your weekly class schedule and room assignments') }}</div>
+      <section class="schedule-card read-only-schedule">
+        <div class="sched-topbar">
+          <div class="sched-topbar-left">
+            <h2 class="sched-grid-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              Prof. {{ userName || 'Teacher' }}
+            </h2>
+            <p class="sched-grid-sub">{{ loadError || (isLoading ? 'Loading schedule...' : 'Read-only view') }}</p>
           </div>
-          <div class="filter-wrap">
-            <select class="subject-select" v-model="selectedSubject">
-              <option value="">All Subject</option>
-              <option v-for="opt in subjectOptions" :key="opt.code" :value="opt.code">
-                {{ opt.label }}
-              </option>
-            </select>
-            <svg class="select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </div>
+          <button class="icon-btn" type="button" title="Print" aria-label="Print schedule" @click="printSchedule">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1-2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          </button>
         </div>
-
-        <!-- Grid -->
-        <div class="table-scroll">
-          <table class="sched-table">
+        <div class="sched-grid-wrap">
+          <table class="sched-grid">
             <thead>
               <tr>
                 <th class="th-time">Time</th>
                 <th
-                  v-for="(day, di) in DAYS"
+                  v-for="day in DAYS"
                   :key="day"
-                  :class="['th-day', { 'th-day-active': expandedDay === day }]"
-                  :style="expandedDay === day ? { width: '300px', minWidth: '300px' } : expandedDay ? { width: '60px', minWidth: '60px' } : { width: '120px', minWidth: '120px' }"
+                  class="th-day"
+                  :style="expandedDay === day ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
                   @click="toggleExpand(day)"
-                >
-                  {{ expandedDay && expandedDay !== day ? DAY_SHORT[day] : day }}
-                </th>
+                >{{ day }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(rowCells, ri) in tableMatrix" :key="ri">
+              <tr v-for="(rowCells, ri) in tableMatrix" :key="ri" class="time-row" :class="{ 'half-hour': TIME_SLOTS[ri].start.endsWith(':30') }">
                 <td class="td-time">{{ TIME_SLOTS[ri].label }}</td>
                 <template v-for="(cell, ci) in rowCells" :key="ci">
                   <!-- Class cell -->
                   <td
                     v-if="cell.type === 'start'"
                     :rowspan="cell.rowspan"
+                    :style="expandedDay === DAYS[ci] ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
                     :class="[
                       'td-class',
                       cell.cls.color === 'orange' ? 'cell-orange' : (cell.cls.color === 'yellow' ? 'cell-yellow' : 'cell-green'),
                       { 'col-expanded': expandedDay === DAYS[ci] }
                     ]"
-                    @click="expandedDay === DAYS[ci] ? openModal(cell.cls) : toggleExpand(DAYS[ci])"
+                    @click="toggleExpand(DAYS[ci])"
                   >
                     <!-- Compact view -->
                     <template v-if="expandedDay !== DAYS[ci]">
@@ -130,7 +122,9 @@
                   <td
                     v-else-if="cell.type === 'consult'"
                     :rowspan="cell.rowspan"
+                    :style="expandedDay === DAYS[ci] ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
                     :class="['td-class', 'cell-blue', { 'col-expanded': expandedDay === DAYS[ci] }]"
+                    @click="toggleExpand(DAYS[ci])"
                   >
                     <template v-if="expandedDay !== DAYS[ci]">
                       <div class="cell-room-sm">Consultation</div>
@@ -172,6 +166,7 @@
                   <!-- Empty cell -->
                   <td
                     v-else-if="cell.type === 'empty'"
+                    :style="expandedDay === DAYS[ci] ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
                     :class="['td-empty', { 'col-expanded': expandedDay === DAYS[ci] }]"
                   ></td>
                   <!-- occupied: skip -->
@@ -313,14 +308,15 @@ const navItems = [
 ]
 
 /* ── Schedule grid constants ── */
-const ALL_STARTS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00']
-const TIME_SLOTS = ALL_STARTS.slice(0, -1).map((s, i) => ({
-  start: s,
-  end:   ALL_STARTS[i + 1],
-  label: `${formatTime12(s)}-${formatTime12(ALL_STARTS[i + 1])}`
-}))
-const GRID_START_MINUTES = Number(ALL_STARTS[0].slice(0, 2)) * 60
-const GRID_END_MINUTES = Number(ALL_STARTS[ALL_STARTS.length - 1].slice(0, 2)) * 60
+const GRID_START_MINUTES = 7 * 60
+const GRID_END_MINUTES = 19 * 60
+const TIME_SLOTS = Array.from({ length: (GRID_END_MINUTES - GRID_START_MINUTES) / 30 }, (_, index) => {
+  const startMinutes = GRID_START_MINUTES + (index * 30)
+  const endMinutes = startMinutes + 30
+  const toTime = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+  const start = toTime(startMinutes)
+  return { start, end: toTime(endMinutes), label: formatTime12(start) }
+})
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_SHORT = { Monday: 'Monday', Tuesday: 'Tues', Wednesday: 'Wed', Thursday: 'Thurs', Friday: 'Fri', Saturday: 'Sat' }
 
@@ -410,7 +406,7 @@ function startSlotIndex(totalMinutes) {
   }
 
   const clamped = Math.max(GRID_START_MINUTES, Math.min(totalMinutes, GRID_END_MINUTES - 1))
-  return Math.floor((clamped - GRID_START_MINUTES) / 60)
+  return Math.floor((clamped - GRID_START_MINUTES) / 30)
 }
 
 function endSlotIndex(totalMinutes) {
@@ -419,7 +415,7 @@ function endSlotIndex(totalMinutes) {
   }
 
   const clamped = Math.max(GRID_START_MINUTES + 1, Math.min(totalMinutes, GRID_END_MINUTES))
-  return Math.ceil((clamped - GRID_START_MINUTES) / 60)
+  return Math.ceil((clamped - GRID_START_MINUTES) / 30)
 }
 
 function resolveGridSpan(startTime, endTime) {
@@ -700,8 +696,8 @@ function toggleExpand(day) {
 
 /* ── Build table matrix (handles rowspan occupation) ── */
 const tableMatrix = computed(() => {
-  const data = filteredClasses.value
-  const consultations = filteredConsultations.value
+  const data = scheduleData.value
+  const consultations = consultationData.value
   const occupied = Array.from({ length: DAYS.length }, () => new Array(TIME_SLOTS.length).fill(false))
 
   return TIME_SLOTS.map((slot, ri) =>
@@ -731,6 +727,16 @@ const showModal    = ref(false)
 const selectedClass = ref(null)
 function openModal(cls) { selectedClass.value = cls; showModal.value = true }
 function closeModal()   { showModal.value = false }
+
+function printSchedule() {
+  const previousExpandedDay = expandedDay.value
+  expandedDay.value = null
+
+  requestAnimationFrame(() => {
+    window.print()
+    expandedDay.value = previousExpandedDay
+  })
+}
 
 /* ── Logout ── */
 const showLogoutModal = ref(false)
@@ -841,11 +847,12 @@ function confirmLogout() {
 .main {
   flex: 1;
   padding: 40px 44px 32px;
-  overflow-y: auto;
+  overflow: hidden;
   min-width: 0;
   display: flex;
   flex-direction: column;
   height: 100vh;
+  box-sizing: border-box;
 }
 
 /* Header */
@@ -1442,6 +1449,272 @@ function confirmLogout() {
   transition: background 0.18s;
 }
 .logout-confirm-btn:hover { background: #2d6a4f; }
+
+/* Read-only teacher schedule */
+.schedule-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.teacher-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #0d3d2b;
+}
+
+.teacher-heading h1 {
+  margin: 0;
+  color: #070707;
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+.schedule-page-header p {
+  margin: 7px 0 0;
+  color: #5d6670;
+  font-size: 0.88rem;
+}
+
+.print-button {
+  width: 43px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  color: #212121;
+  background: #fff;
+  border: 1px solid #d9dfe0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.print-button:hover { background: #f2f7f4; border-color: #1b4332; }
+
+.read-only-schedule {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.read-only-schedule .table-scroll { overflow: auto; }
+
+.read-only-schedule .sched-table {
+  min-width: 980px;
+  table-layout: fixed;
+  border: 1px solid #e3e7e5;
+}
+
+.read-only-schedule .th-time,
+.read-only-schedule .th-day {
+  background: #164b34;
+  border: 1px solid #164b34;
+  color: #fff;
+  padding: 13px 8px;
+  font-size: 0.8rem;
+  cursor: default;
+}
+
+.read-only-schedule .th-time { width: 88px; }
+.read-only-schedule .th-day:hover { background: #164b34; }
+
+.read-only-schedule .td-time {
+  height: 39px;
+  padding: 0 7px;
+  background: #f5f7f6;
+  border-color: #e3e7e5;
+  color: #111;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.read-only-schedule .td-empty {
+  width: auto;
+  min-width: 0;
+  height: 39px;
+  border-color: #e3e7e5;
+  background: #fff;
+}
+
+.read-only-schedule .td-class {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  padding: 8px 10px;
+  border: 4px solid #fff;
+  border-radius: 8px;
+  cursor: default;
+  vertical-align: top;
+}
+
+.read-only-schedule .td-class:hover { filter: none; }
+.read-only-schedule .cell-green { background: #164b34; }
+.read-only-schedule .cell-orange { background: #d97832; color: #fff; }
+.read-only-schedule .cell-yellow { background: #bd8118; color: #fff; }
+.read-only-schedule .cell-blue { background: #2869a9; }
+
+/* Same grid format as Admin > View Schedule > By Teacher */
+.read-only-schedule {
+  background: #fff;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 16px;
+  padding: 22px 24px 24px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sched-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.sched-grid-title {
+  margin: 0;
+  color: #1b4332;
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+.sched-grid-sub { margin: 4px 0 0; color: #777; font-size: 0.82rem; }
+
+.icon-btn {
+  width: 42px;
+  height: 34px;
+  flex: 0 0 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: visible;
+  line-height: 1;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  color: #3f3f3f;
+  background: #fff;
+  cursor: pointer;
+}
+.icon-btn svg { display: block; width: 18px; height: 18px; flex-shrink: 0; }
+.icon-btn:hover { border-color: #1b4332; color: #1b4332; background: #f5faf7; }
+
+.sched-grid-wrap {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 8px;
+}
+.main,
+.sched-grid-wrap {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.main::-webkit-scrollbar,
+.sched-grid-wrap::-webkit-scrollbar { display: none; }
+.sched-grid { width: 100%; min-width: 800px; border-collapse: collapse; table-layout: fixed; }
+.sched-grid th {
+  background: #1b4332;
+  color: #fff;
+  border: 1px solid #1b4332;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 12px 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+.sched-grid .th-day {
+  cursor: pointer;
+  transition: width 650ms cubic-bezier(0.16, 1, 0.3, 1), background-color 180ms ease;
+}
+.sched-grid .th-day:hover { background: #2d6a4f; }
+.sched-grid .th-time { width: 90px; }
+.sched-grid .th-time,
+.sched-grid .th-day {
+  position: static;
+}
+.sched-grid tbody tr { height: 40px; }
+.sched-grid td { border: 1px solid #ececec; padding: 0; vertical-align: top; position: relative; }
+.sched-grid .td-time {
+  width: 90px;
+  height: 40px;
+  padding: 0 6px;
+  text-align: center;
+  vertical-align: middle;
+  background: #f8f9fa;
+  border-color: #ececec;
+  color: #1b4332;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.sched-grid .half-hour .td-time { background: #f4f5f6; }
+.sched-grid .half-hour td { border-top: 1px dashed #eee; }
+.sched-grid .td-empty { width: auto; min-width: 0; height: 40px; background: #fff; }
+.sched-grid .td-class {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  padding: 7px 9px;
+  border: 3px solid #fff;
+  border-radius: 6px;
+  vertical-align: top;
+  cursor: pointer;
+  transition: width 650ms cubic-bezier(0.16, 1, 0.3, 1), min-width 650ms cubic-bezier(0.16, 1, 0.3, 1), padding 650ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sched-grid .td-class.col-expanded,
+.sched-grid .td-empty.col-expanded { width: 320px; min-width: 320px; }
+.sched-grid .td-class.col-expanded {
+  padding: 13px 15px;
+  animation: schedule-card-expand 650ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes schedule-card-expand {
+  from { opacity: 0.72; transform: scaleX(0.88); transform-origin: left center; }
+  to { opacity: 1; transform: scaleX(1); transform-origin: left center; }
+}
+.sched-grid .cell-green { background: #1b4332; color: #fff; }
+.sched-grid .cell-yellow { background: #e9c46a; color: #5a3e00; }
+.sched-grid .cell-orange { background: #f4a261; color: #5a2d00; }
+.sched-grid .cell-blue { background: #4a90d9; color: #fff; }
+.sched-grid .cell-room-sm { font-size: 0.88rem; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sched-grid .cell-subject-sm { font-size: 0.8rem; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sched-grid .cell-tag-sm { font-size: 0.72rem; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.25); padding-top: 3px; }
+.sched-grid .cell-campus-sm { font-size: 0.7rem; margin-top: 2px; }
+.sched-grid .consult-approved-chip { margin: 4px 0 0; }
+
+@media print {
+  .sidebar,
+  .print-button,
+  .icon-btn { display: none !important; }
+
+  .layout,
+  .main {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .main-header { margin-bottom: 16px; }
+  .read-only-schedule {
+    display: block;
+    overflow: visible;
+    border: 0;
+    padding: 0;
+  }
+  .sched-grid-wrap { display: block; overflow: visible; }
+  .sched-grid { min-width: 0; width: 100%; }
+  .sched-grid th,
+  .sched-grid .td-time,
+  .sched-grid .td-class {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
 
 /* Responsive */
 @media (max-width: 900px) {

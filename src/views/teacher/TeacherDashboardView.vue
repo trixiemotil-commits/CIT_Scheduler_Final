@@ -10,6 +10,44 @@
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
         <div class="email">{{ user.email || 'teacher@gmail.com' }}</div>
+        <div class="sidebar-presence-wrap" v-click-outside="closePresenceMenu">
+          <button class="sidebar-presence-btn" @click="showPresenceMenu = !showPresenceMenu">
+            <span :class="['sidebar-status-dot', teacherStatus === 'On School' ? 'is-in-school' : 'is-on-leave']"></span>
+            <span>{{ teacherStatus === 'On School' ? 'In School' : 'On Leave' }}</span>
+            <span class="presence-arrow">›</span>
+          </button>
+          <div v-if="showPresenceMenu" class="presence-menu">
+            <button class="presence-option" @click="setTeacherStatus('On School')"><span class="presence-dot online"></span>In School</button>
+            <button class="presence-option" @click="setTeacherStatus('On Leave')"><span class="presence-dot leave"></span>On Leave</button>
+            <div class="presence-separator"></div>
+            <button class="presence-option" @click="setAvailability('Available')"><span class="presence-dot online"></span>Available for consultations</button>
+            <button class="presence-option" @click="setAvailability('Unavailable')"><span class="presence-dot unavailable"></span>Unavailable for consultations</button>
+            <div class="presence-separator"></div>
+            <button class="presence-option" @click="recordTimeIn"><span class="presence-clock">◷</span>Time in now</button>
+            <div class="presence-time">{{ formattedTimeIn }}</div>
+          </div>
+        </div>
+        <p v-if="teacherStatusMessage" :class="['presence-feedback', teacherStatusError ? 'is-error' : '']">{{ teacherStatusMessage }}</p>
+        <div class="sidebar-status-panel">
+          <div class="sidebar-status-head">
+            <span>My Status</span>
+            <span :class="['sidebar-status-dot', teacherStatus === 'On School' ? 'is-in-school' : 'is-on-leave']"></span>
+          </div>
+          <select v-model="teacherStatus" class="sidebar-status-select" aria-label="Work status">
+            <option value="On School">In School</option>
+            <option value="On Leave">On Leave</option>
+          </select>
+          <select v-model="teacherAvailability" class="sidebar-status-select" aria-label="Consultation availability">
+            <option value="Available">Available for consultations</option>
+            <option value="Unavailable">Unavailable for consultations</option>
+          </select>
+          <div class="sidebar-time-in">Time in: {{ formattedTimeIn }}</div>
+          <div class="sidebar-status-actions">
+            <button :disabled="savingTeacherStatus" @click="recordTimeIn">Time in</button>
+            <button class="sidebar-save-status" :disabled="savingTeacherStatus" @click="saveTeacherStatus">{{ savingTeacherStatus ? 'Saving…' : 'Save' }}</button>
+          </div>
+          <p v-if="teacherStatusMessage" :class="['sidebar-status-message', teacherStatusError ? 'is-error' : '']">{{ teacherStatusMessage }}</p>
+        </div>
       </div>
 
       <!-- Nav -->
@@ -25,6 +63,8 @@
           <span>{{ item.name }}</span>
         </RouterLink>
       </nav>
+
+      <RoleSwitchButton />
 
       <!-- Logout -->
       <button class="logout-btn" @click="showLogoutModal = true">
@@ -46,12 +86,12 @@
           <p class="page-sub">Manage your schedule and student consultations</p>
         </div>
         <div class="notif-wrap" v-click-outside="() => showNotif = false">
-          <button class="notif-btn" @click="showNotif = !showNotif">
+          <button class="notif-btn" @click="toggleNotifications">
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <span class="notif-dot"></span>
+            <span v-if="unreadNotifs.length" class="notif-dot"></span>
           </button>
 
           <!-- Notification Dropdown -->
@@ -62,6 +102,7 @@
             <div class="notif-tabs">
               <button :class="['notif-tab', { active: notifTab === 'all' }]" @click="notifTab = 'all'">All</button>
               <button :class="['notif-tab', { active: notifTab === 'unread' }]" @click="notifTab = 'unread'">Unread</button>
+              <button :class="['notif-tab', { active: notifTab === 'read' }]" @click="notifTab = 'read'">Read</button>
             </div>
             <div class="notif-list-wrap">
               <!-- Unread tab: all unread items under a single New section -->
@@ -69,9 +110,10 @@
                 <template v-if="unreadNotifs.length">
                   <div class="notif-section-label">New</div>
                   <ul class="notif-list">
-                    <li v-for="n in unreadNotifs" :key="n.id" class="notif-item">
+                    <li v-for="n in unreadNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text">{{ n.message }}</span>
+                      <span class="notif-text"><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></span>
+                      <span class="notif-read-status unread">Unread</span>
                       <span class="notif-unread-dot"></span>
                     </li>
                   </ul>
@@ -79,14 +121,29 @@
                 <div v-else class="notif-empty">No unread notifications</div>
               </template>
 
+              <template v-else-if="notifTab === 'read'">
+                <template v-if="readNotifs.length">
+                  <div class="notif-section-label">Read</div>
+                  <ul class="notif-list">
+                    <li v-for="n in readNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
+                      <img :src="n.avatar" class="notif-avatar" alt="" />
+                      <span class="notif-text"><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></span>
+                      <span class="notif-read-status read">Read</span>
+                    </li>
+                  </ul>
+                </template>
+                <div v-else class="notif-empty">No read notifications</div>
+              </template>
+
               <!-- All tab: split by New / today groups -->
               <template v-else>
                 <template v-if="newNotifs.length">
                   <div class="notif-section-label">New</div>
                   <ul class="notif-list">
-                    <li v-for="n in newNotifs" :key="n.id" class="notif-item">
+                    <li v-for="n in newNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text">{{ n.message }}</span>
+                      <span class="notif-text"><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></span>
+                      <span :class="['notif-read-status', n.read ? 'read' : 'unread']">{{ n.read ? 'Read' : 'Unread' }}</span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
                     </li>
                   </ul>
@@ -94,9 +151,10 @@
                 <template v-if="todayNotifs.length">
                   <div class="notif-section-label">today</div>
                   <ul class="notif-list">
-                    <li v-for="n in todayNotifs" :key="n.id" class="notif-item">
+                    <li v-for="n in todayNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text">{{ n.message }}</span>
+                      <span class="notif-text"><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></span>
+                      <span :class="['notif-read-status', n.read ? 'read' : 'unread']">{{ n.read ? 'Read' : 'Unread' }}</span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
                     </li>
                   </ul>
@@ -239,6 +297,7 @@
         </div>
       </div>
     </Teleport>
+
   </div>
 </template>
 
@@ -289,16 +348,154 @@ const navItems = [
 /* ── Notifications ── */
 const showNotif = ref(false)
 const notifTab = ref('all')
-const notifications = ref([
-  { id: 1, avatar: 'https://i.pravatar.cc/100?img=61', message: 'Teddy has submitted a consultation request.', read: false, group: 'new' },
-  { id: 2, avatar: 'https://i.pravatar.cc/100?img=52', message: 'Teddy has submitted a consultation request.', read: false, group: 'today' },
-  { id: 3, avatar: 'https://i.pravatar.cc/100?img=54', message: 'Teddy has submitted a consultation request.', read: false, group: 'today' },
-  { id: 4, avatar: 'https://i.pravatar.cc/100?img=56', message: 'Teddy has submitted a consultation request.', read: true,  group: 'today' },
-  { id: 5, avatar: 'https://i.pravatar.cc/100?img=58', message: 'Teddy has submitted a consultation request.', read: true,  group: 'today' },
-])
+const notifications = ref([])
+const readNotificationIds = ref(new Set(JSON.parse(localStorage.getItem('cit_teacher_read_notifications') || '[]')))
+let notificationRefreshTimer
 const unreadNotifs = computed(() => notifications.value.filter(n => !n.read))
+const readNotifs = computed(() => notifications.value.filter(n => n.read))
 const newNotifs    = computed(() => notifications.value.filter(n => n.group === 'new'))
 const todayNotifs  = computed(() => notifications.value.filter(n => n.group === 'today'))
+
+function notificationGroup(createdAt) {
+  const created = new Date(createdAt)
+  if (Number.isNaN(created.getTime())) return 'today'
+  return Date.now() - created.getTime() < 24 * 60 * 60 * 1000 ? 'new' : 'today'
+}
+
+async function loadConsultationNotifications() {
+  try {
+    const payload = await apiRequest('/consultations/requests')
+    const requests = Array.isArray(payload.requests) ? payload.requests : []
+    notifications.value = requests.slice(0, 20).map(request => {
+      const name = request.studentName || 'Student'
+      const subject = request.subject || 'the selected subject'
+      const day = request.consultationDayOfWeek || 'Schedule TBA'
+      const time = request.consultationStartTime && request.consultationEndTime
+        ? `${request.consultationStartTime} – ${request.consultationEndTime}`
+        : 'Time TBA'
+      return {
+        id: request.id,
+        avatar: request.studentAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=DDECE5&color=1B4332`,
+        studentName: name,
+        subject,
+        consultationTime: `${day} · ${time}`,
+        read: request.status !== 'PENDING' || readNotificationIds.value.has(request.id),
+        group: notificationGroup(request.createdAt || request.requestDate),
+        request,
+      }
+    })
+  } catch (_) {
+    notifications.value = []
+  }
+}
+
+function toggleNotifications() {
+  showNotif.value = !showNotif.value
+  if (showNotif.value) loadConsultationNotifications()
+}
+
+function markNotificationRead(notificationId) {
+  if (!notificationId) return
+  const updatedReadIds = new Set(readNotificationIds.value)
+  updatedReadIds.add(notificationId)
+  readNotificationIds.value = updatedReadIds
+  localStorage.setItem('cit_teacher_read_notifications', JSON.stringify([...updatedReadIds]))
+
+  notifications.value = notifications.value.map(notification =>
+    notification.id === notificationId ? { ...notification, read: true } : notification
+  )
+}
+
+function openNotification(notification) {
+  markNotificationRead(notification.id)
+  showNotif.value = false
+  router.push('/teacher/consultation')
+}
+
+/* ── Teacher status ── */
+const teacherStatus = ref(user.teacher_status || 'On School')
+const teacherAvailability = ref(user.teacher_availability || 'Available')
+const teacherTimeIn = ref(user.teacher_time_in || null)
+const savingTeacherStatus = ref(false)
+const teacherStatusMessage = ref('')
+const teacherStatusError = ref(false)
+const showPresenceMenu = ref(false)
+let statusMessageTimer
+const formattedTimeIn = computed(() => {
+  if (!teacherTimeIn.value) return 'Not recorded'
+  const date = new Date(teacherTimeIn.value)
+  if (Number.isNaN(date.getTime())) return 'Not recorded'
+  return date.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
+})
+
+async function saveTeacherStatus({ record = false, durationMinutes = 0 } = {}) {
+  if (savingTeacherStatus.value) return
+  savingTeacherStatus.value = true
+  teacherStatusMessage.value = ''
+  teacherStatusError.value = false
+
+  try {
+    const payload = await apiRequest('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify({
+        teacher_status: teacherStatus.value,
+        teacher_availability: teacherAvailability.value,
+        recordTimeIn: record,
+        statusDurationMinutes: durationMinutes,
+      }),
+    })
+    const updatedUser = payload.user || {}
+    teacherStatus.value = updatedUser.teacher_status || teacherStatus.value
+    teacherAvailability.value = updatedUser.teacher_availability || teacherAvailability.value
+    teacherTimeIn.value = updatedUser.teacher_time_in || teacherTimeIn.value
+    localStorage.setItem('cit_user', JSON.stringify(updatedUser))
+    teacherStatusMessage.value = record ? 'Time in recorded and status saved.' : 'Status saved. Students can request consultations only when you are available and in school.'
+    clearTimeout(statusMessageTimer)
+    statusMessageTimer = setTimeout(() => {
+      teacherStatusMessage.value = ''
+    }, 3000)
+  } catch (error) {
+    clearTimeout(statusMessageTimer)
+    teacherStatusError.value = true
+    teacherStatusMessage.value = error.message || 'Unable to save your status.'
+  } finally {
+    savingTeacherStatus.value = false
+  }
+}
+
+function closePresenceMenu() {
+  showPresenceMenu.value = false
+}
+
+function setTeacherStatus(status) {
+  teacherStatus.value = status
+  closePresenceMenu()
+  saveTeacherStatus()
+}
+
+function setAvailability(availability) {
+  teacherAvailability.value = availability
+  closePresenceMenu()
+  saveTeacherStatus()
+}
+
+function recordTimeIn() {
+  teacherStatus.value = 'On School'
+  closePresenceMenu()
+  saveTeacherStatus({ record: true })
+}
+
+async function loadTeacherStatus() {
+  try {
+    const payload = await apiRequest('/auth/me')
+    const currentUser = payload.user || {}
+    teacherStatus.value = currentUser.teacher_status || 'On School'
+    teacherAvailability.value = currentUser.teacher_availability || 'Available'
+    teacherTimeIn.value = currentUser.teacher_time_in || null
+  } catch (_) {
+    // Keep the session values as a safe offline fallback.
+  }
+}
 
 /* ── Today's Classes ── */
 const todayClasses = ref([])
@@ -306,9 +503,6 @@ const classesLoading = ref(false)
 const classesError = ref('')
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const todayDayName = ref(dayNames[new Date().getDay()])
-let midnightRefreshTimer = null
-let autoRefreshTimer = null
-const AUTO_REFRESH_MS = 30000
 
 function getTeacherName() {
   const fullName = typeof user?.name === 'string' ? user.name.trim() : ''
@@ -322,13 +516,6 @@ function getTeacherName() {
 
 function getCurrentDayName() {
   return dayNames[new Date().getDay()]
-}
-
-function millisUntilNextDay() {
-  const now = new Date()
-  const nextMidnight = new Date(now)
-  nextMidnight.setHours(24, 0, 0, 0)
-  return Math.max(1000, nextMidnight.getTime() - now.getTime())
 }
 
 async function apiRequest(path, options = {}) {
@@ -487,61 +674,15 @@ async function loadTodayClasses() {
   }
 }
 
-function scheduleMidnightRefresh() {
-  if (midnightRefreshTimer) {
-    clearTimeout(midnightRefreshTimer)
-  }
-
-  midnightRefreshTimer = setTimeout(async () => {
-    await loadTodayClasses()
-    scheduleMidnightRefresh()
-  }, millisUntilNextDay())
-}
-
-function onVisibilityChange() {
-  if (document.visibilityState === 'visible') {
-    loadTodayClasses()
-  }
-}
-
-function onWindowFocus() {
-  loadTodayClasses()
-}
-
-function startAutoRefresh() {
-  if (autoRefreshTimer) {
-    clearInterval(autoRefreshTimer)
-  }
-
-  autoRefreshTimer = setInterval(() => {
-    if (document.visibilityState !== 'visible') {
-      return
-    }
-    loadTodayClasses()
-  }, AUTO_REFRESH_MS)
-}
-
 onMounted(() => {
+  loadTeacherStatus()
   loadTodayClasses()
-  scheduleMidnightRefresh()
-  startAutoRefresh()
-  document.addEventListener('visibilitychange', onVisibilityChange)
-  window.addEventListener('focus', onWindowFocus)
+  loadConsultationNotifications()
+  notificationRefreshTimer = window.setInterval(loadConsultationNotifications, 15000)
 })
 
 onBeforeUnmount(() => {
-  if (midnightRefreshTimer) {
-    clearTimeout(midnightRefreshTimer)
-    midnightRefreshTimer = null
-  }
-
-  if (autoRefreshTimer) {
-    clearInterval(autoRefreshTimer)
-    autoRefreshTimer = null
-  }
-
-  document.removeEventListener('visibilitychange', onVisibilityChange)
-  window.removeEventListener('focus', onWindowFocus)
+  window.clearInterval(notificationRefreshTimer)
 })
 
 /* ── Logout ── */
@@ -609,6 +750,36 @@ function confirmLogout() {
 .brand { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
 .role  { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email { font-size: 0.82rem; color: #888; word-break: break-all; }
+.sidebar-presence-wrap { position: relative; width: 100%; margin-top: 10px; }
+.sidebar-presence-btn { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; padding: 0 10px; border: 0; border-radius: 8px; background: #f2f4f3; color: #475467; font: inherit; font-size: 0.78rem; cursor: pointer; }
+.sidebar-presence-btn:hover { background: #e8f1eb; color: #1b4332; }
+.sidebar-presence-btn .presence-arrow { margin-left: auto; font-size: 1.25rem; line-height: 1; }
+.presence-menu { position: absolute; z-index: 20; width: 245px; padding: 8px; border: 1px solid #d9dedb; border-radius: 10px; background: #fff; box-shadow: 0 10px 28px rgba(0,0,0,.16); text-align: left; }
+.presence-menu { top: calc(100% + 7px); left: 0; }
+.presence-option { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: #344054; font: inherit; font-size: 0.78rem; text-align: left; cursor: pointer; }
+.presence-option:hover { background: #f1f7f3; color: #1b4332; }
+.presence-arrow { margin-left: auto; font-size: 1.2rem; color: #667085; }
+.presence-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+.presence-dot.online { background: #40a86b; }.presence-dot.leave { background: #e63946; }.presence-dot.unavailable { border: 3px solid #98a2b3; background: transparent; }
+.presence-clock { width: 10px; color: #667085; font-size: 1rem; }
+.presence-separator { height: 1px; margin: 6px 4px; background: #eaecf0; }
+.presence-time { padding: 4px 9px 2px 29px; color: #98a2b3; font-size: 0.68rem; }
+.presence-feedback { width: 100%; margin: 6px 0 0; color: #1b4332; font-size: .68rem; line-height: 1.35; text-align: center; }
+.presence-feedback.is-error { color: #b42318; }
+.sidebar-status-panel { display: none; }
+.sidebar-status-panel { width: 100%; margin-top: 12px; padding: 11px; border: 1px solid #dce8e1; border-radius: 10px; background: #f8fcfa; text-align: left; }
+.sidebar-status-head { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; color: #1b4332; font-size: 0.78rem; font-weight: 700; }
+.sidebar-status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.sidebar-status-dot.is-in-school { background: #40916c; }
+.sidebar-status-dot.is-on-leave { background: #e63946; }
+.sidebar-status-select { width: 100%; height: 32px; margin-top: 6px; padding: 0 7px; border: 1px solid #cfe3d8; border-radius: 6px; background: #fff; color: #344054; font: inherit; font-size: 0.73rem; }
+.sidebar-time-in { margin-top: 8px; color: #667085; font-size: 0.7rem; line-height: 1.35; }
+.sidebar-status-actions { display: flex; gap: 6px; margin-top: 9px; }
+.sidebar-status-actions button { flex: 1; height: 30px; border: 1px solid #1b4332; border-radius: 6px; background: #fff; color: #1b4332; font: inherit; font-size: 0.72rem; font-weight: 600; cursor: pointer; }
+.sidebar-status-actions .sidebar-save-status { background: #1b4332; color: #fff; }
+.sidebar-status-actions button:disabled { cursor: not-allowed; opacity: .65; }
+.sidebar-status-message { margin: 8px 0 0; color: #1b4332; font-size: 0.68rem; line-height: 1.35; }
+.sidebar-status-message.is-error { color: #b42318; }
 
 /* Nav */
 .sidebar-nav {
@@ -718,7 +889,8 @@ function confirmLogout() {
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
-  width: 400px;
+  width: 620px;
+  max-width: calc(100vw - 32px);
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.14);
@@ -761,6 +933,11 @@ function confirmLogout() {
 .notif-item:hover { background: #f7faf8; }
 .notif-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .notif-text { flex: 1; font-size: 0.9rem; color: #222; line-height: 1.5; padding-top: 2px; }
+.notif-text strong { color: #1b4332; font-weight: 700; }
+.notif-text small { display: block; margin-top: 4px; color: #667085; font-size: 0.76rem; font-weight: 600; }
+.notif-read-status { align-self: center; padding: 3px 7px; border-radius: 999px; font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
+.notif-read-status.unread { background: #d8f3dc; color: #1b4332; }
+.notif-read-status.read { background: #f0f0f0; color: #667085; }
 .notif-unread-dot { width: 12px; height: 12px; border-radius: 50%; background: #40916c; flex-shrink: 0; margin-top: 6px; }
 
 /* ── Stat Cards ── */

@@ -42,6 +42,23 @@
         <button type="submit" class="submit-btn">Login</button>
       </form>
 
+      <div v-else-if="activeTab === 'role-select'" class="form role-selection">
+        <p class="role-selection__intro">This account has more than one role. Choose how you would like to continue.</p>
+        <button
+          v-for="role in availableRoles"
+          :key="role"
+          type="button"
+          class="role-selection__button"
+          :disabled="isSelectingRole"
+          @click="chooseRole(role)"
+        >
+          <span class="role-selection__name">Continue as {{ roleLabel(role) }}</span>
+          <span class="role-selection__description">{{ role === 'admin' ? 'Manage users, schedules, and system settings.' : 'View your teaching schedule and consultations.' }}</span>
+        </button>
+        <div v-if="loginError" class="error-msg">{{ loginError }}</div>
+        <button type="button" class="action-link plain-btn" @click="cancelRoleSelection">Use another account</button>
+      </div>
+
       <!-- ── Sign Up Form ── -->
       <form v-else class="form" @submit.prevent="handleSignUp">
         <!-- First / Last Name -->
@@ -132,7 +149,7 @@
 </template>
 
 <script setup>
-import { login, register } from '@/auth.js'
+import { login, logout, register, selectRole } from '@/auth.js'
 import { computed, defineComponent, h, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
@@ -221,6 +238,8 @@ const IconEye = defineComponent({
 
 const activeTab = ref('signin')
 const loginError = ref('')
+const availableRoles = ref([])
+const isSelectingRole = ref(false)
 const signUpError = ref('')
 const signUpSuccess = ref('')
 const router = useRouter()
@@ -303,24 +322,41 @@ async function handleLogin() {
       return
     }
 
-    const role = await login(signIn.email, signIn.password, recaptchaToken)
-    console.log('Login role:', role)
-    // Fallback: if admin email, force admin dashboard
-    if (role === 'admin') {
-      router.push('/admin/dashboard')
-    } else if (role === 'teacher') {
-      router.push('/teacher/dashboard')
-    } else if (role === 'student') {
-      router.push('/student/dashboard')
-    } else if (signIn.email === 'lorenzguangco04@gmail.com') {
-      router.push('/admin/dashboard')
-    } else {
-      router.push('/')
+    const payload = await login(signIn.email, signIn.password, recaptchaToken)
+    const roles = Array.isArray(payload.user.roles) && payload.user.roles.length ? payload.user.roles : [payload.user.role]
+    if (roles.length > 1) {
+      availableRoles.value = roles
+      activeTab.value = 'role-select'
+      return
     }
+    router.push(routeByRole(payload.user.role))
   } catch (error) {
     loginError.value = error.message || 'Invalid email or password.'
     try { resetRecaptcha(signinWidgetId) } catch (_) {}
   }
+}
+
+function roleLabel(role) {
+  return role === 'admin' ? 'Admin' : role === 'teacher' ? 'Teacher' : 'Student'
+}
+
+async function chooseRole(role) {
+  loginError.value = ''
+  isSelectingRole.value = true
+  try {
+    await selectRole(role)
+    router.push(routeByRole(role))
+  } catch (error) {
+    loginError.value = error.message || 'Unable to select this role.'
+  } finally {
+    isSelectingRole.value = false
+  }
+}
+
+function cancelRoleSelection() {
+  logout()
+  availableRoles.value = []
+  activeTab.value = 'signin'
 }
 
 async function handleSignUp() {
@@ -623,6 +659,18 @@ watch(activeTab, (val) => {
 }
 .submit-btn:hover { background: #2d6a4f; }
 .submit-btn:active { transform: scale(0.98); }
+
+.role-selection { gap: 14px; }
+.role-selection__intro { margin: 0 0 4px; color: #667085; line-height: 1.5; text-align: center; }
+.role-selection__button {
+  width: 100%; text-align: left; border: 1px solid #d7e3dc; border-radius: 12px;
+  background: #f8fbf9; padding: 15px 16px; cursor: pointer; font-family: inherit;
+  display: flex; flex-direction: column; gap: 4px; transition: border-color .15s, background .15s;
+}
+.role-selection__button:hover:not(:disabled) { background: #edf6f0; border-color: #2d6a4f; }
+.role-selection__button:disabled { opacity: .65; cursor: wait; }
+.role-selection__name { color: #1b4332; font-weight: 700; font-size: 1rem; }
+.role-selection__description { color: #667085; font-size: .84rem; }
 
 @media (max-width: 520px) {
   .card { padding: 36px 22px 32px; }

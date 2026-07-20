@@ -16,6 +16,14 @@ function formatRole(role) {
   return ROLE_LABELS[role] || role;
 }
 
+function getUserRoles(user) {
+  return Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role];
+}
+
+function formatRoles(user) {
+  return getUserRoles(user).map(formatRole).join(" & ");
+}
+
 function sanitizeAccountStatus(status) {
   if (ACCOUNT_STATUS_VALUES.includes(status)) {
     return status;
@@ -37,11 +45,14 @@ function toClientUser(user) {
     lastName: user.lastName,
     name: `${user.firstName} ${user.lastName}`.trim(),
     email: user.email,
-    role: formatRole(user.role),
+    role: formatRoles(user),
+    roles: getUserRoles(user),
     department: user.department || "",
     phone: user.phone || "",
     account_status: user.account_status || fallbackAccountStatus(user.role),
-    teacher_status: user.teacher_status || (user.role === "teacher" ? "On School" : ""),
+    teacher_status: user.teacher_status || (getUserRoles(user).includes("teacher") ? "On School" : ""),
+    teacher_availability: user.teacher_availability || (getUserRoles(user).includes("teacher") ? "Available" : ""),
+    teacher_time_in: user.teacher_time_in || null,
     status: user.account_status || fallbackAccountStatus(user.role),
     employeeId: user.employeeId || "",
     studentId: user.studentId || "",
@@ -62,6 +73,11 @@ function normalizeRole(role) {
   return value;
 }
 
+function normalizeRoles(role, roles) {
+  const values = Array.isArray(roles) && roles.length ? roles : [role];
+  return [...new Set(values.map(normalizeRole))];
+}
+
 function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -78,7 +94,7 @@ async function listUsers(req, res) {
   if (role) {
     const normalizedRole = role.toLowerCase();
     if (normalizedRole === 'teacher' || normalizedRole === 'admin' || normalizedRole === 'student') {
-      query.role = normalizedRole;
+      query.$or = [{ role: normalizedRole }, { roles: normalizedRole }];
     }
   }
   
@@ -93,6 +109,7 @@ async function createUser(req, res) {
       lastName,
       email,
       role,
+      roles,
       password,
       phone = "",
       account_status = "Active",
@@ -111,9 +128,9 @@ async function createUser(req, res) {
       return res.status(400).json({ message: "Password must be at least 8 characters long." });
     }
 
-    let normalizedRole;
+    let normalizedRoles;
     try {
-      normalizedRole = normalizeRole(role);
+      normalizedRoles = normalizeRoles(role, roles);
     } catch (roleError) {
       return res.status(400).json({ message: roleError.message });
     }
@@ -125,7 +142,7 @@ async function createUser(req, res) {
       return res.status(400).json({ message: "Email must end with .au@phinmaed.com." });
     }
 
-    if (normalizedRole === "student" && !normalizedStudentId) {
+    if (normalizedRoles.includes("student") && !normalizedStudentId) {
       return res.status(400).json({ message: "Student ID is required for student accounts." });
     }
 
@@ -154,12 +171,13 @@ async function createUser(req, res) {
       firstName: normalizeString(firstName),
       lastName: normalizeString(lastName),
       email: normalizedEmail,
-      role: normalizedRole,
+      role: normalizedRoles[0],
+      roles: normalizedRoles,
       passwordHash,
       department: DEFAULT_DEPARTMENT,
       phone: normalizeString(phone),
       account_status: "Active",
-      teacher_status: normalizedRole === "teacher" ? sanitizeTeacherStatus(teacher_status) : undefined,
+      teacher_status: normalizedRoles.includes("teacher") ? sanitizeTeacherStatus(teacher_status) : undefined,
       employeeId: normalizedEmployeeId || undefined,
       studentId: normalizedStudentId || undefined,
       avatar: avatar || null,
@@ -180,6 +198,7 @@ async function updateUser(req, res) {
       lastName,
       email,
       role,
+      roles,
       phone = "",
       account_status,
       teacher_status = "On School",
@@ -192,9 +211,9 @@ async function updateUser(req, res) {
       return res.status(400).json({ message: "Missing required fields." });
     }
 
-    let normalizedRole;
+    let normalizedRoles;
     try {
-      normalizedRole = normalizeRole(role);
+      normalizedRoles = normalizeRoles(role, roles);
     } catch (roleError) {
       return res.status(400).json({ message: roleError.message });
     }
@@ -221,7 +240,7 @@ async function updateUser(req, res) {
       if (studentOwner && studentOwner.id !== id) {
         return res.status(409).json({ message: "Student ID already exists." });
       }
-    } else if (normalizedRole === "student") {
+    } else if (normalizedRoles.includes("student")) {
       return res.status(400).json({ message: "Student ID is required for student accounts." });
     }
 
@@ -235,14 +254,15 @@ async function updateUser(req, res) {
     user.firstName = normalizeString(firstName);
     user.lastName = normalizeString(lastName);
     user.email = normalizedEmail;
-    user.role = normalizedRole;
+    user.role = normalizedRoles[0];
+    user.roles = normalizedRoles;
     user.department = DEFAULT_DEPARTMENT;
     user.phone = normalizeString(phone);
     const requestedStatus = normalizeString(account_status) || normalizeString(status);
     if (requestedStatus) {
       user.account_status = sanitizeAccountStatus(requestedStatus);
     }
-    user.teacher_status = normalizedRole === "teacher" ? sanitizeTeacherStatus(teacher_status) : undefined;
+    user.teacher_status = normalizedRoles.includes("teacher") ? sanitizeTeacherStatus(teacher_status) : undefined;
     user.employeeId = normalizedEmployeeId || undefined;
 
     if (normalizedStudentId) {

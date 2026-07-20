@@ -44,11 +44,14 @@ async function findTeacherUserByIdentifier(identifier) {
   if (!key) return null;
 
   // First, try the canonical employeeId lookup.
-  let teacherUser = await User.findOne({ role: "teacher", employeeId: key }).lean();
+  let teacherUser = await User.findOne({
+    employeeId: key,
+    $or: [{ role: "teacher" }, { roles: "teacher" }],
+  }).lean();
   if (teacherUser) return teacherUser;
 
   // Fallback for legacy records where full teacher name may be stored.
-  const teachers = await User.find({ role: "teacher" })
+  const teachers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
     .select("role firstName lastName employeeId department account_status teacher_status avatar")
     .lean();
 
@@ -115,12 +118,16 @@ function dateOnlyToUtc(dateStr) {
 }
 
 async function resolveTeacherStatus(userDoc) {
-  if (!userDoc || userDoc.role !== "teacher") {
+  if (!userDoc || !(Array.isArray(userDoc.roles) ? userDoc.roles : [userDoc.role]).includes("teacher")) {
     return "On Leave";
   }
 
   if (userDoc.account_status !== "Active") {
     return "On Leave";
+  }
+
+  if (userDoc.teacher_status_expires_at && new Date(userDoc.teacher_status_expires_at) <= new Date()) {
+    return "On School";
   }
 
   const directStatus = ["On School", "On Meeting", "On Leave", "Main Campus", "On Main Campus"].includes(userDoc.teacher_status)
@@ -345,8 +352,8 @@ function toClientLog(doc) {
 // GET /api/consultations/teachers
 async function listTeachersForStudents(req, res) {
   try {
-    const teacherUsers = await User.find({ role: "teacher" })
-      .select("role firstName lastName employeeId department account_status teacher_status avatar")
+    const teacherUsers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
+      .select("role firstName lastName employeeId department account_status teacher_status teacher_availability avatar")
       .lean();
 
     const teachers = await Promise.all(
@@ -397,7 +404,7 @@ async function listTeachersForStudents(req, res) {
           avatar: teacherUser.avatar || null,
           department: teacherUser.department || "",
           status,
-          available: status === "On School" && availabilitySlots.length > 0,
+          available: status === "On School" && teacherUser.teacher_availability !== "Unavailable" && availabilitySlots.length > 0,
           subjects: Array.from(subjectSet),
           assignedYears: Array.from(yearSet),
           assignedSections: Array.from(sectionSet),
@@ -443,7 +450,7 @@ async function createConsultationRequest(req, res) {
     }
 
     const teacherUser = await User.findById(teacherId).lean();
-    if (!teacherUser || teacherUser.role !== "teacher") {
+    if (!teacherUser || !(Array.isArray(teacherUser.roles) ? teacherUser.roles : [teacherUser.role]).includes("teacher")) {
       return res.status(404).json({ message: "Teacher not found." });
     }
 
@@ -453,6 +460,10 @@ async function createConsultationRequest(req, res) {
       return res.status(409).json({
         message: `${teacherName} can only accept consultation requests while on school status. Current status: ${teacherStatus}.`,
       });
+    }
+
+    if (teacherUser.teacher_availability === "Unavailable") {
+      return res.status(409).json({ message: `${teacherName} is not accepting consultation requests at the moment.` });
     }
 
     const lookupKeys = [teacherUser.employeeId, teacherName].filter(Boolean);
@@ -687,6 +698,10 @@ async function updateConsultationRequestByStudent(req, res) {
       return res.status(409).json({
         message: `${teacherName} can only accept consultation requests while on school status. Current status: ${teacherStatus}.`,
       });
+    }
+
+    if (teacherUser.teacher_availability === "Unavailable") {
+      return res.status(409).json({ message: `${teacherName} is not accepting consultation requests at the moment.` });
     }
 
     const lookupKeys = [teacherUser.employeeId, teacherName].filter(Boolean);

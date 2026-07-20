@@ -33,3 +33,9 @@ body {
   font-family: 'Poppins', sans-serif !important;
 }
 .swal-cancel-text:hover { background: #ffeaea !important; border-radius: 8px !important; }
+
+.sidebar-nav .admin-secondary-nav {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  flex: 0 0 auto;
+}

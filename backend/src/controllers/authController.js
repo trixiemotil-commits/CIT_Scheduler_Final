@@ -39,11 +39,17 @@ const PASSWORD_OTP_LIFETIME_MS = 60 * 1000;
 const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
 const PASSWORD_OTP_MAX_ATTEMPTS = 5;
 
-function signToken(user) {
+function getUserRoles(user) {
+  const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role];
+  return [...new Set(roles)].filter(Boolean);
+}
+
+function signToken(user, activeRole = user.role) {
   return jwt.sign(
     {
       id: user._id.toString(),
-      role: user.role,
+      role: activeRole,
+      roles: getUserRoles(user),
       email: user.email,
     },
     process.env.JWT_SECRET,
@@ -52,6 +58,9 @@ function signToken(user) {
 }
 
 function toSafeUser(user) {
+  const statusExpired = user.teacher_status_expires_at
+    && new Date(user.teacher_status_expires_at).getTime() <= Date.now();
+
   return {
     id: user._id,
     firstName: user.firstName,
@@ -60,13 +69,17 @@ function toSafeUser(user) {
     studentId: user.studentId,
     email: user.email,
     role: user.role,
+    roles: getUserRoles(user),
     department: user.department,
     yearLevel: user.yearLevel,
     section: user.section,
     phone: user.phone,
     gender: user.gender,
     account_status: user.account_status,
-    teacher_status: user.teacher_status,
+    teacher_status: statusExpired ? "On School" : user.teacher_status,
+    teacher_availability: user.teacher_availability,
+    teacher_time_in: user.teacher_time_in,
+    teacher_status_expires_at: statusExpired ? null : user.teacher_status_expires_at,
     status: user.account_status,
     avatar: user.avatar,
     name: `${user.firstName} ${user.lastName}`.trim(),
@@ -244,15 +257,36 @@ async function login(req, res) {
       return res.status(403).json({ message: getAccountStatusMessage(user.account_status) });
     }
 
-    const token = signToken(user);
+    const roles = getUserRoles(user);
+    const token = signToken(user, user.role);
 
     return res.status(200).json({
       message: "Login successful.",
       token,
-      user: toSafeUser(user),
+      user: { ...toSafeUser(user), role: user.role, roles },
     });
   } catch (error) {
     return res.status(500).json({ message: "Login failed.", error: error.message });
+  }
+}
+
+async function selectRole(req, res) {
+  try {
+    const selectedRole = normalizeString(req.body?.role).toLowerCase();
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    const roles = getUserRoles(user);
+    if (!roles.includes(selectedRole)) {
+      return res.status(403).json({ message: "This account does not have the selected role." });
+    }
+
+    return res.status(200).json({
+      token: signToken(user, selectedRole),
+      user: { ...toSafeUser(user), role: selectedRole, roles },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to select role.", error: error.message });
   }
 }
 
@@ -292,6 +326,12 @@ async function updateMe(req, res) {
     const section = normalizeString(req.body.section);
     const avatar = normalizeString(req.body.avatar);
     const gender = normalizeString(req.body.gender);
+    const teacherStatus = normalizeString(req.body.teacher_status);
+    const teacherAvailability = normalizeString(req.body.teacher_availability);
+    const recordTimeIn = req.body.recordTimeIn === true;
+    const statusDurationMinutes = Number(req.body.statusDurationMinutes || 0);
+    const userRoles = user.roles?.length ? user.roles : [user.role];
+    const isTeacher = userRoles.includes("teacher");
 
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ message: "First name, last name, and email are required." });
@@ -327,6 +367,22 @@ async function updateMe(req, res) {
       return res.status(400).json({ message: "Invalid gender." });
     }
 
+    if (teacherStatus && !["On School", "On Leave"].includes(teacherStatus)) {
+      return res.status(400).json({ message: "Teachers may select only On School or On Leave." });
+    }
+
+    if (teacherAvailability && !["Available", "Unavailable"].includes(teacherAvailability)) {
+      return res.status(400).json({ message: "Invalid consultation availability." });
+    }
+
+    if (statusDurationMinutes && ![15, 60, 480, 1440, 4320].includes(statusDurationMinutes)) {
+      return res.status(400).json({ message: "Invalid status duration." });
+    }
+
+    if ((teacherStatus || teacherAvailability || recordTimeIn) && !isTeacher) {
+      return res.status(403).json({ message: "Only teachers can update teacher status." });
+    }
+
     if (avatar && !avatar.startsWith("data:image/") && !/^https?:\/\//i.test(avatar)) {
       return res.status(400).json({ message: "Avatar must be a valid image URL or data URL." });
     }
@@ -346,6 +402,16 @@ async function updateMe(req, res) {
     }
     if (avatar) {
       user.avatar = avatar;
+    }
+    if (isTeacher) {
+      if (teacherStatus) user.teacher_status = teacherStatus;
+      if (teacherAvailability) user.teacher_availability = teacherAvailability;
+      if (recordTimeIn || teacherStatus === "On School") user.teacher_time_in = new Date();
+      if (teacherStatus) {
+        user.teacher_status_expires_at = teacherStatus === "On Leave" && statusDurationMinutes
+          ? new Date(Date.now() + (statusDurationMinutes * 60 * 1000))
+          : null;
+      }
     }
 
     await user.save();
@@ -581,6 +647,7 @@ async function changePassword(req, res) {
 module.exports = {
   register,
   login,
+  selectRole,
   me,
   updateMe,
   requestPasswordOtp,
