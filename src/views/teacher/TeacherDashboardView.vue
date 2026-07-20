@@ -303,7 +303,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 // v-click-outside directive
@@ -681,7 +681,7 @@ onMounted(() => {
   notificationRefreshTimer = window.setInterval(loadConsultationNotifications, 15000)
 })
 
-onBeforeUnmount(() => {
+onUnmounted(() => {
   window.clearInterval(notificationRefreshTimer)
 })
 

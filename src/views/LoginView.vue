@@ -150,8 +150,8 @@
 </template>
 
 <script setup>
-import { login, register } from '@/auth.js'
-import { computed, defineComponent, h, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { login, register, selectRole } from '@/auth.js'
+import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 // Hidden admin modal state
@@ -683,7 +683,7 @@ onMounted(() => {
   initialiseTronBackground()
 })
 
-onBeforeUnmount(() => {
+onUnmounted(() => {
   disposeTronBackground?.()
 })
 

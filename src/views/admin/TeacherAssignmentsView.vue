@@ -282,7 +282,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -557,7 +557,7 @@ onMounted(() => {
   document.addEventListener('visibilitychange', refreshTeachersWhenVisible)
 })
 
-onBeforeUnmount(() => {
+onUnmounted(() => {
   window.clearInterval(teacherRefreshInterval)
   window.removeEventListener('focus', loadTeachers)
   document.removeEventListener('visibilitychange', refreshTeachersWhenVisible)

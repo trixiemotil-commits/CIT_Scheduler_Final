@@ -273,7 +273,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -655,7 +655,7 @@ onMounted(() => {
   window.addEventListener('focus', onWindowFocus)
 })
 
-onBeforeUnmount(() => {
+onUnmounted(() => {
   if (autoRefreshTimer) {
     clearInterval(autoRefreshTimer)
     autoRefreshTimer = null
