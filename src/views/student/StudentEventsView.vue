@@ -207,7 +207,7 @@ function formatDisplayTime(time24) {
 .header-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #1b4332;
+  color: #4b5563;
 }
 
 .events-wrap {
@@ -223,7 +223,7 @@ function formatDisplayTime(time24) {
   font-size: 1.28rem;
   line-height: 1.1;
   font-weight: 700;
-  color: #1b4332;
+  color: #4b5563;
 }
 
 .events-sub {
@@ -268,7 +268,7 @@ function formatDisplayTime(time24) {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #1b4332;
+  color: #4b5563;
   background: #e4f2e8;
 }
 
@@ -335,7 +335,7 @@ function formatDisplayTime(time24) {
 .ev-view-hero {
   position: relative;
   min-height: 108px;
-  background: radial-gradient(circle at 75% 15%, #2f8b5f 0%, #1b4332 45%, #112a1f 100%);
+  background: radial-gradient(circle at 75% 15%, #2f8b5f 0%, #4b5563 45%, #112a1f 100%);
 }
 
 .ev-view-hero-overlay {
@@ -481,7 +481,7 @@ function formatDisplayTime(time24) {
 
 .ev-view-close-btn {
   border: 1px solid #d1d5db;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border-radius: 10px;
   padding: 7px 14px;

@@ -119,13 +119,13 @@
           <div class="stat-icon">
             <svg width="72" height="72" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
               <!-- Person body -->
-              <circle cx="40" cy="26" r="12" fill="#74c69d" />
-              <path d="M18 62c0-12 10-20 22-20s22 8 22 20" fill="#40916c" />
+              <circle cx="40" cy="26" r="12" fill="#aab0b5" />
+              <path d="M18 62c0-12 10-20 22-20s22 8 22 20" fill="#626a72" />
               <!-- Chat bubble -->
-              <rect x="46" y="10" width="26" height="18" rx="6" fill="#e8f5e9" stroke="#40916c" stroke-width="1.5"/>
-              <path d="M50 32 L46 38 L56 32" fill="#e8f5e9" stroke="#40916c" stroke-width="1.5" stroke-linejoin="round"/>
-              <line x1="52" y1="17" x2="66" y2="17" stroke="#40916c" stroke-width="2" stroke-linecap="round"/>
-              <line x1="52" y1="22" x2="62" y2="22" stroke="#40916c" stroke-width="2" stroke-linecap="round"/>
+              <rect x="46" y="10" width="26" height="18" rx="6" fill="#e8eaeb" stroke="#626a72" stroke-width="1.5"/>
+              <path d="M50 32 L46 38 L56 32" fill="#e8eaeb" stroke="#626a72" stroke-width="1.5" stroke-linejoin="round"/>
+              <line x1="52" y1="17" x2="66" y2="17" stroke="#626a72" stroke-width="2" stroke-linecap="round"/>
+              <line x1="52" y1="22" x2="62" y2="22" stroke="#626a72" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </div>
         </div>
@@ -139,17 +139,17 @@
           <div class="stat-icon">
             <svg width="72" height="72" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
               <!-- Calendar body -->
-              <rect x="12" y="20" width="44" height="40" rx="6" fill="#e8f5e9" stroke="#40916c" stroke-width="2"/>
-              <rect x="12" y="20" width="44" height="14" rx="6" fill="#40916c"/>
-              <rect x="12" y="28" width="44" height="6" fill="#40916c"/>
+              <rect x="12" y="20" width="44" height="40" rx="6" fill="#e8eaeb" stroke="#626a72" stroke-width="2"/>
+              <rect x="12" y="20" width="44" height="14" rx="6" fill="#626a72"/>
+              <rect x="12" y="28" width="44" height="6" fill="#626a72"/>
               <!-- Calendar lines -->
-              <line x1="21" y1="44" x2="29" y2="44" stroke="#40916c" stroke-width="2" stroke-linecap="round"/>
-              <line x1="34" y1="44" x2="42" y2="44" stroke="#40916c" stroke-width="2" stroke-linecap="round"/>
-              <line x1="21" y1="52" x2="29" y2="52" stroke="#40916c" stroke-width="2" stroke-linecap="round"/>
-              <line x1="34" y1="52" x2="42" y2="52" stroke="#40916c" stroke-width="2" stroke-linecap="round"/>
+              <line x1="21" y1="44" x2="29" y2="44" stroke="#626a72" stroke-width="2" stroke-linecap="round"/>
+              <line x1="34" y1="44" x2="42" y2="44" stroke="#626a72" stroke-width="2" stroke-linecap="round"/>
+              <line x1="21" y1="52" x2="29" y2="52" stroke="#626a72" stroke-width="2" stroke-linecap="round"/>
+              <line x1="34" y1="52" x2="42" y2="52" stroke="#626a72" stroke-width="2" stroke-linecap="round"/>
               <!-- Pegs -->
-              <rect x="22" y="14" width="5" height="12" rx="2.5" fill="#2d6a4f"/>
-              <rect x="41" y="14" width="5" height="12" rx="2.5" fill="#2d6a4f"/>
+              <rect x="22" y="14" width="5" height="12" rx="2.5" fill="#4b5259"/>
+              <rect x="41" y="14" width="5" height="12" rx="2.5" fill="#4b5259"/>
               <!-- Clock overlay -->
               <circle cx="58" cy="56" r="14" fill="#fff" stroke="#e8a020" stroke-width="2"/>
               <circle cx="58" cy="56" r="11" fill="#fff3cd"/>
@@ -602,11 +602,11 @@ function confirmLogout() {
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
 }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
 
-.brand { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand { font-size: 1.05rem; font-weight: 600; color: #30353a; }
 .role  { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email { font-size: 0.82rem; color: #888; word-break: break-all; }
 
@@ -631,8 +631,8 @@ function confirmLogout() {
   transition: background 0.18s, color 0.18s;
   cursor: pointer;
 }
-.nav-item:hover { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover { background: #f1f2f2; color: #30353a; }
+.nav-item.active { background: #30353a; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -678,7 +678,7 @@ function confirmLogout() {
 .page-title {
   font-size: 2.4rem;
   font-weight: 700;
-  color: #1b4332;
+  color: #30353a;
   letter-spacing: -0.5px;
   line-height: 1.2;
 }
@@ -701,7 +701,7 @@ function confirmLogout() {
   align-items: center;
   transition: color 0.2s;
 }
-.notif-btn:hover { color: #1b4332; }
+.notif-btn:hover { color: #30353a; }
 .notif-dot {
   position: absolute;
   top: 4px;
@@ -745,7 +745,7 @@ function confirmLogout() {
   border-radius: 20px;
   transition: background 0.18s, color 0.18s;
 }
-.notif-tab.active { background: #1b4332; color: #fff; }
+.notif-tab.active { background: #30353a; color: #fff; }
 .notif-section-label { font-size: 0.88rem; font-weight: 600; color: #333; padding: 14px 22px 6px; }
 .notif-list-wrap { max-height: 340px; overflow-y: auto; padding-bottom: 12px; }
 .notif-list { list-style: none; padding: 0; margin: 0; }
@@ -758,10 +758,10 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.15s;
 }
-.notif-item:hover { background: #f7faf8; }
+.notif-item:hover { background: #f4f5f5; }
 .notif-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .notif-text { flex: 1; font-size: 0.9rem; color: #222; line-height: 1.5; padding-top: 2px; }
-.notif-unread-dot { width: 12px; height: 12px; border-radius: 50%; background: #40916c; flex-shrink: 0; margin-top: 6px; }
+.notif-unread-dot { width: 12px; height: 12px; border-radius: 50%; background: #626a72; flex-shrink: 0; margin-top: 6px; }
 
 /* ── Stat Cards ── */
 .stat-cards {
@@ -783,7 +783,7 @@ function confirmLogout() {
 }
 .stat-left { display: flex; flex-direction: column; gap: 4px; }
 .stat-label { font-size: 0.9rem; color: #555; font-weight: 500; }
-.stat-value { font-size: 3rem; font-weight: 700; color: #1b4332; line-height: 1.1; }
+.stat-value { font-size: 3rem; font-weight: 700; color: #30353a; line-height: 1.1; }
 .stat-sub   { font-size: 0.82rem; color: #aaa; }
 .stat-icon  { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -808,7 +808,7 @@ function confirmLogout() {
   border-radius: 50%;
 }
 .legend-dot.lecture    { background: #e4c86e; }
-.legend-dot.laboratory { background: #40916c; }
+.legend-dot.laboratory { background: #626a72; }
 .legend-dot.main-campus { background: #f4a261; }
 
 /* Table */
@@ -881,7 +881,7 @@ function confirmLogout() {
   font-size: 0.78rem;
   font-weight: 500;
 }
-.badge-parallel { background: #e0f0e8; color: #2d6a4f; }
+.badge-parallel { background: #e0e3e5; color: #4b5259; }
 .badge-not      { background: #f0f0f0; color: #666; }
 
 /* Room badge */
@@ -892,7 +892,7 @@ function confirmLogout() {
   font-size: 0.82rem;
   font-weight: 600;
 }
-.room-green  { background: #d8f3dc; color: #1b4332; }
+.room-green  { background: #d8dcdf; color: #30353a; }
 .room-orange { background: #ffe8c2; color: #b06000; }
 .room-yellow { background: #fff3cd; color: #9a6e00; }
 .room-beige  { background: #fef9e7; color: #9a6e00; }
@@ -954,7 +954,7 @@ function confirmLogout() {
 }
 .logout-cancel-btn:hover { background: #ffeaea; }
 .logout-confirm-btn {
-  background: #1b4332;
+  background: #30353a;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -965,7 +965,7 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.18s;
 }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn:hover { background: #4b5259; }
 
 /* Responsive */
 @media (max-width: 900px) {

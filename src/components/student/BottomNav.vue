@@ -57,7 +57,7 @@ defineProps({ active: { type: String, default: 'home' } })
   font-size: 0.64rem; font-weight: 500;
   transition: color 0.15s;
 }
-.nav-item.active { color: #1b4332; }
-.nav-item.active svg { stroke: #1b4332; }
+.nav-item.active { color: #4b5563; }
+.nav-item.active svg { stroke: #4b5563; }
 .nav-item span { line-height: 1; }
 </style>

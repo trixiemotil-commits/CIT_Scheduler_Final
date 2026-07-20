@@ -275,7 +275,7 @@ function confirmLogout() {
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
 }
 
 .avatar {
@@ -287,7 +287,7 @@ function confirmLogout() {
 .brand {
   font-size: 1.05rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #4b5563;
 }
 
 .role {
@@ -325,12 +325,12 @@ function confirmLogout() {
 }
 
 .nav-item:hover {
-  background: #f0faf3;
-  color: #1b4332;
+  background: #f8fafc;
+  color: #4b5563;
 }
 
 .nav-item.active {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
 }
 
@@ -387,7 +387,7 @@ function confirmLogout() {
 .page-title {
   font-size: 2rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #4b5563;
   letter-spacing: -0.5px;
   line-height: 1.2;
 }
@@ -422,8 +422,8 @@ function confirmLogout() {
   align-items: center;
   gap: 6px;
 }
-.ev-tab:hover  { background: #f0faf3; color: #1b4332; }
-.ev-tab.active { background: #1b4332; color: #fff; }
+.ev-tab:hover  { background: #f8fafc; color: #4b5563; }
+.ev-tab.active { background: #4b5563; color: #fff; }
 .ev-tab-count {
   background: #e63946;
   color: #fff;
@@ -470,7 +470,7 @@ function confirmLogout() {
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
-.event-badge--active   { background: #d8f3e8; color: #1b7a4a; }
+.event-badge--active   { background: #d8dcdf; color: #4f575f; }
 .event-badge--archived { background: #f0f0f0; color: #888; }
 
 .event-card-title { font-size: 1.05rem; font-weight: 700; color: #111; line-height: 1.3; }
@@ -509,7 +509,7 @@ function confirmLogout() {
 
 .event-card--clickable { cursor: pointer; }
 .event-card--clickable:hover {
-  box-shadow: 0 6px 24px rgba(27,67,50,0.13);
+  box-shadow: 0 6px 24px rgba(48, 53, 58,0.13);
   transform: translateY(-2px);
   transition: box-shadow 0.2s, transform 0.2s;
 }
@@ -545,7 +545,7 @@ function confirmLogout() {
 .ev-view-hero {
   position: relative;
   height: 230px;
-  background: linear-gradient(135deg, #1b4332 0%, #52b788 100%);
+  background: linear-gradient(135deg, #4b5563 0%, #64748b 100%);
   background-size: cover;
   background-position: center;
   border-radius: 22px 22px 0 0;
@@ -579,7 +579,7 @@ function confirmLogout() {
   width: fit-content;
   backdrop-filter: blur(4px);
 }
-.ev-view-badge--active   { background: rgba(64,145,108,0.88); color: #fff; }
+.ev-view-badge--active   { background: rgba(83, 91, 100,0.88); color: #fff; }
 .ev-view-badge--archived { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
 .ev-view-title {
   font-size: 1.6rem;
@@ -628,7 +628,7 @@ function confirmLogout() {
   padding: 14px 16px;
   transition: border-color 0.18s, box-shadow 0.18s;
 }
-.ev-view-info-item:hover { border-color: #c8ddd4; box-shadow: 0 2px 10px rgba(27,67,50,0.07); }
+.ev-view-info-item:hover { border-color: #c4c9cd; box-shadow: 0 2px 10px rgba(48, 53, 58,0.07); }
 
 .ev-view-info-icon {
   width: 36px;
@@ -748,7 +748,7 @@ function confirmLogout() {
 }
 
 .logout-confirm-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -761,7 +761,7 @@ function confirmLogout() {
 }
 
 .logout-confirm-btn:hover {
-  background: #2d6a4f;
+  background: #6b7280;
 }
 
 @media (max-width: 900px) {

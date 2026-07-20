@@ -88,6 +88,14 @@
           </div>
         </div>
 
+        <div class="schedule-color-legend" aria-label="Schedule color legend">
+          <span><i class="legend-swatch legend-lab" aria-hidden="true"></i>Laboratory</span>
+          <span><i class="legend-swatch legend-lecture" aria-hidden="true"></i>Lecture</span>
+          <span><i class="legend-swatch legend-consultation" aria-hidden="true"></i>Consultation</span>
+          <span><i class="legend-swatch legend-lunch" aria-hidden="true"></i>Lunch</span>
+          <span><i class="legend-swatch legend-free" aria-hidden="true"></i>Free time</span>
+        </div>
+
         <!-- Pagination: year filter chips -->
         <div class="sched-pagination">
           <span
@@ -109,39 +117,45 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="slot in timeSlots" :key="slot" class="time-row">
+              <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
                 <td class="td-time">{{ slot }}</td>
                 <template v-for="day in days" :key="day">
                   <td
                     v-if="!isSpannedCell(slot, day) && !isConsultSpannedCell(slot, day)"
-                    :rowspan="getEntriesForCell(slot, day).length ? getRowspan(getEntriesForCell(slot, day)[0]) : (getConsultationForCell(slot, day) ? getConsultRowspan(getConsultationForCell(slot, day)) : 1)"
+                    :rowspan="getEntriesForCell(slot, day).length ? getRowspan30(getEntriesForCell(slot, day)[0]) : (getConsultationForCell(slot, day) ? getConsultRowspan30(getConsultationForCell(slot, day)) : 1)"
                     class="td-cell"
-                    :class="{ 'has-entry': getEntriesForCell(slot, day).length, 'consult-cell': !getEntriesForCell(slot, day).length && !!getConsultationForCell(slot, day), 'readonly-entry-cell': getEntriesForCell(slot, day).length && !selectedTeacher }"
+                    :class="{
+                      'has-entry': getEntriesForCell(slot, day).length,
+                      'consult-cell': !getEntriesForCell(slot, day).length && !!getConsultationForCell(slot, day),
+                      'free-time-cell': !getEntriesForCell(slot, day).length && !getConsultationForCell(slot, day),
+                      'readonly-entry-cell': getEntriesForCell(slot, day).length && (!selectedTeacher || getEntriesForCell(slot, day)[0].entryType === 'lunch')
+                    }"
                     @click="canInteractCell(slot, day) ? handleCellClick(slot, day) : null"
                   >
                     <!-- Filled cell: ONE box, all sections inside -->
                     <template v-if="getEntriesForCell(slot, day).length">
                       <div
                         class="sched-entry"
-                        :class="[getEntriesForCell(slot, day)[0].color, { 'entry-readonly': !selectedTeacher }]"
+                        :class="[getEntriesForCell(slot, day)[0].color, { 'entry-readonly': !selectedTeacher || getEntriesForCell(slot, day)[0].entryType === 'lunch' }]"
                         :style="entryStyle(slot, getEntriesForCell(slot, day)[0])"
                       >
                         <div class="entry-teacher">{{ getEntriesForCell(slot, day)[0].teacher }}</div>
                         <div class="entry-subject">{{ getEntriesForCell(slot, day)[0].subject }}</div>
                         <div class="entry-time-range">{{ getEntriesForCell(slot, day)[0].slot }}</div>
                         <!-- Section rows (one per section) -->
-                        <div class="entry-section-rows">
-                          <div
-                            v-for="e in getEntriesForCell(slot, day)"
-                            :key="e._key"
-                            class="entry-section-row"
-                          >
-                            <span class="entry-section-badge">{{ e.section }}</span>
-                            <span class="entry-room">{{ e.room }}</span>
-                          </div>
+                        <div
+                          v-if="getEntriesForCell(slot, day).some((entry) => entry.section || entry.room)"
+                          class="entry-section-rows"
+                        >
+                          <template v-for="e in getEntriesForCell(slot, day)" :key="e._key">
+                            <div v-if="e.section || e.room" class="entry-section-row">
+                              <span v-if="e.section" class="entry-section-badge">{{ e.section }}</span>
+                              <span v-if="e.room" class="entry-room">{{ e.room }}</span>
+                            </div>
+                          </template>
                         </div>
                         <div v-if="getEntriesForCell(slot, day)[0].addedAt" class="entry-timestamp">Added: {{ getEntriesForCell(slot, day)[0].addedAt }}</div>
-                        <div v-if="selectedTeacher" class="entry-edit-hint">Click to edit</div>
+                        <div v-if="selectedTeacher && getEntriesForCell(slot, day)[0].entryType !== 'lunch'" class="entry-edit-hint">Click to edit</div>
                       </div>
                     </template>
                     <!-- Empty cell -->
@@ -772,13 +786,12 @@ import {
   colorForRoom,
   days,
   entries,
-  getRowspan, parseTime,
+  parseTime,
   roomOptions,
   sections,
   subjectOptions,
   teacherOptions,
   timeOptions,
-  timeSlots,
   years,
 } from '@/composables/useSchedule.js'
 import Swal from 'sweetalert2'
@@ -792,6 +805,10 @@ const currentRoute = computed(() => route.path)
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const teacherUserMap = ref({})
+
+// Schedules are entered in 30-minute increments. Render the same increments
+// in this grid so every saved start/end time has an exact label on the left.
+const timeSlots30 = timeOptions
 
 async function apiRequest(path, options = {}) {
   const token = getToken()
@@ -839,7 +856,7 @@ const navItems = [
   { name: 'Add Schedule',   to: '/admin/schedule/add',    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="20"/><line x1="9" y1="17" x2="15" y2="17"/></svg>` },
   { name: 'Teachers',       to: '/admin/teachers',  icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>` },
   { name: 'Events',       to: '/admin/events',    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="5" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="18" r="1" fill="currentColor" stroke="none"/></svg>` },
-  { name: 'Manage Users', to: '/admin/users',     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
+  { name: 'Users',        to: '/admin/users',     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
   { name: 'Settings',     to: '/admin/settings',  icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>` },
 ]
 
@@ -878,7 +895,7 @@ async function fetchConsultationsForTeacher() {
 function getConsultationForCell(rowHour, day) {
   if (!selectedTeacher.value) return null
   const rowStart = parseTime(rowHour)
-  const rowEnd   = rowStart + 60
+  const rowEnd   = rowStart + 30
   return consultationSlots.value.find(c => {
     if (c.dayOfWeek !== day) return false
     const t = parseTime(c.startTime)
@@ -887,7 +904,9 @@ function getConsultationForCell(rowHour, day) {
 }
 
 function canInteractCell(slot, day) {
-  const hasEntry = getEntriesForCell(slot, day).length > 0
+  const cellEntries = getEntriesForCell(slot, day)
+  const hasEntry = cellEntries.length > 0
+  if (cellEntries[0]?.entryType === 'lunch') return false
   if (hasEntry && !selectedTeacher.value) {
     return false
   }
@@ -902,8 +921,8 @@ function consultEntryStyle(rowHour, consult) {
   const mins         = Math.max(1, parseTime(consult.endTime) - consultStart)
   const offsetMins   = consultStart - rowStart
   return {
-    top:    (offsetMins / 60) * ROW_HEIGHT + 3 + 'px',
-    height: Math.max(24, (mins / 60) * ROW_HEIGHT - 6) + 'px',
+    top:    (offsetMins / 30) * ROW_HEIGHT + 3 + 'px',
+    height: Math.max(24, (mins / 30) * ROW_HEIGHT - 6) + 'px',
   }
 }
 
@@ -968,7 +987,7 @@ async function saveConsultSlot() {
     await Swal.fire({
       icon: 'error', title: 'Cannot Save Consultation',
       html: `<span style="font-size:0.95rem;color:#444">${error?.message || 'Failed to save consultation slot.'}</span>`,
-      confirmButtonText: 'OK', confirmButtonColor: '#1b4332', background: '#fff',
+      confirmButtonText: 'OK', confirmButtonColor: '#4b5563', background: '#fff',
       customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
     })
   }
@@ -992,7 +1011,7 @@ async function deleteConsultSlot(id) {
     const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
     consultWeeklyMins.value = res.weeklyUsedMinutes || 0
   } catch (error) {
-    await Swal.fire({ icon: 'error', title: 'Error', text: error?.message || 'Failed to delete.', confirmButtonColor: '#1b4332', background: '#fff' })
+    await Swal.fire({ icon: 'error', title: 'Error', text: error?.message || 'Failed to delete.', confirmButtonColor: '#4b5563', background: '#fff' })
   }
 }
 
@@ -1078,25 +1097,28 @@ function syncEntriesFromApi(apiEntries) {
 
   apiEntries.forEach((entry) => {
     const tableLabel = entry.tableLabel || entry.teacher
-    const section = entry.section
+    const entryType = String(entry.entryType || '').trim().toLowerCase()
+    const isLunch = entryType === 'lunch' || entry.color === 'color-gray' || /\blunch\b/i.test(String(entry.subject || ''))
+    const rawSection = entry.section || ''
+    const section = isLunch ? '' : rawSection
     const day = entry.day
     const slot = `${entry.timeIn} - ${entry.timeOut}`
 
-    if (!tableLabel || !section || !day || !entry.timeIn || !entry.timeOut) {
+    if (!tableLabel || (!rawSection && !isLunch) || !day || !entry.timeIn || !entry.timeOut) {
       return
     }
 
-    const key = `${tableLabel}|${section}|${slot}|${day}`
+    const key = `${tableLabel}|${rawSection || `__lunch_${entry.id || slot}`}|${slot}|${day}`
 
     const inferredCampus = inferCampus(entry)
     const roomBasedColor = colorForRoom(entry.room)
-
     entries[key] = {
+      entryType: isLunch ? 'lunch' : (entryType || 'class'),
       teacher: entry.teacher,
       subject: entry.subject,
       campus: inferredCampus,
       room: entry.room,
-      year: entry.year,
+      year: isLunch ? '' : entry.year,
       tableLabel,
       section,
       day,
@@ -1107,7 +1129,7 @@ function syncEntriesFromApi(apiEntries) {
       parallelGroupId: entry.parallelGroupId || null,
       parallelCount: entry.parallelCount || 1,
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map((slotItem) => ({ ...slotItem })) : [],
-      color: inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || entry.color || 'color-green'),
+      color: isLunch ? 'color-gray' : (roomBasedColor || 'color-yellow'),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -1216,7 +1238,7 @@ async function showScheduleError(error, fallbackTitle = 'Unable to save schedule
     title: isConflict ? 'Schedule Conflict' : fallbackTitle,
     html: `<span style="font-size:0.95rem;color:#444">${error?.message || 'Something went wrong. Please try again.'}</span>`,
     confirmButtonText: 'Got it',
-    confirmButtonColor: isConflict ? '#e63946' : '#1b4332',
+    confirmButtonColor: isConflict ? '#e63946' : '#4b5563',
     background: '#fff',
     customClass: {
       popup: 'swal-cit-popup',
@@ -1230,15 +1252,15 @@ async function showScheduleError(error, fallbackTitle = 'Unable to save schedule
 // Entries sharing the same parallelGroupId are returned so they render in one box.
 function getEntriesForCell(rowHour, day) {
   const rowStart = parseTime(rowHour)
-  const rowEnd   = rowStart + 60
+  const rowEnd   = rowStart + 30
 
   // Filter by selected teacher, year, section
   const sectionMatch = Object.entries(entries).find(([k, v]) => {
     const parts = k.split('|')
     if (parts.length < 4) return false
     if (selectedTeacher.value && v.teacher !== selectedTeacher.value) return false
-    if (yearDropdown.value !== 'All' && v.year !== yearDropdown.value) return false
-    if (filterSection.value !== 'All' && parts[1] !== filterSection.value) return false
+    if (v.entryType !== 'lunch' && yearDropdown.value !== 'All' && v.year !== yearDropdown.value) return false
+    if (v.entryType !== 'lunch' && filterSection.value !== 'All' && parts[1] !== filterSection.value) return false
     if (parts[3] !== day) return false
     const t = parseTime(v.timeIn)
     return t >= rowStart && t < rowEnd
@@ -1255,8 +1277,8 @@ function getEntriesForCell(rowHour, day) {
         const parts = k.split('|')
         if (parts.length < 4) return false
         if (selectedTeacher.value && v.teacher !== selectedTeacher.value) return false
-        if (yearDropdown.value !== 'All' && v.year !== yearDropdown.value) return false
-        if (filterSection.value !== 'All' && parts[1] !== filterSection.value) return false
+        if (v.entryType !== 'lunch' && yearDropdown.value !== 'All' && v.year !== yearDropdown.value) return false
+        if (v.entryType !== 'lunch' && filterSection.value !== 'All' && parts[1] !== filterSection.value) return false
         if (parts[3] !== day) return false
         if (v.parallelGroupId !== matchedEntry.parallelGroupId) return false
         const t = parseTime(v.timeIn)
@@ -1269,8 +1291,8 @@ function getEntriesForCell(rowHour, day) {
   return [{ ...matchedEntry, _key: sectionMatch[0] }]
 }
 
-/* Exact pixel height for the entry card; top offset for :30 starts (70 px = 1 hour row) */
-const ROW_HEIGHT = 70
+/* One 30-minute grid row is exactly 40px high. */
+const ROW_HEIGHT = 40
 function entryStyle(rowHour, entry) {
   if (!entry?.timeIn || !entry?.timeOut) return {}
   const rowStart   = parseTime(rowHour)
@@ -1278,34 +1300,44 @@ function entryStyle(rowHour, entry) {
   const mins       = Math.max(1, parseTime(entry.timeOut) - entryStart)
   const offsetMins = entryStart - rowStart
   return {
-    top:    (offsetMins / 60) * ROW_HEIGHT + 3 + 'px',
-    height: Math.max(24, (mins / 60) * ROW_HEIGHT - 6) + 'px',
+    top:    (offsetMins / 30) * ROW_HEIGHT + 3 + 'px',
+    height: Math.max(24, (mins / 30) * ROW_HEIGHT - 6) + 'px',
   }
 }
 
 // Returns true if a prior row's entry already spans into this slot
 function isSpannedCell(slot, day) {
-  const slotIndex = timeSlots.indexOf(slot)
+  const slotIndex = timeSlots30.indexOf(slot)
   if (slotIndex <= 0) return false
   for (let i = 0; i < slotIndex; i++) {
-    const prev = getEntriesForCell(timeSlots[i], day)
-    if (prev.length > 0 && i + getRowspan(prev[0]) > slotIndex) return true
+    const prev = getEntriesForCell(timeSlots30[i], day)
+    if (prev.length > 0 && i + getRowspan30(prev[0]) > slotIndex) return true
   }
   return false
 }
 
-function getConsultRowspan(consult) {
+function getRowspan30(entry) {
+  if (!entry?.timeIn || !entry?.timeOut) return 1
+  const start = parseTime(entry.timeIn)
+  const end = parseTime(entry.timeOut)
+  const duration = Math.max(1, end - start)
+  return Math.max(1, Math.ceil(((start % 30) + duration) / 30))
+}
+
+function getConsultRowspan30(consult) {
   if (!consult?.startTime || !consult?.endTime) return 1
-  return Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime)) / 60))
+  const start = parseTime(consult.startTime)
+  const duration = Math.max(1, parseTime(consult.endTime) - start)
+  return Math.max(1, Math.ceil(((start % 30) + duration) / 30))
 }
 
 // Returns true if a prior row's consultation slot already spans into this cell
 function isConsultSpannedCell(slot, day) {
-  const slotIndex = timeSlots.indexOf(slot)
+  const slotIndex = timeSlots30.indexOf(slot)
   if (slotIndex <= 0) return false
   for (let i = 0; i < slotIndex; i++) {
-    const consult = getConsultationForCell(timeSlots[i], day)
-    if (consult && i + getConsultRowspan(consult) > slotIndex) return true
+    const consult = getConsultationForCell(timeSlots30[i], day)
+    if (consult && i + getConsultRowspan30(consult) > slotIndex) return true
   }
   return false
 }
@@ -1369,7 +1401,7 @@ async function handleCellClick(slot, day) {
       await Swal.fire({
         icon: 'info', title: 'Select a Teacher',
         text: 'Please select a specific teacher to edit an existing schedule.',
-        confirmButtonText: 'OK', confirmButtonColor: '#1b4332', background: '#fff',
+        confirmButtonText: 'OK', confirmButtonColor: '#4b5563', background: '#fff',
         customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
       })
       return
@@ -1380,7 +1412,7 @@ async function handleCellClick(slot, day) {
       await Swal.fire({
         icon: 'info', title: 'No Teacher Selected',
         text: 'Please select a teacher from the dropdown first.',
-        confirmButtonText: 'OK', confirmButtonColor: '#1b4332', background: '#fff',
+        confirmButtonText: 'OK', confirmButtonColor: '#4b5563', background: '#fff',
         customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
       })
       return
@@ -1530,7 +1562,7 @@ async function showConflictDialog(conflicts) {
       </div>`,
     confirmButtonText: 'OK',
     showCancelButton: false,
-    confirmButtonColor: '#1b4332',
+    confirmButtonColor: '#4b5563',
     background: '#fff',
     customClass: {
       popup: 'swal-cit-popup',
@@ -1752,11 +1784,7 @@ onMounted(async () => {
 /* ── Print ── */
 function printSchedule() {
   const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-  const SLOTS = [
-    '7:00 AM','8:00 AM','9:00 AM','10:00 AM','11:00 AM',
-    '12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM',
-    '5:00 PM','6:00 PM','7:00 PM',
-  ]
+  const SLOTS = timeOptions
 
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
 
@@ -1781,7 +1809,7 @@ function printSchedule() {
   // Find ALL entries whose timeIn falls within [slotMins[si], slotMins[si+1]) for a given day
   function entriesAt(si, day) {
     const from = slotMins[si]
-    const to   = si + 1 < slotMins.length ? slotMins[si + 1] : from + 60
+    const to   = si + 1 < slotMins.length ? slotMins[si + 1] : from + 30
     return pageEntries.filter(v => {
       if (v.day !== day) return false
       const t = toMins(v.timeIn)
@@ -1794,7 +1822,7 @@ function printSchedule() {
     const startMins = toMins(entry.timeIn)
     const endMins   = toMins(entry.timeOut)
     const si = slotMins.findIndex((m, i) => {
-      const next = i + 1 < slotMins.length ? slotMins[i + 1] : m + 60
+      const next = i + 1 < slotMins.length ? slotMins[i + 1] : m + 30
       return startMins >= m && startMins < next
     })
     if (si < 0) return 1
@@ -1949,10 +1977,10 @@ function confirmLogout() {
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
 }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
-.brand  { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand  { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role   { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email  { font-size: 0.82rem; color: #888; word-break: break-all; }
 
@@ -1965,8 +1993,8 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.18s, color 0.18s;
 }
-.nav-item:hover { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -1986,7 +2014,7 @@ function confirmLogout() {
   display: flex; flex-direction: column;
 }
 .main-header { margin-bottom: 24px; }
-.page-title { font-size: 2rem; font-weight: 600; color: #1b4332; letter-spacing: -0.5px; line-height: 1.2; }
+.page-title { font-size: 2rem; font-weight: 600; color: #4b5563; letter-spacing: -0.5px; line-height: 1.2; }
 .page-sub   { font-size: 0.95rem; color: #777; margin-top: 4px; }
 
 /* ═══ SCHEDULE CARD ═══ */
@@ -2020,13 +2048,13 @@ function confirmLogout() {
 /* When teacher is selected */
 .sched-grid-sub.teacher-selected {
   font-size: 0.92rem;
-  color: #1b4332;
+  color: #4b5563;
   font-weight: 600;
-  background: linear-gradient(120deg, #e8f5e9 0%, #e1f5fe 100%);
+  background: linear-gradient(120deg, #f3f4f6 0%, #e1f5fe 100%);
   padding: 10px 14px;
-  border-left: 4px solid #40916c;
+  border-left: 4px solid #9ca3af;
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(64, 145, 108, 0.15);
+  box-shadow: 0 2px 8px rgba(83, 91, 100, 0.15);
 }
 .sched-grid-meta {
   display: flex;
@@ -2050,59 +2078,59 @@ function confirmLogout() {
   cursor: pointer;
   outline: none;
 }
-.sched-select:focus { border-color: #40916c; }
+.sched-select:focus { border-color: #9ca3af; }
 .sched-select-arrow { position: absolute; right: 10px; pointer-events: none; color: #666; }
 
 /* Teacher Select - Prominent Styling (Matches App Theme) */
 .teacher-select-wrap {
   padding: 3px 6px;
-  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f6 100%);
+  background: linear-gradient(135deg, #f3f4f6 0%, #f1f8f6 100%);
   border-radius: 10px;
-  border: 2px solid #40916c;
-  box-shadow: 0 4px 12px rgba(64, 145, 108, 0.2);
+  border: 2px solid #9ca3af;
+  box-shadow: 0 4px 12px rgba(83, 91, 100, 0.2);
   transition: all 0.2s ease;
 }
 .teacher-select-wrap:hover {
-  border-color: #1b4332;
-  box-shadow: 0 6px 16px rgba(27, 67, 50, 0.25);
-  background: linear-gradient(135deg, #d4edda 0%, #e8f5e9 100%);
+  border-color: #4b5563;
+  box-shadow: 0 6px 16px rgba(48, 53, 58, 0.25);
+  background: linear-gradient(135deg, #d8dcdf 0%, #f3f4f6 100%);
 }
 
 .teacher-select {
   background: linear-gradient(to bottom, #f8fffe, #eef9f7);
-  border: 1px solid #40916c !important;
+  border: 1px solid #9ca3af !important;
   border-radius: 8px;
   padding: 8px 32px 8px 13px;
   font-size: 0.88rem;
   font-weight: 500;
-  color: #1b4332;
-  box-shadow: inset 0 1px 3px rgba(27, 67, 50, 0.08);
+  color: #4b5563;
+  box-shadow: inset 0 1px 3px rgba(48, 53, 58, 0.08);
 }
 .teacher-select:hover {
   background: linear-gradient(to bottom, #f0fdf9, #e8faf6);
-  color: #1b4332;
+  color: #4b5563;
 }
 .teacher-select:focus {
-  border-color: #1b4332 !important;
-  outline: 2px solid rgba(64, 145, 108, 0.4);
+  border-color: #4b5563 !important;
+  outline: 2px solid rgba(83, 91, 100, 0.4);
   outline-offset: 1px;
-  color: #1b4332;
+  color: #4b5563;
 }
 .teacher-select-wrap .sched-select-arrow {
-  color: #40916c;
+  color: #9ca3af;
   font-weight: 600;
 }
 
 /* Buttons */
 .new-sched-btn {
   display: flex; align-items: center; gap: 6px;
-  background: #1b4332; color: #fff;
+  background: #4b5563; color: #fff;
   border: none; border-radius: 8px;
   padding: 8px 16px;
   font-size: 0.85rem; font-weight: 500; font-family: inherit;
   cursor: pointer; transition: background 0.18s;
 }
-.new-sched-btn:hover { background: #2d6a4f; }
+.new-sched-btn:hover { background: #6b7280; }
 
 .icon-btn {
   background: none; border: 1px solid #ddd;
@@ -2111,7 +2139,7 @@ function confirmLogout() {
   display: flex; align-items: center;
   transition: border-color 0.15s, color 0.15s;
 }
-.icon-btn:hover { border-color: #40916c; color: #1b4332; }
+.icon-btn:hover { border-color: #9ca3af; color: #4b5563; }
 
 /* Pagination */
 .sched-pagination {
@@ -2124,7 +2152,7 @@ function confirmLogout() {
   border-radius: 4px; transition: color 0.15s;
 }
 .page-arrow:disabled { opacity: 0.3; cursor: default; }
-.page-arrow:not(:disabled):hover { color: #1b4332; }
+.page-arrow:not(:disabled):hover { color: #4b5563; }
 .page-dot {
   padding: 4px 12px;
   border-radius: 20px;
@@ -2138,8 +2166,8 @@ function confirmLogout() {
   user-select: none;
   line-height: 1.6;
 }
-.page-dot:hover { background: #c8ddd4; color: #1b4332; }
-.page-dot.active { background: #1b4332; color: #fff; border-radius: 20px; width: auto; }
+.page-dot:hover { background: #c4c9cd; color: #4b5563; }
+.page-dot.active { background: #4b5563; color: #fff; border-radius: 20px; width: auto; }
 
 /* Grid */
 .sched-grid-wrap {
@@ -2155,7 +2183,7 @@ function confirmLogout() {
   min-width: 800px;
 }
 .sched-grid th {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -2171,9 +2199,11 @@ function confirmLogout() {
   position: sticky;
   left: 0;
   z-index: 20;
-  background: #1b4332;
+  background: #4b5563;
 }
-.sched-grid tbody tr { height: 70px; }
+.sched-grid tbody tr { height: 40px; }
+.sched-grid tbody tr.half-hour .td-time { background: #f4f5f6; }
+.sched-grid tbody tr.half-hour td { border-top: 1px dashed #eee; }
 .sched-grid td {
   border: 1px solid #ececec;
   padding: 0;
@@ -2185,7 +2215,7 @@ function confirmLogout() {
   text-align: center;
   vertical-align: middle;
   font-size: 0.8rem;
-  color: #1b4332;
+  color: #4b5563;
   font-weight: 600;
   white-space: nowrap;
   border: 1px solid #ececec;
@@ -2212,7 +2242,7 @@ function confirmLogout() {
   padding: 0;
   position: relative;
 }
-.td-cell:hover { background: #f7faf8; }
+.td-cell:hover { background: #f4f5f5; }
 .td-cell.has-entry { padding: 0; }
 .td-cell.readonly-entry-cell {
   cursor: default;
@@ -2300,8 +2330,8 @@ function confirmLogout() {
 .form-value-locked {
   display: flex; align-items: center;
   padding: 6px 12px; border-radius: 8px;
-  background: #f0f4f2; border: 1px solid #d0e0d8;
-  font-size: 0.875rem; color: #1b4332; font-weight: 600;
+  background: #f8fafc; border: 1px solid #e5e7eb;
+  font-size: 0.875rem; color: #4b5563; font-weight: 600;
   min-width: 0; flex: 1;
 }
 .schedule-for-text {
@@ -2315,18 +2345,18 @@ function confirmLogout() {
   width: min(100%, 520px);
   min-height: 42px;
   padding: 10px 14px;
-  border-left: 5px solid #2d8a59;
+  border-left: 5px solid #626a72;
   border-radius: 10px;
-  background: linear-gradient(135deg, #e8f5ee 0%, #d7efe4 100%);
+  background: linear-gradient(135deg, #f3f4f6 0%, #d7efe4 100%);
   box-shadow: 0 6px 14px rgba(45, 138, 89, 0.14);
   font-size: 0.94rem;
-  color: #145a3d;
+  color: #41484f;
   font-weight: 800;
   letter-spacing: 0.01em;
 }
 
 /* Entry colors */
-.color-green  { background: #1b4332; color: #fff; }
+.color-green  { background: #4b5563; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
 .color-orange { background: #f4a261; color: #5a2d00; }
 .color-blue   { background: #4a90d9; color: #fff; }
@@ -2344,7 +2374,7 @@ function confirmLogout() {
   background: #f0f6ff; border: 1px solid #c8dff8; border-radius: 8px;
   padding: 8px 12px;
 }
-.consult-slot-day  { font-weight: 700; font-size: 0.82rem; color: #1b4332; min-width: 36px; }
+.consult-slot-day  { font-weight: 700; font-size: 0.82rem; color: #4b5563; min-width: 36px; }
 .consult-slot-time { flex: 1; font-size: 0.82rem; color: #333; }
 .consult-slot-dur  { font-size: 0.78rem; color: #666; white-space: nowrap; }
 .consult-slot-actions { display: flex; gap: 6px; }
@@ -2359,9 +2389,9 @@ function confirmLogout() {
 }
 .consult-del-btn:hover { background: #fde8e8; }
 .consult-empty { padding: 8px 24px 12px; color: #888; font-size: 0.84rem; font-style: italic; }
-.consult-form-title { padding: 0 24px 8px; font-weight: 600; font-size: 0.88rem; color: #1b4332; }
+.consult-form-title { padding: 0 24px 8px; font-weight: 600; font-size: 0.88rem; color: #4b5563; }
 .limit-warning { color: #e63946; font-weight: 600; }
-.limit-ok { color: #1b4332; }
+.limit-ok { color: #4b5563; }
 .color-purple { background: #7b5ea7; color: #fff; }
 .color-red    { background: #e63946; color: #fff; }
 
@@ -2387,9 +2417,9 @@ function confirmLogout() {
   text-transform: uppercase; letter-spacing: 0.07em;
   padding: 3px 10px; border-radius: 20px; margin-bottom: 6px;
 }
-.badge-add  { background: #e8f5ee; color: #1b4332; }
+.badge-add  { background: #f3f4f6; color: #4b5563; }
 .badge-edit { background: #fff3cd; color: #7a5500; }
-.sched-modal-title { font-size: 1.25rem; font-weight: 700; color: #1b4332; margin: 0 0 3px; }
+.sched-modal-title { font-size: 1.25rem; font-weight: 700; color: #4b5563; margin: 0 0 3px; }
 .sched-modal-sub   { font-size: 0.84rem; color: #888; margin: 0; }
 
 .sched-form { display: flex; flex-direction: column; gap: 13px; margin-bottom: 22px; }
@@ -2410,7 +2440,7 @@ function confirmLogout() {
   background: #fff; cursor: pointer; outline: none;
   transition: border-color 0.15s;
 }
-.form-select:focus { border-color: #40916c; }
+.form-select:focus { border-color: #9ca3af; }
 .form-input {
   width: 100%;
   border: 1px solid #ccc;
@@ -2423,7 +2453,7 @@ function confirmLogout() {
   outline: none;
   transition: border-color 0.15s;
 }
-.form-input:focus { border-color: #40916c; }
+.form-input:focus { border-color: #9ca3af; }
 .sel-arrow { position: absolute; right: 12px; pointer-events: none; color: #666; }
 
 .campus-toggle {
@@ -2443,15 +2473,15 @@ function confirmLogout() {
   transition: all 0.15s;
 }
 .campus-btn.active {
-  background: #e8f5ee;
-  color: #1b4332;
-  border-color: #63b892;
+  background: #f3f4f6;
+  color: #4b5563;
+  border-color: #9ca3af;
 }
 
 .parallel-slot-divider {
-  font-size: 0.78rem; font-weight: 700; color: #40916c;
+  font-size: 0.78rem; font-weight: 700; color: #9ca3af;
   text-transform: uppercase; letter-spacing: 0.06em;
-  padding: 6px 0 2px; border-top: 1px solid #e8f5ee; margin-top: 4px;
+  padding: 6px 0 2px; border-top: 1px solid #f3f4f6; margin-top: 4px;
 }
 .parallel-row { display: flex; align-items: center; gap: 24px; margin-top: 4px; }
 .parallel-btn {
@@ -2460,14 +2490,14 @@ function confirmLogout() {
   font-size: 0.92rem; font-weight: 500; color: #444;
   cursor: pointer; padding: 0; transition: color 0.15s;
 }
-.parallel-btn.active { color: #1b4332; font-weight: 600; }
+.parallel-btn.active { color: #4b5563; font-weight: 600; }
 .par-radio {
   width: 22px; height: 22px; border-radius: 50%;
   border: 2px solid #bbb;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; transition: background 0.15s, border-color 0.15s;
 }
-.par-radio.checked { background: #1b4332; border-color: #1b4332; }
+.par-radio.checked { background: #4b5563; border-color: #4b5563; }
 
 .sched-modal-actions {
   display: flex; align-items: center; justify-content: flex-end;
@@ -2489,12 +2519,12 @@ function confirmLogout() {
 .cancel-btn-text:hover { opacity: 0.75; }
 .save-btn {
   display: flex; align-items: center; gap: 6px;
-  background: #1b4332; color: #fff; border: none;
+  background: #4b5563; color: #fff; border: none;
   font-family: inherit; font-size: 0.88rem; font-weight: 600;
   padding: 10px 26px; border-radius: 10px; cursor: pointer;
   transition: background 0.18s;
 }
-.save-btn:hover:not(:disabled) { background: #2d6a4f; }
+.save-btn:hover:not(:disabled) { background: #6b7280; }
 .save-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* ═══ Add Schedule Panel ═══ */
@@ -2521,7 +2551,7 @@ function confirmLogout() {
   display: inline-block; font-size: 0.72rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.07em;
   padding: 3px 10px; border-radius: 20px;
-  background: #e8f5ee; color: #1b4332; margin-bottom: 6px;
+  background: #f3f4f6; color: #4b5563; margin-bottom: 6px;
 }
 .panel-title { font-size: 1.2rem; font-weight: 700; color: #111; margin: 0 0 3px; }
 .panel-sub   { font-size: 0.84rem; color: #888; margin: 0; }
@@ -2555,7 +2585,7 @@ function confirmLogout() {
 }
 .flash-msg {
   display: flex; align-items: center; gap: 8px;
-  background: #d8f3dc; color: #1b4332;
+  background: #e5e7eb; color: #4b5563;
   border-radius: 8px; padding: 10px 16px;
   font-size: 0.88rem; font-weight: 600;
   margin: 4px 28px 0;
@@ -2604,11 +2634,11 @@ function confirmLogout() {
 }
 .logout-cancel-btn:hover  { background: #ffeaea; }
 .logout-confirm-btn {
-  background: #1b4332; color: #fff; border: none;
+  background: #4b5563; color: #fff; border: none;
   font-family: inherit; font-size: 1rem; font-weight: 600;
   padding: 10px 32px; border-radius: 10px; cursor: pointer;
 }
-.logout-confirm-btn:hover { background: #2d6a4f; }  
+.logout-confirm-btn:hover { background: #6b7280; }
 </style>
 
 <style>

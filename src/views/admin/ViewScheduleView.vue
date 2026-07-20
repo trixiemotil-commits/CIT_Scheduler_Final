@@ -149,7 +149,7 @@
           <div class="sched-topbar">
             <div class="sched-topbar-left">
               <h2 class="sched-grid-title">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
                 Room {{ selectedRoom }}
               </h2>
               <p class="sched-grid-sub">{{ selectedFloor }} &bull; Read-only view</p>
@@ -161,7 +161,7 @@
             </div>
           </div>
           <div v-if="loading" class="loading-state">
-            <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+            <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
             Loading schedule…
           </div>
           <div v-else-if="roomHasNoEntries" class="empty-state">
@@ -175,18 +175,29 @@
                 <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
                   <td class="td-time">{{ slot }}</td>
                   <template v-for="day in days" :key="day">
-                    <td v-if="!isSpannedRoomCell(slot, day)" :rowspan="getEntriesForRoomCell(slot, day).length ? getRoomRowspan(getEntriesForRoomCell(slot, day)[0]) : 1" class="td-cell" :class="{ 'has-entry': getEntriesForRoomCell(slot, day).length }">
+                    <td
+                      v-if="!isSpannedRoomCell(slot, day)"
+                      :rowspan="getEntriesForRoomCell(slot, day).length ? getRoomRowspan(getEntriesForRoomCell(slot, day)[0]) : 1"
+                      class="td-cell"
+                      :class="{
+                        'has-entry': getEntriesForRoomCell(slot, day).length,
+                        'free-time-cell': !getEntriesForRoomCell(slot, day).length
+                      }"
+                    >
                       <template v-if="getEntriesForRoomCell(slot, day).length">
                         <div class="sched-entry" :class="getEntriesForRoomCell(slot, day)[0].color" :style="roomEntryStyle(slot, getEntriesForRoomCell(slot, day)[0])">
                           <div class="entry-teacher">{{ getEntriesForRoomCell(slot, day)[0].teacher }}</div>
                           <div class="entry-subject">{{ getEntriesForRoomCell(slot, day)[0].subject }}</div>
                           <div class="entry-time-range">{{ getEntriesForRoomCell(slot, day)[0].slot }}</div>
-                          <div class="entry-section-rows">
-                            <div v-for="e in getEntriesForRoomCell(slot, day)" :key="e._key" class="entry-section-row">
+                          <div v-if="getEntriesForRoomCell(slot, day).some((entry) => entry.section)" class="entry-section-rows">
+                            <div v-for="e in getEntriesForRoomCell(slot, day).filter((entry) => entry.section)" :key="e._key" class="entry-section-row">
                               <span class="entry-section-badge">{{ e.section }}</span>
                             </div>
                           </div>
                         </div>
+                      </template>
+                      <template v-else>
+                        <span v-if="slot.includes(':00')" class="free-time-label">Free time</span>
                       </template>
                     </td>
                   </template>
@@ -202,7 +213,7 @@
         <!-- Step 1: Teacher selection -->
         <div v-if="!selectedTeacher" class="step-container">
           <div v-if="loadingTeachers" class="loading-state">
-            <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+            <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
             Loading teachers…
           </div>
           <template v-else>
@@ -231,7 +242,7 @@
           <div class="sched-topbar">
             <div class="sched-topbar-left">
               <h2 class="sched-grid-title">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
                 Prof. {{ selectedTeacher }}
               </h2>
               <p class="sched-grid-sub">Read-only view</p>
@@ -243,7 +254,7 @@
             </div>
           </div>
           <div v-if="loading" class="loading-state">
-            <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+            <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
             Loading schedule…
           </div>
           <div v-else-if="teacherHasNoEntries" class="empty-state">
@@ -261,17 +272,26 @@
                     v-if="!isSpannedTeacherCell(slot, day) && !isSpannedConsultTeacherCell(slot, day)"
                     :rowspan="getEntriesForTeacherCell(slot, day).length ? getRoomRowspan(getEntriesForTeacherCell(slot, day)[0]) : (getConsultationForTeacherCell(slot, day) ? getConsultRowspan(getConsultationForTeacherCell(slot, day)) : 1)"
                     class="td-cell"
-                    :class="{ 'has-entry': getEntriesForTeacherCell(slot, day).length, 'consult-cell': !getEntriesForTeacherCell(slot, day).length && !!getConsultationForTeacherCell(slot, day) }"
+                    :class="{
+                      'has-entry': getEntriesForTeacherCell(slot, day).length,
+                      'consult-cell': !getEntriesForTeacherCell(slot, day).length && !!getConsultationForTeacherCell(slot, day),
+                      'free-time-cell': !getEntriesForTeacherCell(slot, day).length && !getConsultationForTeacherCell(slot, day)
+                    }"
                   >
                       <template v-if="getEntriesForTeacherCell(slot, day).length">
                         <div class="sched-entry" :class="getEntriesForTeacherCell(slot, day)[0].color" :style="roomEntryStyle(slot, getEntriesForTeacherCell(slot, day)[0])">
                           <div class="entry-teacher">{{ getEntriesForTeacherCell(slot, day)[0].subject }}</div>
                           <div class="entry-subject">{{ getEntriesForTeacherCell(slot, day)[0].slot }}</div>
-                          <div class="entry-section-rows">
-                            <div v-for="e in getEntriesForTeacherCell(slot, day)" :key="e._key" class="entry-section-row">
-                              <span class="entry-section-badge">{{ e.section }}</span>
-                              <span class="entry-room">{{ e.room }}</span>
-                            </div>
+                          <div
+                            v-if="getEntriesForTeacherCell(slot, day).some((entry) => entry.section || entry.room)"
+                            class="entry-section-rows"
+                          >
+                            <template v-for="e in getEntriesForTeacherCell(slot, day)" :key="e._key">
+                              <div v-if="e.section || e.room" class="entry-section-row">
+                                <span v-if="e.section" class="entry-section-badge">{{ e.section }}</span>
+                                <span v-if="e.room" class="entry-room">{{ e.room }}</span>
+                              </div>
+                            </template>
                           </div>
                         </div>
                       </template>
@@ -280,6 +300,9 @@
                           <div class="entry-teacher">Consultation</div>
                           <div class="entry-subject">{{ getConsultationForTeacherCell(slot, day).startTime }} – {{ getConsultationForTeacherCell(slot, day).endTime }}</div>
                         </div>
+                      </template>
+                      <template v-else>
+                        <span v-if="slot.includes(':00')" class="free-time-label">Free time</span>
                       </template>
                     </td>
                   </template>
@@ -371,7 +394,7 @@ const navItems = [
   { name: 'Add Schedule',   to: '/admin/schedule/add',    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="20"/><line x1="9" y1="17" x2="15" y2="17"/></svg>` },
   { name: 'Teachers',       to: '/admin/teachers',        icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>` },
   { name: 'Events',         to: '/admin/events',          icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="5" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="18" r="1" fill="currentColor" stroke="none"/></svg>` },
-  { name: 'Manage Users',   to: '/admin/users',           icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
+  { name: 'Users',          to: '/admin/users',           icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
   { name: 'Settings',       to: '/admin/settings',        icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>` },
 ]
 
@@ -592,19 +615,23 @@ function syncEntriesFromApi(apiEntries) {
   if (!Array.isArray(apiEntries)) return
   apiEntries.forEach(entry => {
     const tableLabel = entry.tableLabel || entry.teacher
-    const section = entry.section
+    const entryType = String(entry.entryType || '').trim().toLowerCase()
+    const isLunch = entryType === 'lunch' || entry.color === 'color-gray' || /\blunch\b/i.test(String(entry.subject || ''))
+    const rawSection = entry.section || ''
+    const section = isLunch ? '' : rawSection
     const day = entry.day
     const slot = `${entry.timeIn} - ${entry.timeOut}`
-    if (!tableLabel || !section || !day || !entry.timeIn || !entry.timeOut) return
-    const key = `${tableLabel}|${section}|${slot}|${day}`
+    if (!tableLabel || (!rawSection && !isLunch) || !day || !entry.timeIn || !entry.timeOut) return
+    const key = `${tableLabel}|${rawSection || `__lunch_${entry.id || slot}`}|${slot}|${day}`
     const inferredCampus = inferCampus(entry)
     const roomBasedColor = colorForRoom(entry.room)
     entries[key] = {
+      entryType: isLunch ? 'lunch' : (entryType || 'class'),
       teacher: entry.teacher,
       subject: entry.subject,
       campus: inferredCampus,
       room: entry.room,
-      year: entry.year,
+      year: isLunch ? '' : entry.year,
       tableLabel,
       section,
       day,
@@ -615,7 +642,7 @@ function syncEntriesFromApi(apiEntries) {
       parallelGroupId: entry.parallelGroupId || null,
       parallelCount: entry.parallelCount || 1,
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map(s => ({ ...s })) : [],
-      color: inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || entry.color || 'color-green'),
+      color: isLunch ? 'color-gray' : (roomBasedColor || 'color-yellow'),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -711,11 +738,12 @@ function printSchedule() {
     '4:00 PM','4:30 PM','5:00 PM','5:30 PM','6:00 PM','6:30 PM','7:00 PM',
   ]
   const colorMap = {
-    'color-green':  { bg: '#1b4332', fg: '#ffffff' },
-    'color-yellow': { bg: '#e9c46a', fg: '#5a3e00' },
-    'color-orange': { bg: '#f4a261', fg: '#5a2d00' },
-    'color-blue':   { bg: '#4a90d9', fg: '#ffffff' },
-    'color-purple': { bg: '#7b5ea7', fg: '#ffffff' },
+    'color-green':  { bg: '#b7ddc3', fg: '#214d30' },
+    'color-yellow': { bg: '#efd77c', fg: '#5d4700' },
+    'color-orange': { bg: '#efd77c', fg: '#5d4700' },
+    'color-blue':   { bg: '#b6d8f5', fg: '#1d527d' },
+    'color-gray':   { bg: '#cdd3d6', fg: '#4e575d' },
+    'color-purple': { bg: '#d8c3ef', fg: '#5b417c' },
     'color-red':    { bg: '#e63946', fg: '#ffffff' },
   }
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -811,14 +839,14 @@ function printSchedule() {
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
   body{font-family:'Segoe UI',Arial,sans-serif;padding:20px;font-size:11px;}
-  h2{font-size:15px;font-weight:700;margin-bottom:3px;color:#1b4332;}
+  h2{font-size:15px;font-weight:700;margin-bottom:3px;color:#4b5563;}
   .sub{font-size:10px;color:#666;margin-bottom:12px;}
   table{width:100%;border-collapse:collapse;table-layout:fixed;}
-  th{background:#1b4332;color:#fff;padding:7px 6px;text-align:center;font-size:10px;font-weight:600;border:1px solid #0d2a20;}
+  th{background:#4b5563;color:#fff;padding:7px 6px;text-align:center;font-size:10px;font-weight:600;border:1px solid #0d2a20;}
   th.time-hdr{width:66px;}
   td{border:1px solid #dde;vertical-align:top;}
   tr.half td{border-top:1px dashed #e0e0e0;}
-  td.time-col{background:#f0f2fa;font-size:9.5px;font-weight:700;color:#1b4332;text-align:center;padding:4px 2px;vertical-align:middle;}
+  td.time-col{background:#f0f2fa;font-size:9.5px;font-weight:700;color:#4b5563;text-align:center;padding:4px 2px;vertical-align:middle;}
   td.time-col.tc-half{background:#f6f7f9;color:#444;}
   td.ec{background:#fafbff;padding:0;}
   td.ec-half{background:#f9fafb;padding:0;}
@@ -878,10 +906,10 @@ function printSchedule() {
 .avatar-wrap {
   width: 96px; height: 96px;
   border-radius: 50%; overflow: hidden;
-  margin-bottom: 10px; border: 3px solid #c8ddd4;
+  margin-bottom: 10px; border: 3px solid #c4c9cd;
 }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
-.brand  { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand  { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role   { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email  { font-size: 0.82rem; color: #888; word-break: break-all; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 4px; width: 100%; flex: 1; }
@@ -892,8 +920,8 @@ function printSchedule() {
   text-decoration: none; cursor: pointer;
   transition: background 0.18s, color 0.18s;
 }
-.nav-item:hover { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 .logout-btn {
@@ -920,7 +948,7 @@ function printSchedule() {
 }
 .header-left { display: flex; flex-direction: column; gap: 4px; }
 .header-right { flex-shrink: 0; padding-top: 4px; }
-.page-title { font-size: 2rem; font-weight: 600; color: #1b4332; letter-spacing: -0.5px; line-height: 1.2; }
+.page-title { font-size: 2rem; font-weight: 600; color: #4b5563; letter-spacing: -0.5px; line-height: 1.2; }
 .page-sub   { font-size: 0.95rem; color: #777; margin-top: 2px; }
 
 /* Breadcrumb */
@@ -930,14 +958,14 @@ function printSchedule() {
 }
 .bc-btn {
   background: none; border: none; font-family: inherit;
-  font-size: 0.83rem; color: #40916c; font-weight: 500;
+  font-size: 0.83rem; color: #9ca3af; font-weight: 500;
   cursor: pointer; padding: 0; transition: color 0.15s;
   text-decoration: underline; text-underline-offset: 2px;
 }
-.bc-btn:hover { color: #1b4332; }
-.bc-active { color: #1b4332 !important; text-decoration: none; cursor: default; }
+.bc-btn:hover { color: #4b5563; }
+.bc-active { color: #4b5563 !important; text-decoration: none; cursor: default; }
 .bc-current {
-  font-size: 0.83rem; font-weight: 700; color: #1b4332;
+  font-size: 0.83rem; font-weight: 700; color: #4b5563;
 }
 
 /* Icon button */
@@ -948,7 +976,7 @@ function printSchedule() {
   display: flex; align-items: center;
   transition: border-color 0.15s, color 0.15s;
 }
-.icon-btn:hover { border-color: #40916c; color: #1b4332; }
+.icon-btn:hover { border-color: #9ca3af; color: #4b5563; }
 
 /* ── Mode selection ── */
 .mode-select-container { display: flex; flex-direction: column; gap: 16px; }
@@ -960,14 +988,14 @@ function printSchedule() {
   cursor: pointer; transition: all 0.2s; font-family: inherit;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
-.mode-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(64,145,108,0.15); }
+.mode-card:hover { border-color: #9ca3af; background: #f8fafc; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(83, 91, 100,0.15); }
 .mode-icon-wrap {
   width: 72px; height: 72px; border-radius: 50%;
-  background: linear-gradient(135deg, #e8f5e9, #d4edda);
+  background: linear-gradient(135deg, #f3f4f6, #d8dcdf);
   display: flex; align-items: center; justify-content: center;
-  color: #1b4332;
+  color: #4b5563;
 }
-.mode-label { font-size: 1.1rem; font-weight: 700; color: #1b4332; }
+.mode-label { font-size: 1.1rem; font-weight: 700; color: #4b5563; }
 .mode-desc { font-size: 0.85rem; color: #888; text-align: center; line-height: 1.4; }
 
 /* ── Teacher grid ── */
@@ -977,13 +1005,13 @@ function printSchedule() {
   padding: 12px 14px;
   border: 1.5px solid #dce8e1;
   border-radius: 999px;
-  background: #f8fcfa;
+  background: #f4f5f5;
   margin-bottom: 16px;
 }
-.teacher-search-icon { color: #40916c; flex-shrink: 0; }
+.teacher-search-icon { color: #9ca3af; flex-shrink: 0; }
 .teacher-search-input {
   border: none; outline: none; background: transparent;
-  width: 100%; font-size: 0.95rem; color: #1b4332; font-family: inherit;
+  width: 100%; font-size: 0.95rem; color: #4b5563; font-family: inherit;
 }
 .teacher-grid {
   display: grid;
@@ -1003,24 +1031,24 @@ function printSchedule() {
   cursor: pointer; transition: all 0.18s; font-family: inherit;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
-.teacher-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); box-shadow: 0 4px 14px rgba(64,145,108,0.14); }
+.teacher-card:hover { border-color: #9ca3af; background: #f8fafc; transform: translateY(-2px); box-shadow: 0 4px 14px rgba(83, 91, 100,0.14); }
 .teacher-avatar-img {
   width: 88px; height: 88px; border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #dfeee6;
-  box-shadow: 0 4px 12px rgba(27, 67, 50, 0.12);
+  border: 3px solid #dfe2e4;
+  box-shadow: 0 4px 12px rgba(48, 53, 58, 0.12);
 }
 .teacher-avatar {
   width: 88px; height: 88px; border-radius: 50%;
-  background: linear-gradient(135deg, #1b4332, #40916c);
+  background: linear-gradient(135deg, #4b5563, #9ca3af);
   color: #fff; font-size: 1.15rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   letter-spacing: 0.03em;
 }
-.teacher-name { font-size: 0.95rem; font-weight: 600; color: #1b4332; text-align: center; line-height: 1.3; }
+.teacher-name { font-size: 0.95rem; font-weight: 600; color: #4b5563; text-align: center; line-height: 1.3; }
 .small-empty-state {
   padding: 18px 20px; border-radius: 12px;
-  background: #f8fcfa; border: 1px dashed #cfe3d8;
+  background: #f4f5f5; border: 1px dashed #cfe3d8;
   color: #5d7a6d;
 }
 
@@ -1070,10 +1098,10 @@ function printSchedule() {
   font-family: inherit;
 }
 .floor-card:hover {
-  border-color: #40916c;
-  background: #f0faf3;
+  border-color: #9ca3af;
+  background: #f8fafc;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(64,145,108,0.15);
+  box-shadow: 0 6px 20px rgba(83, 91, 100,0.15);
 }
 .floor-card-expanded {
   width: 100%;
@@ -1101,8 +1129,8 @@ function printSchedule() {
 }
 .floor-room-btn {
   border: 1px solid #dce8e1;
-  background: #f8fcfa;
-  color: #1b4332;
+  background: #f4f5f5;
+  color: #4b5563;
   border-radius: 999px;
   padding: 8px 14px;
   font-size: 0.9rem;
@@ -1112,14 +1140,14 @@ function printSchedule() {
   font-family: inherit;
 }
 .floor-room-btn:hover {
-  border-color: #40916c;
+  border-color: #9ca3af;
   background: #e8f5ea;
   transform: translateY(-1px);
 }
 .floor-number {
   width: 52px; height: 52px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1b4332, #40916c);
+  background: linear-gradient(135deg, #4b5563, #9ca3af);
   color: #fff;
   font-size: 1.5rem;
   font-weight: 700;
@@ -1131,7 +1159,7 @@ function printSchedule() {
 .floor-label {
   font-size: 1rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #4b5563;
 }
 .floor-room-count {
   font-size: 0.78rem;
@@ -1162,10 +1190,10 @@ function printSchedule() {
   font-family: inherit;
 }
 .room-card:hover {
-  border-color: #40916c;
-  background: #f0faf3;
+  border-color: #9ca3af;
+  background: #f8fafc;
   transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgba(64,145,108,0.14);
+  box-shadow: 0 4px 14px rgba(83, 91, 100,0.14);
 }
 .room-card-comlab {
   border-color: #c5e1f9;
@@ -1175,12 +1203,12 @@ function printSchedule() {
   border-color: #4a90d9;
   background: #e8f4ff;
 }
-.room-card-icon { color: #1b4332; opacity: 0.5; }
+.room-card-icon { color: #4b5563; opacity: 0.5; }
 .room-card-comlab .room-card-icon { color: #4a90d9; }
 .room-card-number {
   font-size: 1rem;
   font-weight: 700;
-  color: #1b4332;
+  color: #4b5563;
   text-align: center;
 }
 .room-card-floor {
@@ -1216,7 +1244,7 @@ function printSchedule() {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #40916c;
+  color: #9ca3af;
   font-size: 0.9rem;
   padding: 40px 0;
   justify-content: center;
@@ -1252,7 +1280,7 @@ function printSchedule() {
   min-width: 800px;
 }
 .sched-grid th {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -1268,7 +1296,7 @@ function printSchedule() {
   position: sticky;
   left: 0;
   z-index: 20;
-  background: #1b4332;
+  background: #4b5563;
 }
 .sched-grid tbody tr { height: 40px; }
 .sched-grid tbody tr.half-hour .td-time {
@@ -1286,7 +1314,7 @@ function printSchedule() {
   text-align: center;
   vertical-align: middle;
   font-size: 0.78rem;
-  color: #1b4332;
+  color: #4b5563;
   font-weight: 600;
   white-space: nowrap;
   border: 1px solid #ececec;
@@ -1355,7 +1383,7 @@ function printSchedule() {
 }
 
 /* Entry colors */
-.color-green  { background: #1b4332; color: #fff; }
+.color-green  { background: #4b5563; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
 .color-orange { background: #f4a261; color: #5a2d00; }
 .color-blue   { background: #4a90d9; color: #fff; }
@@ -1393,9 +1421,9 @@ function printSchedule() {
 }
 .logout-cancel-btn:hover  { background: #ffeaea; }
 .logout-confirm-btn {
-  background: #1b4332; color: #fff; border: none;
+  background: #4b5563; color: #fff; border: none;
   font-family: inherit; font-size: 1rem; font-weight: 600;
   padding: 10px 32px; border-radius: 10px; cursor: pointer;
 }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn:hover { background: #6b7280; }
 </style>

@@ -47,7 +47,7 @@
         <div class="settings-card">
           <div class="settings-card-header">
             <div class="settings-card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </div>
             <h2 class="settings-card-title">Change Password</h2>
           </div>
@@ -156,7 +156,7 @@
         <div class="settings-faq-section">
           <div class="faq-header">
             <div class="faq-header-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
             <h2 class="faq-title">FAQs</h2>
           </div>
@@ -189,7 +189,7 @@
     <div v-if="showTFAModal" class="modal-overlay" @click.self="showTFAModal = false">
       <div class="tfa-modal">
         <div class="tfa-modal-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
         </div>
         <h2 class="tfa-modal-title">Check your email</h2>
         <p class="tfa-modal-sub">Enter the code we sent to <strong>{{ maskedEmail }}</strong></p>
@@ -515,13 +515,13 @@ const faqs = [
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
   cursor: pointer;
   transition: opacity 0.18s;
 }
 .avatar-wrap:hover { opacity: 0.85; }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
-.brand  { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand  { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role   { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email  { font-size: 0.82rem; color: #888; word-break: break-all; }
 
@@ -544,8 +544,8 @@ const faqs = [
   text-decoration: none;
   transition: background 0.18s, color 0.18s;
 }
-.nav-item:hover  { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover  { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -581,7 +581,7 @@ const faqs = [
 .page-title {
   font-size: 2rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #4b5563;
   letter-spacing: -0.5px;
   line-height: 1.2;
   margin: 0 0 4px;
@@ -617,7 +617,7 @@ const faqs = [
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: #e8f5ee;
+  background: #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -648,8 +648,8 @@ const faqs = [
   transition: border-color 0.18s, box-shadow 0.18s;
 }
 .settings-input:focus {
-  border-color: #2d6a4f;
-  box-shadow: 0 0 0 3px rgba(45,106,79,0.09);
+  border-color: #6b7280;
+  box-shadow: 0 0 0 3px rgba(83, 91, 100,0.09);
 }
 
 /* eye toggle */
@@ -667,7 +667,7 @@ const faqs = [
   padding: 0;
   transition: color 0.15s;
 }
-.pw-eye:hover { color: #1b4332; }
+.pw-eye:hover { color: #4b5563; }
 
 /* Send OTP button */
 .send-otp-btn {
@@ -676,14 +676,14 @@ const faqs = [
   font-weight: 600;
   white-space: nowrap;
   width: fit-content;
-  background: linear-gradient(135deg, #1b4332, #2d6a4f);
+  background: linear-gradient(135deg, #4b5563, #6b7280);
   color: #fff;
   border: none;
   border-radius: 8px;
   padding: 10px 20px;
   cursor: pointer;
   transition: opacity 0.15s;
-  box-shadow: 0 2px 6px rgba(27,67,50,0.2);
+  box-shadow: 0 2px 6px rgba(48, 53, 58,0.2);
 }
 .send-otp-btn:hover { opacity: 0.85; }
 
@@ -692,8 +692,8 @@ const faqs = [
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #d8f3e8;
-  color: #1b7a4a;
+  background: #d8dcdf;
+  color: #4f575f;
   border-radius: 8px;
   padding: 9px 14px;
   font-size: 0.83rem;
@@ -702,7 +702,7 @@ const faqs = [
 .resend-text-btn {
   background: none;
   border: none;
-  color: #1b4332;
+  color: #4b5563;
   font-size: 0.8rem;
   font-weight: 600;
   text-decoration: underline;
@@ -710,7 +710,7 @@ const faqs = [
   padding: 0;
   margin-left: 4px;
 }
-.resend-text-btn:hover { color: #2d6a4f; }
+.resend-text-btn:hover { color: #6b7280; }
 
 /* OTP hint label */
 .otp-hint {
@@ -735,13 +735,13 @@ const faqs = [
   border: 1.5px solid #dde2e8;
   border-radius: 8px;
   background: #f9fafb;
-  color: #1b4332;
+  color: #4b5563;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .otp-box-sm:focus {
-  border-color: #2d6a4f;
-  box-shadow: 0 0 0 3px rgba(45,106,79,0.15);
+  border-color: #6b7280;
+  box-shadow: 0 0 0 3px rgba(83, 91, 100,0.15);
   background: #fff;
 }
 
@@ -753,12 +753,12 @@ const faqs = [
   border-radius: 8px;
 }
 .settings-msg--error   { background: #ffeaea; color: #e63946; }
-.settings-msg--success { background: #d8f3e8; color: #1b7a4a; }
+.settings-msg--success { background: #d8dcdf; color: #4f575f; }
 
 /* Update button */
 .settings-form-footer { display: flex; justify-content: center; padding-top: 4px; }
 .update-pw-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -768,9 +768,9 @@ const faqs = [
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.18s, opacity 0.18s;
-  box-shadow: 0 4px 14px rgba(27,67,50,0.2);
+  box-shadow: 0 4px 14px rgba(48, 53, 58,0.2);
 }
-.update-pw-btn:hover:not(:disabled) { background: #2d6a4f; }
+.update-pw-btn:hover:not(:disabled) { background: #6b7280; }
 .update-pw-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 
 /* ── Toggle ── */
@@ -787,7 +787,7 @@ const faqs = [
   padding: 0;
   outline: none;
 }
-.toggle-switch--on { background: #1b4332; }
+.toggle-switch--on { background: #4b5563; }
 .toggle-thumb {
   position: absolute;
   top: 3px; left: 3px;
@@ -805,10 +805,10 @@ const faqs = [
   gap: 8px;
   margin-top: 18px;
   padding: 12px 16px;
-  background: #e8f5ee;
+  background: #f3f4f6;
   border-radius: 10px;
   font-size: 0.84rem;
-  color: #1b7a4a;
+  color: #4f575f;
   line-height: 1.55;
 }
 
@@ -818,7 +818,7 @@ const faqs = [
 .faq-header-icon {
   width: 38px; height: 38px;
   border-radius: 10px;
-  background: #e8f5ee;
+  background: #f3f4f6;
   display: flex; align-items: center; justify-content: center;
 }
 .faq-title { font-size: 1.1rem; font-weight: 700; color: #111; margin: 0; }
@@ -830,7 +830,7 @@ const faqs = [
   overflow: hidden;
   transition: border-color 0.18s, box-shadow 0.18s;
 }
-.faq-item--open { border-color: #b7d8c8; box-shadow: 0 2px 10px rgba(27,67,50,0.07); }
+.faq-item--open { border-color: #bdc2c6; box-shadow: 0 2px 10px rgba(48, 53, 58,0.07); }
 .faq-question {
   display: flex;
   align-items: center;
@@ -848,9 +848,9 @@ const faqs = [
   cursor: pointer;
   transition: background 0.15s;
 }
-.faq-question:hover { background: #f7faf8; }
+.faq-question:hover { background: #f4f5f5; }
 .faq-chevron { flex-shrink: 0; color: #aaa; transition: transform 0.22s; }
-.faq-chevron--open { transform: rotate(180deg); color: #1b4332; }
+.faq-chevron--open { transform: rotate(180deg); color: #4b5563; }
 .faq-answer {
   padding: 0 20px 18px;
   font-size: 0.875rem;
@@ -888,7 +888,7 @@ const faqs = [
 .tfa-modal-icon {
   width: 64px; height: 64px;
   border-radius: 50%;
-  background: #e8f5ee;
+  background: #f3f4f6;
   display: flex; align-items: center; justify-content: center;
   margin-bottom: 4px;
 }
@@ -908,15 +908,15 @@ const faqs = [
   text-align: center;
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1b4332;
+  color: #4b5563;
   outline: none;
   font-family: inherit;
   transition: border-color 0.15s, box-shadow 0.15s;
   background: #f9fafb;
 }
 .otp-box:focus {
-  border-color: #1b4332;
-  box-shadow: 0 0 0 3px rgba(27,67,50,0.12);
+  border-color: #4b5563;
+  box-shadow: 0 0 0 3px rgba(48, 53, 58,0.12);
   background: #fff;
 }
 
@@ -926,7 +926,7 @@ const faqs = [
   gap: 6px;
   background: none;
   border: none;
-  color: #1b4332;
+  color: #4b5563;
   font-family: inherit;
   font-size: 0.85rem;
   font-weight: 600;
@@ -935,7 +935,7 @@ const faqs = [
   border-radius: 6px;
   transition: background 0.15s;
 }
-.resend-btn:hover { background: #e8f5ee; }
+.resend-btn:hover { background: #f3f4f6; }
 
 .tfa-modal-actions {
   display: flex;
@@ -991,7 +991,7 @@ const faqs = [
   padding: 10px 0;
   border-radius: 9px;
   border: none;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   font-weight: 600;
   font-size: 0.92rem;
@@ -999,7 +999,7 @@ const faqs = [
   cursor: pointer;
   transition: background 0.15s;
 }
-.tfa-continue-btn:hover { background: #2d6a4f; }
+.tfa-continue-btn:hover { background: #6b7280; }
 
 /* ── Logout Modal ── */
 .logout-modal-box {
@@ -1047,7 +1047,7 @@ const faqs = [
 }
 .logout-cancel-btn:hover { background: #ffeaea; }
 .logout-confirm-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -1058,7 +1058,7 @@ const faqs = [
   cursor: pointer;
   transition: background 0.18s;
 }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn:hover { background: #6b7280; }
 
 @keyframes modalIn {
   from { opacity: 0; transform: scale(0.94) translateY(12px); }

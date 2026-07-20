@@ -29,6 +29,7 @@ export const timeOptions = [
 export const teacherOptions = ref([])
 
 export const subjectOptions = [
+  'Lunch Break',
   'ITE 300 | Object Oriented Programming',
   'ITE 367 | Managing IT Resources',
   'ITE 383 | Elective 4: Network Security',

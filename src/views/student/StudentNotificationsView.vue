@@ -99,8 +99,8 @@ function markAll() {
   padding: 5px 10px;
 }
 .unread-banner {
-  background: #e6f3ea;
-  color: #1b7a42;
+  background: #e4e7e9;
+  color: #4f575f;
   font-size: 0.8rem;
   font-weight: 700;
   padding: 8px 16px;
@@ -129,7 +129,7 @@ function markAll() {
   margin-top: 6px;
   flex-shrink: 0;
 }
-.notif-dot.on { background: #17a34a; }
+.notif-dot.on { background: #626a72; }
 .notif-title { font-size: 0.91rem; font-weight: 700; color: #252b31; }
 .notif-desc { font-size: 0.79rem; color: #74808d; margin-top: 2px; line-height: 1.4; }
 .notif-time { font-size: 0.72rem; color: #a4adb7; margin-top: 4px; }

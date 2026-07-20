@@ -104,7 +104,7 @@
       <!-- ── By Teacher: pick teacher ── -->
       <div v-else-if="addMode === 'teacher' && !selectedTeacher" class="step-container">
         <div v-if="loadingAddTeachers" class="loading-state">
-          <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+          <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
           Loading teachers…
         </div>
         <template v-else>
@@ -191,11 +191,11 @@
           <div class="sched-topbar-left">
             <h2 class="sched-grid-title">
               <template v-if="addMode === 'teacher'">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
                 Prof. {{ selectedTeacher }}
               </template>
               <template v-else-if="addMode === 'room'">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
                 Room {{ contextRoom }}
               </template>
             </h2>
@@ -257,6 +257,7 @@
                     :class="{
                       'has-entry': getEntriesForCell30(slot, day).length,
                       'consult-cell': !getEntriesForCell30(slot, day).length && !!getConsultationForCell30(slot, day),
+                      'free-time-cell': !getEntriesForCell30(slot, day).length && !getConsultationForCell30(slot, day),
                       'readonly-entry-cell': getEntriesForCell30(slot, day).length && !selectedTeacher,
                     }"
                     @click="canInteractCell30(slot, day) ? handleCellClick30(slot, day) : null"
@@ -271,10 +272,10 @@
                         <div class="entry-teacher">{{ getEntriesForCell30(slot, day)[0].teacher }}</div>
                         <div class="entry-subject">{{ getEntriesForCell30(slot, day)[0].subject }}</div>
                         <div class="entry-time-range">{{ getEntriesForCell30(slot, day)[0].slot }}</div>
-                        <div class="entry-section-rows">
+                        <div v-if="getEntriesForCell30(slot, day)[0].section && getEntriesForCell30(slot, day)[0].entryType !== 'lunch'" class="entry-section-rows">
                           <div v-for="e in getEntriesForCell30(slot, day)" :key="e._key" class="entry-section-row">
-                            <span class="entry-section-badge">{{ e.section }}</span>
-                            <span class="entry-room">{{ e.room }}</span>
+                            <span v-if="e.section" class="entry-section-badge">{{ e.section }}</span>
+                            <span v-if="e.room" class="entry-room">{{ e.room }}</span>
                           </div>
                         </div>
                         <div v-if="getEntriesForCell30(slot, day)[0].addedAt" class="entry-timestamp">Added: {{ getEntriesForCell30(slot, day)[0].addedAt }}</div>
@@ -314,7 +315,10 @@
                     v-if="!isSpannedRoomCell30(slot, day)"
                     :rowspan="getEntriesForRoomCell30(slot, day).length ? getRowspan30(getEntriesForRoomCell30(slot, day)[0]) : 1"
                     class="td-cell"
-                    :class="{ 'has-entry': getEntriesForRoomCell30(slot, day).length }"
+                    :class="{
+                      'has-entry': getEntriesForRoomCell30(slot, day).length,
+                      'free-time-cell': !getEntriesForRoomCell30(slot, day).length
+                    }"
                     @click="handleRoomCellClick30(slot, day)"
                   >
                     <template v-if="getEntriesForRoomCell30(slot, day).length">
@@ -429,10 +433,14 @@
             </div>
             <div class="form-row-inline">
               <label class="form-label">Subject</label>
-              <div class="form-select-wrap">
+              <div v-if="form.subject === 'Lunch Break'" class="lunch-subject-selected">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
+                Lunch Break selected
+              </div>
+              <div v-else class="form-select-wrap">
                 <select v-model="form.subject" class="form-select">
                   <option value="" disabled>Select Subject</option>
-                  <option v-for="s in subjectOptions" :key="s" :value="s">{{ s }}</option>
+                  <option v-for="s in modalSubjectOptions" :key="s" :value="s">{{ s }}</option>
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
@@ -516,6 +524,13 @@
             {{ modalTimeError }}
           </div>
 
+          <div v-if="!editMode && addMode === 'teacher' && lunchBreakContext.teacher && lunchBreakContext.day" class="lunch-break-footer">
+            <button type="button" class="lunch-break-modal-btn" @click="openLunchBreakPicker">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
+              Add Lunch Break
+            </button>
+          </div>
+
           <div class="sched-modal-actions">
             <button v-if="editMode" class="clear-slot-btn" @click="clearSlot">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
@@ -528,6 +543,54 @@
             </button>
           </div>
         </div>
+      </div>
+    </Teleport>
+
+    <!-- ═══ Lunch Break Time Picker ═══ -->
+    <Teleport to="body">
+      <div v-if="showLunchBreakPicker" class="modal-overlay lunch-break-picker-overlay" @click.self="showLunchBreakPicker = false">
+        <section class="lunch-break-picker" role="dialog" aria-modal="true" aria-labelledby="lunch-break-picker-title">
+          <div class="lunch-break-picker-header">
+            <div class="lunch-break-picker-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
+            </div>
+            <div>
+              <h2 id="lunch-break-picker-title">{{ lunchBreakContext.editing ? 'Edit Lunch Break' : 'Set Lunch Break' }}</h2>
+              <p>{{ lunchBreakContext.day }} &bull; Select the lunch time.</p>
+            </div>
+          </div>
+
+          <div class="lunch-break-picker-fields">
+            <label class="lunch-break-picker-field">
+              <span>Start Time</span>
+              <select v-model="lunchBreakForm.timeIn">
+                <option value="" disabled>Select Start Time</option>
+                <option v-for="time in timeOptions" :key="time" :value="time">{{ time }}</option>
+              </select>
+            </label>
+            <label class="lunch-break-picker-field">
+              <span>End Time</span>
+              <select v-model="lunchBreakForm.timeOut">
+                <option value="" disabled>Select End Time</option>
+                <option v-for="time in timeOptions" :key="time" :value="time">{{ time }}</option>
+              </select>
+            </label>
+          </div>
+
+          <p v-if="lunchBreakTimeError" class="lunch-break-picker-error">{{ lunchBreakTimeError }}</p>
+
+          <div class="lunch-break-picker-actions">
+            <button type="button" class="cancel-btn-text" @click="showLunchBreakPicker = false">Cancel</button>
+            <button
+              type="button"
+              class="save-btn"
+              :disabled="!lunchBreakForm.timeIn || !lunchBreakForm.timeOut || !!lunchBreakTimeError"
+              @click="saveLunchBreakFromPicker"
+            >
+              {{ lunchBreakContext.editing ? 'Update Lunch Break' : 'Save Lunch Break' }}
+            </button>
+          </div>
+        </section>
       </div>
     </Teleport>
 
@@ -877,7 +940,7 @@ const navItems = [
   { name: 'Add Schedule',   to: '/admin/schedule/add',    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="20"/><line x1="9" y1="17" x2="15" y2="17"/></svg>` },
   { name: 'Teachers',       to: '/admin/teachers',        icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>` },
   { name: 'Events',         to: '/admin/events',          icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="5" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="18" r="1" fill="currentColor" stroke="none"/></svg>` },
-  { name: 'Manage Users',   to: '/admin/users',           icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
+  { name: 'Users',          to: '/admin/users',           icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
   { name: 'Settings',       to: '/admin/settings',        icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>` },
 ]
 
@@ -997,7 +1060,7 @@ async function handleRoomCellClick30(slot, day) {
     await Swal.fire({
       icon: 'info', title: 'Slot Occupied',
       html: `<div style="font-size:0.9rem;color:#444"><b>${cell[0].teacher}</b><br>${cell[0].subject}<br>${cell[0].slot}</div><p style="font-size:0.8rem;color:#888;margin-top:8px;">To edit this entry, use the <b>By Teacher</b> mode.</p>`,
-      confirmButtonText: 'OK', confirmButtonColor: '#1b4332', background: '#fff',
+      confirmButtonText: 'OK', confirmButtonColor: '#4b5563', background: '#fff',
       customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
     })
   } else {
@@ -1038,8 +1101,8 @@ function getEntriesForCell30(rowSlot, day) {
     const parts = k.split('|')
     if (parts.length < 4) return false
     if (selectedTeacher.value && v.teacher !== selectedTeacher.value) return false
-    if (yearDropdown.value !== 'All' && v.year !== yearDropdown.value) return false
-    if (filterSection.value !== 'All' && parts[1] !== filterSection.value) return false
+    if (yearDropdown.value !== 'All' && v.year !== yearDropdown.value && v.entryType !== 'lunch') return false
+    if (filterSection.value !== 'All' && parts[1] !== filterSection.value && v.entryType !== 'lunch') return false
     if (parts[3] !== day) return false
     const t = parseTime(v.timeIn)
     return t >= rowStart && t < rowEnd
@@ -1055,8 +1118,8 @@ function getEntriesForCell30(rowSlot, day) {
         const parts = k.split('|')
         if (parts.length < 4) return false
         if (selectedTeacher.value && v.teacher !== selectedTeacher.value) return false
-        if (yearDropdown.value !== 'All' && v.year !== yearDropdown.value) return false
-        if (filterSection.value !== 'All' && parts[1] !== filterSection.value) return false
+        if (yearDropdown.value !== 'All' && v.year !== yearDropdown.value && v.entryType !== 'lunch') return false
+        if (filterSection.value !== 'All' && parts[1] !== filterSection.value && v.entryType !== 'lunch') return false
         if (parts[3] !== day) return false
         if (v.parallelGroupId !== matchedEntry.parallelGroupId) return false
         const t = parseTime(v.timeIn)
@@ -1139,7 +1202,8 @@ function consultEntryStyle30(rowSlot, consult) {
 }
 
 function canInteractCell30(slot, day) {
-  const hasEntry = getEntriesForCell30(slot, day).length > 0
+  const cellEntries = getEntriesForCell30(slot, day)
+  const hasEntry = cellEntries.length > 0
   if (hasEntry && !selectedTeacher.value) return false
   return !getConsultationForCell30(slot, day) || hasEntry
 }
@@ -1151,9 +1215,13 @@ async function handleCellClick30(slot, day) {
       await Swal.fire({
         icon: 'info', title: 'Select a Teacher',
         text: 'Please select a specific teacher to edit an existing schedule.',
-        confirmButtonText: 'OK', confirmButtonColor: '#1b4332', background: '#fff',
+        confirmButtonText: 'OK', confirmButtonColor: '#4b5563', background: '#fff',
         customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
       })
+      return
+    }
+    if (cell[0].entryType === 'lunch') {
+      openLunchBreakEditor(cell[0])
       return
     }
     openEditModal(slot, day, cell[0])
@@ -1162,7 +1230,7 @@ async function handleCellClick30(slot, day) {
       await Swal.fire({
         icon: 'info', title: 'No Teacher Selected',
         text: 'Please select a teacher from the dropdown first.',
-        confirmButtonText: 'OK', confirmButtonColor: '#1b4332', background: '#fff',
+        confirmButtonText: 'OK', confirmButtonColor: '#4b5563', background: '#fff',
         customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
       })
       return
@@ -1204,21 +1272,26 @@ function syncEntriesFromApi(apiEntries) {
   if (!Array.isArray(apiEntries)) return
   apiEntries.forEach(entry => {
     const tableLabel = entry.tableLabel || entry.teacher
-    const section = entry.section
+    const isLunch = entry.entryType === 'lunch' || entry.color === 'color-gray' || /\blunch\b/i.test(String(entry.subject || ''))
+    const legacySection = entry.section || ''
+    const section = isLunch ? '' : legacySection
     const day = entry.day
     const slot = `${entry.timeIn} - ${entry.timeOut}`
-    if (!tableLabel || !section || !day || !entry.timeIn || !entry.timeOut) return
-    const key = `${tableLabel}|${section}|${slot}|${day}`
+    if (!tableLabel || (!legacySection && !isLunch) || !day || !entry.timeIn || !entry.timeOut) return
+    const key = `${tableLabel}|${legacySection || `__lunch_${entry.id || slot}`}|${slot}|${day}`
     const inferredCampus = inferCampus(entry)
     const roomBasedColor = colorForRoom(entry.room)
     entries[key] = {
+      id: entry.id || '',
       teacher: entry.teacher,
       subject: entry.subject,
       campus: inferredCampus,
       room: entry.room,
-      year: entry.year,
+      year: isLunch ? '' : entry.year,
       tableLabel,
       section,
+      legacySection: isLunch ? legacySection : '',
+      legacyYear: isLunch ? entry.year : '',
       day,
       slot,
       timeIn: entry.timeIn,
@@ -1227,7 +1300,8 @@ function syncEntriesFromApi(apiEntries) {
       parallelGroupId: entry.parallelGroupId || null,
       parallelCount: entry.parallelCount || 1,
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map(s => ({ ...s })) : [],
-      color: inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || entry.color || 'color-green'),
+      entryType: isLunch ? 'lunch' : (entry.entryType || 'class'),
+      color: isLunch ? 'color-gray' : (roomBasedColor || 'color-yellow'),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -1334,7 +1408,7 @@ async function showConflictDialog(conflicts) {
         ${buildConflictHtml(conflicts)}
       </div>`,
     confirmButtonText: 'OK',
-    confirmButtonColor: '#1b4332',
+    confirmButtonColor: '#4b5563',
     background: '#fff',
     customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title' },
   })
@@ -1347,7 +1421,7 @@ async function showScheduleError(error, fallbackTitle = 'Unable to save schedule
     title: isConflict ? 'Schedule Conflict' : fallbackTitle,
     html: `<span style="font-size:0.95rem;color:#444">${error?.message || 'Something went wrong. Please try again.'}</span>`,
     confirmButtonText: 'Got it',
-    confirmButtonColor: isConflict ? '#e63946' : '#1b4332',
+    confirmButtonColor: isConflict ? '#e63946' : '#4b5563',
     background: '#fff',
     customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
   })
@@ -1357,6 +1431,20 @@ async function showScheduleError(error, fallbackTitle = 'Unable to save schedule
 const showSchedModal = ref(false)
 const editMode       = ref(false)
 const fromButton     = ref(false)
+const showLunchBreakPicker = ref(false)
+const lunchBreakContext = reactive({
+  id: '',
+  teacher: '',
+  day: '',
+  campus: 'South Campus',
+  editing: false,
+  oldTableLabel: '',
+  oldSection: '',
+  oldDay: '',
+  oldTimeIn: '',
+  oldTimeOut: '',
+  legacyYear: '',
+})
 
 const form = reactive({
   slot: '', day: '', teacher: '', subject: '',
@@ -1377,6 +1465,14 @@ const form = reactive({
   _oldDay: '',
 })
 const modalTimeError = ref('')
+const modalSubjectOptions = computed(() => subjectOptions.filter((subject) => subject !== 'Lunch Break'))
+const lunchBreakForm = reactive({ timeIn: '', timeOut: '' })
+const lunchBreakTimeError = computed(() => {
+  if (!lunchBreakForm.timeIn || !lunchBreakForm.timeOut) return ''
+  return parseTime(lunchBreakForm.timeOut) <= parseTime(lunchBreakForm.timeIn)
+    ? 'End time must be after start time.'
+    : ''
+})
 
 function buildSlots(count) {
   return Array.from({ length: count }, () => ({ section: '', room: '' }))
@@ -1399,10 +1495,178 @@ watch(() => form.room, (val) => {
   if (auto) form.color = auto
 })
 
+function openLunchBreakPicker() {
+  lunchBreakContext.id = ''
+  lunchBreakContext.editing = false
+  lunchBreakContext.oldTableLabel = ''
+  lunchBreakContext.oldSection = ''
+  lunchBreakContext.oldDay = ''
+  lunchBreakContext.oldTimeIn = ''
+  lunchBreakContext.oldTimeOut = ''
+  lunchBreakContext.legacyYear = ''
+  lunchBreakForm.timeIn = form.timeIn || ''
+  lunchBreakForm.timeOut = form.timeOut || ''
+  showLunchBreakPicker.value = true
+}
+
+function openLunchBreakEditor(entry) {
+  // Lunch entries use a dedicated time-only editor. They do not require
+  // class fields such as year, section, subject, or room.
+  lunchBreakContext.id = entry.id || ''
+  lunchBreakContext.teacher = entry.teacher || selectedTeacher.value || ''
+  lunchBreakContext.day = entry.day || ''
+  lunchBreakContext.campus = entry.campus || 'South Campus'
+  lunchBreakContext.editing = true
+  lunchBreakContext.oldTableLabel = entry.tableLabel || entry.teacher || ''
+  lunchBreakContext.oldSection = entry.legacySection || entry.section || 'Lunch Break'
+  lunchBreakContext.oldDay = entry.day || ''
+  lunchBreakContext.oldTimeIn = entry.timeIn || ''
+  lunchBreakContext.oldTimeOut = entry.timeOut || ''
+  lunchBreakContext.legacyYear = years.includes(entry.legacyYear || entry.year) ? (entry.legacyYear || entry.year) : years[0]
+  lunchBreakForm.timeIn = entry.timeIn || ''
+  lunchBreakForm.timeOut = entry.timeOut || ''
+  showSchedModal.value = false
+  showLunchBreakPicker.value = true
+}
+
+function isMissingLunchPatchRoute(error) {
+  // A current server returns "Lunch break not found" for an invalid ID. Do
+  // not fall back in that case because a replace could recreate a deleted
+  // record. Older servers instead return a generic 404 for the PATCH route.
+  return error?.status === 404 && !/lunch break not found/i.test(String(error?.message || ''))
+}
+
+async function updateLunchBreak(payload) {
+  try {
+    return await apiRequest(`/schedules/lunch/${encodeURIComponent(lunchBreakContext.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        day: payload.day,
+        timeIn: payload.timeIn,
+        timeOut: payload.timeOut,
+      }),
+    })
+  } catch (error) {
+    if (!isMissingLunchPatchRoute(error)) throw error
+
+    // Compatibility for the already-running server, which has the regular
+    // replace endpoint but not the lunch PATCH route. These fields are drawn
+    // from the saved legacy entry; the admin still only edits the two times.
+    const legacyYear = years.includes(lunchBreakContext.legacyYear)
+      ? lunchBreakContext.legacyYear
+      : years[0]
+    const legacySection = lunchBreakContext.oldSection || 'Lunch Break'
+    const old = {
+      tableLabel: lunchBreakContext.oldTableLabel || lunchBreakContext.teacher,
+      section: legacySection,
+      day: lunchBreakContext.oldDay || lunchBreakContext.day,
+      timeIn: lunchBreakContext.oldTimeIn,
+      timeOut: lunchBreakContext.oldTimeOut,
+    }
+    const next = {
+      tableLabel: lunchBreakContext.teacher,
+      baseYear: legacyYear,
+      year: legacyYear,
+      campus: payload.campus,
+      day: payload.day,
+      timeIn: payload.timeIn,
+      timeOut: payload.timeOut,
+      teacher: lunchBreakContext.teacher,
+      subject: 'Lunch Break',
+      section: legacySection,
+      room: '',
+      parallel: false,
+      parallelCount: 1,
+    }
+
+    return apiRequest('/schedules/replace', {
+      method: 'POST',
+      body: JSON.stringify({ old, next }),
+    })
+  }
+}
+
+async function postLunchBreak(payload) {
+  try {
+    return await apiRequest('/schedules', { method: 'POST', body: JSON.stringify(payload) })
+  } catch (error) {
+    // Older API servers do not recognize `entryType: 'lunch'` and run the
+    // normal schedule validator instead. Retry only that exact legacy error
+    // with internal values; the lunch popup still needs only day and times.
+    const isLegacyValidator = error?.status === 400 && error?.message === 'Missing required schedule fields.'
+    if (!isLegacyValidator) throw error
+
+    const legacyYear = years.includes(yearDropdown.value) ? yearDropdown.value : years[0]
+    return apiRequest('/schedules', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...payload,
+        subject: 'Lunch Break',
+        year: legacyYear,
+        baseYear: legacyYear,
+        section: 'Lunch Break',
+      }),
+    })
+  }
+}
+
+async function saveLunchBreakFromPicker() {
+  if (!lunchBreakContext.teacher || !lunchBreakContext.day || !lunchBreakForm.timeIn || !lunchBreakForm.timeOut || lunchBreakTimeError.value) return
+
+  const payload = {
+    entryType: 'lunch',
+    teacher: lunchBreakContext.teacher,
+    day: lunchBreakContext.day,
+    timeIn: lunchBreakForm.timeIn,
+    timeOut: lunchBreakForm.timeOut,
+    campus: lunchBreakContext.campus,
+    parallel: false,
+    room: '',
+  }
+  const skipFilter = lunchBreakContext.editing
+    ? (_key, entry) => entry.id === lunchBreakContext.id
+    : null
+  const conflicts = checkScheduleConflict(payload, skipFilter)
+  if (conflicts.length > 0) {
+    await showConflictDialog(conflicts)
+    return
+  }
+
+  try {
+    if (lunchBreakContext.editing) {
+      if (!lunchBreakContext.id) {
+        throw new Error('This lunch break is missing its saved identifier. Refresh the schedule and try again.')
+      }
+      await updateLunchBreak(payload)
+    } else {
+      await postLunchBreak(payload)
+    }
+    await refreshScheduleData(lunchBreakContext.teacher)
+    yearDropdown.value = 'All'
+    filterSection.value = 'All'
+    showLunchBreakPicker.value = false
+    showSchedModal.value = false
+  } catch (error) {
+    await showScheduleError(error, 'Unable to save lunch break')
+  }
+}
+
 function openAddModal(slot, day) {
   filterSection.value  = 'All'
   editMode.value       = false
   fromButton.value     = (slot === null && day === null)
+  showLunchBreakPicker.value = false
+  lunchBreakContext.teacher = selectedTeacher.value || ''
+  lunchBreakContext.day = day ?? ''
+  lunchBreakContext.campus = 'South Campus'
+  lunchBreakContext.id = ''
+  lunchBreakContext.editing = false
+  lunchBreakContext.oldTableLabel = ''
+  lunchBreakContext.oldSection = ''
+  lunchBreakContext.oldDay = ''
+  lunchBreakContext.oldTimeIn = ''
+  lunchBreakContext.oldTimeOut = ''
+  lunchBreakContext.legacyYear = ''
   form.day             = day ?? ''
   form.timeIn          = slot ?? ''
   form.timeOut         = ''
@@ -1432,6 +1696,17 @@ function openEditModal(slot, day, e) {
   filterSection.value  = 'All'
   editMode.value       = true
   fromButton.value     = false
+  showLunchBreakPicker.value = false
+  lunchBreakContext.teacher = ''
+  lunchBreakContext.day = ''
+  lunchBreakContext.id = ''
+  lunchBreakContext.editing = false
+  lunchBreakContext.oldTableLabel = ''
+  lunchBreakContext.oldSection = ''
+  lunchBreakContext.oldDay = ''
+  lunchBreakContext.oldTimeIn = ''
+  lunchBreakContext.oldTimeOut = ''
+  lunchBreakContext.legacyYear = ''
   form.slot            = slot
   form.day             = day
   form.year            = e.year ?? ''
@@ -1595,6 +1870,8 @@ function openAddPanel() {
   addForm.year = ''; addForm.day = ''; addForm.timeIn = ''; addForm.timeOut = ''
   addForm.section = ''; addForm.campus = 'South Campus'
   addForm.teacher = selectedTeacher.value || ''
+  addForm.subject = ''
+  addForm.room = addMode.value === 'room' ? contextRoom.value || '' : ''
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
     { section: '', room: '' }, { section: '', room: '' })
@@ -1690,7 +1967,7 @@ async function saveConsultSlot() {
     await Swal.fire({
       icon: 'error', title: 'Cannot Save Consultation',
       html: `<span style="font-size:0.95rem;color:#444">${error?.message || 'Failed to save consultation slot.'}</span>`,
-      confirmButtonText: 'OK', confirmButtonColor: '#1b4332', background: '#fff',
+      confirmButtonText: 'OK', confirmButtonColor: '#4b5563', background: '#fff',
       customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
     })
   }
@@ -1714,7 +1991,7 @@ async function deleteConsultSlot(id) {
     const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
     consultWeeklyMins.value = res.weeklyUsedMinutes || 0
   } catch (error) {
-    await Swal.fire({ icon: 'error', title: 'Error', text: error?.message || 'Failed to delete.', confirmButtonColor: '#1b4332', background: '#fff' })
+    await Swal.fire({ icon: 'error', title: 'Error', text: error?.message || 'Failed to delete.', confirmButtonColor: '#4b5563', background: '#fff' })
   }
 }
 
@@ -1728,9 +2005,10 @@ function printSchedule() {
     '4:00 PM','4:30 PM','5:00 PM','5:30 PM','6:00 PM','6:30 PM','7:00 PM',
   ]
   const colorMap = {
-    'color-green': { bg: '#1b4332', fg: '#ffffff' }, 'color-yellow': { bg: '#e9c46a', fg: '#5a3e00' },
-    'color-orange': { bg: '#f4a261', fg: '#5a2d00' }, 'color-blue': { bg: '#4a90d9', fg: '#ffffff' },
-    'color-purple': { bg: '#7b5ea7', fg: '#ffffff' }, 'color-red': { bg: '#e63946', fg: '#ffffff' },
+    'color-green': { bg: '#b7ddc3', fg: '#214d30' }, 'color-yellow': { bg: '#efd77c', fg: '#5d4700' },
+    'color-orange': { bg: '#efd77c', fg: '#5d4700' }, 'color-blue': { bg: '#b6d8f5', fg: '#1d527d' },
+    'color-gray': { bg: '#cdd3d6', fg: '#4e575d' },
+    'color-purple': { bg: '#d8c3ef', fg: '#5b417c' }, 'color-red': { bg: '#e63946', fg: '#ffffff' },
   }
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   function toMins(t) {
@@ -1859,9 +2137,9 @@ onMounted(async () => {
   overflow-y: auto;
 }
 .sidebar-profile { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 28px; text-align: center; }
-.avatar-wrap { width: 96px; height: 96px; border-radius: 50%; overflow: hidden; margin-bottom: 10px; border: 3px solid #c8ddd4; }
+.avatar-wrap { width: 96px; height: 96px; border-radius: 50%; overflow: hidden; margin-bottom: 10px; border: 3px solid #c4c9cd; }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
-.brand  { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand  { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role   { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email  { font-size: 0.82rem; color: #888; word-break: break-all; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 4px; width: 100%; flex: 1; }
@@ -1872,8 +2150,8 @@ onMounted(async () => {
   text-decoration: none; cursor: pointer;
   transition: background 0.18s, color 0.18s;
 }
-.nav-item:hover { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 .logout-btn {
@@ -1898,20 +2176,135 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 16px;
 }
-.page-title { font-size: 2rem; font-weight: 600; color: #1b4332; letter-spacing: -0.5px; line-height: 1.2; }
+.page-title { font-size: 2rem; font-weight: 600; color: #4b5563; letter-spacing: -0.5px; line-height: 1.2; }
 .page-sub   { font-size: 0.95rem; color: #777; margin-top: 4px; }
 .header-actions { display: flex; align-items: center; gap: 10px; padding-top: 6px; flex-shrink: 0; }
 
 /* ── Buttons ── */
 .new-sched-btn {
   display: flex; align-items: center; gap: 6px;
-  background: #1b4332; color: #fff;
+  background: #4b5563; color: #fff;
   border: none; border-radius: 8px;
   padding: 9px 18px;
   font-size: 0.85rem; font-weight: 500; font-family: inherit;
   cursor: pointer; transition: background 0.18s;
 }
-.new-sched-btn:hover { background: #2d6a4f; }
+.new-sched-btn:hover { background: #6b7280; }
+.lunch-subject-selected {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 12px;
+  color: #4e575d;
+  background: linear-gradient(145deg, #f0f2f3, #cdd3d6);
+  border: 1px solid #aeb5b9;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+.lunch-break-footer { padding: 0 24px 12px; }
+.lunch-break-modal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 14px;
+  color: #4e575d;
+  background: linear-gradient(145deg, #f0f2f3, #cdd3d6);
+  border: 1px solid #aeb5b9;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.lunch-break-modal-btn:hover {
+  filter: brightness(1.04);
+  box-shadow: 0 3px 9px rgba(61, 67, 73, 0.16), inset 0 1px rgba(255, 255, 255, 0.76);
+}
+.lunch-break-modal-btn:active { transform: translateY(1px); }
+.lunch-break-picker-overlay { z-index: 1100; }
+.lunch-break-picker {
+  width: 430px;
+  max-width: 94vw;
+  padding: 26px;
+  color: #31383e;
+  background: linear-gradient(145deg, #fafbfb, #dde1e3);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(33, 38, 43, 0.32);
+}
+.lunch-break-picker-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.lunch-break-picker-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  color: #4e575d;
+  background: linear-gradient(145deg, #f0f2f3, #cdd3d6);
+  border: 1px solid #aeb5b9;
+  border-radius: 12px;
+}
+.lunch-break-picker h2 {
+  margin: 0;
+  color: #32383e;
+  font-size: 1.15rem;
+}
+.lunch-break-picker-header p {
+  margin: 3px 0 0;
+  color: #687078;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.lunch-break-picker-fields {
+  display: grid;
+  gap: 12px;
+}
+.lunch-break-picker-field {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: center;
+  gap: 12px;
+  color: #424950;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.lunch-break-picker-field select {
+  width: 100%;
+  padding: 9px 12px;
+  color: #343a40;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid #b9c0c4;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 0.84rem;
+}
+.lunch-break-picker-error {
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  color: #8b2d33;
+  background: #fbe5e6;
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+.lunch-break-picker-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
 .icon-btn {
   background: none; border: 1px solid #ddd;
   border-radius: 8px; padding: 6px 10px;
@@ -1919,7 +2312,7 @@ onMounted(async () => {
   display: flex; align-items: center;
   transition: border-color 0.15s, color 0.15s;
 }
-.icon-btn:hover { border-color: #40916c; color: #1b4332; }
+.icon-btn:hover { border-color: #9ca3af; color: #4b5563; }
 .consult-btn { background: #4a90d9 !important; color: #fff !important; border-color: #4a90d9 !important; }
 .consult-btn:hover { background: #357abd !important; }
 
@@ -1933,13 +2326,13 @@ onMounted(async () => {
   cursor: pointer; transition: all 0.2s; font-family: inherit;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
-.mode-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(64,145,108,0.15); }
+.mode-card:hover { border-color: #9ca3af; background: #f8fafc; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(83, 91, 100,0.15); }
 .mode-icon-wrap {
   width: 72px; height: 72px; border-radius: 50%;
-  background: linear-gradient(135deg, #e8f5e9, #d4edda);
-  display: flex; align-items: center; justify-content: center; color: #1b4332;
+  background: linear-gradient(135deg, #f3f4f6, #d8dcdf);
+  display: flex; align-items: center; justify-content: center; color: #4b5563;
 }
-.mode-label { font-size: 1.1rem; font-weight: 700; color: #1b4332; }
+.mode-label { font-size: 1.1rem; font-weight: 700; color: #4b5563; }
 .mode-desc  { font-size: 0.85rem; color: #888; text-align: center; line-height: 1.4; }
 
 .step-container { display: flex; flex-direction: column; gap: 16px; }
@@ -1951,13 +2344,13 @@ onMounted(async () => {
   padding: 12px 14px;
   border: 1.5px solid #dce8e1;
   border-radius: 999px;
-  background: #f8fcfa;
+  background: #f4f5f5;
   margin-bottom: 16px;
 }
-.teacher-search-icon { color: #40916c; flex-shrink: 0; }
+.teacher-search-icon { color: #9ca3af; flex-shrink: 0; }
 .teacher-search-input {
   border: none; outline: none; background: transparent;
-  width: 100%; font-size: 0.95rem; color: #1b4332; font-family: inherit;
+  width: 100%; font-size: 0.95rem; color: #4b5563; font-family: inherit;
 }
 .room-search-wrap { margin-bottom: 14px; }
 
@@ -1969,7 +2362,7 @@ onMounted(async () => {
   cursor: pointer; transition: all 0.2s; font-family: inherit;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
-.floor-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); }
+.floor-card:hover { border-color: #9ca3af; background: #f8fafc; transform: translateY(-2px); }
 .floor-card-expanded {
   width: 100%;
   min-height: auto;
@@ -1996,8 +2389,8 @@ onMounted(async () => {
 }
 .floor-room-btn {
   border: 1px solid #dce8e1;
-  background: #f8fcfa;
-  color: #1b4332;
+  background: #f4f5f5;
+  color: #4b5563;
   border-radius: 999px;
   padding: 8px 14px;
   font-size: 0.9rem;
@@ -2007,17 +2400,17 @@ onMounted(async () => {
   font-family: inherit;
 }
 .floor-room-btn:hover {
-  border-color: #40916c;
+  border-color: #9ca3af;
   background: #e8f5ea;
   transform: translateY(-1px);
 }
 .floor-number {
   width: 54px; height: 54px; border-radius: 50%;
-  background: linear-gradient(135deg, #1b4332, #40916c); color: #fff;
+  background: linear-gradient(135deg, #4b5563, #9ca3af); color: #fff;
   font-size: 1.4rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
-.floor-label { font-size: 1rem; font-weight: 600; color: #1b4332; }
+.floor-label { font-size: 1rem; font-weight: 600; color: #4b5563; }
 .floor-room-count { font-size: 0.78rem; color: #888; }
 
 .room-grid { display: flex; flex-wrap: wrap; gap: 14px; }
@@ -2028,7 +2421,7 @@ onMounted(async () => {
   cursor: pointer; transition: all 0.18s; font-family: inherit;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
-.room-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); }
+.room-card:hover { border-color: #9ca3af; background: #f8fafc; transform: translateY(-2px); }
 .room-card-inline {
   min-height: 110px;
   width: 130px;
@@ -2036,9 +2429,9 @@ onMounted(async () => {
 }
 .room-card-comlab { border-color: #c5e1f9; background: #f0f8ff; }
 .room-card-comlab:hover { border-color: #4a90d9; background: #e8f4ff; }
-.room-card-icon { color: #1b4332; opacity: 0.5; }
+.room-card-icon { color: #4b5563; opacity: 0.5; }
 .room-card-comlab .room-card-icon { color: #4a90d9; }
-.room-card-number { font-size: 1rem; font-weight: 700; color: #1b4332; text-align: center; }
+.room-card-number { font-size: 1rem; font-weight: 700; color: #4b5563; text-align: center; }
 .room-card-floor { font-size: 0.72rem; color: #888; }
 
 .teacher-grid {
@@ -2057,20 +2450,20 @@ onMounted(async () => {
   cursor: pointer; transition: all 0.18s; font-family: inherit;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
-.teacher-card:hover { border-color: #40916c; background: #f0faf3; transform: translateY(-2px); }
+.teacher-card:hover { border-color: #9ca3af; background: #f8fafc; transform: translateY(-2px); }
 .teacher-avatar-img {
   width: 88px; height: 88px; border-radius: 50%; object-fit: cover;
-  border: 3px solid #dfeee6; box-shadow: 0 4px 12px rgba(27, 67, 50, 0.12);
+  border: 3px solid #dfe2e4; box-shadow: 0 4px 12px rgba(48, 53, 58, 0.12);
 }
 .teacher-avatar {
   width: 88px; height: 88px; border-radius: 50%;
-  background: linear-gradient(135deg, #1b4332, #40916c); color: #fff;
+  background: linear-gradient(135deg, #4b5563, #9ca3af); color: #fff;
   font-size: 1.15rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
-.teacher-name { font-size: 0.95rem; font-weight: 600; color: #1b4332; text-align: center; line-height: 1.3; }
+.teacher-name { font-size: 0.95rem; font-weight: 600; color: #4b5563; text-align: center; line-height: 1.3; }
 .small-empty-state {
-  padding: 18px 20px; border-radius: 12px; background: #f8fcfa; border: 1px dashed #cfe3d8; color: #5d7a6d;
+  padding: 18px 20px; border-radius: 12px; background: #f4f5f5; border: 1px dashed #cfe3d8; color: #5d7a6d;
 }
 
 @media (max-width: 900px) {
@@ -2081,17 +2474,17 @@ onMounted(async () => {
   .teacher-grid { grid-template-columns: 1fr; }
 }
 
-.loading-state { display: flex; align-items: center; gap: 10px; color: #40916c; font-size: 0.9rem; padding: 40px 0; justify-content: center; }
+.loading-state { display: flex; align-items: center; gap: 10px; color: #9ca3af; font-size: 0.9rem; padding: 40px 0; justify-content: center; }
 .spin-icon { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* breadcrumb */
 .header-left { display: flex; flex-direction: column; gap: 4px; }
 .breadcrumb { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.bc-btn { background: none; border: none; font-family: inherit; font-size: 0.83rem; color: #40916c; font-weight: 500; cursor: pointer; padding: 0; transition: color 0.15s; text-decoration: underline; text-underline-offset: 2px; }
-.bc-btn:hover { color: #1b4332; }
-.bc-active { color: #1b4332 !important; text-decoration: none; cursor: default; }
-.bc-current { font-size: 0.83rem; font-weight: 700; color: #1b4332; }
+.bc-btn { background: none; border: none; font-family: inherit; font-size: 0.83rem; color: #9ca3af; font-weight: 500; cursor: pointer; padding: 0; transition: color 0.15s; text-decoration: underline; text-underline-offset: 2px; }
+.bc-btn:hover { color: #4b5563; }
+.bc-active { color: #4b5563 !important; text-decoration: none; cursor: default; }
+.bc-current { font-size: 0.83rem; font-weight: 700; color: #4b5563; }
 
 /* ═══ SCHEDULE CARD ═══ */
 .schedule-card {
@@ -2116,10 +2509,10 @@ onMounted(async () => {
   transition: all 0.3s ease;
 }
 .sched-grid-sub.teacher-selected {
-  font-size: 0.92rem; color: #1b4332; font-weight: 600;
-  background: linear-gradient(120deg, #e8f5e9 0%, #e1f5fe 100%);
-  padding: 10px 14px; border-left: 4px solid #40916c; border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(64, 145, 108, 0.15);
+  font-size: 0.92rem; color: #4b5563; font-weight: 600;
+  background: linear-gradient(120deg, #f3f4f6 0%, #e1f5fe 100%);
+  padding: 10px 14px; border-left: 4px solid #9ca3af; border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(83, 91, 100, 0.15);
 }
 .sched-grid-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sched-topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -2131,19 +2524,19 @@ onMounted(async () => {
   padding: 7px 32px 7px 12px; font-size: 0.85rem; font-family: inherit; color: #333;
   cursor: pointer; outline: none;
 }
-.sched-select:focus { border-color: #40916c; }
+.sched-select:focus { border-color: #9ca3af; }
 .sched-select-arrow { position: absolute; right: 10px; pointer-events: none; color: #666; }
 .teacher-select-wrap {
   padding: 3px 6px;
-  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f6 100%);
-  border-radius: 10px; border: 2px solid #40916c;
-  box-shadow: 0 4px 12px rgba(64, 145, 108, 0.2);
+  background: linear-gradient(135deg, #f3f4f6 0%, #f1f8f6 100%);
+  border-radius: 10px; border: 2px solid #9ca3af;
+  box-shadow: 0 4px 12px rgba(83, 91, 100, 0.2);
   transition: all 0.2s ease;
 }
-.teacher-select-wrap:hover { border-color: #1b4332; box-shadow: 0 6px 16px rgba(27, 67, 50, 0.25); }
+.teacher-select-wrap:hover { border-color: #4b5563; box-shadow: 0 6px 16px rgba(48, 53, 58, 0.25); }
 .teacher-select {
-  background: linear-gradient(to bottom, #f8fffe, #eef9f7); border: 1px solid #40916c !important;
-  border-radius: 8px; padding: 8px 32px 8px 13px; font-size: 0.88rem; font-weight: 500; color: #1b4332;
+  background: linear-gradient(to bottom, #f8fffe, #eef9f7); border: 1px solid #9ca3af !important;
+  border-radius: 8px; padding: 8px 32px 8px 13px; font-size: 0.88rem; font-weight: 500; color: #4b5563;
 }
 
 /* Grid */
@@ -2154,11 +2547,11 @@ onMounted(async () => {
   width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 800px;
 }
 .sched-grid th {
-  background: #1b4332; color: #fff; font-size: 0.85rem; font-weight: 600;
+  background: #4b5563; color: #fff; font-size: 0.85rem; font-weight: 600;
   padding: 12px 10px; text-align: center; white-space: nowrap;
   position: sticky; top: 0; z-index: 10;
 }
-.th-time { width: 90px; position: sticky; left: 0; z-index: 20; background: #1b4332; }
+.th-time { width: 90px; position: sticky; left: 0; z-index: 20; background: #4b5563; }
 
 /* 30-minute rows */
 .sched-grid tbody tr { height: 40px; }
@@ -2171,7 +2564,7 @@ onMounted(async () => {
 }
 .sched-grid td.td-time {
   background: #f8f9fa; text-align: center; vertical-align: middle;
-  font-size: 0.78rem; color: #1b4332; font-weight: 600; white-space: nowrap;
+  font-size: 0.78rem; color: #4b5563; font-weight: 600; white-space: nowrap;
   border: 1px solid #ececec; position: sticky; left: 0; z-index: 15;
   width: 90px; padding: 0 6px;
 }
@@ -2179,7 +2572,7 @@ onMounted(async () => {
 .sched-grid tbody tr.half-hour td { border-top: 1px dashed #eee; }
 
 .td-cell { cursor: pointer; transition: background 0.15s; padding: 0; position: relative; }
-.td-cell:hover { background: #f7faf8; }
+.td-cell:hover { background: #f4f5f5; }
 .td-cell.has-entry { padding: 0; }
 .td-cell.readonly-entry-cell { cursor: default; }
 .td-cell.readonly-entry-cell:hover { background: inherit; }
@@ -2207,7 +2600,7 @@ onMounted(async () => {
 .click-to-add { display: flex; align-items: center; justify-content: center; height: 100%; text-align: center; font-size: 0.72rem; color: #aaa; user-select: none; padding: 4px; }
 
 /* Colors */
-.color-green  { background: #1b4332; color: #fff; }
+.color-green  { background: #4b5563; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
 .color-orange { background: #f4a261; color: #5a2d00; }
 .color-blue   { background: #4a90d9; color: #fff; }
@@ -2229,9 +2622,9 @@ onMounted(async () => {
 }
 .sched-modal-header { margin-bottom: 20px; }
 .sched-modal-mode-badge { display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 3px 10px; border-radius: 20px; margin-bottom: 6px; }
-.badge-add  { background: #e8f5ee; color: #1b4332; }
+.badge-add  { background: #f3f4f6; color: #4b5563; }
 .badge-edit { background: #fff3cd; color: #7a5500; }
-.sched-modal-title { font-size: 1.25rem; font-weight: 700; color: #1b4332; margin: 0 0 3px; }
+.sched-modal-title { font-size: 1.25rem; font-weight: 700; color: #4b5563; margin: 0 0 3px; }
 .sched-modal-sub   { font-size: 0.84rem; color: #888; margin: 0; }
 .sched-form { display: flex; flex-direction: column; gap: 13px; margin-bottom: 22px; }
 .form-row-inline { display: grid; grid-template-columns: 100px 1fr; align-items: center; gap: 12px; }
@@ -2239,35 +2632,35 @@ onMounted(async () => {
 .form-label { font-size: 0.95rem; font-weight: 700; color: #111; }
 .form-select-wrap { position: relative; display: flex; align-items: center; }
 .form-select { width: 100%; appearance: none; border: 1px solid #ccc; border-radius: 10px; padding: 9px 34px 9px 14px; font-size: 0.88rem; font-family: inherit; color: #333; background: #fff; cursor: pointer; outline: none; transition: border-color 0.15s; }
-.form-select:focus { border-color: #40916c; }
+.form-select:focus { border-color: #9ca3af; }
 .form-input { width: 100%; border: 1px solid #ccc; border-radius: 10px; padding: 9px 14px; font-size: 0.88rem; font-family: inherit; color: #333; background: #fff; outline: none; transition: border-color 0.15s; }
-.form-input:focus { border-color: #40916c; }
+.form-input:focus { border-color: #9ca3af; }
 .sel-arrow { position: absolute; right: 12px; pointer-events: none; color: #666; }
 .campus-toggle { display: inline-flex; gap: 8px; }
 .campus-btn { border: 1px solid #d4d4d4; background: #f8f9fa; color: #666; border-radius: 8px; padding: 7px 12px; font-size: 0.8rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s; }
-.campus-btn.active { background: #e8f5ee; color: #1b4332; border-color: #63b892; }
-.parallel-slot-divider { font-size: 0.78rem; font-weight: 700; color: #40916c; text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 0 2px; border-top: 1px solid #e8f5ee; margin-top: 4px; }
+.campus-btn.active { background: #f3f4f6; color: #4b5563; border-color: #9ca3af; }
+.parallel-slot-divider { font-size: 0.78rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 0 2px; border-top: 1px solid #f3f4f6; margin-top: 4px; }
 .parallel-row { display: flex; align-items: center; gap: 24px; margin-top: 4px; }
 .parallel-btn { display: flex; align-items: center; gap: 8px; background: none; border: none; font-family: inherit; font-size: 0.92rem; font-weight: 500; color: #444; cursor: pointer; padding: 0; transition: color 0.15s; }
-.parallel-btn.active { color: #1b4332; font-weight: 600; }
+.parallel-btn.active { color: #4b5563; font-weight: 600; }
 .par-radio { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #bbb; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s, border-color 0.15s; }
-.par-radio.checked { background: #1b4332; border-color: #1b4332; }
+.par-radio.checked { background: #4b5563; border-color: #4b5563; }
 .sched-modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 4px; }
 .clear-slot-btn { margin-right: auto; display: flex; align-items: center; gap: 6px; background: none; border: 1px solid #e63946; color: #e63946; font-family: inherit; font-size: 0.85rem; font-weight: 600; padding: 7px 14px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
 .clear-slot-btn:hover { background: #ffeaea; }
 .cancel-btn-text { background: none; border: none; color: #e63946; font-family: inherit; font-size: 1rem; font-weight: 600; cursor: pointer; padding: 8px 12px; transition: opacity 0.15s; }
 .cancel-btn-text:hover { opacity: 0.75; }
-.save-btn { display: flex; align-items: center; gap: 6px; background: #1b4332; color: #fff; border: none; font-family: inherit; font-size: 0.88rem; font-weight: 600; padding: 10px 26px; border-radius: 10px; cursor: pointer; transition: background 0.18s; }
-.save-btn:hover:not(:disabled) { background: #2d6a4f; }
+.save-btn { display: flex; align-items: center; gap: 6px; background: #4b5563; color: #fff; border: none; font-family: inherit; font-size: 0.88rem; font-weight: 600; padding: 10px 26px; border-radius: 10px; cursor: pointer; transition: background 0.18s; }
+.save-btn:hover:not(:disabled) { background: #6b7280; }
 .save-btn:disabled { opacity: 0.5; cursor: default; }
-.form-value-locked { display: flex; align-items: center; padding: 6px 12px; border-radius: 8px; background: #f0f4f2; border: 1px solid #d0e0d8; font-size: 0.875rem; color: #1b4332; font-weight: 600; min-width: 0; flex: 1; }
-.schedule-for-text { display: flex; align-items: center; justify-content: center; text-align: center; flex: 1; min-height: 42px; padding: 10px 14px; border-left: 5px solid #2d8a59; border-radius: 10px; background: linear-gradient(135deg, #e8f5ee 0%, #d7efe4 100%); box-shadow: 0 6px 14px rgba(45, 138, 89, 0.14); font-size: 0.94rem; color: #145a3d; font-weight: 800; }
+.form-value-locked { display: flex; align-items: center; padding: 6px 12px; border-radius: 8px; background: #f8fafc; border: 1px solid #e5e7eb; font-size: 0.875rem; color: #4b5563; font-weight: 600; min-width: 0; flex: 1; }
+.schedule-for-text { display: flex; align-items: center; justify-content: center; text-align: center; flex: 1; min-height: 42px; padding: 10px 14px; border-left: 5px solid #626a72; border-radius: 10px; background: linear-gradient(135deg, #f3f4f6 0%, #d7efe4 100%); box-shadow: 0 6px 14px rgba(45, 138, 89, 0.14); font-size: 0.94rem; color: #41484f; font-weight: 800; }
 
 /* Consultation modal */
 .consult-modal-box { max-width: 480px; }
 .consult-slots-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 24px 12px; }
 .consult-slot-item { display: flex; align-items: center; gap: 10px; background: #f0f6ff; border: 1px solid #c8dff8; border-radius: 8px; padding: 8px 12px; }
-.consult-slot-day  { font-weight: 700; font-size: 0.82rem; color: #1b4332; min-width: 36px; }
+.consult-slot-day  { font-weight: 700; font-size: 0.82rem; color: #4b5563; min-width: 36px; }
 .consult-slot-time { flex: 1; font-size: 0.82rem; color: #333; }
 .consult-slot-dur  { font-size: 0.78rem; color: #666; white-space: nowrap; }
 .consult-slot-actions { display: flex; gap: 6px; }
@@ -2276,16 +2669,16 @@ onMounted(async () => {
 .consult-del-btn { padding: 3px 8px; border-radius: 5px; border: 1px solid #e63946; background: transparent; color: #e63946; cursor: pointer; display: flex; align-items: center; }
 .consult-del-btn:hover { background: #fde8e8; }
 .consult-empty { padding: 8px 24px 12px; color: #888; font-size: 0.84rem; font-style: italic; }
-.consult-form-title { padding: 0 24px 8px; font-weight: 600; font-size: 0.88rem; color: #1b4332; }
+.consult-form-title { padding: 0 24px 8px; font-weight: 600; font-size: 0.88rem; color: #4b5563; }
 .limit-warning { color: #e63946; font-weight: 600; }
-.limit-ok { color: #1b4332; }
+.limit-ok { color: #4b5563; }
 .time-error { display: flex; align-items: center; gap: 6px; color: #e63946; font-size: 0.8rem; font-weight: 500; background: #ffeaea; border-radius: 8px; padding: 8px 12px; margin: 0 28px; }
 
 /* ═══ Add Schedule Panel ═══ */
 .panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.30); z-index: 900; display: flex; justify-content: flex-end; }
 .add-panel { width: 420px; max-width: 96vw; background: #fff; height: 100vh; display: flex; flex-direction: column; box-shadow: -4px 0 32px rgba(0,0,0,0.14); overflow: hidden; }
 .panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 24px 28px 20px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0; }
-.panel-badge { display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 3px 10px; border-radius: 20px; background: #e8f5ee; color: #1b4332; margin-bottom: 6px; }
+.panel-badge { display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 3px 10px; border-radius: 20px; background: #f3f4f6; color: #4b5563; margin-bottom: 6px; }
 .panel-title { font-size: 1.2rem; font-weight: 700; color: #111; margin: 0 0 3px; }
 .panel-sub   { font-size: 0.84rem; color: #888; margin: 0; }
 .panel-close { background: none; border: 1px solid #ddd; border-radius: 8px; padding: 6px 8px; cursor: pointer; color: #555; flex-shrink: 0; display: flex; align-items: center; transition: all 0.15s; }
@@ -2294,7 +2687,7 @@ onMounted(async () => {
 .panel-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 14px 28px 20px; border-top: 1px solid #f0f0f0; flex-shrink: 0; background: #fff; }
 .reset-btn { background: none; border: 1px solid #ccc; border-radius: 8px; padding: 8px 16px; font-family: inherit; font-size: 0.85rem; color: #666; cursor: pointer; transition: all 0.15s; }
 .reset-btn:hover { border-color: #999; color: #333; }
-.flash-msg { display: flex; align-items: center; gap: 8px; background: #d8f3dc; color: #1b4332; border-radius: 8px; padding: 10px 16px; font-size: 0.88rem; font-weight: 600; margin: 4px 28px 0; }
+.flash-msg { display: flex; align-items: center; gap: 8px; background: #e5e7eb; color: #4b5563; border-radius: 8px; padding: 10px 16px; font-size: 0.88rem; font-weight: 600; margin: 4px 28px 0; }
 .flash-enter-active, .flash-leave-active { transition: opacity 0.3s; }
 .flash-enter-from, .flash-leave-to { opacity: 0; }
 .panel-enter-active { transition: opacity 0.25s ease; }
@@ -2313,8 +2706,8 @@ onMounted(async () => {
 .logout-modal-actions { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 6px; width: 100%; }
 .logout-cancel-btn { background: none; border: none; font-family: inherit; font-size: 1rem; font-weight: 600; color: #e63946; cursor: pointer; padding: 8px 18px; border-radius: 10px; }
 .logout-cancel-btn:hover  { background: #ffeaea; }
-.logout-confirm-btn { background: #1b4332; color: #fff; border: none; font-family: inherit; font-size: 1rem; font-weight: 600; padding: 10px 32px; border-radius: 10px; cursor: pointer; }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn { background: #4b5563; color: #fff; border: none; font-family: inherit; font-size: 1rem; font-weight: 600; padding: 10px 32px; border-radius: 10px; cursor: pointer; }
+.logout-confirm-btn:hover { background: #6b7280; }
 </style>
 
 <style>

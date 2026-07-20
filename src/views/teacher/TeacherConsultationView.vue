@@ -147,7 +147,7 @@
       <div v-if="showApproveModal" class="modal-overlay" @click.self="cancelApprove">
         <div class="approve-modal">
           <div class="approve-modal-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
@@ -166,7 +166,7 @@
       <div v-if="showDoneModal" class="modal-overlay" @click.self="closeDoneModal">
         <div class="done-modal">
           <div class="done-modal-icon">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
@@ -611,9 +611,9 @@ async function patchRequestStatus(id, nextStatus, successTitle = 'Status Updated
     showConfirmButton: false,
     timer: 2500,
     timerProgressBar: true,
-    background: '#1b4332',
+    background: '#4b5563',
     color: '#fff',
-    iconColor: '#74c69d',
+    iconColor: '#cbd5e1',
   })
 }
 
@@ -653,7 +653,7 @@ async function approveAllIncoming() {
     showCancelButton: true,
     cancelButtonText: 'Cancel',
     confirmButtonText: 'Yes, approve all',
-    confirmButtonColor: '#1b4332',
+    confirmButtonColor: '#4b5563',
     customClass: { cancelButton: 'swal-cancel-text', popup: 'swal-rounded' },
     reverseButtons: false,
   })
@@ -681,9 +681,9 @@ async function approveAllIncoming() {
       showConfirmButton: false,
       timer: 2800,
       timerProgressBar: true,
-      background: '#1b4332',
+      background: '#4b5563',
       color: '#fff',
-      iconColor: '#74c69d',
+      iconColor: '#cbd5e1',
     })
   } catch (error) {
     Swal.fire('Unable to approve all', error.message || 'Failed to update all pending requests.', 'error')
@@ -818,7 +818,7 @@ async function saveEdit() {
     showCancelButton: true,
     cancelButtonText: 'Cancel',
     confirmButtonText: 'Yes, update',
-    confirmButtonColor: '#1b4332',
+    confirmButtonColor: '#4b5563',
     customClass: { cancelButton: 'swal-cancel-text', popup: 'swal-rounded' },
     reverseButtons: false
   })
@@ -898,11 +898,11 @@ function confirmLogout() {
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
 }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
 
-.brand { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role  { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email { font-size: 0.82rem; color: #888; word-break: break-all; }
 
@@ -927,8 +927,8 @@ function confirmLogout() {
   transition: background 0.18s, color 0.18s;
   cursor: pointer;
 }
-.nav-item:hover { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -974,7 +974,7 @@ function confirmLogout() {
 .page-title {
   font-size: 2.4rem;
   font-weight: 700;
-  color: #1b4332;
+  color: #4b5563;
   letter-spacing: -0.5px;
   line-height: 1.2;
 }
@@ -1025,7 +1025,7 @@ function confirmLogout() {
   padding: 11px 16px;
   border: none;
   border-radius: 6px;
-  background: #2d6a4f;
+  background: #6b7280;
   color: #fff;
   font-family: inherit;
   font-size: 0.9rem;
@@ -1035,7 +1035,7 @@ function confirmLogout() {
   flex-shrink: 0;
 }
 
-.btn-approve-all:hover { background: #1b4332; }
+.btn-approve-all:hover { background: #4b5563; }
 
 .btn-approve-all:disabled {
   cursor: not-allowed;
@@ -1055,8 +1055,8 @@ function confirmLogout() {
   transition: background 0.15s, color 0.15s;
   white-space: nowrap;
 }
-.filter-tab:hover { background: #e8f4ee; color: #1b4332; }
-.filter-tab.active { background: #1b4332; color: #fff; font-weight: 600; }
+.filter-tab:hover { background: #f3f4f6; color: #4b5563; }
+.filter-tab.active { background: #4b5563; color: #fff; font-weight: 600; }
 
 /* ── Request List ── */
 .request-list {
@@ -1078,9 +1078,9 @@ function confirmLogout() {
 .request-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
 
 .border-pending   { border-left-color: #e8a020; background: #fffdf5; }
-.border-approved  { border-left-color: #1b4332; background: #f6faf8; }
+.border-approved  { border-left-color: #4b5563; background: #f8fafc; }
 .border-resched   { border-left-color: #e63946; background: #fff8f8; }
-.border-completed { border-left-color: #74c69d; background: #f5fdf8; }
+.border-completed { border-left-color: #cbd5e1; background: #f8fafc; }
 .border-cancelled { border-left-color: #8d99ae; background: #f6f7f9; }
 
 /* Top row */
@@ -1111,8 +1111,8 @@ function confirmLogout() {
 }
 .req-name { font-size: 0.98rem; font-weight: 700; color: #111; }
 .req-id   { font-size: 0.8rem; color: #888; margin-top: 2px; }
-.req-ticket { font-size: 0.78rem; color: #2d6a4f; font-weight: 600; margin-top: 4px; }
-.req-queue { font-size: 0.78rem; color: #1b4332; font-weight: 600; margin-top: 4px; }
+.req-ticket { font-size: 0.78rem; color: #6b7280; font-weight: 600; margin-top: 4px; }
+.req-queue { font-size: 0.78rem; color: #4b5563; font-weight: 600; margin-top: 4px; }
 
 /* Status badges */
 .status-badge {
@@ -1123,9 +1123,9 @@ function confirmLogout() {
   font-weight: 600;
 }
 .badge-pending   { background: #fff0cc; color: #b06000; }
-.badge-approved  { background: #d8f3dc; color: #1b4332; }
+.badge-approved  { background: #e5e7eb; color: #4b5563; }
 .badge-resched   { background: #ffd6d8; color: #c1121f; }
-.badge-completed { background: #d0f0e0; color: #2d6a4f; }
+.badge-completed { background: #f3f4f6; color: #6b7280; }
 .badge-cancelled { background: #e9ecef; color: #5c677d; }
 
 /* Action buttons */
@@ -1141,7 +1141,7 @@ function confirmLogout() {
   align-items: center;
   gap: 5px;
   padding: 7px 16px;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -1151,7 +1151,7 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.15s;
 }
-.btn-approve:hover { background: #2d6a4f; }
+.btn-approve:hover { background: #6b7280; }
 
 .btn-reject {
   display: flex;
@@ -1190,7 +1190,7 @@ function confirmLogout() {
   align-items: center;
   gap: 5px;
   padding: 7px 16px;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -1200,13 +1200,13 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.15s;
 }
-.btn-done:hover { background: #2d6a4f; }
+.btn-done:hover { background: #6b7280; }
 
 /* Card body */
 .req-subject {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #40916c;
+  color: #9ca3af;
   margin-bottom: 5px;
 }
 .req-message {
@@ -1288,7 +1288,7 @@ function confirmLogout() {
 }
 .logout-cancel-btn:hover { background: #ffeaea; }
 .logout-confirm-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -1299,7 +1299,7 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.18s;
 }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn:hover { background: #6b7280; }
 
 /* ── Reject Consultation Modal ── */
 .reject-modal {
@@ -1364,7 +1364,7 @@ function confirmLogout() {
   cursor: pointer;
   outline: none;
 }
-.reject-select:focus { border-color: #1b4332; }
+.reject-select:focus { border-color: #4b5563; }
 
 .reject-select-arrow {
   position: absolute;
@@ -1430,7 +1430,7 @@ function confirmLogout() {
   transition: border-color 0.15s;
 }
 .reject-other-input::placeholder { color: #bbb; }
-.reject-other-input:focus { border-color: #1b4332; }
+.reject-other-input:focus { border-color: #4b5563; }
 
 /* ── Approve Modal ── */
 .approve-modal {
@@ -1447,7 +1447,7 @@ function confirmLogout() {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: #d8f3dc;
+  background: #e5e7eb;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1491,7 +1491,7 @@ function confirmLogout() {
 
 .approve-ok-btn {
   padding: 10px 28px;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -1501,7 +1501,7 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.15s;
 }
-.approve-ok-btn:hover { background: #2d6a4f; }
+.approve-ok-btn:hover { background: #6b7280; }
 
 /* ── Reject reason required ── */
 .reject-required { color: #e63946; margin-left: 2px; }
@@ -1531,14 +1531,14 @@ function confirmLogout() {
   background: #fff;
   border-radius: 20px;
   padding: 28px 28px 24px;
-  border: 1px solid #eef2f0;
+  border: 1px solid #eef0f1;
   box-shadow: 0 20px 56px rgba(0, 0, 0, 0.16);
 }
 .done-modal-icon {
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  background: #e9f7ef;
+  background: #e9ebec;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1567,7 +1567,7 @@ function confirmLogout() {
 }
 .done-textarea {
   width: 100%;
-  border: 1.5px solid #d7ddd9;
+  border: 1.5px solid #d7dadd;
   border-radius: 12px;
   padding: 12px 13px;
   font-family: inherit;
@@ -1581,9 +1581,9 @@ function confirmLogout() {
 }
 .done-textarea:focus {
   outline: none;
-  border-color: #1b4332;
+  border-color: #4b5563;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(27, 67, 50, 0.12);
+  box-shadow: 0 0 0 3px rgba(48, 53, 58, 0.12);
 }
 .done-note-count {
   margin-top: 6px;
@@ -1615,7 +1615,7 @@ function confirmLogout() {
 }
 .done-cancel-btn:hover { background: #eceff1; }
 .done-confirm-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
 }
 .done-confirm-btn:hover { background: #245a42; }
@@ -1734,7 +1734,7 @@ function confirmLogout() {
   height: 64px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2.5px solid #c8ddd4;
+  border: 2.5px solid #c4c9cd;
   flex-shrink: 0;
 }
 
@@ -1860,15 +1860,15 @@ function confirmLogout() {
 
 /* Per-status dot + selected colour */
 .opt-pending   { color: #b06000; }
-.opt-approved  { color: #1b4332; }
+.opt-approved  { color: #4b5563; }
 .opt-resched   { color: #c1121f; }
-.opt-completed { color: #2d6a4f; }
+.opt-completed { color: #6b7280; }
 .opt-cancelled { color: #5c677d; }
 
 .opt-pending.selected   { background: #fffdf5; }
-.opt-approved.selected  { background: #f6faf8; }
+.opt-approved.selected  { background: #f8fafc; }
 .opt-resched.selected   { background: #fff8f8; }
-.opt-completed.selected { background: #f5fdf8; }
+.opt-completed.selected { background: #f8fafc; }
 .opt-cancelled.selected { background: #f4f5f7; }
 
 .opt-dot {
@@ -1906,7 +1906,7 @@ function confirmLogout() {
   align-items: center;
   gap: 6px;
   padding: 9px 22px;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -1916,7 +1916,7 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.15s;
 }
-.edit-save-btn:hover { background: #2d6a4f; }
+.edit-save-btn:hover { background: #6b7280; }
 
 /* ── Responsive ── */
 @media (max-width: 900px) {

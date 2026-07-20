@@ -218,7 +218,7 @@ function initialsFor(name) {
 }
 
 function colorForName(name) {
-  const palette = ['#e63946', '#3a86ff', '#2d6a4f', '#f4a261', '#9b5de5', '#00a896', '#577590']
+  const palette = ['#e63946', '#3a86ff', '#6b7280', '#f4a261', '#9b5de5', '#00a896', '#577590']
   const text = String(name || '')
   let hash = 0
   for (let i = 0; i < text.length; i += 1) {
@@ -505,8 +505,8 @@ onMounted(() => {
   color: #444; padding: 4px; display: flex; align-items: center;
   border-radius: 6px; margin-left: -4px; transition: color 0.15s;
 }
-.back-btn:hover { color: #1b4332; }
-.header-title { font-weight: 700; font-size: 1rem; color: #1b4332; }
+.back-btn:hover { color: #4b5563; }
+.header-title { font-weight: 700; font-size: 1rem; color: #4b5563; }
 
 /* Search */
 .search-wrap {
@@ -520,7 +520,7 @@ onMounted(() => {
   border-radius: 10px; font-size: 0.87rem;
   background: #fff; outline: none; font-family: inherit;
 }
-.search-input:focus { border-color: #2d6a4f; }
+.search-input:focus { border-color: #6b7280; }
 
 /* Filters */
 .filter-row { display: flex; gap: 8px; padding: 12px 18px 0; overflow-x: auto; scrollbar-width: none; }
@@ -532,7 +532,7 @@ onMounted(() => {
   cursor: pointer; font-family: inherit; color: #555;
   transition: all 0.15s;
 }
-.filter-chip.active { background: #1b4332; color: #fff; border-color: #1b4332; }
+.filter-chip.active { background: #4b5563; color: #fff; border-color: #4b5563; }
 
 /* Teacher cards */
 .teacher-list { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 0; }
@@ -569,9 +569,9 @@ onMounted(() => {
   align-items: center;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #edf6f1;
-  border: 1px solid #d4e9de;
-  color: #1f5138;
+  background: #edf0f1;
+  border: 1px solid #d5d9dc;
+  color: #4b5259;
   font-size: 0.68rem;
   font-weight: 600;
   line-height: 1.2;
@@ -586,20 +586,20 @@ onMounted(() => {
   padding: 3px 10px; border-radius: 20px;
   white-space: nowrap; flex-shrink: 0;
 }
-.pill-green  { background: #d8f3e8; color: #1b7a4a; }
+.pill-green  { background: #d8dcdf; color: #4f575f; }
 .pill-orange { background: #fff3e0; color: #b35e00; }
 .pill-red    { background: #ffeaea; color: #e63946; }
 .pill-gray   { background: #f0f0f0; color: #666; }
 
 .teacher-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.price { font-size: 0.82rem; font-weight: 600; color: #1b4332; min-width: 12px; }
+.price { font-size: 0.82rem; font-weight: 600; color: #4b5563; min-width: 12px; }
 .action-btn {
   padding: 9px 14px; border-radius: 8px;
   border: none; font-family: inherit;
   font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
 }
 .action-btn:active { opacity: 0.8; }
-.action-btn.green   { background: #1b4332; color: #fff; }
+.action-btn.green   { background: #4b5563; color: #fff; }
 .action-btn.disabled {
   background: #7b8794;
   color: #fff;
@@ -631,7 +631,7 @@ onMounted(() => {
   font-family: inherit; font-weight: 600; font-size: 0.88rem; cursor: pointer;
 }
 .modal-submit {
-  flex: 2; padding: 12px; background: #1b4332; color: #fff;
+  flex: 2; padding: 12px; background: #4b5563; color: #fff;
   border: none; border-radius: 10px;
   font-family: inherit; font-weight: 600; font-size: 0.88rem; cursor: pointer;
 }
@@ -645,7 +645,7 @@ onMounted(() => {
   border-radius: 8px; font-family: inherit; font-size: 0.87rem;
   outline: none; box-sizing: border-box;
 }
-.field-input:focus { border-color: #1b4332; }
+.field-input:focus { border-color: #4b5563; }
 .field-textarea { resize: none; }
 .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .msg-err { color: #e63946; font-size: 0.8rem; font-weight: 500; }
@@ -694,13 +694,13 @@ onMounted(() => {
 .prof-label { font-size: 0.73rem; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; }
 .prof-value { font-size: 0.88rem; color: #111; font-weight: 500; }
 .prof-avail { font-size: 0.88rem; font-weight: 600; }
-.avail-yes  { color: #2d6a4f; }
+.avail-yes  { color: #6b7280; }
 .avail-no   { color: #e63946; }
 
 /* Toast */
 .toast {
   position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-  background: #1b4332; color: #fff; padding: 10px 22px;
+  background: #4b5563; color: #fff; padding: 10px 22px;
   border-radius: 20px; font-size: 0.85rem; font-weight: 600;
   z-index: 200; white-space: nowrap;
   box-shadow: 0 4px 20px rgba(0,0,0,0.18);

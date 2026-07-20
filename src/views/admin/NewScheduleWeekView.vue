@@ -333,7 +333,7 @@ const navItems = [
   { name: 'Add Schedule',   to: '/admin/schedule/add',    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="20"/><line x1="9" y1="17" x2="15" y2="17"/></svg>` },
   { name: 'Teachers',       to: '/admin/teachers',  icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>` },
   { name: 'Events',       to: '/admin/events',    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="5" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="18" r="1" fill="currentColor" stroke="none"/></svg>` },
-  { name: 'Manage Users', to: '/admin/users',     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
+  { name: 'Users',        to: '/admin/users',     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
   { name: 'Settings',     to: '/admin/settings',  icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>` },
 ]
 
@@ -392,6 +392,11 @@ function isSpannedCell(slot, day) {
   return false
 }
 
+function colorForSchedule(room, subject) {
+  if (/\blunch\b/i.test(String(subject || ''))) return 'color-gray'
+  return colorForRoom(room) ?? 'color-yellow'
+}
+
 /* ── Add entry ── */
 function addEntry() {
   if (!form.day || !form.timeIn || !form.timeOut || !form.teacher || !form.subject) return
@@ -404,7 +409,7 @@ function addEntry() {
   if (form.parallel) {
     const groupId = `pg_${Date.now()}`
     form.parallelSlots.forEach((ps) => {
-      const color = colorForRoom(ps.room) ?? 'color-green'
+      const color = colorForSchedule(ps.room, form.subject)
       const key = `${form.teacher}|${ps.section}|${slot}|${form.day}`
       entries[key] = {
         teacher: form.teacher, subject: form.subject,
@@ -417,7 +422,7 @@ function addEntry() {
       }
     })
   } else {
-    const color = colorForRoom(form.room) ?? 'color-green'
+    const color = colorForSchedule(form.room, form.subject)
     entries[`${form.teacher}|${form.section}|${slot}|${form.day}`] = {
       teacher: form.teacher, subject: form.subject,
       room: form.room, year: form.year, tableLabel: form.teacher, section: form.section, slot,
@@ -457,15 +462,15 @@ function confirmLogout() {
   padding: 28px 18px 24px; height: 100vh; overflow-y: auto;
 }
 .sidebar-profile { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 28px; text-align: center; }
-.avatar-wrap { width: 96px; height: 96px; border-radius: 50%; overflow: hidden; margin-bottom: 10px; border: 3px solid #c8ddd4; }
+.avatar-wrap { width: 96px; height: 96px; border-radius: 50%; overflow: hidden; margin-bottom: 10px; border: 3px solid #c4c9cd; }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
-.brand  { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand  { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role   { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email  { font-size: 0.82rem; color: #888; word-break: break-all; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 4px; width: 100%; flex: 1; }
 .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 10px; font-size: 0.88rem; font-weight: 400; color: #444; text-decoration: none; transition: background 0.18s, color 0.18s; }
-.nav-item:hover { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 .logout-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px 12px; background: #e63946; color: #fff; border: none; border-radius: 10px; font-size: 0.85rem; font-weight: 500; font-family: inherit; cursor: pointer; transition: background 0.2s; margin-top: 16px; }
 .logout-btn:hover { background: #c1121f; }
@@ -480,8 +485,8 @@ function confirmLogout() {
   padding: 6px 14px; font-size: 0.82rem; color: #555;
   font-family: inherit; cursor: pointer; transition: all 0.15s; width: fit-content;
 }
-.back-btn:hover { border-color: #1b4332; color: #1b4332; background: #f0faf3; }
-.page-title { font-size: 2rem; font-weight: 600; color: #1b4332; letter-spacing: -0.5px; line-height: 1.2; }
+.back-btn:hover { border-color: #4b5563; color: #4b5563; background: #f8fafc; }
+.page-title { font-size: 2rem; font-weight: 600; color: #4b5563; letter-spacing: -0.5px; line-height: 1.2; }
 .page-sub   { font-size: 0.95rem; color: #777; margin-top: 4px; }
 
 /* Two-column layout */
@@ -508,7 +513,7 @@ function confirmLogout() {
   font-size: 0.72rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.07em;
   padding: 3px 10px; border-radius: 20px;
-  background: #e8f5ee; color: #1b4332; margin-bottom: 6px;
+  background: #f3f4f6; color: #4b5563; margin-bottom: 6px;
 }
 .form-card-title { font-size: 1.2rem; font-weight: 700; color: #111; margin: 0 0 3px; }
 .form-card-sub   { font-size: 0.84rem; color: #888; margin: 0; }
@@ -518,24 +523,24 @@ function confirmLogout() {
 .form-label { font-size: 0.95rem; font-weight: 700; color: #111; }
 .form-select-wrap { position: relative; display: flex; align-items: center; }
 .form-select { width: 100%; appearance: none; border: 1px solid #ccc; border-radius: 10px; padding: 9px 34px 9px 14px; font-size: 0.88rem; font-family: inherit; color: #333; background: #fff; cursor: pointer; outline: none; transition: border-color 0.15s; }
-.form-select:focus { border-color: #40916c; }
+.form-select:focus { border-color: #9ca3af; }
 .sel-arrow { position: absolute; right: 12px; pointer-events: none; color: #666; }
 
-.parallel-slot-divider { font-size: 0.78rem; font-weight: 700; color: #40916c; text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 0 2px; border-top: 1px solid #e8f5ee; margin-top: 4px; }
+.parallel-slot-divider { font-size: 0.78rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 0 2px; border-top: 1px solid #f3f4f6; margin-top: 4px; }
 .parallel-row { display: flex; align-items: center; gap: 24px; margin-top: 4px; }
 .parallel-btn { display: flex; align-items: center; gap: 8px; background: none; border: none; font-family: inherit; font-size: 0.92rem; font-weight: 500; color: #444; cursor: pointer; padding: 0; transition: color 0.15s; }
-.parallel-btn.active { color: #1b4332; font-weight: 600; }
+.parallel-btn.active { color: #4b5563; font-weight: 600; }
 .par-radio { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #bbb; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s, border-color 0.15s; }
-.par-radio.checked { background: #1b4332; border-color: #1b4332; }
+.par-radio.checked { background: #4b5563; border-color: #4b5563; }
 
 .form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .reset-btn { background: none; border: 1px solid #ccc; border-radius: 8px; padding: 8px 16px; font-family: inherit; font-size: 0.85rem; color: #666; cursor: pointer; transition: all 0.15s; }
 .reset-btn:hover { border-color: #999; color: #333; }
-.add-btn { display: flex; align-items: center; gap: 6px; background: #1b4332; color: #fff; border: none; font-family: inherit; font-size: 0.88rem; font-weight: 600; padding: 10px 22px; border-radius: 10px; cursor: pointer; transition: background 0.18s; }
-.add-btn:hover:not(:disabled) { background: #2d6a4f; }
+.add-btn { display: flex; align-items: center; gap: 6px; background: #4b5563; color: #fff; border: none; font-family: inherit; font-size: 0.88rem; font-weight: 600; padding: 10px 22px; border-radius: 10px; cursor: pointer; transition: background 0.18s; }
+.add-btn:hover:not(:disabled) { background: #6b7280; }
 .add-btn:disabled { opacity: 0.5; cursor: default; }
 
-.flash-msg { display: flex; align-items: center; gap: 8px; background: #d8f3dc; color: #1b4332; border-radius: 8px; padding: 10px 16px; font-size: 0.88rem; font-weight: 600; margin-top: 14px; }
+.flash-msg { display: flex; align-items: center; gap: 8px; background: #e5e7eb; color: #4b5563; border-radius: 8px; padding: 10px 16px; font-size: 0.88rem; font-weight: 600; margin-top: 14px; }
 .flash-enter-active, .flash-leave-active { transition: opacity 0.3s; }
 .flash-enter-from, .flash-leave-to { opacity: 0; }
 
@@ -551,12 +556,12 @@ function confirmLogout() {
 
 .sched-select-wrap { position: relative; display: flex; align-items: center; }
 .sched-select { appearance: none; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 7px 32px 7px 12px; font-size: 0.85rem; font-family: inherit; color: #333; cursor: pointer; outline: none; }
-.sched-select:focus { border-color: #40916c; }
+.sched-select:focus { border-color: #9ca3af; }
 .sched-select-arrow { position: absolute; right: 10px; pointer-events: none; color: #666; }
 
 .preview-grid-wrap { flex: 1; overflow: auto; }
 .sched-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.sched-grid th { background: #1b4332; color: #fff; font-size: 0.78rem; font-weight: 600; padding: 10px 6px; text-align: center; white-space: nowrap; }
+.sched-grid th { background: #4b5563; color: #fff; font-size: 0.78rem; font-weight: 600; padding: 10px 6px; text-align: center; white-space: nowrap; }
 .th-time { width: 90px; }
 .sched-grid td { border: 1px solid #ececec; padding: 0; vertical-align: middle; height: 56px; }
 .td-time { background: #fff; text-align: center; font-size: 0.72rem; color: #555; font-weight: 500; white-space: nowrap; border: 1px solid #ececec; }
@@ -571,7 +576,7 @@ function confirmLogout() {
 .entry-time-range { font-size: 0.58rem; opacity: 0.7; font-style: italic; margin-top: 2px; }
 .click-to-add { display: block; }
 
-.color-green  { background: #1b4332; color: #fff; }
+.color-green  { background: #4b5563; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
 .color-blue   { background: #4a90d9; color: #fff; }
 .color-purple { background: #7b5ea7; color: #fff; }
@@ -586,6 +591,6 @@ function confirmLogout() {
 .logout-modal-actions { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 6px; width: 100%; }
 .logout-cancel-btn  { background: none; border: none; font-family: inherit; font-size: 1rem; font-weight: 600; color: #e63946; cursor: pointer; padding: 8px 18px; border-radius: 10px; }
 .logout-cancel-btn:hover  { background: #ffeaea; }
-.logout-confirm-btn { background: #1b4332; color: #fff; border: none; font-family: inherit; font-size: 1rem; font-weight: 600; padding: 10px 32px; border-radius: 10px; cursor: pointer; }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn { background: #4b5563; color: #fff; border: none; font-family: inherit; font-size: 1rem; font-weight: 600; padding: 10px 32px; border-radius: 10px; cursor: pointer; }
+.logout-confirm-btn:hover { background: #6b7280; }
 </style>

@@ -315,7 +315,7 @@ onMounted(() => {
 .header-title { font-weight: 700; color: #252a2f; font-size: 1rem; }
 .edit-btn {
   border: none;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border-radius: 8px;
   padding: 6px 14px;
@@ -350,7 +350,7 @@ onMounted(() => {
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   display: flex;
   align-items: center;
@@ -363,7 +363,7 @@ onMounted(() => {
   height: 58px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #1b4332;
+  border: 2px solid #4b5563;
 }
 .avatar-plus {
   position: absolute;
@@ -372,7 +372,7 @@ onMounted(() => {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   font-size: 0.95rem;
   font-weight: 700;
@@ -388,7 +388,7 @@ onMounted(() => {
 .profile-email { margin-top: 2px; font-size: 0.79rem; color: #89939d; }
 .active-badge {
   margin-top: 6px;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border-radius: 999px;
   font-size: 0.72rem;
@@ -419,7 +419,7 @@ onMounted(() => {
   font-weight: 700;
   font-family: inherit;
 }
-.act-btn.green { background: #1b4332; }
+.act-btn.green { background: #4b5563; }
 .act-btn.red { background: #be404a; }
 
 .modal-overlay {
@@ -472,10 +472,10 @@ onMounted(() => {
 }
 .modal-avatar-img {
   object-fit: cover;
-  border: 2px solid #1b4332;
+  border: 2px solid #4b5563;
 }
 .modal-avatar-fallback {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   display: flex;
   align-items: center;
@@ -490,7 +490,7 @@ onMounted(() => {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: 2px solid #fff;
   display: inline-flex;
@@ -502,7 +502,7 @@ onMounted(() => {
 .change-photo-btn {
   border: 1px solid #cfd6de;
   background: #f8fafb;
-  color: #1b4332;
+  color: #4b5563;
   border-radius: 8px;
   padding: 8px 10px;
   font-family: inherit;
@@ -553,7 +553,7 @@ onMounted(() => {
 .modal-cancel { color: #be404a; font-weight: 600; }
 .modal-save {
   color: #fff;
-  background: #1b4332;
+  background: #4b5563;
   border-radius: 10px;
   padding: 7px 12px;
   font-size: 1rem;

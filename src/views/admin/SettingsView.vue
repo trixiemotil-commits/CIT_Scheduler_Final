@@ -49,7 +49,7 @@
         <div class="settings-card">
           <div class="settings-card-header">
             <div class="settings-card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </div>
             <h2 class="settings-card-title">Change Password</h2>
           </div>
@@ -129,7 +129,7 @@
         <div class="settings-faq-section">
           <div class="faq-header">
             <div class="faq-header-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
             <h2 class="faq-title">FAQs</h2>
           </div>
@@ -248,7 +248,7 @@ const navItems = [
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="5" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="18" r="1" fill="currentColor" stroke="none"/></svg>`
   },
   {
-    name: 'Manage Users', to: '/admin/users',
+    name: 'Users', to: '/admin/users',
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
   },
   {
@@ -434,10 +434,10 @@ const faqs = [
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
 }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
-.brand  { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand  { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role   { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email  { font-size: 0.82rem; color: #888; word-break: break-all; }
 
@@ -461,8 +461,8 @@ const faqs = [
   transition: background 0.18s, color 0.18s;
   cursor: pointer;
 }
-.nav-item:hover  { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover  { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -505,7 +505,7 @@ const faqs = [
 .page-title {
   font-size: 2rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #4b5563;
   letter-spacing: -0.5px;
   line-height: 1.2;
 }
@@ -549,7 +549,7 @@ const faqs = [
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: #e8f5ee;
+  background: #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -591,8 +591,8 @@ const faqs = [
   transition: border-color 0.18s, box-shadow 0.18s;
 }
 .settings-input:focus {
-  border-color: #2d6a4f;
-  box-shadow: 0 0 0 3px rgba(45,106,79,0.09);
+  border-color: #6b7280;
+  box-shadow: 0 0 0 3px rgba(83, 91, 100,0.09);
 }
 
 /* password eye toggle */
@@ -614,7 +614,7 @@ const faqs = [
   padding: 0;
   transition: color 0.15s;
 }
-.pw-eye:hover { color: #1b4332; }
+.pw-eye:hover { color: #4b5563; }
 
 /* OTP row */
 .otp-wrap {
@@ -640,7 +640,7 @@ const faqs = [
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.otp-btn:hover { background: #1b4332; color: #fff; }
+.otp-btn:hover { background: #4b5563; color: #fff; }
 .otp-btn:disabled,
 .update-pw-btn:disabled { cursor: not-allowed; opacity: 0.65; }
 .otp-expiry { font-size: 0.75rem; color: #b45309; font-weight: 500; }
@@ -653,7 +653,7 @@ const faqs = [
   border-radius: 8px;
 }
 .settings-msg--error   { background: #ffeaea; color: #e63946; }
-.settings-msg--success { background: #d8f3e8; color: #1b7a4a; }
+.settings-msg--success { background: #d8dcdf; color: #4f575f; }
 
 /* Update button */
 .settings-form-footer {
@@ -662,7 +662,7 @@ const faqs = [
   padding-top: 4px;
 }
 .update-pw-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -672,9 +672,9 @@ const faqs = [
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.18s;
-  box-shadow: 0 4px 14px rgba(27,67,50,0.2);
+  box-shadow: 0 4px 14px rgba(48, 53, 58,0.2);
 }
-.update-pw-btn:hover { background: #2d6a4f; }
+.update-pw-btn:hover { background: #6b7280; }
 
 /* ── Disable 2FA SweetAlert ── */
 .swal-overlay {
@@ -736,14 +736,14 @@ const faqs = [
   padding: 10px 0;
   border-radius: 8px;
   border: none;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   font-weight: 600;
   font-size: 0.92rem;
   cursor: pointer;
   transition: background 0.15s;
 }
-.swal-continue:hover { background: #2d6a4f; }
+.swal-continue:hover { background: #6b7280; }
 
 /* ── Toggle Switch ── */
 .toggle-switch {
@@ -759,7 +759,7 @@ const faqs = [
   padding: 0;
   outline: none;
 }
-.toggle-switch--on { background: #1b4332; }
+.toggle-switch--on { background: #4b5563; }
 .toggle-thumb {
   position: absolute;
   top: 3px;
@@ -779,10 +779,10 @@ const faqs = [
   gap: 8px;
   margin-top: 18px;
   padding: 12px 16px;
-  background: #e8f5ee;
+  background: #f3f4f6;
   border-radius: 10px;
   font-size: 0.84rem;
-  color: #1b7a4a;
+  color: #4f575f;
   line-height: 1.55;
 }
 
@@ -797,7 +797,7 @@ const faqs = [
 .faq-header-icon {
   width: 38px; height: 38px;
   border-radius: 10px;
-  background: #e8f5ee;
+  background: #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -822,8 +822,8 @@ const faqs = [
   transition: border-color 0.18s, box-shadow 0.18s;
 }
 .faq-item--open {
-  border-color: #b7d8c8;
-  box-shadow: 0 2px 10px rgba(27,67,50,0.07);
+  border-color: #bdc2c6;
+  box-shadow: 0 2px 10px rgba(48, 53, 58,0.07);
 }
 .faq-question {
   display: flex;
@@ -842,7 +842,7 @@ const faqs = [
   cursor: pointer;
   transition: background 0.15s;
 }
-.faq-question:hover { background: #f7faf8; }
+.faq-question:hover { background: #f4f5f5; }
 .faq-chevron {
   flex-shrink: 0;
   color: #aaa;
@@ -850,7 +850,7 @@ const faqs = [
 }
 .faq-chevron--open {
   transform: rotate(180deg);
-  color: #1b4332;
+  color: #4b5563;
 }
 .faq-answer {
   padding: 0 20px 18px;
@@ -923,7 +923,7 @@ const faqs = [
 }
 .logout-cancel-btn:hover { background: #ffeaea; }
 .logout-confirm-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -934,7 +934,7 @@ const faqs = [
   cursor: pointer;
   transition: background 0.18s;
 }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn:hover { background: #6b7280; }
 
 /* ── Responsive ── */
 @media (max-width: 800px) {

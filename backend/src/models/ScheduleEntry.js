@@ -18,15 +18,26 @@ const scheduleEntrySchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    entryType: {
+      type: String,
+      enum: ["class", "lunch"],
+      default: "class",
+      required: true,
+      trim: true,
+    },
     year: {
       type: String,
       enum: YEAR_VALUES,
-      required: true,
+      required: function requiresYear() {
+        return this.entryType !== "lunch";
+      },
       trim: true,
     },
     section: {
       type: String,
-      required: true,
+      required: function requiresSection() {
+        return this.entryType !== "lunch";
+      },
       trim: true,
     },
     day: {

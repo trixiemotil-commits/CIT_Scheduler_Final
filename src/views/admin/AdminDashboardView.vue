@@ -1,5 +1,5 @@
 <template>
-  <div class="layout">
+  <div class="layout admin-dashboard">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
     <aside class="sidebar">
       <!-- Profile -->
@@ -301,7 +301,7 @@ const navItems = [
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="5" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="18" r="1" fill="currentColor" stroke="none"/></svg>`
   },
   {
-    name: 'Manage Users', to: '/admin/users',
+    name: 'Users', to: '/admin/users',
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
   },
   {
@@ -314,19 +314,19 @@ const navItems = [
 const stats = ref([
   {
     label: 'Available Teachers', value: 0, sub: 'On School status',
-    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
+    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#626a72" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
   },
   {
     label: 'Available Rooms', value: 0, sub: 'Distinct rooms in schedules',
-    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`
+    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#626a72" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`
   },
   {
     label: 'Classes Today', value: 0, sub: 'Scheduled for today',
-    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`
+    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#626a72" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`
   },
   {
     label: 'Active Consultations', value: 0, sub: 'Pending / Approved / Rescheduled',
-    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#40916c" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
+    icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#626a72" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
   }
 ])
 
@@ -471,9 +471,9 @@ function createLineChart() {
       labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
       datasets: [{
         data: [52, 43, 27, 47],
-        borderColor: '#2d6a4f',
+        borderColor: '#4b5259',
         backgroundColor: 'transparent',
-        pointBackgroundColor: '#2d6a4f',
+        pointBackgroundColor: '#7d858d',
         pointRadius: 4,
         pointHoverRadius: 6,
         tension: 0.45,
@@ -490,22 +490,22 @@ function createLineChart() {
             title: (ctx) => ctx[0].label,
             label: (ctx) => `Consultation : ${ctx.parsed.y}`
           },
-          backgroundColor: '#fff',
-          titleColor: '#333',
-          bodyColor: '#1b9e5a',
-          borderColor: '#ddd',
+          backgroundColor: '#30353a',
+          titleColor: '#f4f5f5',
+          bodyColor: '#d8dcdf',
+          borderColor: '#7d858d',
           borderWidth: 1,
           padding: 10,
           displayColors: false
         }
       },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#888', font: { size: 12 } } },
+        x: { grid: { display: false }, ticks: { color: '#69727c', font: { size: 12 } } },
         y: {
           beginAtZero: true,
           max: 80,
-          ticks: { stepSize: 20, color: '#888', font: { size: 12 } },
-          grid: { color: '#f0f0f0' }
+          ticks: { stepSize: 20, color: '#69727c', font: { size: 12 } },
+          grid: { color: 'rgba(83, 91, 100, 0.16)' }
         }
       }
     }
@@ -521,7 +521,7 @@ function createBarChart() {
       labels: [...(expanded ? BAR_LABELS_FULL : BAR_LABELS_SHORT)],
       datasets: [{
         data: [...(expanded ? BAR_DATA_FULL : BAR_DATA_SHORT)],
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#596169',
         borderRadius: 4,
         borderSkipped: false
       }]
@@ -536,10 +536,10 @@ function createBarChart() {
             title: (ctx) => ctx[0].label,
             label: (ctx) => `Hours : ${ctx.parsed.y}`
           },
-          backgroundColor: '#fff',
-          titleColor: '#333',
-          bodyColor: '#1b9e5a',
-          borderColor: '#ddd',
+          backgroundColor: '#30353a',
+          titleColor: '#f4f5f5',
+          bodyColor: '#d8dcdf',
+          borderColor: '#7d858d',
           borderWidth: 1,
           padding: 10,
           displayColors: false
@@ -549,12 +549,12 @@ function createBarChart() {
         if (elements.length) openWorkloadModal(elements[0].index)
       },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#888', font: { size: 11 } } },
+        x: { grid: { display: false }, ticks: { color: '#69727c', font: { size: 11 } } },
         y: {
           beginAtZero: true,
           max: expanded ? 28 : 24,
-          ticks: { stepSize: 6, color: '#888', font: { size: 12 } },
-          grid: { color: '#f0f0f0' }
+          ticks: { stepSize: 6, color: '#69727c', font: { size: 12 } },
+          grid: { color: 'rgba(83, 91, 100, 0.16)' }
         }
       }
     }
@@ -623,14 +623,14 @@ function confirmLogout() {
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
 }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
 
 .brand {
   font-size: 1.05rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #30353a;
 }
 .role {
   font-size: 0.88rem;
@@ -664,8 +664,8 @@ function confirmLogout() {
   transition: background 0.18s, color 0.18s;
   cursor: pointer;
 }
-.nav-item:hover { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover { background: #f1f2f2; color: #30353a; }
+.nav-item.active { background: #30353a; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -711,7 +711,7 @@ function confirmLogout() {
 .page-title {
   font-size: 2rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #30353a;
   letter-spacing: -0.5px;
   line-height: 1.2;
 }
@@ -737,7 +737,7 @@ function confirmLogout() {
   align-items: center;
   transition: color 0.2s;
 }
-.notif-btn:hover { color: #1b4332; }
+.notif-btn:hover { color: #30353a; }
 .notif-dot {
   position: absolute;
   top: 4px;
@@ -788,7 +788,7 @@ function confirmLogout() {
   transition: background 0.18s, color 0.18s;
 }
 .notif-tab.active {
-  background: #1b4332;
+  background: #30353a;
   color: #fff;
 }
 .notif-see-all {
@@ -798,7 +798,7 @@ function confirmLogout() {
   cursor: pointer;
   text-decoration: underline;
 }
-.notif-see-all:hover { color: #1b4332; }
+.notif-see-all:hover { color: #30353a; }
 .notif-section-label {
   font-size: 0.82rem;
   font-weight: 600;
@@ -829,7 +829,7 @@ function confirmLogout() {
   transition: background 0.15s;
   cursor: pointer;
 }
-.notif-item:hover { background: #f7faf8; }
+.notif-item:hover { background: #f4f5f5; }
 .notif-avatar {
   width: 44px;
   height: 44px;
@@ -847,7 +847,7 @@ function confirmLogout() {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #40916c;
+  background: #626a72;
   flex-shrink: 0;
 }
 
@@ -861,9 +861,9 @@ function confirmLogout() {
 .stat-card {
   border-radius: 16px;
   padding: 26px 28px 22px;
-  box-shadow: 0 4px 18px rgba(27,67,50,0.10);
+  box-shadow: 0 4px 18px rgba(48, 53, 58,0.10);
   background: #fff;
-  color: #1b4332;
+  color: #30353a;
 }
 .stat-top {
   display: flex;
@@ -880,7 +880,7 @@ function confirmLogout() {
 .stat-value {
   font-size: 2.8rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #30353a;
   line-height: 1.1;
 }
 .stat-sub {
@@ -934,7 +934,7 @@ function confirmLogout() {
   display: flex;
   transition: color 0.2s;
 }
-.expand-btn:hover { color: #1b4332; }
+.expand-btn:hover { color: #30353a; }
 .chart-wrap {
   flex: 1;
   min-height: 0;
@@ -997,7 +997,7 @@ function confirmLogout() {
   height: 54px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #c8ddd4;
+  border: 2px solid #c4c9cd;
   flex-shrink: 0;
 }
 .modal-teacher-info { flex: 1; }
@@ -1007,7 +1007,7 @@ function confirmLogout() {
   color: #111;
 }
 .modal-hours-badge {
-  background: #52b788;
+  background: #8b9298;
   color: #fff;
   font-size: 0.9rem;
   font-weight: 600;
@@ -1060,7 +1060,7 @@ function confirmLogout() {
   color: #888;
 }
 .modal-summary {
-  background: #52b788;
+  background: #8b9298;
   border-radius: 14px;
   padding: 18px 22px;
   color: #fff;
@@ -1148,7 +1148,7 @@ function confirmLogout() {
 }
 .logout-cancel-btn:hover { background: #ffeaea; }
 .logout-confirm-btn {
-  background: #1b4332;
+  background: #30353a;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -1159,7 +1159,7 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.18s;
 }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn:hover { background: #4b5259; }
 
 /* Responsive */
 @media (max-width: 900px) {

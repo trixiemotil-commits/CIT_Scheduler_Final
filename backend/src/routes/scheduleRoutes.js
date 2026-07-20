@@ -5,6 +5,8 @@ const {
   createScheduleTable,
   listSchedules,
   createSchedule,
+  createLunchBreak,
+  updateLunchBreak,
   replaceSchedule,
   deleteSchedule,
   getAdminDashboardSummary,
@@ -20,6 +22,8 @@ router.use(authRequired, authorizeRoles("admin"));
 
 router.post("/tables", createScheduleTable);
 router.post("/", createSchedule);
+router.post("/lunch", createLunchBreak);
+router.patch("/lunch/:id", updateLunchBreak);
 router.post("/replace", replaceSchedule);
 router.post("/delete", deleteSchedule);
 

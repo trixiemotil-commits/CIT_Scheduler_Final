@@ -133,22 +133,22 @@ function formatDate(dateStr) {
 .header-left { display: flex; align-items: center; gap: 12px; }
 .avatar-sm {
   width: 42px; height: 42px;
-  background: #1b4332;
+  background: #30353a;
   color: #fff;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 0.9rem; font-weight: 700;
   flex-shrink: 0;
 }
-.header-title { font-weight: 700; font-size: 0.97rem; color: #1b4332; }
+.header-title { font-weight: 700; font-size: 0.97rem; color: #30353a; }
 .header-sub   { font-size: 0.78rem; color: #777; }
 .header-notif-btn {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid #cfe4d6;
+  border: 1px solid #d1d5d8;
   background: #fff;
-  color: #1b4332;
+  color: #4b5563;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -169,7 +169,7 @@ function formatDate(dateStr) {
   border-left: 4px solid;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
-.stat-card.green { border-color: #2d6a4f; }
+.stat-card.green { border-color: #6b7280; }
 .stat-card.red   { border-color: #e63946; }
 .stat-card.blue  { border-color: #3a86ff; }
 .stat-card.orange{ border-color: #f4a261; }
@@ -185,7 +185,7 @@ function formatDate(dateStr) {
   padding: 14px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
-.section-title { font-weight: 700; font-size: 0.92rem; margin-bottom: 12px; color: #1b4332; }
+.section-title { font-weight: 700; font-size: 0.92rem; margin-bottom: 12px; color: #30353a; }
 
 /* Consult rows */
 .consult-row {
@@ -205,7 +205,7 @@ function formatDate(dateStr) {
   padding: 3px 10px; border-radius: 20px;
   white-space: nowrap;
 }
-.badge-green  { background: #d8f3e8; color: #1b7a4a; }
+.badge-green  { background: #d8dcdf; color: #4f575f; }
 .badge-orange { background: #fff3e0; color: #b35e00; }
 .badge-red    { background: #ffeaea; color: #e63946; }
 .badge-gray   { background: #f0f0f0; color: #666; }
@@ -223,7 +223,7 @@ function formatDate(dateStr) {
   cursor: pointer; transition: opacity 0.15s;
 }
 .cta-btn:active { opacity: 0.85; }
-.cta-btn.primary   { background: #1b4332; color: #fff; }
+.cta-btn.primary   { background: #30353a; color: #fff; }
 .cta-btn.secondary { background: #e63946; color: #fff; border: 1.5px solid #e63946; }
 
 .events-card {
@@ -234,8 +234,8 @@ function formatDate(dateStr) {
   width: 100%;
   margin-top: 10px;
   border: 1.5px solid #b8ddc4;
-  background: #e6f3ea;
-  color: #1b4332;
+  background: #e4e7e9;
+  color: #30353a;
   border-radius: 10px;
   padding: 11px;
   font-family: inherit;

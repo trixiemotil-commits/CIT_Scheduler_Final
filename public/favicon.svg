@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- Background -->
-  <rect width="512" height="512" fill="#1b4332"/>
+  <rect width="512" height="512" fill="#30353a"/>
 
   <!-- Calendar body -->
   <rect x="76" y="130" width="360" height="300" rx="28" fill="white" fill-opacity="0.13"/>
@@ -10,9 +10,9 @@
   <rect x="76" y="190" width="360" height="28" fill="white" fill-opacity="0.22"/>
 
   <!-- Calendar pin left -->
-  <rect x="160" y="96" width="26" height="60" rx="13" fill="#52b788"/>
+  <rect x="160" y="96" width="26" height="60" rx="13" fill="#a7adb3"/>
   <!-- Calendar pin right -->
-  <rect x="326" y="96" width="26" height="60" rx="13" fill="#52b788"/>
+  <rect x="326" y="96" width="26" height="60" rx="13" fill="#a7adb3"/>
 
   <!-- Grid dots -->
   <circle cx="150" cy="290" r="14" fill="white" fill-opacity="0.5"/>
@@ -20,7 +20,7 @@
   <circle cx="286" cy="290" r="14" fill="white" fill-opacity="0.5"/>
   <circle cx="354" cy="290" r="14" fill="white" fill-opacity="0.5"/>
   <circle cx="150" cy="360" r="14" fill="white" fill-opacity="0.5"/>
-  <circle cx="218" cy="360" r="14" fill="#52b788"/>
+  <circle cx="218" cy="360" r="14" fill="#a7adb3"/>
   <circle cx="286" cy="360" r="14" fill="white" fill-opacity="0.5"/>
   <circle cx="354" cy="360" r="14" fill="white" fill-opacity="0.5"/>
 

@@ -286,7 +286,7 @@ async function loadProfile() {
       icon: 'warning',
       title: 'Unable to load profile',
       text: error.message || 'Please try again.',
-      confirmButtonColor: '#1b4332',
+      confirmButtonColor: '#4b5563',
     })
   }
 }
@@ -315,7 +315,7 @@ function onAvatarSelected(event) {
       icon: 'warning',
       title: 'Invalid image file',
       text: 'Please select a valid image file.',
-      confirmButtonColor: '#1b4332',
+      confirmButtonColor: '#4b5563',
     })
     return
   }
@@ -325,7 +325,7 @@ function onAvatarSelected(event) {
       icon: 'warning',
       title: 'Image too large',
       text: 'Please use an image smaller than 5 MB.',
-      confirmButtonColor: '#1b4332',
+      confirmButtonColor: '#4b5563',
     })
     return
   }
@@ -348,7 +348,7 @@ async function saveProfile() {
       icon: 'warning',
       title: 'Missing required fields',
       text: 'Name and email are required.',
-      confirmButtonColor: '#1b4332',
+      confirmButtonColor: '#4b5563',
     })
     return
   }
@@ -384,14 +384,14 @@ async function saveProfile() {
       toast: true, position: 'top-end', icon: 'success',
       title: 'Profile Updated', showConfirmButton: false,
       timer: 2500, timerProgressBar: true,
-      background: '#1b4332', color: '#fff', iconColor: '#74c69d'
+      background: '#4b5563', color: '#fff', iconColor: '#cbd5e1'
     })
   } catch (error) {
     await Swal.fire({
       icon: 'error',
       title: 'Unable to update profile',
       text: error.message || 'Please try again.',
-      confirmButtonColor: '#1b4332',
+      confirmButtonColor: '#4b5563',
     })
   }
 }
@@ -408,11 +408,11 @@ function confirmLogout() {
 <style scoped>
 /* ─── Design tokens ─────────────────────── */
 :root {
-  --green-900: #1b4332;
-  --green-700: #2d6a4f;
-  --green-500: #40916c;
-  --green-200: #c8ddd4;
-  --green-50:  #f0faf3;
+  --green-900: #4b5563;
+  --green-700: #6b7280;
+  --green-500: #9ca3af;
+  --green-200: #c4c9cd;
+  --green-50:  #f8fafc;
   --red:       #e63946;
   --red-dark:  #c1121f;
   --bg:        #f0f2f5;
@@ -470,14 +470,14 @@ function confirmLogout() {
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
   cursor: pointer;
   transition: opacity 0.18s;
 }
 .avatar-wrap:hover { opacity: 0.85; }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
 
-.brand { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role  { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email { font-size: 0.82rem; color: #888; word-break: break-all; }
 
@@ -502,8 +502,8 @@ function confirmLogout() {
   transition: background 0.18s, color 0.18s;
   cursor: pointer;
 }
-.nav-item:hover { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -565,7 +565,7 @@ function confirmLogout() {
 
 .card-banner {
   height: 148px;
-  background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
+  background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -610,9 +610,9 @@ function confirmLogout() {
   display: inline-flex;
   align-items: center;
   padding: 4px 12px;
-  background: #e8f5ee;
-  color: #1b4332;
-  border: 1px solid #c8ddd4;
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #c4c9cd;
   border-radius: 20px;
   font-size: 0.72rem;
   font-weight: 600;
@@ -717,7 +717,7 @@ function confirmLogout() {
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px 18px;
-  background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
+  background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%);
 }
 .edit-modal-title { font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0 0 2px; }
 .edit-modal-sub   { font-size: 0.76rem; color: rgba(255,255,255,0.65); margin: 0; }
@@ -754,7 +754,7 @@ function confirmLogout() {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #1b4332;
+  color: #4b5563;
 }
 .edit-input {
   padding: 10px 13px;
@@ -770,9 +770,9 @@ function confirmLogout() {
   width: 100%;
 }
 .edit-input:focus {
-  border-color: #1b4332;
+  border-color: #4b5563;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(27,67,50,0.10);
+  box-shadow: 0 0 0 3px rgba(48, 53, 58,0.10);
 }
 
 .select-wrap { position: relative; }
@@ -791,9 +791,9 @@ function confirmLogout() {
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 .edit-select:focus {
-  border-color: #1b4332;
+  border-color: #4b5563;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(27,67,50,0.10);
+  box-shadow: 0 0 0 3px rgba(48, 53, 58,0.10);
 }
 .photo-help {
   color: #64748b;
@@ -849,7 +849,7 @@ function confirmLogout() {
 .edit-cancel-btn:hover { background: #f5f5f5; border-color: #c0c0c0; }
 .edit-save-btn {
   padding: 9px 24px;
-  background: linear-gradient(135deg, #1b4332, #2d6a4f);
+  background: linear-gradient(135deg, #4b5563, #6b7280);
   color: #fff;
   border: none;
   border-radius: 9px;
@@ -858,9 +858,9 @@ function confirmLogout() {
   cursor: pointer;
   font-family: inherit;
   transition: opacity 0.15s, box-shadow 0.15s;
-  box-shadow: 0 2px 8px rgba(27,67,50,0.25);
+  box-shadow: 0 2px 8px rgba(48, 53, 58,0.25);
 }
-.edit-save-btn:hover { opacity: 0.88; box-shadow: 0 4px 14px rgba(27,67,50,0.32); }
+.edit-save-btn:hover { opacity: 0.88; box-shadow: 0 4px 14px rgba(48, 53, 58,0.32); }
 
 /* Logout Modal */
 .logout-modal-box {

@@ -7,7 +7,7 @@
       ══════════════════════════════ -->
       <template v-if="step === 1">
         <div class="icon-wrap">
-          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="4" width="20" height="16" rx="2" />
             <path d="M2 8l10 6 10-6" />
           </svg>
@@ -39,7 +39,7 @@
       ══════════════════════════════ -->
       <template v-else-if="step === 2">
         <div class="icon-wrap">
-          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="4" width="20" height="16" rx="2" />
             <path d="M2 8l10 6 10-6" />
           </svg>
@@ -79,10 +79,10 @@
       <template v-else>
         <div class="icon-wrap">
           <!-- Lock icon -->
-          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <rect x="5" y="11" width="14" height="10" rx="2" />
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-            <circle cx="12" cy="16" r="1" fill="#1b4332" />
+            <circle cx="12" cy="16" r="1" fill="#4b5563" />
           </svg>
         </div>
         <h2 class="step-title">Step 3: Reset Your Password</h2>
@@ -284,7 +284,7 @@ async function handleReset() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at 50% 110%, #d8f3dc 0%, #74c69d 30%, #40916c 55%, #2d6a4f 72%, #1b4332 100%);
+  background: radial-gradient(ellipse at 50% 110%, #e5e7eb 0%, #cbd5e1 30%, #9ca3af 55%, #6b7280 72%, #4b5563 100%);
   padding: 24px;
 }
 
@@ -306,7 +306,7 @@ async function handleReset() {
 .icon-wrap {
   width: 80px;
   height: 80px;
-  border: 2.5px solid #1b4332;
+  border: 2.5px solid #4b5563;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -358,7 +358,7 @@ async function handleReset() {
   text-align: left;
 }
 .input-field::placeholder { color: #aaa; }
-.input-field:focus { border-color: #40916c; }
+.input-field:focus { border-color: #9ca3af; }
 
 .input-icon {
   position: absolute;
@@ -377,7 +377,7 @@ async function handleReset() {
 }
 .success-msg {
   font-size: 0.86rem;
-  color: #1b7a4a;
+  color: #4f575f;
   text-align: center;
   margin-top: -4px;
 }
@@ -394,7 +394,7 @@ async function handleReset() {
   pointer-events: all;
   transition: color 0.2s;
 }
-.icon-btn:hover { color: #1b4332; }
+.icon-btn:hover { color: #4b5563; }
 
 /* Requirements */
 .req-list {
@@ -415,10 +415,10 @@ async function handleReset() {
   color: #aaa;
   transition: color 0.2s;
 }
-.req-list li.met { color: #1b4332; }
+.req-list li.met { color: #4b5563; }
 .req-icon { display: flex; align-items: center; }
 .req-list li:not(.met) .req-icon { color: #ccc; }
-.req-list li.met .req-icon { color: #1b4332; }
+.req-list li.met .req-icon { color: #4b5563; }
 
 /* Match indicator */
 .match-indicator {
@@ -430,13 +430,13 @@ async function handleReset() {
   align-self: flex-start;
   margin-top: -4px;
 }
-.match-indicator.matched { color: #1b4332; }
+.match-indicator.matched { color: #4b5563; }
 
 /* Submit */
 .submit-btn {
   width: 100%;
   padding: 14px;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   border-radius: 50px;
@@ -447,7 +447,7 @@ async function handleReset() {
   letter-spacing: 0.8px;
   transition: background 0.2s, transform 0.1s, opacity 0.2s;
 }
-.submit-btn:hover { background: #2d6a4f; }
+.submit-btn:hover { background: #6b7280; }
 .submit-btn:active { transform: scale(0.98); }
 .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -477,16 +477,16 @@ async function handleReset() {
   font-size: 1.4rem;
   font-weight: 700;
   font-family: inherit;
-  color: #1b4332;
+  color: #4b5563;
   text-align: center;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
   background: #fff;
-  caret-color: #1b4332;
+  caret-color: #4b5563;
 }
 .pin-box:focus {
-  border-color: #40916c;
-  box-shadow: 0 0 0 3px rgba(64,145,108,0.15);
+  border-color: #9ca3af;
+  box-shadow: 0 0 0 3px rgba(83, 91, 100,0.15);
 }
 
 @media (max-width: 480px) {

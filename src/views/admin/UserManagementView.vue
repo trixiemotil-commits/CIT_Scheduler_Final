@@ -400,8 +400,8 @@
   <Teleport to="body">
     <div v-if="showRestoreModal" class="modal-overlay" @click.self="showRestoreModal = false">
       <div class="um-delete-box">
-        <div class="um-delete-icon" style="background:#e8f5ee;">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1b7a4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
+        <div class="um-delete-icon" style="background:#f3f4f6;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4f575f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
         </div>
         <h2 class="um-delete-title">Restore User?</h2>
         <p class="um-delete-sub"><strong>{{ restoreTarget?.name }}</strong> will be moved back to active users and regain access.</p>
@@ -574,7 +574,7 @@ const navItems = [
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="5" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="18" r="1" fill="currentColor" stroke="none"/></svg>`
   },
   {
-    name: 'Manage Users', to: '/admin/users',
+    name: 'Users', to: '/admin/users',
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
   },
   {
@@ -962,10 +962,10 @@ function printUsersTable() {
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
     body{font-family:'Segoe UI',Arial,sans-serif;padding:20px;font-size:12px;color:#1a1a2e;}
-    h2{font-size:18px;font-weight:700;margin-bottom:6px;color:#1b4332;}
+    h2{font-size:18px;font-weight:700;margin-bottom:6px;color:#4b5563;}
     .meta{font-size:11px;color:#4b5563;margin-bottom:12px;line-height:1.5;}
     table{width:100%;border-collapse:collapse;table-layout:fixed;}
-    th{background:#1b4332;color:#fff;padding:8px 6px;text-align:left;font-size:11px;font-weight:600;border:1px solid #0f2d21;}
+    th{background:#4b5563;color:#fff;padding:8px 6px;text-align:left;font-size:11px;font-weight:600;border:1px solid #0f2d21;}
     td{border:1px solid #dfe5e2;padding:8px 6px;vertical-align:top;font-size:11px;word-wrap:break-word;}
     .dept{color:#6b7280;font-size:10px;}
     .empty{padding:12px;text-align:center;color:#6b7280;border:1px solid #dfe5e2;}
@@ -1166,10 +1166,10 @@ function confirmRestoreUser() {
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
 }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
-.brand  { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand  { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role   { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email  { font-size: 0.82rem; color: #888; word-break: break-all; }
 
@@ -1193,8 +1193,8 @@ function confirmRestoreUser() {
   transition: background 0.18s, color 0.18s;
   cursor: pointer;
 }
-.nav-item:hover  { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover  { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -1237,7 +1237,7 @@ function confirmRestoreUser() {
 .page-title {
   font-size: 2rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #4b5563;
   letter-spacing: -0.5px;
   line-height: 1.2;
 }
@@ -1265,7 +1265,7 @@ function confirmRestoreUser() {
   display: flex;
   align-items: center;
   gap: 7px;
-  background: #14532d;
+  background: #41484f;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -1276,7 +1276,7 @@ function confirmRestoreUser() {
   cursor: pointer;
   transition: background 0.18s, opacity 0.18s;
 }
-.um-approve-all-btn:hover { background: #166534; }
+.um-approve-all-btn:hover { background: #4b5259; }
 .um-approve-all-btn[disabled] {
   opacity: 0.65;
   cursor: not-allowed;
@@ -1286,7 +1286,7 @@ function confirmRestoreUser() {
   align-items: center;
   gap: 7px;
   background: #fff;
-  color: #14532d;
+  color: #41484f;
   border: 1.5px solid #d1e7db;
   font-family: inherit;
   font-size: 0.84rem;
@@ -1325,8 +1325,8 @@ function confirmRestoreUser() {
   transition: border-color 0.18s, box-shadow 0.18s;
 }
 .um-search-input:focus {
-  border-color: #2d6a4f;
-  box-shadow: 0 0 0 3px rgba(45,106,79,0.09);
+  border-color: #6b7280;
+  box-shadow: 0 0 0 3px rgba(83, 91, 100,0.09);
 }
 .um-filter-select {
   font-family: inherit;
@@ -1340,12 +1340,12 @@ function confirmRestoreUser() {
   cursor: pointer;
   transition: border-color 0.18s;
 }
-.um-filter-select:focus { border-color: #2d6a4f; }
+.um-filter-select:focus { border-color: #6b7280; }
 .um-add-btn {
   display: flex;
   align-items: center;
   gap: 7px;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -1356,7 +1356,7 @@ function confirmRestoreUser() {
   cursor: pointer;
   transition: background 0.18s;
 }
-.um-add-btn:hover { background: #2d6a4f; }
+.um-add-btn:hover { background: #6b7280; }
 
 /* ── Stats Row ── */
 .um-stats-row {
@@ -1383,13 +1383,13 @@ function confirmRestoreUser() {
   justify-content: center;
   flex-shrink: 0;
 }
-.um-stat-icon--total   { background: #e8f5ee; color: #1b7a4a; }
+.um-stat-icon--total   { background: #f3f4f6; color: #4f575f; }
 .um-stat-icon--admin   { background: #e8eefe; color: #2563eb; }
 .um-stat-icon--archived { background: #f3f4f6; color: #6b7280; }
 .um-stat-card--clickable { cursor: pointer; transition: box-shadow 0.18s, transform 0.15s; }
 .um-stat-card--clickable:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.12); transform: translateY(-2px); }
 .um-stat-icon--teacher { background: #fef3c7; color: #b45309; }
-.um-stat-icon--active  { background: #d8f3e8; color: #1b7a4a; }
+.um-stat-icon--active  { background: #d8dcdf; color: #4f575f; }
 .um-stat-val   { font-size: 1.6rem; font-weight: 800; color: #111; line-height: 1; }
 .um-stat-label { font-size: 0.78rem; color: #888; font-weight: 500; margin-top: 3px; }
 
@@ -1413,9 +1413,9 @@ function confirmRestoreUser() {
   margin-bottom: 14px;
 }
 .um-info-banner {
-  background: #e8f5ee;
+  background: #f3f4f6;
   border: 1px solid #b7dfca;
-  color: #1b7a4a;
+  color: #4f575f;
   padding: 12px 16px;
   border-radius: 12px;
   font-size: 0.9rem;
@@ -1494,7 +1494,7 @@ function confirmRestoreUser() {
   padding: 4px 12px;
   border-radius: 20px;
 }
-.um-status--active   { background: #d8f3e8; color: #1b7a4a; }
+.um-status--active   { background: #d8dcdf; color: #4f575f; }
 .um-status--pending  { background: #fff7e0; color: #b45309; }
 .um-status--inactive { background: #ffeaea; color: #e63946; }
 .um-status--denied   { background: #fee2e2; color: #b91c1c; }
@@ -1539,13 +1539,13 @@ function confirmRestoreUser() {
 }
 .um-btn--edit   { background: #eef4fe; color: #2563eb; }
 .um-btn--edit:hover { background: #dceafd; }
-.um-btn--approve { background: #dcfce7; color: #166534; }
+.um-btn--approve { background: #dcfce7; color: #4b5259; }
 .um-btn--approve:hover { background: #bbf7d0; }
 .um-btn--deny  { background: #fee2e2; color: #b91c1c; }
 .um-btn--deny:hover { background: #fecaca; }
 .um-btn--archive { background: #fff7ed; color: #b45309; }
 .um-btn--archive:hover { background: #fde68a; }
-.um-btn--restore { background: #e8f5ee; color: #1b7a4a; }
+.um-btn--restore { background: #f3f4f6; color: #4f575f; }
 .um-btn--restore:hover { background: #d1fae5; }
 
 .um-empty {
@@ -1590,7 +1590,7 @@ function confirmRestoreUser() {
   to   { opacity: 1; transform: scale(1)   translateY(0); }
 }
 .um-modal-banner {
-  background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
+  background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%);
   padding: 26px 28px 22px;
   display: flex;
   align-items: center;
@@ -1676,9 +1676,9 @@ function confirmRestoreUser() {
 }
 .form-input::placeholder { color: #c0c4cc; }
 .form-input:focus {
-  border-color: #2d6a4f;
+  border-color: #6b7280;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(45,106,79,0.09);
+  box-shadow: 0 0 0 3px rgba(83, 91, 100,0.09);
 }
 .um-pw-error {
   font-size: 0.82rem;
@@ -1694,8 +1694,8 @@ function confirmRestoreUser() {
   display: flex;
   align-items: center;
   gap: 16px;
-  background: #f7faf8;
-  border: 1.5px dashed #c8ddd4;
+  background: #f4f5f5;
+  border: 1.5px dashed #c4c9cd;
   border-radius: 14px;
   padding: 14px 18px;
   margin-bottom: 4px;
@@ -1705,7 +1705,7 @@ function confirmRestoreUser() {
   height: 60px;
   border-radius: 50%;
   background: #e8f0ec;
-  border: 2px solid #c8ddd4;
+  border: 2px solid #c4c9cd;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1714,7 +1714,7 @@ function confirmRestoreUser() {
 .reg-avatar-name {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #4b5563;
   margin: 0 0 2px;
 }
 .reg-avatar-role {
@@ -1767,7 +1767,7 @@ function confirmRestoreUser() {
   display: flex;
   align-items: center;
   gap: 7px;
-  background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
+  background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%);
   color: #fff;
   border: none;
   font-family: inherit;
@@ -1777,9 +1777,9 @@ function confirmRestoreUser() {
   border-radius: 10px;
   cursor: pointer;
   transition: opacity 0.18s, box-shadow 0.18s;
-  box-shadow: 0 4px 14px rgba(27,67,50,0.25);
+  box-shadow: 0 4px 14px rgba(48, 53, 58,0.25);
 }
-.um-submit-btn:hover { opacity: 0.9; box-shadow: 0 6px 18px rgba(27,67,50,0.32); }
+.um-submit-btn:hover { opacity: 0.9; box-shadow: 0 6px 18px rgba(48, 53, 58,0.32); }
 
 /* ── Delete Modal ── */
 .um-delete-box {
@@ -1876,13 +1876,13 @@ function confirmRestoreUser() {
   font-family: inherit;
   font-size: 0.83rem;
   font-weight: 600;
-  color: #2d6a4f;
+  color: #6b7280;
   cursor: pointer;
   padding: 0;
   text-decoration: underline;
 }
 .um-reset-confirm-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -1893,9 +1893,9 @@ function confirmRestoreUser() {
   cursor: pointer;
   transition: background 0.18s;
 }
-.um-reset-confirm-btn:hover { background: #2d6a4f; }
+.um-reset-confirm-btn:hover { background: #6b7280; }
 .um-restore-confirm-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -1906,7 +1906,7 @@ function confirmRestoreUser() {
   cursor: pointer;
   transition: background 0.18s;
 }
-.um-restore-confirm-btn:hover { background: #2d6a4f; }
+.um-restore-confirm-btn:hover { background: #6b7280; }
 
 /* ── View Tabs ── */
 .um-view-tabs {
@@ -1929,10 +1929,10 @@ function confirmRestoreUser() {
   cursor: pointer;
   transition: all 0.18s;
 }
-.um-view-tab:hover { border-color: #2d6a4f; color: #2d6a4f; }
+.um-view-tab:hover { border-color: #6b7280; color: #6b7280; }
 .um-view-tab--on {
-  background: #1b4332;
-  border-color: #1b4332;
+  background: #4b5563;
+  border-color: #4b5563;
   color: #fff;
   font-weight: 600;
 }
@@ -1990,7 +1990,7 @@ function confirmRestoreUser() {
 }
 .swal-cancel:hover { background: #ffeaea; }
 .swal-continue {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -2000,9 +2000,9 @@ function confirmRestoreUser() {
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.18s;
-  box-shadow: 0 4px 14px rgba(27,67,50,0.22);
+  box-shadow: 0 4px 14px rgba(48, 53, 58,0.22);
 }
-.swal-continue:hover { background: #2d6a4f; }
+.swal-continue:hover { background: #6b7280; }
 
 /* ── Logout Modal ── */
 .logout-modal-box {
@@ -2052,7 +2052,7 @@ function confirmRestoreUser() {
 }
 .logout-cancel-btn:hover { background: #ffeaea; }
 .logout-confirm-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -2063,7 +2063,7 @@ function confirmRestoreUser() {
   cursor: pointer;
   transition: background 0.18s;
 }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn:hover { background: #6b7280; }
 
 /* ── Responsive ── */
 @media (max-width: 1100px) {

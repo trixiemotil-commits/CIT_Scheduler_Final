@@ -61,6 +61,14 @@
           </div>
         </div>
 
+        <div class="schedule-color-legend" aria-label="Schedule color legend">
+          <span><i class="legend-swatch legend-lab" aria-hidden="true"></i>Laboratory</span>
+          <span><i class="legend-swatch legend-lecture" aria-hidden="true"></i>Lecture</span>
+          <span><i class="legend-swatch legend-consultation" aria-hidden="true"></i>Consultation</span>
+          <span><i class="legend-swatch legend-lunch" aria-hidden="true"></i>Lunch</span>
+          <span><i class="legend-swatch legend-free" aria-hidden="true"></i>Free time</span>
+        </div>
+
         <!-- Grid -->
         <div class="table-scroll">
           <table class="sched-table">
@@ -88,28 +96,30 @@
                     :rowspan="cell.rowspan"
                     :class="[
                       'td-class',
-                      cell.cls.color === 'orange' ? 'cell-orange' : (cell.cls.color === 'yellow' ? 'cell-yellow' : 'cell-green'),
+                      cell.cls.color === 'gray'
+                        ? 'cell-gray'
+                        : (cell.cls.color === 'orange' || cell.cls.color === 'yellow' ? 'cell-yellow' : 'cell-green'),
                       { 'col-expanded': expandedDay === DAYS[ci] }
                     ]"
                     @click="expandedDay === DAYS[ci] ? openModal(cell.cls) : toggleExpand(DAYS[ci])"
                   >
                     <!-- Compact view -->
                     <template v-if="expandedDay !== DAYS[ci]">
-                      <div class="cell-room-sm">{{ cell.cls.room }}</div>
+                      <div v-if="cell.cls.room" class="cell-room-sm">{{ cell.cls.room }}</div>
                       <div class="cell-subject-sm">{{ cell.cls.subject }}</div>
                       <div v-if="cell.cls.color === 'orange'" class="cell-campus-sm">Main Campus</div>
-                      <div class="cell-tag-sm">{{ cell.cls.year || '--' }} • {{ cell.cls.section || '--' }}</div>
-                      <div class="cell-tag-sm">{{ cell.cls.parallel ? 'Parallel' : 'Non-parallel' }}</div>
+                      <div v-if="cell.cls.year || cell.cls.section" class="cell-tag-sm">{{ cell.cls.year || '--' }} • {{ cell.cls.section || '--' }}</div>
+                      <div v-if="cell.cls.entryType !== 'lunch'" class="cell-tag-sm">{{ cell.cls.parallel ? 'Parallel' : 'Non-parallel' }}</div>
                     </template>
                     <!-- Expanded view -->
                     <template v-else>
-                      <div class="cell-badge-row">
+                      <div v-if="cell.cls.entryType !== 'lunch'" class="cell-badge-row">
                         <span :class="['cell-badge', cell.cls.parallel ? 'badge-p' : 'badge-np']">
                           {{ cell.cls.parallel ? 'Parallel' : 'Non-parallel' }}
                         </span>
                         <span v-if="cell.cls.color === 'orange'" class="cell-badge badge-campus">Main Campus</span>
                       </div>
-                      <div class="cell-exp-line">
+                      <div v-if="cell.cls.room" class="cell-exp-line">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cell-exp-icon">
                           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
                           <polyline points="9 22 9 12 15 12 15 22"/>
@@ -123,7 +133,7 @@
                         </svg>
                         <strong class="cell-exp-subject">{{ cell.cls.subject }}</strong>
                       </div>
-                      <div class="cell-exp-section">{{ cell.cls.year || '--' }} • {{ cell.cls.section }}</div>
+                      <div v-if="cell.cls.year || cell.cls.section" class="cell-exp-section">{{ cell.cls.year || '--' }} • {{ cell.cls.section }}</div>
                     </template>
                   </td>
                   <!-- Consultation cell -->
@@ -172,7 +182,11 @@
                   <!-- Empty cell -->
                   <td
                     v-else-if="cell.type === 'empty'"
-                    :class="['td-empty', { 'col-expanded': expandedDay === DAYS[ci] }]"
+                    :class="[
+                      'td-empty',
+                      'free-time-cell',
+                      { 'col-expanded': expandedDay === DAYS[ci] }
+                    ]"
                   ></td>
                   <!-- occupied: skip -->
                 </template>
@@ -193,7 +207,7 @@
             <span class="modal-key">Subject:</span>
             <span class="modal-val">{{ selectedClass.subject }}</span>
           </div>
-          <div class="modal-info-row">
+          <div v-if="selectedClass.room" class="modal-info-row">
             <span class="modal-key">Room:</span>
             <span class="modal-val">{{ selectedClass.room }}</span>
           </div>
@@ -201,13 +215,13 @@
             <span class="modal-key">Teacher:</span>
             <span class="modal-val">{{ selectedClass.teacher }}</span>
           </div>
-          <div class="modal-info-row">
+          <div v-if="selectedClass.section" class="modal-info-row">
             <span class="modal-key">Section:</span>
             <span class="modal-val">{{ selectedClass.section }}</span>
           </div>
-          <div class="modal-info-row">
+          <div v-if="selectedClass.year" class="modal-info-row">
             <span class="modal-key">Year Level:</span>
-            <span class="modal-val">{{ selectedClass.year || '--' }}</span>
+            <span class="modal-val">{{ selectedClass.year }}</span>
           </div>
           <div class="modal-time-row">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -313,14 +327,21 @@ const navItems = [
 ]
 
 /* ── Schedule grid constants ── */
-const ALL_STARTS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00']
-const TIME_SLOTS = ALL_STARTS.slice(0, -1).map((s, i) => ({
-  start: s,
-  end:   ALL_STARTS[i + 1],
-  label: `${formatTime12(s)}-${formatTime12(ALL_STARTS[i + 1])}`
-}))
-const GRID_START_MINUTES = Number(ALL_STARTS[0].slice(0, 2)) * 60
-const GRID_END_MINUTES = Number(ALL_STARTS[ALL_STARTS.length - 1].slice(0, 2)) * 60
+// The admin schedule form uses 30-minute time choices, so use the same
+// interval here instead of rounding a :30 class into an hourly row.
+const GRID_START_MINUTES = 7 * 60
+const GRID_END_MINUTES = 19 * 60
+const GRID_SLOT_MINUTES = 30
+const TIME_SLOTS = Array.from(
+  { length: (GRID_END_MINUTES - GRID_START_MINUTES) / GRID_SLOT_MINUTES },
+  (_, index) => {
+    const startMinutes = GRID_START_MINUTES + (index * GRID_SLOT_MINUTES)
+    const endMinutes = startMinutes + GRID_SLOT_MINUTES
+    const start = `${String(Math.floor(startMinutes / 60)).padStart(2, '0')}:${String(startMinutes % 60).padStart(2, '0')}`
+    const end = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`
+    return { start, end, label: `${formatTime12(start)}-${formatTime12(end)}` }
+  }
+)
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_SHORT = { Monday: 'Monday', Tuesday: 'Tues', Wednesday: 'Wed', Thursday: 'Thurs', Friday: 'Fri', Saturday: 'Sat' }
 
@@ -377,12 +398,10 @@ function isGreenComlabRoom(room) {
   return /(\b406\b|\b407\b|\b408\b|\b409\b|comlab|\bcl\b)/i.test(String(room || ''))
 }
 
-function scheduleColor(colorToken, campus, room) {
+function scheduleColor(colorToken, _campus, room, subject) {
+  if (/^(?:color-)?gray$/i.test(String(colorToken || '')) || /\blunch\b/i.test(String(subject || ''))) return 'gray'
   if (isGreenComlabRoom(room)) return 'green'
-  if (campus === 'Main Campus') return 'orange'
-  if (colorToken === 'color-orange') return 'orange'
-  if (colorToken === 'color-yellow') return 'yellow'
-  return 'green'
+  return 'yellow'
 }
 
 function timeToMinutes(value) {
@@ -410,7 +429,7 @@ function startSlotIndex(totalMinutes) {
   }
 
   const clamped = Math.max(GRID_START_MINUTES, Math.min(totalMinutes, GRID_END_MINUTES - 1))
-  return Math.floor((clamped - GRID_START_MINUTES) / 60)
+  return Math.floor((clamped - GRID_START_MINUTES) / GRID_SLOT_MINUTES)
 }
 
 function endSlotIndex(totalMinutes) {
@@ -419,7 +438,7 @@ function endSlotIndex(totalMinutes) {
   }
 
   const clamped = Math.max(GRID_START_MINUTES + 1, Math.min(totalMinutes, GRID_END_MINUTES))
-  return Math.ceil((clamped - GRID_START_MINUTES) / 60)
+  return Math.ceil((clamped - GRID_START_MINUTES) / GRID_SLOT_MINUTES)
 }
 
 function resolveGridSpan(startTime, endTime) {
@@ -526,6 +545,9 @@ function mapEntriesToSchedule(entries) {
     const start = to24Hour(entry.timeIn)
     const end = to24Hour(entry.timeOut)
     const span = resolveGridSpan(start, end)
+    const isLunch = String(entry.entryType || '').trim().toLowerCase() === 'lunch'
+      || /^(?:color-)?gray$/i.test(String(entry.color || ''))
+      || /\blunch\b/i.test(String(entry.subject || ''))
     if (!day || !start || !end || !span) {
       return
     }
@@ -534,13 +556,14 @@ function mapEntriesToSchedule(entries) {
       day,
       start,
       end,
-      year: entry.year || '',
+      entryType: isLunch ? 'lunch' : 'class',
+      year: isLunch ? '' : (entry.year || ''),
       room: entry.room || '',
       subject: entry.subject || 'Untitled Subject',
       code: entry.subject || 'Untitled Subject',
-      section: entry.section || '',
-      parallel: Boolean(entry.parallel),
-      color: scheduleColor(entry.color, entry.campus, entry.room),
+      section: isLunch ? '' : (entry.section || ''),
+      parallel: isLunch ? false : Boolean(entry.parallel),
+      color: scheduleColor(entry.color, entry.campus, entry.room, entry.subject),
       teacher: entry.teacher || userName.value || 'Teacher',
       avatar,
       parallelSections: [],
@@ -782,11 +805,11 @@ function confirmLogout() {
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
 }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
 
-.brand { font-size: 1.05rem; font-weight: 600; color: #1b4332; }
+.brand { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role  { font-size: 0.88rem; color: #444; font-weight: 500; }
 .email { font-size: 0.82rem; color: #888; word-break: break-all; }
 
@@ -811,8 +834,8 @@ function confirmLogout() {
   transition: background 0.18s, color 0.18s;
   cursor: pointer;
 }
-.nav-item:hover { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -858,7 +881,7 @@ function confirmLogout() {
 .page-title {
   font-size: 2.4rem;
   font-weight: 700;
-  color: #1b4332;
+  color: #4b5563;
   letter-spacing: -0.5px;
   line-height: 1.2;
 }
@@ -904,7 +927,7 @@ function confirmLogout() {
   cursor: pointer;
   outline: none;
 }
-.subject-select:focus { border-color: #1b4332; }
+.subject-select:focus { border-color: #4b5563; }
 .select-arrow {
   position: absolute;
   right: 10px;
@@ -926,7 +949,7 @@ function confirmLogout() {
 
 /* ─ Header: Time Column ─ */
 .th-time {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   font-size: 0.82rem;
   font-weight: 600;
@@ -937,12 +960,12 @@ function confirmLogout() {
   position: sticky;
   top: 0;
   z-index: 2;
-  border-right: 1px solid #2d6a4f;
+  border-right: 1px solid #6b7280;
 }
 
 /* ─ Header: Day Columns ─ */
 .th-day {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   font-size: 0.82rem;
   font-weight: 600;
@@ -953,13 +976,13 @@ function confirmLogout() {
   position: sticky;
   top: 0;
   z-index: 2;
-  border-left: 1px solid #2d6a4f;
+  border-left: 1px solid #6b7280;
   user-select: none;
   transition: background 0.2s ease, width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.th-day:hover { background: #2d6a4f; }
-.th-day-active { background: #2d6a4f; }
+.th-day:hover { background: #6b7280; }
+.th-day-active { background: #6b7280; }
 
 /* ─ Body: Time Column ─ */
 .td-time {
@@ -970,7 +993,7 @@ function confirmLogout() {
   padding: 0 10px;
   white-space: nowrap;
   border: 1px solid #e8e8e8;
-  height: 52px;
+  height: 40px;
   vertical-align: middle;
 }
 
@@ -992,7 +1015,7 @@ function confirmLogout() {
 .td-class {
   border: 1px solid rgba(0, 0, 0, 0.08);
   vertical-align: middle;
-  padding: 10px 12px;
+  padding: 6px 10px;
   cursor: pointer;
   width: 120px;
   min-width: 120px;
@@ -1013,7 +1036,7 @@ function confirmLogout() {
 
 /* ─ Cell Colors ─ */
 .cell-green {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
 }
 
@@ -1110,7 +1133,7 @@ function confirmLogout() {
 
 .badge-np {
   background: rgba(255, 255, 255, 0.9);
-  color: #1b4332;
+  color: #4b5563;
 }
 
 .badge-p {
@@ -1242,7 +1265,7 @@ function confirmLogout() {
   padding: 32px 32px 28px;
   background: #fff;
   border-radius: 24px;
-  border-top: 5px solid #1b4332;
+  border-top: 5px solid #4b5563;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
 }
 
@@ -1276,7 +1299,7 @@ function confirmLogout() {
 .modal-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #1b4332;
+  color: #4b5563;
   margin: 0 0 20px;
   padding-bottom: 16px;
   border-bottom: 1.5px solid #e6f2ec;
@@ -1290,7 +1313,7 @@ function confirmLogout() {
   gap: 12px;
   margin-bottom: 10px;
   padding: 10px 14px;
-  background: #f6faf8;
+  background: #f8fafc;
   border-radius: 10px;
   font-size: 0.92rem;
 }
@@ -1299,7 +1322,7 @@ function confirmLogout() {
   min-width: 80px;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #40916c;
+  color: #9ca3af;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1317,7 +1340,7 @@ function confirmLogout() {
   gap: 8px;
   margin-top: 18px;
   padding: 9px 20px;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border-radius: 20px;
   font-size: 0.92rem;
@@ -1340,7 +1363,7 @@ function confirmLogout() {
   height: 68px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #74c69d;
+  border: 3px solid #cbd5e1;
   flex-shrink: 0;
 }
 
@@ -1361,8 +1384,8 @@ function confirmLogout() {
 .modal-parallel-label {
   display: inline-block;
   padding: 3px 12px;
-  background: #d8f3dc;
-  color: #1b4332;
+  background: #e5e7eb;
+  color: #4b5563;
   border-radius: 20px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -1375,12 +1398,12 @@ function confirmLogout() {
   gap: 12px;
   margin-bottom: 10px;
   padding: 10px 14px;
-  background: #f6faf8;
+  background: #f8fafc;
   border-radius: 10px;
   font-size: 0.92rem;
 }
 
-.modal-section-val { font-weight: 600; color: #40916c; }
+.modal-section-val { font-weight: 600; color: #9ca3af; }
 
 /* ── Logout Modal ── */
 .logout-modal-box {
@@ -1430,7 +1453,7 @@ function confirmLogout() {
 }
 .logout-cancel-btn:hover { background: #ffeaea; }
 .logout-confirm-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -1441,7 +1464,7 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.18s;
 }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn:hover { background: #6b7280; }
 
 /* Responsive */
 @media (max-width: 900px) {

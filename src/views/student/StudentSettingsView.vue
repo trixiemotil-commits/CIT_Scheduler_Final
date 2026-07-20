@@ -160,7 +160,7 @@ function handleUpdatePassword() {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   display: flex;
   align-items: center;
@@ -171,7 +171,7 @@ function handleUpdatePassword() {
 .user-name { font-weight: 700; font-size: 0.9rem; color: #181c20; }
 .user-email { font-size: 0.75rem; color: #85909b; }
 .profile-link {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -220,7 +220,7 @@ function handleUpdatePassword() {
 }
 .update-btn {
   border: none;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border-radius: 9px;
   padding: 11px;
@@ -229,7 +229,7 @@ function handleUpdatePassword() {
 }
 .msg { font-size: 0.78rem; padding: 8px 10px; border-radius: 8px; }
 .msg-err { color: #d0414f; background: #fff1f3; }
-.msg-ok { color: #1b4332; background: #eaf7ee; }
+.msg-ok { color: #4b5563; background: #f8fafc; }
 
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
 .toggle-label { font-size: 0.9rem; font-weight: 600; color: #23282d; }
@@ -254,7 +254,7 @@ function handleUpdatePassword() {
   border-radius: 50%;
   transition: 0.2s;
 }
-.toggle-switch input:checked + .toggle-slider { background: #1b4332; }
+.toggle-switch input:checked + .toggle-slider { background: #4b5563; }
 .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
 
 .twofa-msg {
@@ -264,7 +264,7 @@ function handleUpdatePassword() {
   padding: 10px;
   line-height: 1.45;
 }
-.msg-on { background: #e7f6eb; color: #1b4332; border: 1px solid #1b4332; }
+.msg-on { background: #f8fafc; color: #4b5563; border: 1px solid #4b5563; }
 .msg-off { background: #fff1f1; color: #e14d56; border: 1px solid #f3c3c7; }
 
 .modal-overlay {
@@ -280,7 +280,7 @@ function handleUpdatePassword() {
 .success-modal {
   width: min(320px, 100%);
   background: #fff;
-  border: 2px solid #1b4332;
+  border: 2px solid #4b5563;
   border-radius: 14px;
   box-shadow: 0 16px 28px rgba(0, 0, 0, 0.2);
   padding: 18px 16px 16px;
@@ -290,8 +290,8 @@ function handleUpdatePassword() {
   width: 72px;
   height: 72px;
   margin: 0 auto 10px;
-  border: 4px solid #1b4332;
-  color: #1b4332;
+  border: 4px solid #4b5563;
+  color: #4b5563;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -312,7 +312,7 @@ function handleUpdatePassword() {
 .success-btn {
   margin-top: 14px;
   border: none;
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   border-radius: 999px;
   padding: 9px 22px;

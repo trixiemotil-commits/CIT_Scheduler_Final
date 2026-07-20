@@ -179,13 +179,13 @@
             <div class="modal-avatar-placeholder" @click="$refs.fileInput.click()">
               <img v-if="previewImage" :src="previewImage" alt="Preview" class="modal-avatar-preview" />
               <template v-else>
-                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="1.5">
+                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
               </template>
               <div class="modal-avatar-checkmark">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="#52b788">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#64748b">
                   <path d="M20 6L9 17l-5-5" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </div>
@@ -432,7 +432,7 @@ const navItems = [
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="5" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="18" r="1" fill="currentColor" stroke="none"/></svg>`
   },
   {
-    name: 'Manage Users', to: '/admin/users',
+    name: 'Users', to: '/admin/users',
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
   },
   {
@@ -596,14 +596,14 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c8ddd4;
+  border: 3px solid #c4c9cd;
 }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
 
 .brand {
   font-size: 1.05rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #4b5563;
 }
 .role {
   font-size: 0.88rem;
@@ -643,8 +643,8 @@ onBeforeUnmount(() => {
   font-family: inherit;
   margin: 0;
 }
-.nav-item:hover { background: #f0faf3; color: #1b4332; }
-.nav-item.active { background: #1b4332; color: #fff; }
+.nav-item:hover { background: #f8fafc; color: #4b5563; }
+.nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -689,7 +689,7 @@ onBeforeUnmount(() => {
 .page-title {
   font-size: 2rem;
   font-weight: 600;
-  color: #1b4332;
+  color: #4b5563;
   letter-spacing: -0.5px;
   line-height: 1.2;
 }
@@ -735,7 +735,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 10px 24px;
-  background-color: #1b4332;
+  background-color: #4b5563;
   color: white;
   border: none;
   border-radius: 10px;
@@ -747,7 +747,7 @@ onBeforeUnmount(() => {
 }
 
 .add-teacher-btn:hover {
-  background-color: #2d6a4f;
+  background-color: #6b7280;
 }
 
 /* ════════════════════════ STATUS TABS ════════════════════════ */
@@ -771,14 +771,14 @@ onBeforeUnmount(() => {
 }
 
 .status-tab:hover {
-  border-color: #1b4332;
-  color: #1b4332;
+  border-color: #4b5563;
+  color: #4b5563;
 }
 
 .status-tab.active {
-  background-color: #1b4332;
+  background-color: #4b5563;
   color: white;
-  border-color: #1b4332;
+  border-color: #4b5563;
 }
 
 /* ════════════════════════ TEACHERS GRID/CAROUSEL ════════════════════════ */
@@ -808,9 +808,9 @@ onBeforeUnmount(() => {
 }
 
 .carousel-arrow:hover {
-  background-color: #1b4332;
+  background-color: #4b5563;
   color: white;
-  border-color: #1b4332;
+  border-color: #4b5563;
 }
 
 .teachers-grid {
@@ -847,8 +847,8 @@ onBeforeUnmount(() => {
 }
 
 .card-in-school {
-  border: 2px solid #4CAF50;
-  background-color: #e8f5e9;
+  border: 2px solid #69727c;
+  background-color: #f3f4f6;
 }
 
 .card-on-leave {
@@ -873,7 +873,7 @@ onBeforeUnmount(() => {
 }
 
 .badge-in-school {
-  background-color: #4CAF50;
+  background-color: #69727c;
   color: white;
 }
 
@@ -949,13 +949,13 @@ onBeforeUnmount(() => {
 }
 
 .status-dropdown:hover {
-  border-color: #1b4332;
+  border-color: #4b5563;
 }
 
 .status-dropdown:focus {
   outline: none;
-  border-color: #1b4332;
-  box-shadow: 0 0 0 2px rgba(27, 67, 50, 0.1);
+  border-color: #4b5563;
+  box-shadow: 0 0 0 2px rgba(48, 53, 58, 0.1);
 }
 
 .designated-areas {
@@ -980,8 +980,8 @@ onBeforeUnmount(() => {
 
 .area-tag {
   padding: 5px 10px;
-  background-color: #e0f0e8;
-  color: #1b4332;
+  background-color: #f3f4f6;
+  color: #4b5563;
   border-radius: 4px;
   font-size: 0.8rem;
   font-weight: 500;
@@ -1029,13 +1029,13 @@ onBeforeUnmount(() => {
 }
 
 .substitute-dropdown:hover {
-  border-color: #1b4332;
+  border-color: #4b5563;
 }
 
 .substitute-dropdown:focus {
   outline: none;
-  border-color: #1b4332;
-  box-shadow: 0 0 0 2px rgba(27, 67, 50, 0.1);
+  border-color: #4b5563;
+  box-shadow: 0 0 0 2px rgba(48, 53, 58, 0.1);
 }
 
 /* ════════════════════════ CAROUSEL INDICATORS ════════════════════════ */
@@ -1056,11 +1056,11 @@ onBeforeUnmount(() => {
 }
 
 .indicator:hover {
-  background-color: #1b4332;
+  background-color: #4b5563;
 }
 
 .indicator.active {
-  background-color: #1b4332;
+  background-color: #4b5563;
 }
 
 /* ════════════════════════ MODAL ════════════════════════ */
@@ -1110,8 +1110,8 @@ onBeforeUnmount(() => {
 .logout-modal-actions { display: flex; justify-content: center; gap: 20px; }
 .logout-cancel-btn, .logout-confirm-btn { border: none; border-radius: 10px; padding: 10px 22px; font: inherit; font-weight: 600; cursor: pointer; }
 .logout-cancel-btn { background: #ffeaea; color: #e63946; }
-.logout-confirm-btn { background: #1b4332; color: #fff; }
-.logout-confirm-btn:hover { background: #2d6a4f; }
+.logout-confirm-btn { background: #4b5563; color: #fff; }
+.logout-confirm-btn:hover { background: #6b7280; }
 
 .modal-header {
   margin-bottom: 24px;
@@ -1121,7 +1121,7 @@ onBeforeUnmount(() => {
 .modal-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #1b4332;
+  color: #4b5563;
   margin: 0 0 4px;
 }
 
@@ -1142,11 +1142,11 @@ onBeforeUnmount(() => {
   width: 100px;
   height: 100px;
   border-radius: 50%;
-  background: #e8f5e9;
+  background: #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed #1b4332;
+  border: 2px dashed #4b5563;
   cursor: pointer;
   transition: all 0.2s;
   overflow: hidden;
@@ -1154,7 +1154,7 @@ onBeforeUnmount(() => {
 
 .modal-avatar-placeholder:hover {
   background: #d4e8d9;
-  border-color: #2d6a4f;
+  border-color: #6b7280;
 }
 
 .modal-avatar-preview {
@@ -1175,7 +1175,7 @@ onBeforeUnmount(() => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #52b788;
+  background: #64748b;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1206,8 +1206,8 @@ onBeforeUnmount(() => {
 .modal-input:focus,
 .modal-select:focus {
   outline: none;
-  border-color: #1b4332;
-  box-shadow: 0 0 0 2px rgba(27, 67, 50, 0.1);
+  border-color: #4b5563;
+  box-shadow: 0 0 0 2px rgba(48, 53, 58, 0.1);
 }
 
 .modal-areas-group {
@@ -1236,8 +1236,8 @@ onBeforeUnmount(() => {
 
 .modal-areas-select:focus {
   outline: none;
-  border-color: #1b4332;
-  box-shadow: 0 0 0 2px rgba(27, 67, 50, 0.1);
+  border-color: #4b5563;
+  box-shadow: 0 0 0 2px rgba(48, 53, 58, 0.1);
 }
 
 .modal-areas-select option {
@@ -1247,7 +1247,7 @@ onBeforeUnmount(() => {
 }
 
 .modal-areas-select option:checked {
-  background: #1b4332;
+  background: #4b5563;
   color: white;
 }
 
@@ -1282,13 +1282,13 @@ onBeforeUnmount(() => {
 }
 
 .modal-dropdown-btn:hover {
-  border-color: #1b4332;
+  border-color: #4b5563;
 }
 
 .modal-dropdown-btn:focus {
   outline: none;
-  border-color: #1b4332;
-  box-shadow: 0 0 0 2px rgba(27, 67, 50, 0.1);
+  border-color: #4b5563;
+  box-shadow: 0 0 0 2px rgba(48, 53, 58, 0.1);
 }
 
 .modal-dropdown-placeholder {
@@ -1297,7 +1297,7 @@ onBeforeUnmount(() => {
 
 .modal-dropdown-selected {
   font-weight: 500;
-  color: #1b4332;
+  color: #4b5563;
 }
 
 .modal-dropdown-icon {
@@ -1342,7 +1342,7 @@ onBeforeUnmount(() => {
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #1b4332;
+  accent-color: #4b5563;
   flex-shrink: 0;
 }
 
@@ -1383,7 +1383,7 @@ onBeforeUnmount(() => {
 }
 
 .modal-add-btn {
-  background: #1b4332;
+  background: #4b5563;
   color: #fff;
   display: flex;
   align-items: center;
@@ -1395,7 +1395,7 @@ onBeforeUnmount(() => {
 }
 
 .modal-add-btn:hover {
-  background: #2d6a4f;
+  background: #6b7280;
 }
 
 /* ════════════════════════ RESPONSIVE ════════════════════════ */
