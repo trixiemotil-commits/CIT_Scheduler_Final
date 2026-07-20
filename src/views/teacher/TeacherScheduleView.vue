@@ -22,6 +22,7 @@
           <span>{{ item.name }}</span>
         </RouterLink>
       </nav>
+      <RoleSwitchButton />
       <button class="logout-btn" @click="showLogoutModal = true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -34,19 +35,21 @@
 
     <!-- ═══════════════════ MAIN ═══════════════════ -->
     <main class="main">
-      <header class="main-header">
+      <header class="main-header teacher-main-header">
         <div>
           <h1 class="page-title">My Schedule</h1>
-          <p class="page-sub">View your teaching schedule and availability</p>
+          <p class="page-sub">View your weekly class and consultation schedule</p>
         </div>
       </header>
 
-      <!-- Schedule Card -->
-      <section class="schedule-card">
-        <div class="card-top">
-          <div>
-            <div class="card-title">My Teaching Schedule</div>
-            <div class="card-sub">{{ loadError || (isLoading ? 'Loading your schedule...' : 'Your weekly class schedule and room assignments') }}</div>
+      <section class="schedule-card read-only-schedule">
+        <div class="sched-topbar">
+          <div class="sched-topbar-left">
+            <h2 class="sched-grid-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              Prof. {{ userName || 'Teacher' }}
+            </h2>
+            <p class="sched-grid-sub">{{ loadError || (isLoading ? 'Loading schedule...' : 'Read-only view') }}</p>
           </div>
           <div class="filter-wrap">
             <select class="subject-select" v-model="selectedSubject">
@@ -61,14 +64,6 @@
           </div>
         </div>
 
-        <div class="schedule-color-legend" aria-label="Schedule color legend">
-          <span><i class="legend-swatch legend-lab" aria-hidden="true"></i>Laboratory</span>
-          <span><i class="legend-swatch legend-lecture" aria-hidden="true"></i>Lecture</span>
-          <span><i class="legend-swatch legend-consultation" aria-hidden="true"></i>Consultation</span>
-          <span><i class="legend-swatch legend-lunch" aria-hidden="true"></i>Lunch</span>
-          <span><i class="legend-swatch legend-free" aria-hidden="true"></i>Free time</span>
-        </div>
-
         <!-- Grid -->
         <div class="table-scroll">
           <table class="sched-table">
@@ -76,24 +71,23 @@
               <tr>
                 <th class="th-time">Time</th>
                 <th
-                  v-for="(day, di) in DAYS"
+                  v-for="day in DAYS"
                   :key="day"
-                  :class="['th-day', { 'th-day-active': expandedDay === day }]"
-                  :style="expandedDay === day ? { width: '300px', minWidth: '300px' } : expandedDay ? { width: '60px', minWidth: '60px' } : { width: '120px', minWidth: '120px' }"
+                  class="th-day"
+                  :style="expandedDay === day ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
                   @click="toggleExpand(day)"
-                >
-                  {{ expandedDay && expandedDay !== day ? DAY_SHORT[day] : day }}
-                </th>
+                >{{ day }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(rowCells, ri) in tableMatrix" :key="ri">
+              <tr v-for="(rowCells, ri) in tableMatrix" :key="ri" class="time-row" :class="{ 'half-hour': TIME_SLOTS[ri].start.endsWith(':30') }">
                 <td class="td-time">{{ TIME_SLOTS[ri].label }}</td>
                 <template v-for="(cell, ci) in rowCells" :key="ci">
                   <!-- Class cell -->
                   <td
                     v-if="cell.type === 'start'"
                     :rowspan="cell.rowspan"
+                    :style="expandedDay === DAYS[ci] ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
                     :class="[
                       'td-class',
                       cell.cls.color === 'gray'
@@ -101,7 +95,7 @@
                         : (cell.cls.color === 'orange' || cell.cls.color === 'yellow' ? 'cell-yellow' : 'cell-green'),
                       { 'col-expanded': expandedDay === DAYS[ci] }
                     ]"
-                    @click="expandedDay === DAYS[ci] ? openModal(cell.cls) : toggleExpand(DAYS[ci])"
+                    @click="toggleExpand(DAYS[ci])"
                   >
                     <!-- Compact view -->
                     <template v-if="expandedDay !== DAYS[ci]">
@@ -140,7 +134,9 @@
                   <td
                     v-else-if="cell.type === 'consult'"
                     :rowspan="cell.rowspan"
+                    :style="expandedDay === DAYS[ci] ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
                     :class="['td-class', 'cell-blue', { 'col-expanded': expandedDay === DAYS[ci] }]"
+                    @click="toggleExpand(DAYS[ci])"
                   >
                     <template v-if="expandedDay !== DAYS[ci]">
                       <div class="cell-room-sm">Consultation</div>
@@ -182,11 +178,7 @@
                   <!-- Empty cell -->
                   <td
                     v-else-if="cell.type === 'empty'"
-                    :class="[
-                      'td-empty',
-                      'free-time-cell',
-                      { 'col-expanded': expandedDay === DAYS[ci] }
-                    ]"
+                    :class="['td-empty', { 'col-expanded': expandedDay === DAYS[ci] }]"
                   ></td>
                   <!-- occupied: skip -->
                 </template>
@@ -327,21 +319,14 @@ const navItems = [
 ]
 
 /* ── Schedule grid constants ── */
-// The admin schedule form uses 30-minute time choices, so use the same
-// interval here instead of rounding a :30 class into an hourly row.
-const GRID_START_MINUTES = 7 * 60
-const GRID_END_MINUTES = 19 * 60
-const GRID_SLOT_MINUTES = 30
-const TIME_SLOTS = Array.from(
-  { length: (GRID_END_MINUTES - GRID_START_MINUTES) / GRID_SLOT_MINUTES },
-  (_, index) => {
-    const startMinutes = GRID_START_MINUTES + (index * GRID_SLOT_MINUTES)
-    const endMinutes = startMinutes + GRID_SLOT_MINUTES
-    const start = `${String(Math.floor(startMinutes / 60)).padStart(2, '0')}:${String(startMinutes % 60).padStart(2, '0')}`
-    const end = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`
-    return { start, end, label: `${formatTime12(start)}-${formatTime12(end)}` }
-  }
-)
+const ALL_STARTS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00']
+const TIME_SLOTS = ALL_STARTS.slice(0, -1).map((s, i) => ({
+  start: s,
+  end:   ALL_STARTS[i + 1],
+  label: `${formatTime12(s)}-${formatTime12(ALL_STARTS[i + 1])}`
+}))
+const GRID_START_MINUTES = Number(ALL_STARTS[0].slice(0, 2)) * 60
+const GRID_END_MINUTES = Number(ALL_STARTS[ALL_STARTS.length - 1].slice(0, 2)) * 60
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_SHORT = { Monday: 'Monday', Tuesday: 'Tues', Wednesday: 'Wed', Thursday: 'Thurs', Friday: 'Fri', Saturday: 'Sat' }
 
@@ -429,7 +414,7 @@ function startSlotIndex(totalMinutes) {
   }
 
   const clamped = Math.max(GRID_START_MINUTES, Math.min(totalMinutes, GRID_END_MINUTES - 1))
-  return Math.floor((clamped - GRID_START_MINUTES) / GRID_SLOT_MINUTES)
+  return Math.floor((clamped - GRID_START_MINUTES) / 60)
 }
 
 function endSlotIndex(totalMinutes) {
@@ -438,7 +423,7 @@ function endSlotIndex(totalMinutes) {
   }
 
   const clamped = Math.max(GRID_START_MINUTES + 1, Math.min(totalMinutes, GRID_END_MINUTES))
-  return Math.ceil((clamped - GRID_START_MINUTES) / GRID_SLOT_MINUTES)
+  return Math.ceil((clamped - GRID_START_MINUTES) / 60)
 }
 
 function resolveGridSpan(startTime, endTime) {
@@ -723,8 +708,8 @@ function toggleExpand(day) {
 
 /* ── Build table matrix (handles rowspan occupation) ── */
 const tableMatrix = computed(() => {
-  const data = filteredClasses.value
-  const consultations = filteredConsultations.value
+  const data = scheduleData.value
+  const consultations = consultationData.value
   const occupied = Array.from({ length: DAYS.length }, () => new Array(TIME_SLOTS.length).fill(false))
 
   return TIME_SLOTS.map((slot, ri) =>
@@ -754,6 +739,16 @@ const showModal    = ref(false)
 const selectedClass = ref(null)
 function openModal(cls) { selectedClass.value = cls; showModal.value = true }
 function closeModal()   { showModal.value = false }
+
+function printSchedule() {
+  const previousExpandedDay = expandedDay.value
+  expandedDay.value = null
+
+  requestAnimationFrame(() => {
+    window.print()
+    expandedDay.value = previousExpandedDay
+  })
+}
 
 /* ── Logout ── */
 const showLogoutModal = ref(false)
@@ -864,11 +859,12 @@ function confirmLogout() {
 .main {
   flex: 1;
   padding: 40px 44px 32px;
-  overflow-y: auto;
+  overflow: hidden;
   min-width: 0;
   display: flex;
   flex-direction: column;
   height: 100vh;
+  box-sizing: border-box;
 }
 
 /* Header */
@@ -1464,7 +1460,7 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.18s;
 }
-.logout-confirm-btn:hover { background: #6b7280; }
+.logout-confirm-btn:hover { background: #2d6a4f; }
 
 /* Responsive */
 @media (max-width: 900px) {

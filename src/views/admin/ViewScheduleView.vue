@@ -13,7 +13,7 @@
 
       <nav class="sidebar-nav">
         <RouterLink
-          v-for="item in navItems"
+          v-for="item in navItems.filter(item => item.to !== '/admin/settings')"
           :key="item.name"
           :to="item.to"
           class="nav-item"
@@ -22,7 +22,16 @@
           <span class="nav-icon" v-html="item.icon"></span>
           <span>{{ item.name }}</span>
         </RouterLink>
+        <RouterLink to="/admin/activity-logs" class="nav-item admin-secondary-nav" :class="{ active: currentRoute === '/admin/activity-logs' }">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l3-3 3 2 5-6"/></svg></span>
+          <span>Activity Logs</span>
+        </RouterLink>
+        <RouterLink to="/admin/settings" class="nav-item admin-secondary-nav" :class="{ active: currentRoute === '/admin/settings' }">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33"/></svg></span>
+          <span>Settings</span>
+        </RouterLink>
       </nav>
+      <RoleSwitchButton />
 
       <button class="logout-btn" @click="showLogoutModal = true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -466,7 +475,7 @@ async function loadTeachers() {
     const res = await apiRequest('/users?role=teacher')
     if (res.users && Array.isArray(res.users)) {
       teacherList.value = res.users
-        .filter(u => u.role === 'Teacher')
+        .filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
         .map(u => {
           const name = `${u.firstName} ${u.lastName}`.trim()
           return {

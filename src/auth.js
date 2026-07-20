@@ -12,11 +12,11 @@ function clearSession() {
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...(options.headers || {})
-    },
-    ...options
+    }
   })
 
   let body = {}
@@ -43,7 +43,17 @@ export async function login(email, password, recaptchaToken = null) {
   })
 
   saveSession(payload)
-  return payload.user.role
+  return payload
+}
+
+export async function selectRole(role) {
+  const payload = await request('/auth/select-role', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: JSON.stringify({ role })
+  })
+  saveSession(payload)
+  return payload.user
 }
 
 export async function register(signUpPayload) {

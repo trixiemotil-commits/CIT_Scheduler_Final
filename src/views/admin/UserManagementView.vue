@@ -13,7 +13,7 @@
 
       <nav class="sidebar-nav">
         <RouterLink
-          v-for="item in navItems"
+          v-for="item in navItems.filter(item => item.to !== '/admin/settings')"
           :key="item.name"
           :to="item.to"
           class="nav-item"
@@ -22,7 +22,16 @@
           <span class="nav-icon" v-html="item.icon"></span>
           <span>{{ item.name }}</span>
         </RouterLink>
+        <RouterLink to="/admin/activity-logs" class="nav-item admin-secondary-nav" :class="{ active: currentRoute === '/admin/activity-logs' }">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l3-3 3 2 5-6"/></svg></span>
+          <span>Activity Logs</span>
+        </RouterLink>
+        <RouterLink to="/admin/settings" class="nav-item admin-secondary-nav" :class="{ active: currentRoute === '/admin/settings' }">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33"/></svg></span>
+          <span>Settings</span>
+        </RouterLink>
       </nav>
+      <RoleSwitchButton />
 
       <button class="logout-btn" @click="showLogoutModal = true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -66,6 +75,15 @@
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/><path d="M22 10l-7 7"/></svg>
             {{ isBulkApproving ? 'Approving...' : `Approve All (${pendingCount})` }}
+          </button>
+          <button
+            v-if="activeView === 'active' && selectedPendingUsers.length"
+            class="um-approve-selected-btn"
+            :disabled="isBulkApproving"
+            @click="promptApproveSelected"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/><path d="M22 10l-7 7"/></svg>
+            {{ isBulkApproving ? 'Approving...' : `Approve Selected (${selectedPendingUsers.length})` }}
           </button>
           <div class="um-search-wrap">
             <span class="um-search-icon">
@@ -119,7 +137,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
           </div>
           <div class="um-stat-info">
-            <div class="um-stat-val">{{ users.filter(u => u.role === 'Teacher').length }}</div>
+            <div class="um-stat-val">{{ users.filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher').length }}</div>
             <div class="um-stat-label">Teachers</div>
           </div>
         </div>
@@ -150,6 +168,16 @@
         <table class="um-table">
           <thead>
             <tr>
+              <th class="um-select-col">
+                <input
+                  v-if="activeView === 'active' && selectablePendingUsers.length"
+                  type="checkbox"
+                  class="um-select-check"
+                  :checked="allVisiblePendingSelected"
+                  :aria-label="allVisiblePendingSelected ? 'Clear pending-user selection' : 'Select all pending users'"
+                  @change="toggleAllVisiblePending"
+                />
+              </th>
               <th>User</th>
               <th>Email</th>
               <th>Role</th>
@@ -160,7 +188,7 @@
           </thead>
           <tbody>
             <tr v-if="isLoadingUsers">
-              <td colspan="6">
+              <td colspan="7">
                 <div class="um-empty">
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   <span>Loading users...</span>
@@ -169,6 +197,16 @@
             </tr>
             <template v-else>
             <tr v-for="user in filteredUsers" :key="user.id" class="um-row">
+              <td class="um-select-col">
+                <input
+                  v-if="activeView === 'active' && user.status === 'Pending'"
+                  v-model="selectedPendingIds"
+                  type="checkbox"
+                  class="um-select-check"
+                  :value="user.id"
+                  :aria-label="`Select ${user.name}`"
+                />
+              </td>
               <td>
                 <div class="um-user-cell">
                   <img :src="user.avatar" class="um-user-avatar" alt="" />
@@ -223,7 +261,7 @@
               </td>
             </tr>
             <tr v-if="filteredUsers.length === 0">
-              <td colspan="6">
+              <td colspan="7">
                 <div class="um-empty">
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   <span>No users found</span>
@@ -311,6 +349,7 @@
                 <option value="" disabled>Select role…</option>
                 <option value="Admin">Admin</option>
                 <option value="Teacher">Teacher</option>
+                <option value="Admin & Teacher">Admin & Teacher</option>
                 <option value="Student">Student</option>
               </select>
             </div>
@@ -507,10 +546,10 @@
   <Teleport to="body">
     <div v-if="showApproveAllConfirm" class="modal-overlay">
       <div class="swal-box">
-        <p class="swal-text">Approve all {{ pendingCount }} pending user account(s)?</p>
+        <p class="swal-text">{{ approvalMode === 'selected' ? `Approve ${selectedPendingUsers.length} selected user account(s)?` : `Approve all ${pendingCount} pending user account(s)?` }}</p>
         <div class="swal-actions">
           <button class="swal-cancel" @click="showApproveAllConfirm = false">Cancel</button>
-          <button class="swal-continue" @click="confirmApproveAllPending">Approve All</button>
+          <button class="swal-continue" @click="confirmApproval">{{ approvalMode === 'selected' ? 'Approve Selected' : 'Approve All' }}</button>
         </div>
       </div>
     </div>
@@ -604,6 +643,8 @@ const isLoadingUsers = ref(false)
 const loadError = ref('')
 const autoRefreshNotice = ref('')
 const isBulkApproving = ref(false)
+const selectedPendingIds = ref([])
+const approvalMode = ref('all')
 const PHINMA_EMAIL_REGEX = /^[a-z0-9._%+-]+\.au@phinmaed\.com$/i
 const AUTO_REFRESH_MS = 10000
 let autoRefreshTimer = null
@@ -626,6 +667,25 @@ const filteredUsers = computed(() => {
     return matchView && matchSearch && matchRole
   })
 })
+
+const selectablePendingUsers = computed(() => filteredUsers.value.filter((user) => user.status === 'Pending'))
+const selectedPendingUsers = computed(() => {
+  const selectedIds = new Set(selectedPendingIds.value)
+  return users.value.filter((user) => user.status === 'Pending' && selectedIds.has(user.id))
+})
+const allVisiblePendingSelected = computed(() => {
+  const visible = selectablePendingUsers.value
+  return visible.length > 0 && visible.every((user) => selectedPendingIds.value.includes(user.id))
+})
+
+function toggleAllVisiblePending() {
+  const visibleIds = selectablePendingUsers.value.map((user) => user.id)
+  if (allVisiblePendingSelected.value) {
+    selectedPendingIds.value = selectedPendingIds.value.filter((id) => !visibleIds.includes(id))
+  } else {
+    selectedPendingIds.value = [...new Set([...selectedPendingIds.value, ...visibleIds])]
+  }
+}
 
 function formatDisplayDate(dateInput) {
   if (!dateInput) return ''
@@ -660,6 +720,7 @@ function mapUserForUi(user) {
     lastName,
     email: user.email || '',
     role: normalizeRoleLabel(user.role || user.roleKey),
+    roles: Array.isArray(user.roles) ? user.roles : [],
     department: user.department || '',
     status: user.status || 'Active',
     dateAdded: formatDisplayDate(user.dateAdded || user.createdAt),
@@ -783,16 +844,21 @@ function trimValue(value) {
 
 function buildUserPayload(includePassword) {
   const schoolId = trimValue(userForm.value.schoolId)
+  const role = userForm.value.role
+  const roles = role === 'Admin & Teacher'
+    ? ['admin', 'teacher']
+    : [String(role || '').toLowerCase()]
   const payload = {
     firstName: trimValue(userForm.value.firstName),
     lastName: trimValue(userForm.value.lastName),
     email: trimValue(userForm.value.email),
-    role: userForm.value.role,
+    role: roles[0],
+    roles,
     status: editingUser.value ? (userForm.value.status || 'Active') : 'Active',
   }
 
   if (schoolId) {
-    if (userForm.value.role === 'Student') {
+    if (roles.includes('student')) {
       payload.studentId = schoolId
     } else {
       payload.employeeId = schoolId
@@ -921,16 +987,47 @@ async function approveAllPending() {
   }
 }
 
+async function approveSelectedPending() {
+  const selectedUsers = selectedPendingUsers.value
+  if (!selectedUsers.length || isBulkApproving.value) return
+
+  isBulkApproving.value = true
+  loadError.value = ''
+  try {
+    await Promise.all(selectedUsers.map((user) => apiRequest(`/users/${user.id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'Active' })
+    })))
+    selectedPendingIds.value = []
+    await fetchUsers()
+  } catch (error) {
+    loadError.value = error.message || 'Failed to approve selected users.'
+  } finally {
+    isBulkApproving.value = false
+  }
+}
+
 function promptApproveAll() {
   if (pendingCount.value === 0 || isBulkApproving.value) {
     return
   }
+  approvalMode.value = 'all'
   showApproveAllConfirm.value = true
 }
 
-async function confirmApproveAllPending() {
+function promptApproveSelected() {
+  if (!selectedPendingUsers.value.length || isBulkApproving.value) return
+  approvalMode.value = 'selected'
+  showApproveAllConfirm.value = true
+}
+
+async function confirmApproval() {
   showApproveAllConfirm.value = false
-  await approveAllPending()
+  if (approvalMode.value === 'selected') {
+    await approveSelectedPending()
+  } else {
+    await approveAllPending()
+  }
 }
 
 function printUsersTable() {
@@ -1281,6 +1378,13 @@ function confirmRestoreUser() {
   opacity: 0.65;
   cursor: not-allowed;
 }
+.um-approve-selected-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 13px; border: 1px solid #1b4332; border-radius: 8px;
+  background: #fff; color: #1b4332; font: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+}
+.um-approve-selected-btn:hover { background: #edf8f1; }
+.um-approve-selected-btn[disabled] { opacity: 0.6; cursor: not-allowed; }
 .um-print-btn {
   display: flex;
   align-items: center;
@@ -1448,6 +1552,8 @@ function confirmRestoreUser() {
   letter-spacing: 0.5px;
   padding: 14px 20px;
 }
+.um-select-col { width: 42px; padding-left: 14px !important; padding-right: 4px !important; text-align: center; }
+.um-select-check { width: 16px; height: 16px; accent-color: #1b4332; cursor: pointer; vertical-align: middle; }
 .um-row {
   border-bottom: 1px solid #f4f4f4;
   transition: background 0.15s;

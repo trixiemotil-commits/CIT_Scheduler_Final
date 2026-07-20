@@ -1,10 +1,12 @@
 import { createApp } from 'vue'
 import App from './App.vue'
+import RoleSwitchButton from './components/RoleSwitchButton.vue'
 import './assets/main.css'
 import router from './router'
 
 const app = createApp(App)
 app.use(router)
+app.component('RoleSwitchButton', RoleSwitchButton)
 
 // Global error handlers to surface runtime errors to the page for debugging
 window.addEventListener('error', (ev) => {

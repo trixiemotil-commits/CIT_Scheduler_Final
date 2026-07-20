@@ -306,8 +306,8 @@ function mapTeacher(teacher) {
     initials: initialsFor(teacher.name),
     color: colorForName(teacher.name),
     status: resolvedStatus,
-    // Request button follows working status; selected slot is still validated in modal submit.
-    available: resolvedStatus === 'In School',
+    // Requests require a teacher who is on school status and accepting consultations.
+    available: Boolean(teacher.available) && resolvedStatus === 'In School',
     tags: resolvedSubjects.slice(0, 3),
     subjectList: resolvedSubjects,
     assignedYearSections,

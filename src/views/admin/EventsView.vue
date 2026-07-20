@@ -15,7 +15,7 @@
       <!-- Nav -->
       <nav class="sidebar-nav">
         <RouterLink
-          v-for="item in navItems"
+          v-for="item in navItems.filter(item => item.to !== '/admin/settings')"
           :key="item.name"
           :to="item.to"
           class="nav-item"
@@ -24,7 +24,16 @@
           <span class="nav-icon" v-html="item.icon"></span>
           <span>{{ item.name }}</span>
         </RouterLink>
+        <RouterLink to="/admin/activity-logs" class="nav-item admin-secondary-nav" :class="{ active: currentRoute === '/admin/activity-logs' }">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l3-3 3 2 5-6"/></svg></span>
+          <span>Activity Logs</span>
+        </RouterLink>
+        <RouterLink to="/admin/settings" class="nav-item admin-secondary-nav" :class="{ active: currentRoute === '/admin/settings' }">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33"/></svg></span>
+          <span>Settings</span>
+        </RouterLink>
       </nav>
+      <RoleSwitchButton />
 
       <!-- Logout -->
       <button class="logout-btn" @click="showLogoutModal = true">
@@ -335,6 +344,37 @@
               </div>
             </div>
 
+            <!-- Teachers involved -->
+            <div class="form-group">
+              <label class="form-label">Teachers Involved <span class="form-optional">(optional)</span></label>
+              <div class="teacher-picker" v-click-outside="() => showTeacherPicker = false">
+                <button type="button" class="teacher-picker-trigger" @click="showTeacherPicker = !showTeacherPicker">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  <span :class="eventForm.teacherIds.length ? 'teacher-picker-value' : 'teacher-picker-placeholder'">{{ selectedTeacherLabel }}</span>
+                  <svg class="td-chevron" :class="{ 'td-chevron--open': showTeacherPicker }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div v-if="showTeacherPicker" class="teacher-picker-panel">
+                  <div class="teacher-picker-search">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input v-model.trim="teacherSearchQuery" type="search" placeholder="Search teachers..." />
+                  </div>
+                  <label class="teacher-picker-all">
+                    <input type="checkbox" :checked="allVisibleTeachersSelected" @change="toggleVisibleTeachers" />
+                    <span>Select visible teachers</span>
+                  </label>
+                  <div class="teacher-picker-list">
+                    <label v-for="teacher in filteredEventTeachers" :key="teacher.id" class="teacher-picker-option">
+                      <input v-model="eventForm.teacherIds" type="checkbox" :value="teacher.id" />
+                      <span class="teacher-picker-avatar">{{ teacher.initials }}</span>
+                      <span>{{ teacher.name }}</span>
+                    </label>
+                    <p v-if="!filteredEventTeachers.length" class="teacher-picker-empty">No teachers found.</p>
+                  </div>
+                </div>
+              </div>
+              <span class="teacher-picker-help">Select the teachers who will attend this event.</span>
+            </div>
+
             <!-- Image upload -->
             <div class="form-group">
               <label class="form-label">Event Image</label>
@@ -400,7 +440,7 @@
 </template>
 
 <script setup>
-import { getUser, logout } from '@/auth.js'
+import { getToken, getUser, logout } from '@/auth.js'
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -416,6 +456,7 @@ const vClickOutside = {
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 
 const user = getUser() || {}
@@ -463,9 +504,12 @@ function confirmLogout() {
 const showEventModal = ref(false)
 const editingEvent   = ref(null)
 const eventsTab      = ref('active')
-const eventForm      = ref({ title: '', description: '', date: '', time: '', location: '', image: '' })
+const eventForm      = ref({ title: '', description: '', date: '', time: '', location: '', image: '', teacherIds: [] })
 const imagePreview   = ref('')
 const imgInput       = ref(null)
+const eventTeachers = ref([])
+const teacherSearchQuery = ref('')
+const showTeacherPicker = ref(false)
 
 /* ── Time Picker ── */
 const showTimePicker = ref(false)
@@ -517,12 +561,56 @@ const events = ref([
 
 const activeEvents   = computed(() => events.value.filter(e => e.status === 'active'))
 const archivedEvents = computed(() => events.value.filter(e => e.status === 'archived'))
+const filteredEventTeachers = computed(() => {
+  const query = teacherSearchQuery.value.toLowerCase()
+  return !query ? eventTeachers.value : eventTeachers.value.filter((teacher) => teacher.name.toLowerCase().includes(query))
+})
+const selectedTeacherLabel = computed(() => {
+  const count = eventForm.value.teacherIds.length
+  return count ? `${count} teacher${count === 1 ? '' : 's'} selected` : 'Select teachers involved'
+})
+const allVisibleTeachersSelected = computed(() => {
+  const visible = filteredEventTeachers.value
+  return visible.length > 0 && visible.every((teacher) => eventForm.value.teacherIds.includes(teacher.id))
+})
+
+async function loadEventTeachers() {
+  const token = getToken()
+  if (!token) return
+
+  try {
+    const response = await fetch(`${API_BASE}/users?role=teacher`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const payload = await response.json()
+    if (!response.ok) throw new Error(payload.message || 'Unable to load teachers.')
+
+    eventTeachers.value = (Array.isArray(payload.users) ? payload.users : []).map((teacher) => {
+      const name = `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || teacher.name || teacher.email || 'Teacher'
+      return { id: teacher.id, name, initials: name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() }
+    })
+  } catch (_error) {
+    eventTeachers.value = []
+  }
+}
+
+function toggleVisibleTeachers() {
+  const visibleIds = filteredEventTeachers.value.map((teacher) => teacher.id)
+  if (allVisibleTeachersSelected.value) {
+    eventForm.value.teacherIds = eventForm.value.teacherIds.filter((id) => !visibleIds.includes(id))
+  } else {
+    eventForm.value.teacherIds = [...new Set([...eventForm.value.teacherIds, ...visibleIds])]
+  }
+}
 
 function openAddEvent() {
   editingEvent.value = null
-  eventForm.value = { title: '', description: '', date: '', time: '', location: '', image: '' }
+  eventForm.value = { title: '', description: '', date: '', time: '', location: '', image: '', teacherIds: [] }
   imagePreview.value = ''
   showTimePicker.value = false
+  showTeacherPicker.value = false
+  teacherSearchQuery.value = ''
+  loadEventTeachers()
   syncPickerToTime('')
   if (imgInput.value) imgInput.value.value = ''
   showEventModal.value = true
@@ -530,9 +618,12 @@ function openAddEvent() {
 
 function openEditEvent(ev) {
   editingEvent.value = ev
-  eventForm.value = { title: ev.title, description: ev.description, date: ev.date, time: ev.time, location: ev.location, image: ev.image || '' }
+  eventForm.value = { title: ev.title, description: ev.description, date: ev.date, time: ev.time, location: ev.location, image: ev.image || '', teacherIds: [...(ev.teacherIds || [])] }
   imagePreview.value = ev.image || ''
   showTimePicker.value = false
+  showTeacherPicker.value = false
+  teacherSearchQuery.value = ''
+  loadEventTeachers()
   syncPickerToTime(ev.time || '')
   if (imgInput.value) imgInput.value.value = ''
   showEventModal.value = true
@@ -1170,6 +1261,33 @@ function openViewEvent(ev) {
 .event-form { display: flex; flex-direction: column; gap: 18px; padding: 26px 28px 28px; }
 .form-group { display: flex; flex-direction: column; gap: 7px; }
 .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-optional { color: #999; font-weight: 400; text-transform: none; }
+
+.teacher-picker { position: relative; }
+.teacher-picker-trigger {
+  width: 100%; min-height: 46px; display: flex; align-items: center; gap: 10px;
+  padding: 0 13px; border: 1px solid #e1e5e8; border-radius: 10px;
+  background: #f8f9fb; color: #1b4332; font: inherit; cursor: pointer; text-align: left;
+}
+.teacher-picker-trigger:hover { border-color: #74a98e; }
+.teacher-picker-value { color: #333; font-size: 0.88rem; }
+.teacher-picker-placeholder { color: #a7adba; font-size: 0.88rem; }
+.teacher-picker-trigger .td-chevron { margin-left: auto; color: #687178; }
+.teacher-picker-panel {
+  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; right: 0;
+  padding: 10px; border: 1px solid #d9e2dd; border-radius: 10px; background: #fff;
+  box-shadow: 0 12px 28px rgba(18, 53, 38, 0.16);
+}
+.teacher-picker-search { display: flex; align-items: center; gap: 8px; padding: 0 9px; border: 1px solid #e4e7e9; border-radius: 7px; color: #668174; }
+.teacher-picker-search input { width: 100%; height: 32px; border: 0; outline: 0; font: inherit; font-size: 0.82rem; background: transparent; }
+.teacher-picker-all { display: flex; align-items: center; gap: 8px; margin: 9px 3px 6px; font-size: 0.78rem; color: #567064; cursor: pointer; }
+.teacher-picker-list { max-height: 164px; overflow-y: auto; border-top: 1px solid #edf0ee; }
+.teacher-picker-option { display: flex; align-items: center; gap: 9px; padding: 8px 4px; color: #333; font-size: 0.84rem; cursor: pointer; }
+.teacher-picker-option:hover { background: #f2f8f4; }
+.teacher-picker-option input, .teacher-picker-all input { accent-color: #1b4332; }
+.teacher-picker-avatar { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #dcefe4; color: #1b4332; font-size: 0.66rem; font-weight: 700; }
+.teacher-picker-empty { margin: 14px 4px; color: #8b9490; text-align: center; font-size: 0.8rem; }
+.teacher-picker-help { color: #8b9490; font-size: 0.74rem; }
 .form-label { font-size: 0.78rem; font-weight: 700; color: #666; letter-spacing: 0.4px; text-transform: uppercase; }
 .form-required { color: #e63946; }
 .form-input {

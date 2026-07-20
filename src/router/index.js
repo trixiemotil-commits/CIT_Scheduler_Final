@@ -1,8 +1,9 @@
-import { getUser, isLoggedIn } from '@/auth.js'
+import { getToken, getUser, isLoggedIn } from '@/auth.js'
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
 import LoginView from '@/views/LoginView.vue'
 import AddScheduleView from '@/views/admin/AddScheduleView.vue'
 import AdminDashboardView from '@/views/admin/AdminDashboardView.vue'
+import ActivityLogsView from '@/views/admin/ActivityLogsView.vue'
 import AdminProfileView from '@/views/admin/AdminProfileView.vue'
 import EventsView from '@/views/admin/EventsView.vue'
 import NewScheduleWeekView from '@/views/admin/NewScheduleWeekView.vue'
@@ -32,6 +33,7 @@ const router = createRouter({
     { path: '/', name: 'login', component: LoginView },
     { path: '/forgot-password', name: 'forgot-password', component: ForgotPasswordView },
     { path: '/admin/dashboard', name: 'admin-dashboard', component: AdminDashboardView, meta: { requiresAuth: true, role: 'admin' } },
+    { path: '/admin/activity-logs', name: 'admin-activity-logs', component: ActivityLogsView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/schedule', name: 'admin-schedule', component: ScheduleView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/schedule/view', name: 'admin-schedule-view', component: ViewScheduleView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/schedule/add', name: 'admin-schedule-add', component: AddScheduleView, meta: { requiresAuth: true, role: 'admin' } },
@@ -70,6 +72,36 @@ router.beforeEach((to, _from, next) => {
   } else {
     next()
   }
+})
+
+const activityRouteLabels = {
+  '/teacher/dashboard': 'Teacher Dashboard',
+  '/teacher/schedule': 'Teacher Schedule',
+  '/teacher/events': 'Teacher Events',
+  '/teacher/consultation': 'Teacher Consultation',
+  '/teacher/settings': 'Teacher Settings',
+  '/teacher/profile': 'Teacher Profile',
+  '/student/dashboard': 'Student Dashboard',
+  '/student/teachers': 'Student Teachers',
+  '/student/events': 'Student Events',
+  '/student/consultations': 'Student Consultations',
+  '/student/profile': 'Student Profile',
+  '/student/settings': 'Student Settings',
+  '/student/notifications': 'Student Notifications',
+}
+
+router.afterEach((to) => {
+  const currentUser = getUser()
+  const role = String(currentUser?.role || '').toLowerCase()
+  const token = getToken()
+  const routeLabel = activityRouteLabels[to.path]
+  if (!token || !routeLabel || !['teacher', 'student'].includes(role)) return
+
+  fetch('/api/activity-logs/navigation', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ routeLabel, routePath: to.path }),
+  }).catch(() => {})
 })
 
 export default router
