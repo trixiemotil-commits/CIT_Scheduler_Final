@@ -10,47 +10,46 @@
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
         <div class="email">{{ user.email || 'teacher@gmail.com' }}</div>
-        <div class="sidebar-presence-wrap" v-click-outside="closePresenceMenu">
-          <button class="sidebar-presence-btn" @click="showPresenceMenu = !showPresenceMenu">
-            <span :class="['sidebar-status-dot', teacherStatus === 'On School' ? 'is-in-school' : 'is-on-leave']"></span>
-            <span>{{ teacherStatus === 'On School' ? 'In School' : 'On Leave' }}</span>
-            <span class="presence-arrow">›</span>
-          </button>
-          <div v-if="showPresenceMenu" class="presence-menu">
-            <button class="presence-option" @click="setTeacherStatus('On School')"><span class="presence-dot online"></span>In School</button>
-            <button class="presence-option" @click="setTeacherStatus('On Leave')"><span class="presence-dot leave"></span>On Leave</button>
-            <div class="presence-separator"></div>
-            <button class="presence-option" @click="setAvailability('Available')"><span class="presence-dot online"></span>Available for consultations</button>
-            <button class="presence-option" @click="setAvailability('Unavailable')"><span class="presence-dot unavailable"></span>Unavailable for consultations</button>
-            <div class="presence-separator"></div>
-            <button class="presence-option" @click="recordTimeIn"><span class="presence-clock">◷</span>Time in now</button>
-            <div class="presence-time">{{ formattedTimeIn }}</div>
-          </div>
-        </div>
         <p v-if="teacherStatusMessage" :class="['presence-feedback', teacherStatusError ? 'is-error' : '']">{{ teacherStatusMessage }}</p>
         <div class="sidebar-status-panel">
           <div class="sidebar-status-head">
-            <span>My Status</span>
-            <span :class="['sidebar-status-dot', teacherStatus === 'On School' ? 'is-in-school' : 'is-on-leave']"></span>
+            <span>Work Status</span>
+            <span :class="['sidebar-status-dot', teacherIsClockedOut ? 'is-offline' : (teacherStatus === 'On School' ? 'is-in-school' : 'is-on-leave')]"></span>
           </div>
-          <select v-model="teacherStatus" class="sidebar-status-select" aria-label="Work status">
-            <option value="On School">In School</option>
-            <option value="On Leave">On Leave</option>
-          </select>
-          <select v-model="teacherAvailability" class="sidebar-status-select" aria-label="Consultation availability">
-            <option value="Available">Available for consultations</option>
-            <option value="Unavailable">Unavailable for consultations</option>
-          </select>
+          <div class="status-row">
+            <label class="status-label">Work status</label>
+            <div class="sidebar-status-action-row">
+              <span class="sidebar-status-value">{{ teacherStatusDisplay }}</span>
+              <button
+                class="sidebar-status-button"
+                type="button"
+                :disabled="workStatusDisabled"
+                @click="showClockOutConfirm = true"
+              >
+                Clock Out
+              </button>
+            </div>
+          </div>
           <div class="sidebar-time-in">Time in: {{ formattedTimeIn }}</div>
-          <div class="sidebar-status-actions">
-            <button :disabled="savingTeacherStatus" @click="recordTimeIn">Time in</button>
-            <button class="sidebar-save-status" :disabled="savingTeacherStatus" @click="saveTeacherStatus">{{ savingTeacherStatus ? 'Saving…' : 'Save' }}</button>
+        </div>
+
+        <div class="sidebar-status-panel">
+          <div class="sidebar-status-head">
+            <span>Availability</span>
+            <span :class="['sidebar-status-dot', resolvedSecondStatus === 'Available for Consultation' ? 'is-in-school' : (resolvedSecondStatus === 'Unavailable' ? 'is-on-leave' : 'is-offline')]"></span>
           </div>
-          <p v-if="teacherStatusMessage" :class="['sidebar-status-message', teacherStatusError ? 'is-error' : '']">{{ teacherStatusMessage }}</p>
+          <div class="status-row">
+            <label class="status-label">Availability</label>
+            <select v-model="teacherAvailabilityChoice" class="sidebar-status-select" aria-label="Availability">
+              <option v-for="option in availabilityOptions" :key="option.value" :value="option.value" :disabled="option.disabled">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
+          <div style="margin-top:6px;font-size:0.68rem;color:#667085">{{ resolvedSecondSubtext }}</div>
         </div>
       </div>
 
-      <!-- Nav -->
       <nav class="sidebar-nav">
         <RouterLink
           v-for="item in navItems"
@@ -298,6 +297,42 @@
       </div>
     </Teleport>
 
+      <Teleport to="body">
+        <div v-if="showMorningPrompt" class="modal-overlay" @click.self="showMorningPrompt = false">
+          <div class="logout-modal-box">
+            <div class="logout-modal-icon">
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" />
+                <path d="M12 8v6l4 2" />
+              </svg>
+            </div>
+            <h2 class="logout-modal-title">Daily status check</h2>
+            <p class="logout-modal-sub">Are you on school or on leave today?</p>
+            <div class="logout-modal-actions">
+              <button class="logout-cancel-btn" @click="setMorningStartStatus('On Leave')">On Leave</button>
+              <button class="logout-confirm-btn" @click="setMorningStartStatus('On School')">On School</button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+      <Teleport to="body">
+        <div v-if="showClockOutConfirm" class="modal-overlay" @click.self="cancelClockOut">
+          <div class="logout-modal-box">
+            <div class="logout-modal-icon">
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" />
+                <path d="M15 12l-3 3-3-3" />
+              </svg>
+            </div>
+            <h2 class="logout-modal-title">Confirm Clock Out</h2>
+            <p class="logout-modal-sub">Are you sure you want to clock out for today?</p>
+            <div class="logout-modal-actions">
+              <button class="logout-cancel-btn" @click="cancelClockOut">Cancel</button>
+              <button class="logout-confirm-btn" @click="confirmClockOut">Yes, Clock Out</button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
   </div>
 </template>
 
@@ -416,10 +451,15 @@ function openNotification(notification) {
 const teacherStatus = ref(user.teacher_status || 'On School')
 const teacherAvailability = ref(user.teacher_availability || 'Available')
 const teacherTimeIn = ref(user.teacher_time_in || null)
+const teacherIsClockedOut = ref(false)
 const savingTeacherStatus = ref(false)
 const teacherStatusMessage = ref('')
 const teacherStatusError = ref(false)
 const showPresenceMenu = ref(false)
+const showMorningPrompt = ref(false)
+const morningPromptDate = ref(localStorage.getItem(getTeacherMorningPromptDateKey()) || '')
+const morningPromptSessionShown = ref(sessionStorage.getItem(getTeacherMorningPromptSessionKey()) === 'true')
+const forcedOfflineDate = ref(localStorage.getItem(getTeacherForcedOfflineDateKey()) || '')
 let statusMessageTimer
 const formattedTimeIn = computed(() => {
   if (!teacherTimeIn.value) return 'Not recorded'
@@ -467,13 +507,185 @@ function closePresenceMenu() {
   showPresenceMenu.value = false
 }
 
+function normalizeTeacherStatus(status) {
+  const normalized = String(status || '').trim().toLowerCase()
+
+  if (normalized === 'on school' || normalized === 'in school') return 'On School'
+  if (normalized === 'on meeting' || normalized === 'on-meeting') return 'On Meeting'
+  if (normalized === 'on leave' || normalized === 'on-leave') return 'On Leave'
+  if (normalized === 'off campus' || normalized === 'off-campus') return 'Off Campus'
+
+  return 'On School'
+}
+
 function setTeacherStatus(status) {
-  teacherStatus.value = status
+  const safeStatus = normalizeTeacherStatus(status)
+
+  // Support a "Clock Out" friendly label that maps to On Leave in backend
+  if (status === 'Clock Out') {
+    teacherIsClockedOut.value = true
+    teacherStatus.value = 'On Leave'
+    closePresenceMenu()
+    saveTeacherStatus()
+    return
+  }
+
+  // If coming back to school, clear clocked out flag
+  if (safeStatus === 'On School') {
+    teacherIsClockedOut.value = false
+  }
+
+  teacherStatus.value = safeStatus
   closePresenceMenu()
   saveTeacherStatus()
 }
 
+const teacherStatusDisplay = computed(() => {
+  if (teacherIsClockedOut.value) return 'Offline'
+  const status = normalizeTeacherStatus(teacherStatus.value)
+  if (status === 'On School') return 'In School'
+  if (status === 'On Meeting') return 'On Meeting'
+  if (status === 'Off Campus') return 'Off Campus'
+  return 'On Leave'
+})
+
+const showClockOutConfirm = ref(false)
+
+const workStatusDisabled = computed(() => {
+  const status = normalizeTeacherStatus(teacherStatus.value)
+  return teacherIsClockedOut.value || status === 'On Leave' || forcedOfflineDate.value === getTodayKey()
+})
+
+const teacherStatusClass = computed(() => {
+  if (teacherIsClockedOut.value || forcedOfflineDate.value === getTodayKey()) return 'is-offline'
+  return teacherStatus.value === 'On School' ? 'is-in-school' : 'is-on-leave'
+})
+
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function getTeacherStorageId() {
+  const id = String(user?.email || user?.employeeId || user?._id || 'anonymous').trim().toLowerCase()
+  return id.replace(/\s+/g, '_')
+}
+
+function getTeacherMorningPromptDateKey() {
+  return `cit_teacher_morning_prompt_date_${getTeacherStorageId()}`
+}
+
+function getTeacherMorningPromptSessionKey() {
+  return `cit_teacher_morning_prompt_shown_${getTeacherStorageId()}`
+}
+
+function getTeacherForcedOfflineDateKey() {
+  return `cit_teacher_forced_offline_date_${getTeacherStorageId()}`
+}
+
+function isWeekday(date = new Date()) {
+  const day = date.getDay()
+  return day >= 1 && day <= 6
+}
+
+function markMorningPromptShown() {
+  morningPromptDate.value = getTodayKey()
+  morningPromptSessionShown.value = true
+  localStorage.setItem(getTeacherMorningPromptDateKey(), morningPromptDate.value)
+  sessionStorage.setItem(getTeacherMorningPromptSessionKey(), 'true')
+}
+
+function markForcedOfflineToday() {
+  forcedOfflineDate.value = getTodayKey()
+  localStorage.setItem(getTeacherForcedOfflineDateKey(), forcedOfflineDate.value)
+  teacherIsClockedOut.value = true
+}
+
+function confirmClockOut() {
+  setTeacherStatus('Clock Out')
+  showClockOutConfirm.value = false
+}
+
+function cancelClockOut() {
+  showClockOutConfirm.value = false
+}
+
+function clearExpiredDailyState() {
+  const today = getTodayKey()
+  if (morningPromptDate.value !== today) {
+    morningPromptDate.value = ''
+    localStorage.removeItem(getTeacherMorningPromptDateKey())
+  }
+  if (forcedOfflineDate.value !== today) {
+    if (teacherIsClockedOut.value && forcedOfflineDate.value) {
+      teacherIsClockedOut.value = false
+    }
+    forcedOfflineDate.value = ''
+    localStorage.removeItem(getTeacherForcedOfflineDateKey())
+  }
+}
+
+function shouldShowMorningPrompt() {
+  if (!isWeekday()) return false
+  if (morningPromptDate.value === getTodayKey()) return false
+  if (morningPromptSessionShown.value) return false
+  const now = new Date()
+  return now.getHours() > 6 || (now.getHours() === 6 && now.getMinutes() >= 30)
+}
+
+function shouldEnforceAutoOffline() {
+  if (!isWeekday()) return false
+  if (forcedOfflineDate.value === getTodayKey()) return false
+  const now = new Date()
+  return now.getHours() > 20 || (now.getHours() === 20 && now.getMinutes() >= 0)
+}
+
+function openMorningPrompt() {
+  if (shouldShowMorningPrompt()) {
+    showMorningPrompt.value = true
+  }
+}
+
+function setMorningStartStatus(status) {
+  teacherStatus.value = status
+  teacherIsClockedOut.value = false
+  markMorningPromptShown()
+  showMorningPrompt.value = false
+  saveTeacherStatus()
+}
+
+function enforceAutoOffline() {
+  if (!shouldEnforceAutoOffline()) return
+  markForcedOfflineToday()
+  teacherStatus.value = 'On Leave'
+  showMorningPrompt.value = false
+  saveTeacherStatus()
+  teacherStatusMessage.value = 'You are automatically offline for today because you did not clock out before 8:00 PM.'
+  teacherStatusError.value = false
+  clearTimeout(statusMessageTimer)
+  statusMessageTimer = setTimeout(() => { teacherStatusMessage.value = '' }, 4000)
+}
+
+function dailyStatusCheck() {
+  clearExpiredDailyState()
+  openMorningPrompt()
+  enforceAutoOffline()
+}
+
+function initDailyStatusTimers() {
+  dailyStatusCheck()
+  window.setInterval(dailyStatusCheck, 60000)
+}
+
 function setAvailability(availability) {
+  if (!canChangeAvailability()) {
+    teacherStatusMessage.value = 'Cannot change availability while not in a changeable state.'
+    teacherStatusError.value = true
+    clearTimeout(statusMessageTimer)
+    statusMessageTimer = setTimeout(() => { teacherStatusMessage.value = '' ; teacherStatusError.value = false }, 3000)
+    closePresenceMenu()
+    return
+  }
+
   teacherAvailability.value = availability
   closePresenceMenu()
   saveTeacherStatus()
@@ -497,12 +709,191 @@ async function loadTeacherStatus() {
   }
 }
 
+function getCurrentMinutesOfDay() {
+  const d = new Date()
+  return d.getHours() * 60 + d.getMinutes()
+}
+
+function parseRangeToMinutes(rangeText) {
+  if (!rangeText) return [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]
+  const parts = rangeText.split(/–|-/).map(p => p.trim())
+  if (parts.length < 2) return [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]
+  return [parseTimeToMinutes(parts[0]), parseTimeToMinutes(parts[1])]
+}
+
+function isNowWithin(rangeText) {
+  const [start, end] = parseRangeToMinutes(rangeText)
+  const now = getCurrentMinutesOfDay()
+  return now >= start && now <= end
+}
+
+const isCurrentlyInClass = computed(() => {
+  return todayClasses.value.some(c => {
+    if (c.isConsultation || c.hasMainCampus) return false
+    if (!isNowWithin(c.time)) return false
+    return !/lunch/i.test(c.subject)
+  })
+})
+
+const isCurrentlyOnMainCampusClass = computed(() => {
+  return todayClasses.value.some(c => {
+    if (c.isConsultation || !c.hasMainCampus) return false
+    if (!isNowWithin(c.time)) return false
+    return !/lunch/i.test(c.subject)
+  })
+})
+
+const isCurrentlyOnLunchBreak = computed(() => {
+  return todayClasses.value.some(c => {
+    if (c.isConsultation) return false
+    if (!isNowWithin(c.time)) return false
+    return /lunch/i.test(c.subject)
+  })
+})
+
+const isCurrentlyInConsultationSlot = computed(() => {
+  return todayClasses.value.some(c => c.isConsultation && isNowWithin(c.time))
+})
+
+const resolvedSecondStatus = computed(() => {
+  const status = normalizeTeacherStatus(teacherStatus.value)
+
+  if (status === 'On Leave' || teacherIsClockedOut.value) return 'Unavailable'
+  if (status === 'On Meeting') return 'On Meeting'
+  if (status === 'Off Campus') return 'Off Campus'
+  if (teacherAvailability.value === 'On Lunch' || isCurrentlyOnLunchBreak.value) return 'On Lunch'
+  if (isCurrentlyInMeeting.value) return 'On Meeting'
+  if (isCurrentlyInEvent.value) return 'On Event'
+  if (isCurrentlyOnMainCampusClass.value) return 'Off Campus'
+
+  if (isCurrentlyInClass.value) return 'In Class'
+  if (isCurrentlyInConsultationSlot.value) {
+    return teacherAvailability.value === 'Available' ? 'Available for Consultation' : 'Unavailable'
+  }
+
+  return teacherAvailability.value === 'Available' ? 'Available for Consultation' : 'Unavailable'
+})
+
+const resolvedSecondSubtext = computed(() => {
+  if (teacherStatus.value === 'On Leave' || teacherIsClockedOut.value) return 'You are on leave/offline — availability cannot be changed.'
+  if (teacherStatus.value === 'On Meeting') return 'You are marked as in a meeting.'
+  if (teacherStatus.value === 'Off Campus') return 'You are off campus — availability cannot be changed.'
+  if (teacherAvailability.value === 'On Lunch' || isCurrentlyOnLunchBreak.value) return 'Currently on lunch break — availability is hidden from manual selection.'
+  if (isCurrentlyInMeeting.value) return 'Marked as in a meeting by the system.'
+  if (isCurrentlyInEvent.value) return 'Marked as attending an event.'
+  if (isCurrentlyOnMainCampusClass.value) return 'You are on Main Campus class — showing off campus status.'
+  if (isCurrentlyInClass.value) return 'System detected class in progress.'
+  if (isCurrentlyInConsultationSlot.value) return 'Scheduled consultation hours.'
+  return 'Toggle to update your consultation availability.'
+})
+
+function canChangeAvailability() {
+  if (teacherStatus.value === 'On Leave') return false
+  if (teacherStatus.value === 'On Meeting') return false
+  if (teacherStatus.value === 'Off Campus') return false
+  if (isCurrentlyInClass.value) return false
+  if (isCurrentlyOnLunchBreak.value) return false
+  return teacherStatus.value === 'On School'
+}
+
+const canToggleAvailability = computed(() => canChangeAvailability())
+
+function currentClassInfo() {
+  return todayClasses.value.find(c => !c.isConsultation && isNowWithin(c.time)) || null
+}
+
+const availabilityOptions = computed(() => {
+  const currentStatus = resolvedSecondStatus.value
+  const manualDisabled = !canToggleAvailability.value
+
+  const options = [
+    {
+      value: 'Available',
+      label: 'Available for consultations',
+      disabled: manualDisabled,
+    },
+    {
+      value: 'Unavailable',
+      label: 'Unavailable for consultations',
+      disabled: manualDisabled,
+    },
+  ]
+
+  if (!['Available for Consultation', 'Unavailable'].includes(currentStatus)) {
+    options.unshift({
+      value: '__current',
+      label: `${currentStatus} (current)`,
+      disabled: true,
+    })
+  }
+
+  return options
+})
+
+const teacherAvailabilityChoice = computed({
+  get() {
+    const currentStatus = resolvedSecondStatus.value
+    if (currentStatus === 'Available for Consultation') return 'Available'
+    if (currentStatus === 'Unavailable') return 'Unavailable'
+    return '__current'
+  },
+  set(val) {
+    if (val === 'Available' || val === 'Unavailable') {
+      setAvailability(val)
+      return
+    }
+
+    teacherStatusMessage.value = 'This status is set automatically and cannot be changed manually.'
+    teacherStatusError.value = false
+    clearTimeout(statusMessageTimer)
+    statusMessageTimer = setTimeout(() => { teacherStatusMessage.value = '' }, 2500)
+  }
+})
+
 /* ── Today's Classes ── */
 const todayClasses = ref([])
 const classesLoading = ref(false)
 const classesError = ref('')
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const todayDayName = ref(dayNames[new Date().getDay()])
+
+const events = ref([])
+
+async function loadEvents() {
+  try {
+    const teacherName = getTeacherName()
+    const url = teacherName ? `/events?teacher=${encodeURIComponent(teacherName)}` : '/events'
+    const payload = await apiRequest(url).catch(() => ({ events: [] }))
+    events.value = payload.events || payload || []
+  } catch (_e) {
+    events.value = []
+  }
+}
+
+const isCurrentlyInEvent = computed(() => {
+  const todayISO = new Date().toISOString().slice(0, 10)
+  return events.value.some(ev => {
+    const evDate = ev.date || ev.eventDate || ''
+    if (evDate && !evDate.startsWith(todayISO)) return false
+    const timeRange = ev.startTime && ev.endTime ? `${ev.startTime} – ${ev.endTime}` : (ev.time || '')
+    if (!timeRange) return false
+    return isNowWithin(timeRange)
+  })
+})
+
+const isCurrentlyInMeeting = computed(() => {
+  const todayISO = new Date().toISOString().slice(0, 10)
+  return events.value.some(ev => {
+    const evDate = ev.date || ev.eventDate || ''
+    if (evDate && !evDate.startsWith(todayISO)) return false
+    const timeRange = ev.startTime && ev.endTime ? `${ev.startTime} – ${ev.endTime}` : (ev.time || '')
+    if (!timeRange) return false
+    const within = isNowWithin(timeRange)
+    if (!within) return false
+    const title = (ev.title || '') + ' ' + (ev.description || '')
+    return /meeting/i.test(title) || ev.type === 'meeting' || ev.isMeeting
+  })
+})
 
 function getTeacherName() {
   const fullName = typeof user?.name === 'string' ? user.name.trim() : ''
@@ -623,6 +1014,7 @@ function mapTodayClasses(entries) {
         section: sections.length ? sections.join(', ') : 'N/A',
         parallel: item.parallel,
         room: rooms.length ? rooms.join(' and ') : 'TBA',
+        hasMainCampus: item.hasMainCampus,
         roomColor: item.hasMainCampus ? 'room-orange' : roomBadgeClass(rooms[0] || ''),
         sortValue: item.sortValue,
       }
@@ -678,7 +1070,9 @@ onMounted(() => {
   loadTeacherStatus()
   loadTodayClasses()
   loadConsultationNotifications()
+  loadEvents()
   notificationRefreshTimer = window.setInterval(loadConsultationNotifications, 15000)
+  initDailyStatusTimers()
 })
 
 onUnmounted(() => {
@@ -766,18 +1160,27 @@ function confirmLogout() {
 .presence-time { padding: 4px 9px 2px 29px; color: #98a2b3; font-size: 0.68rem; }
 .presence-feedback { width: 100%; margin: 6px 0 0; color: #1b4332; font-size: .68rem; line-height: 1.35; text-align: center; }
 .presence-feedback.is-error { color: #b42318; }
-.sidebar-status-panel { display: none; }
 .sidebar-status-panel { width: 100%; margin-top: 12px; padding: 11px; border: 1px solid #dce8e1; border-radius: 10px; background: #f8fcfa; text-align: left; }
 .sidebar-status-head { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; color: #1b4332; font-size: 0.78rem; font-weight: 700; }
 .sidebar-status-dot { width: 8px; height: 8px; border-radius: 50%; }
 .sidebar-status-dot.is-in-school { background: #40916c; }
 .sidebar-status-dot.is-on-leave { background: #e63946; }
+.sidebar-status-dot.is-offline { background: #98a2b3; }
 .sidebar-status-select { width: 100%; height: 32px; margin-top: 6px; padding: 0 7px; border: 1px solid #cfe3d8; border-radius: 6px; background: #fff; color: #344054; font: inherit; font-size: 0.73rem; }
+.sidebar-status-action-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.sidebar-status-value { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 12px; background: #fff; border: 1px solid #cfe3d8; border-radius: 8px; color: #344054; font: inherit; font-size: 0.84rem; font-weight: 600; }
+.sidebar-status-button { min-width: 120px; height: 34px; padding: 0 14px; border: 1px solid #1b4332; border-radius: 8px; background: #1b4332; color: #fff; font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: background .2s ease; }
+.sidebar-status-button:disabled { cursor: not-allowed; opacity: 0.6; background: #94a19d; border-color: #7b8a84; }
 .sidebar-time-in { margin-top: 8px; color: #667085; font-size: 0.7rem; line-height: 1.35; }
 .sidebar-status-actions { display: flex; gap: 6px; margin-top: 9px; }
 .sidebar-status-actions button { flex: 1; height: 30px; border: 1px solid #1b4332; border-radius: 6px; background: #fff; color: #1b4332; font: inherit; font-size: 0.72rem; font-weight: 600; cursor: pointer; }
 .sidebar-status-actions .sidebar-save-status { background: #1b4332; color: #fff; }
 .sidebar-status-actions button:disabled { cursor: not-allowed; opacity: .65; }
+.sidebar-toggle-available { height: 30px; padding: 6px 10px; border-radius: 6px; background: #1b4332; color: #fff; border: none; cursor: pointer; }
+.sidebar-toggle-unavailable { height: 30px; padding: 6px 10px; border-radius: 6px; background: transparent; color: #344054; border: 1px solid #cfe3d8; cursor: pointer; }
+
+.status-row { display:flex; flex-direction:column; gap:6px; margin-top:6px }
+.status-label { font-size:0.7rem; color:#425; font-weight:600 }
 .sidebar-status-message { margin: 8px 0 0; color: #1b4332; font-size: 0.68rem; line-height: 1.35; }
 .sidebar-status-message.is-error { color: #b42318; }
 

@@ -45,22 +45,27 @@
       <section class="schedule-card read-only-schedule">
         <div class="sched-topbar">
           <div class="sched-topbar-left">
-            <h2 class="sched-grid-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-              Prof. {{ userName || 'Teacher' }}
-            </h2>
-            <p class="sched-grid-sub">{{ loadError || (isLoading ? 'Loading schedule...' : 'Read-only view') }}</p>
+            <div>
+              <h2 class="sched-grid-title">Prof. {{ userName || 'Teacher' }}</h2>
+              <p class="sched-grid-sub">{{ loadError || (isLoading ? 'Loading schedule...' : 'Read-only view') }}</p>
+            </div>
           </div>
-          <div class="filter-wrap">
-            <select class="subject-select" v-model="selectedSubject">
-              <option value="">All Subject</option>
-              <option v-for="opt in subjectOptions" :key="opt.code" :value="opt.code">
-                {{ opt.label }}
-              </option>
-            </select>
-            <svg class="select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
+          <div class="sched-topbar-right">
+            <div class="filter-wrap">
+              <select class="subject-select" v-model="selectedSubject">
+                <option value="">All Subject</option>
+                <option v-for="opt in subjectOptions" :key="opt.code" :value="opt.code">
+                  {{ opt.label }}
+                </option>
+              </select>
+              <svg class="select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+            <button class="icon-btn print-btn" @click="printSchedule" title="Print schedule">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 22h12v-9H6z"/><path d="M6 14h12"/></svg>
+              Print
+            </button>
           </div>
         </div>
 
@@ -179,7 +184,9 @@
                   <td
                     v-else-if="cell.type === 'empty'"
                     :class="['td-empty', { 'col-expanded': expandedDay === DAYS[ci] }]"
-                  ></td>
+                  >
+                    <span v-if="TIME_SLOTS[ri].start.endsWith(':00')" class="free-time-label">Free time</span>
+                  </td>
                   <!-- occupied: skip -->
                 </template>
               </tr>
@@ -273,6 +280,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import { timeOptions } from '@/composables/useSchedule.js'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -319,14 +327,9 @@ const navItems = [
 ]
 
 /* ── Schedule grid constants ── */
-const ALL_STARTS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00']
-const TIME_SLOTS = ALL_STARTS.slice(0, -1).map((s, i) => ({
-  start: s,
-  end:   ALL_STARTS[i + 1],
-  label: `${formatTime12(s)}-${formatTime12(ALL_STARTS[i + 1])}`
-}))
-const GRID_START_MINUTES = Number(ALL_STARTS[0].slice(0, 2)) * 60
-const GRID_END_MINUTES = Number(ALL_STARTS[ALL_STARTS.length - 1].slice(0, 2)) * 60
+const TIME_SLOTS = timeOptions.map((start) => ({ start, label: start }))
+const GRID_START_MINUTES = timeToMinutes(timeOptions[0])
+const GRID_END_MINUTES = timeToMinutes(timeOptions[timeOptions.length - 1])
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_SHORT = { Monday: 'Monday', Tuesday: 'Tues', Wednesday: 'Wed', Thursday: 'Thurs', Friday: 'Fri', Saturday: 'Sat' }
 
@@ -414,7 +417,7 @@ function startSlotIndex(totalMinutes) {
   }
 
   const clamped = Math.max(GRID_START_MINUTES, Math.min(totalMinutes, GRID_END_MINUTES - 1))
-  return Math.floor((clamped - GRID_START_MINUTES) / 60)
+  return Math.floor((clamped - GRID_START_MINUTES) / 30)
 }
 
 function endSlotIndex(totalMinutes) {
@@ -423,7 +426,7 @@ function endSlotIndex(totalMinutes) {
   }
 
   const clamped = Math.max(GRID_START_MINUTES + 1, Math.min(totalMinutes, GRID_END_MINUTES))
-  return Math.ceil((clamped - GRID_START_MINUTES) / 60)
+  return Math.ceil((clamped - GRID_START_MINUTES) / 30)
 }
 
 function resolveGridSpan(startTime, endTime) {
@@ -906,6 +909,36 @@ function confirmLogout() {
 .card-sub   { font-size: 0.82rem; color: #888; margin-top: 2px; }
 
 /* Filter dropdown */
+.sched-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.sched-topbar-left {
+  min-width: 240px;
+}
+.sched-grid-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 6px;
+}
+.sched-grid-sub {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #6b7280;
+}
+.sched-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 .filter-wrap {
   position: relative;
   display: flex;
@@ -915,26 +948,60 @@ function confirmLogout() {
   appearance: none;
   border: 1.5px solid #d0d0d0;
   border-radius: 8px;
-  padding: 7px 36px 7px 14px;
+  padding: 10px 38px 10px 14px;
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: 0.92rem;
   color: #333;
   background: #fff;
   cursor: pointer;
   outline: none;
+  min-width: 220px;
 }
 .subject-select:focus { border-color: #4b5563; }
 .select-arrow {
   position: absolute;
-  right: 10px;
+  right: 12px;
   pointer-events: none;
   color: #555;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #1f2937;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: #f8fafc;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+}
+
+.print-btn {
+  white-space: nowrap;
 }
 
 /* ── Table ── */
 .table-scroll {
   flex: 1;
   overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.table-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .sched-table {
@@ -999,12 +1066,27 @@ function confirmLogout() {
   vertical-align: top;
   width: 120px;
   min-width: 120px;
+  height: 48px;
+  padding: 10px 10px;
+  background: #fafafa;
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .td-empty.col-expanded {
   width: 300px;
   min-width: 300px;
+}
+
+.free-time-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #4b5563;
+  font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0.85;
 }
 
 /* ─ Body: Class Cells ─ */
