@@ -28,30 +28,63 @@
     <div class="teacher-list">
       <div v-if="loadingTeachers" class="empty-state-card">Loading teachers...</div>
       <div v-else-if="loadError" class="empty-state-card error">{{ loadError }}</div>
-      <div v-else-if="!filteredTeachers.length" class="empty-state-card">No teachers found.</div>
-      <div v-for="t in filteredTeachers" :key="t.id" class="teacher-card">
-        <div class="teacher-top">
-          <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
-          <div class="teacher-meta">
-            <div class="teacher-name">{{ t.name }}</div>
-            <div class="teacher-subjects-clean">
-              <span v-for="subject in displayedSubjects(t)" :key="subject" class="subject-chip">{{ subject }}</span>
-              <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
+      <div v-else-if="!visibleTeacherCount" class="empty-state-card">No teachers found.</div>
+
+      <template v-if="(activeFilter === 'All' || activeFilter === 'Subject Teacher') && visibleSubjectTeachers.length">
+        <div class="section-title">Subject Teachers</div>
+        <div v-for="t in visibleSubjectTeachers" :key="t.id" class="teacher-card">
+          <div class="teacher-top">
+            <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
+            <div class="teacher-meta">
+              <div class="teacher-name">{{ t.name }}</div>
+              <div class="teacher-type-pill subject">Subject Teacher</div>
+              <div class="teacher-subjects-clean">
+                <span v-for="subject in displayedSubjects(t)" :key="subject" class="subject-chip">{{ subject }}</span>
+                <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
+              </div>
             </div>
+            <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
           </div>
-          <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
+          <div class="teacher-footer">
+            <span class="price">&nbsp;</span>
+            <button
+              :class="['action-btn', t.available ? 'green' : 'disabled']"
+              :disabled="!t.available"
+              @click="openRequest(t)"
+            >
+              {{ t.available ? 'Book Consultation' : 'Request Consultation' }}
+            </button>
+          </div>
         </div>
-        <div class="teacher-footer">
-          <span class="price">&nbsp;</span>
-          <button
-            :class="['action-btn', t.available ? 'green' : 'disabled']"
-            :disabled="!t.available"
-            @click="openRequest(t)"
-          >
-            Request Consultations
-          </button>
+      </template>
+
+      <template v-if="(activeFilter === 'All' || activeFilter === 'Available Teacher') && visibleAvailableTeachers.length">
+        <div class="section-title">Available Teachers</div>
+        <div v-for="t in visibleAvailableTeachers" :key="t.id" class="teacher-card">
+          <div class="teacher-top">
+            <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
+            <div class="teacher-meta">
+              <div class="teacher-name">{{ t.name }}</div>
+              <div class="teacher-type-pill available">Available Teacher</div>
+              <div class="teacher-subjects-clean">
+                <span v-for="subject in displayedSubjects(t)" :key="subject" class="subject-chip">{{ subject }}</span>
+                <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
+              </div>
+            </div>
+            <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
+          </div>
+          <div class="teacher-footer">
+            <span class="price">&nbsp;</span>
+            <button
+              :class="['action-btn', t.available ? 'green' : 'disabled']"
+              :disabled="!t.available"
+              @click="openRequest(t)"
+            >
+              {{ t.available ? 'Book Consultation' : 'Request Consultation' }}
+            </button>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
 
     <!-- Toast notification -->
@@ -95,12 +128,18 @@
           </div>
           <div class="field-group">
             <label class="field-label">Consultation Schedule</label>
-            <select v-model="reqForm.availabilityId" class="field-input">
-              <option value="" disabled>Select assigned availability</option>
-              <option v-for="slot in selectedTeacher?.consultationSlots || []" :key="slot.id" :value="slot.id">
-                {{ formatSlotLabel(slot) }}
-              </option>
-            </select>
+            <template v-if="selectedTeacher?.isSubjectTeacher">
+              <select v-model="reqForm.availabilityId" class="field-input">
+                <option value="" disabled>Select assigned availability</option>
+                <option v-for="slot in selectedTeacher?.consultationSlots || []" :key="slot.id" :value="slot.id">
+                  {{ formatSlotLabel(slot) }}
+                </option>
+              </select>
+            </template>
+            <template v-else>
+              <input v-model="reqForm.date" class="field-input" type="date" :min="today" />
+              <input v-model="reqForm.time" class="field-input" type="time" />
+            </template>
           </div>
           <div class="field-group">
             <label class="field-label">Short Description <span class="optional">(optional)</span></label>
@@ -166,15 +205,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
 import { getToken, getUser } from '@/auth.js'
 import BottomNav from '@/components/student/BottomNav.vue'
+import { computed, onMounted, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const search       = ref('')
 const activeFilter = ref('All')
-const filters      = ['All', 'In School', 'On Main Campus', 'On-Meeting', 'On Leave']
+const filters      = ['All', 'Subject Teacher', 'Available Teacher']
 const loadingTeachers = ref(false)
 const loadError = ref('')
 const CONSULTATION_REASONS = [
@@ -211,6 +250,14 @@ function hasMatchingAssignment(teacher) {
   )
 }
 
+function isSubjectTeacher(teacher) {
+  return Boolean(teacher?.isSubjectTeacher)
+}
+
+function isAvailableTeacher(teacher) {
+  return Boolean(teacher?.available)
+}
+
 function initialsFor(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return '?'
@@ -228,26 +275,33 @@ function colorForName(name) {
   return palette[Math.abs(hash) % palette.length]
 }
 
-function normalizeTeacherStatus(status) {
-  const normalized = String(status || '').trim()
+function normalizeTeacherStatus(statusOrObj) {
+  // Accept either a status string or a teacher object with fields from the DB/API.
+  if (statusOrObj && typeof statusOrObj === 'object') {
+    const t = statusOrObj
+    const account = String(t.account_status || '').trim()
+    if (account && account !== 'Active') return 'On Leave'
 
-  if (normalized === 'On School' || normalized === 'In School') {
+    if (t.teacher_status_expires_at) {
+      try {
+        const expires = new Date(t.teacher_status_expires_at)
+        if (!Number.isNaN(expires.getTime()) && expires <= new Date()) {
+          return 'In School'
+        }
+      } catch (e) {
+        // ignore parsing errors and fall through
+      }
+    }
+
+    const statusRaw = String(t.teacher_status || t.status || '').trim().toLowerCase()
+    if (statusRaw === 'on leave' || statusRaw === 'leave') return 'On Leave'
     return 'In School'
   }
 
-  if (normalized === 'On Meeting' || normalized === 'On-Meeting') {
-    return 'On-Meeting'
-  }
-
-  if (normalized === 'On Leave') {
-    return 'On Leave'
-  }
-
-  if (normalized === 'Main Campus' || normalized === 'On Main Campus') {
-    return 'On Main Campus'
-  }
-
-  return 'On Leave'
+  const normalized = String(statusOrObj || '').trim()
+  const lower = normalized.toLowerCase()
+  if (lower === 'on leave' || lower === 'leave') return 'On Leave'
+  return 'In School'
 }
 
 async function apiRequest(path, options = {}) {
@@ -283,8 +337,9 @@ function mapTeacher(teacher) {
   const subjects = Array.isArray(teacher.subjects) ? teacher.subjects.filter(Boolean) : []
   const assignedYearSections = Array.isArray(teacher.assignedYearSections) ? teacher.assignedYearSections : []
   const subjectAssignments = Array.isArray(teacher.subjectAssignments) ? teacher.subjectAssignments : []
-  const resolvedStatus = normalizeTeacherStatus(teacher.status || teacher.teacher_status)
+  const resolvedStatus = normalizeTeacherStatus(teacher)
   const consultationSlots = Array.isArray(teacher.consultationSlots) ? teacher.consultationSlots : []
+  const teacherAvailability = String(teacher.teacherAvailability || teacher.teacher_availability || 'Available').trim()
 
   const matchedSubjects = (studentYearLevel.value && studentSection.value)
     ? subjectAssignments
@@ -297,6 +352,11 @@ function mapTeacher(teacher) {
     : []
 
   const resolvedSubjects = matchedSubjects.length ? [...new Set(matchedSubjects)] : subjects
+  const subjectTeacherMatch = matchedSubjects.length > 0
+
+  const isStatusAvailable = ['In School'].includes(resolvedStatus)
+  const hasSlots = consultationSlots.length > 0
+  const isAvailable = hasSlots && teacherAvailability !== 'Unavailable' && isStatusAvailable
 
   return {
     id: teacher.id,
@@ -306,12 +366,12 @@ function mapTeacher(teacher) {
     initials: initialsFor(teacher.name),
     color: colorForName(teacher.name),
     status: resolvedStatus,
-    // Requests require a teacher who is on school status and accepting consultations.
-    available: Boolean(teacher.available) && resolvedStatus === 'In School',
+    available: subjectTeacherMatch ? hasSlots : isAvailable,
     tags: resolvedSubjects.slice(0, 3),
     subjectList: resolvedSubjects,
     assignedYearSections,
     consultationSlots,
+    isSubjectTeacher: subjectTeacherMatch,
   }
 }
 
@@ -329,12 +389,44 @@ async function loadTeachers() {
   }
 }
 
-const filteredTeachers = computed(() => teachers.value.filter(t => {
-  const matchSearch = !search.value || t.name.toLowerCase().includes(search.value.toLowerCase()) || t.subject.toLowerCase().includes(search.value.toLowerCase())
-  const matchFilter = activeFilter.value === 'All' || t.status === activeFilter.value
-  const matchAssignment = hasMatchingAssignment(t)
-  return matchSearch && matchFilter && matchAssignment
-}))
+function matchesSearch(teacher) {
+  const query = String(search.value || '').trim().toLowerCase()
+  if (!query) return true
+  return (String(teacher.name || '').toLowerCase().includes(query)
+    || String(teacher.subject || '').toLowerCase().includes(query))
+}
+
+const subjectTeachers = computed(() => {
+  return teachers.value
+    .filter((t) => isSubjectTeacher(t) && matchesSearch(t) && hasMatchingAssignment(t))
+    .sort((a, b) => {
+      if (Number(b.available) !== Number(a.available)) {
+        return Number(b.available) - Number(a.available)
+      }
+      return a.name.localeCompare(b.name)
+    })
+})
+
+const availableTeachers = computed(() => {
+  return teachers.value
+    .filter((t) => isAvailableTeacher(t) && matchesSearch(t) && !isSubjectTeacher(t))
+    .sort((a, b) => a.name.localeCompare(b.name))
+})
+
+const visibleSubjectTeachers = computed(() => {
+  if (activeFilter.value === 'Available Teacher') {
+    return []
+  }
+  return subjectTeachers.value
+})
+
+const visibleAvailableTeachers = computed(() => availableTeachers.value)
+
+const visibleTeacherCount = computed(() => {
+  if (activeFilter.value === 'Subject Teacher') return visibleSubjectTeachers.value.length
+  if (activeFilter.value === 'Available Teacher') return visibleAvailableTeachers.value.length
+  return visibleSubjectTeachers.value.length + visibleAvailableTeachers.value.length
+})
 
 function displayedSubjects(teacher) {
   const list = Array.isArray(teacher?.subjectList) ? teacher.subjectList : []
@@ -349,8 +441,6 @@ function hiddenSubjectCount(teacher) {
 function statusClass(s) {
   return {
     'In School': 'pill-green',
-    'On Main Campus': 'pill-orange',
-    'On-Meeting': 'pill-orange',
     'On Leave': 'pill-red',
   }[s] || 'pill-gray'
 }
@@ -361,7 +451,8 @@ const showProfileModal = ref(false)
 const selectedTeacher  = ref(null)
 const toastMsg         = ref('')
 const reqError         = ref('')
-const reqForm          = ref({ subject: '', reason: CONSULTATION_REASONS[0], availabilityId: '', description: '' })
+const today = new Date().toISOString().split('T')[0]
+const reqForm          = ref({ subject: '', reason: CONSULTATION_REASONS[0], availabilityId: '', date: '', time: '', description: '' })
 
 function formatSlotLabel(slot) {
   return `${slot.dayOfWeek} • ${slot.startTime} - ${slot.endTime}`
@@ -418,7 +509,9 @@ function openRequest(t) {
   reqForm.value = {
     subject: t.subjectList?.[0] || '',
     reason: CONSULTATION_REASONS[0],
-    availabilityId: t.consultationSlots?.[0]?.id || '',
+    availabilityId: t.isSubjectTeacher ? t.consultationSlots?.[0]?.id || '' : '',
+    date: !t.isSubjectTeacher ? today : '',
+    time: '',
     description: '',
   }
   reqError.value = ''
@@ -439,14 +532,6 @@ function submitRequest() {
   reqError.value = ''
   if (!reqForm.value.subject) { reqError.value = 'Please select a subject.'; return }
   if (!reqForm.value.reason) { reqError.value = 'Please select a reason.'; return }
-  if (!reqForm.value.availabilityId) { reqError.value = 'Please select consultation availability.'; return }
-
-  const slot = (selectedTeacher.value?.consultationSlots || []).find((item) => item.id === reqForm.value.availabilityId)
-  if (!slot) { reqError.value = 'Selected consultation availability is invalid.'; return }
-
-  const date = nextDateForDay(slot.dayOfWeek, slot.startTime)
-  const time = to24Hour(slot.startTime)
-  if (!date || !time) { reqError.value = 'Selected consultation availability is invalid.'; return }
 
   const notes = [
     `Reason: ${reqForm.value.reason}`,
@@ -455,16 +540,34 @@ function submitRequest() {
     .filter(Boolean)
     .join('\n')
 
+  const body = {
+    teacherId: selectedTeacher.value.id,
+    topic: reqForm.value.subject,
+    notes,
+  }
+
+  if (selectedTeacher.value?.isSubjectTeacher) {
+    if (!reqForm.value.availabilityId) { reqError.value = 'Please select consultation availability.'; return }
+
+    const slot = (selectedTeacher.value?.consultationSlots || []).find((item) => item.id === reqForm.value.availabilityId)
+    if (!slot) { reqError.value = 'Selected consultation availability is invalid.'; return }
+
+    body.availabilityId = reqForm.value.availabilityId
+    body.date = nextDateForDay(slot.dayOfWeek, slot.startTime)
+    body.time = to24Hour(slot.startTime)
+    if (!body.date || !body.time) { reqError.value = 'Selected consultation availability is invalid.'; return }
+  } else {
+    if (!reqForm.value.date) { reqError.value = 'Please pick a consultation date.'; return }
+    if (!reqForm.value.time) { reqError.value = 'Please pick a consultation time.'; return }
+
+    body.date = reqForm.value.date
+    body.time = to24Hour(reqForm.value.time)
+    if (!body.time) { reqError.value = 'Selected consultation time is invalid.'; return }
+  }
+
   apiRequest('/consultations/requests', {
     method: 'POST',
-    body: JSON.stringify({
-      teacherId: selectedTeacher.value.id,
-      topic: reqForm.value.subject,
-      availabilityId: reqForm.value.availabilityId,
-      date,
-      time,
-      notes,
-    }),
+    body: JSON.stringify(body),
   })
     .then(() => {
       showReqModal.value = false

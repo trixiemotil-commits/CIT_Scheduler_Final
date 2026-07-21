@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const STATUS_VALUES = ["PENDING", "APPROVED", "RESCHED", "COMPLETED", "CANCELLED"];
+const STATUS_VALUES = ["PENDING", "APPROVED", "RESCHED", "COMPLETED", "CANCELLED", "ARCHIVED"];
 
 const consultationRequestSchema = new mongoose.Schema(
   {

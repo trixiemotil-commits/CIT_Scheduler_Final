@@ -130,43 +130,29 @@ async function resolveTeacherStatus(userDoc) {
     return "On School";
   }
 
-  const directStatus = ["On School", "On Meeting", "On Leave", "Main Campus", "On Main Campus"].includes(userDoc.teacher_status)
+  const directStatus = ["On School", "On Leave"].includes(userDoc.teacher_status)
     ? userDoc.teacher_status
     : "On School";
 
-  // Explicit meeting/leave flags should always win.
-  if (directStatus === "On Meeting" || directStatus === "On Leave") {
-    return directStatus;
-  }
-
-  const teacherName = normalizeTeacherFullName(userDoc);
-  if (!teacherName) {
-    return directStatus === "Main Campus" ? "On Main Campus" : directStatus;
-  }
-
-  const now = nowContext();
-  const activeEntry = await ScheduleEntry.findOne({
-    teacher: teacherName,
-    day: now.dayOfWeek,
-    timeInMinutes: { $lte: now.minutes },
-    timeOutMinutes: { $gt: now.minutes },
-  })
-    .select("campus color")
-    .lean();
-
-  if (activeEntry) {
-    const onMainCampus =
-      activeEntry.campus === "Main Campus" ||
-      activeEntry.color === "color-orange";
-
-    return onMainCampus ? "On Main Campus" : "On School";
-  }
-
-  if (directStatus === "Main Campus") {
-    return "On Main Campus";
-  }
-
   return directStatus;
+}
+
+async function isStudentAssignedToTeacher(teacherUser, studentYear, studentSection) {
+  const teacherName = normalizeTeacherFullName(teacherUser);
+  const year = String(studentYear || '').trim();
+  const section = String(studentSection || '').trim();
+
+  if (!teacherName || !year || !section) {
+    return false;
+  }
+
+  const match = await ScheduleEntry.exists({
+    teacher: teacherName,
+    year,
+    section,
+  });
+
+  return Boolean(match);
 }
 
 function isRequestWithinAvailability(requestMinutes, startTime, endTime) {
@@ -353,7 +339,7 @@ function toClientLog(doc) {
 async function listTeachersForStudents(req, res) {
   try {
     const teacherUsers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
-      .select("role firstName lastName employeeId department account_status teacher_status teacher_availability avatar")
+      .select("role firstName lastName employeeId department account_status teacher_status teacher_status_expires_at teacher_availability avatar")
       .lean();
 
     const teachers = await Promise.all(
@@ -397,6 +383,8 @@ async function listTeachersForStudents(req, res) {
           if (subject && year && section) subjectAssignmentSet.add(`${subject}||${year}||${section}`);
         }
 
+        const canAcceptRequests = status !== "On Leave" && teacherUser.teacher_availability !== "Unavailable" && availabilitySlots.length > 0
+
         return {
           id: teacherUser._id.toString(),
           name: fullName,
@@ -404,7 +392,8 @@ async function listTeachersForStudents(req, res) {
           avatar: teacherUser.avatar || null,
           department: teacherUser.department || "",
           status,
-          available: status === "On School" && teacherUser.teacher_availability !== "Unavailable" && availabilitySlots.length > 0,
+          teacherAvailability: teacherUser.teacher_availability || "Available",
+          available: canAcceptRequests,
           subjects: Array.from(subjectSet),
           assignedYears: Array.from(yearSet),
           assignedSections: Array.from(sectionSet),
@@ -456,14 +445,20 @@ async function createConsultationRequest(req, res) {
 
     const teacherName = normalizeTeacherFullName(teacherUser);
     const teacherStatus = await resolveTeacherStatus(teacherUser);
-    if (teacherStatus !== "On School") {
-      return res.status(409).json({
-        message: `${teacherName} can only accept consultation requests while on school status. Current status: ${teacherStatus}.`,
-      });
-    }
+    const studentYear = String(req.user?.yearLevel || req.user?.grade || "").trim();
+    const studentSection = String(req.user?.section || "").trim();
+    const isSubjectTeacher = await isStudentAssignedToTeacher(teacherUser, studentYear, studentSection);
 
-    if (teacherUser.teacher_availability === "Unavailable") {
-      return res.status(409).json({ message: `${teacherName} is not accepting consultation requests at the moment.` });
+    if (!isSubjectTeacher) {
+      if (teacherStatus === "On Leave") {
+        return res.status(409).json({
+          message: `${teacherName} can only accept consultation requests while available. Current status: ${teacherStatus}.`,
+        });
+      }
+
+      if (teacherUser.teacher_availability === "Unavailable") {
+        return res.status(409).json({ message: `${teacherName} is not accepting consultation requests at the moment.` });
+      }
     }
 
     const lookupKeys = [teacherUser.employeeId, teacherName].filter(Boolean);
@@ -565,7 +560,13 @@ async function createConsultationRequest(req, res) {
 // GET /api/consultations/requests
 async function listConsultationRequests(req, res) {
   try {
-    const filter = {};
+    const archiveCutoff = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    await ConsultationRequest.updateMany(
+      { status: "COMPLETED", updatedAt: { $lte: archiveCutoff } },
+      { status: "ARCHIVED" }
+    );
+
+    const filter = { status: { $ne: "ARCHIVED" } };
     if (req.user?.role === "student") {
       filter.studentId = req.user.id;
     } else if (req.user?.role === "teacher") {
@@ -694,14 +695,20 @@ async function updateConsultationRequestByStudent(req, res) {
 
     const teacherName = normalizeTeacherFullName(teacherUser);
     const teacherStatus = await resolveTeacherStatus(teacherUser);
-    if (teacherStatus !== "On School") {
-      return res.status(409).json({
-        message: `${teacherName} can only accept consultation requests while on school status. Current status: ${teacherStatus}.`,
-      });
-    }
+    const studentYear = String(req.user?.yearLevel || req.user?.grade || "").trim();
+    const studentSection = String(req.user?.section || "").trim();
+    const isSubjectTeacher = await isStudentAssignedToTeacher(teacherUser, studentYear, studentSection);
 
-    if (teacherUser.teacher_availability === "Unavailable") {
-      return res.status(409).json({ message: `${teacherName} is not accepting consultation requests at the moment.` });
+    if (!isSubjectTeacher) {
+      if (teacherStatus === "On Leave") {
+        return res.status(409).json({
+          message: `${teacherName} can only accept consultation requests while available. Current status: ${teacherStatus}.`,
+        });
+      }
+
+      if (teacherUser.teacher_availability === "Unavailable") {
+        return res.status(409).json({ message: `${teacherName} is not accepting consultation requests at the moment.` });
+      }
     }
 
     const lookupKeys = [teacherUser.employeeId, teacherName].filter(Boolean);
@@ -756,7 +763,7 @@ async function updateConsultationRequestByStudent(req, res) {
 // PATCH /api/consultations/requests/:id/status
 async function updateConsultationRequestStatus(req, res) {
   try {
-    const allowed = ["PENDING", "APPROVED", "RESCHED", "COMPLETED", "CANCELLED"];
+    const allowed = ["PENDING", "APPROVED", "RESCHED", "COMPLETED", "CANCELLED", "ARCHIVED"];
     const nextStatus = String(req.body?.status || "").trim().toUpperCase();
     const statusNotes = String(req.body?.notes || "").trim();
     if (!allowed.includes(nextStatus)) {

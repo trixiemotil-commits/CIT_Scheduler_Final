@@ -1,5 +1,5 @@
-import { computed, ref } from 'vue'
 import { getToken } from '@/auth.js'
+import { computed, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -9,6 +9,7 @@ const sessionsError = ref('')
 
 let hasLoadedSessions = false
 let inFlightLoad = null
+let lastIncludeArchived = false
 
 function initialsFor(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
@@ -33,6 +34,7 @@ function mapStatusFromApi(status) {
   if (normalized === 'RESCHED') return 'Reschedule'
   if (normalized === 'COMPLETED') return 'Completed'
   if (normalized === 'CANCELLED') return 'Cancelled'
+  if (normalized === 'ARCHIVED') return 'Archived'
   return 'Pending'
 }
 
@@ -132,8 +134,9 @@ function mapRequestToSession(requestDoc, teacherLookup, availabilityLookup) {
   }
 }
 
-async function loadSessions(force = false) {
-  if (hasLoadedSessions && !force) {
+async function loadSessions(force = false, options = { includeArchived: false }) {
+  const includeArchived = Boolean(options.includeArchived)
+  if (hasLoadedSessions && !force && lastIncludeArchived === includeArchived) {
     return sessions.value
   }
 
@@ -147,7 +150,7 @@ async function loadSessions(force = false) {
 
     try {
       const [requestsPayload, teachersPayload] = await Promise.all([
-        apiRequest('/consultations/requests'),
+        apiRequest(`/consultations/requests${includeArchived ? '?includeArchived=true' : ''}`),
         apiRequest('/consultations/teachers').catch(() => ({ teachers: [] })),
       ])
 
@@ -179,6 +182,7 @@ async function loadSessions(force = false) {
       const requests = Array.isArray(requestsPayload.requests) ? requestsPayload.requests : []
       sessions.value = requests.map((r) => mapRequestToSession(r, teacherLookup, availabilityLookup))
       hasLoadedSessions = true
+      lastIncludeArchived = includeArchived
       return sessions.value
     } catch (error) {
       sessions.value = []
@@ -200,6 +204,7 @@ const stats = computed(() => ({
   pending: sessions.value.filter((s) => s.status === 'Pending').length,
   completed: sessions.value.filter((s) => s.status === 'Completed').length,
   cancelled: sessions.value.filter((s) => s.status === 'Cancelled').length,
+  archived: sessions.value.filter((s) => s.status === 'Archived').length,
 }))
 
 function addSession(teacher, topic, date, time, notes) {

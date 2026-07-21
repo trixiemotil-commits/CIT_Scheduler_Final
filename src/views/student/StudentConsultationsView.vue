@@ -98,9 +98,29 @@
             <span class="detail-label">{{ detailNotesLabel(activeSession) }}</span>
             <span class="detail-val">{{ detailNotes(activeSession) }}</span>
           </div>
+          <div v-if="activeSession?.status === 'Approved'" class="queue-card">
+            <div class="queue-card-header">
+              <div>
+                <div class="queue-card-title">Queue Ticket</div>
+                <div class="queue-card-subtitle">{{ queueLineLabel(activeSession) }}</div>
+              </div>
+              <div class="queue-ticket-badge">{{ activeSession.ticketNumber || 'Queue' }}</div>
+            </div>
+            <div class="queue-qr-panel" role="img" aria-label="Queue ticket barcode">
+              <div class="qr-grid">
+                <div v-for="(cell, index) in qrCells" :key="index" class="qr-cell" :class="{ filled: cell }"></div>
+              </div>
+            </div>
+            <div class="queue-ticket-details">
+              <div class="queue-ticket-line"><span>Ticket</span><strong>{{ activeSession.ticketNumber || `#${activeSession.id}` }}</strong></div>
+              <div class="queue-ticket-line"><span>Teacher</span><strong>{{ activeSession.teacher }}</strong></div>
+              <div class="queue-ticket-line"><span>Subject</span><strong>{{ activeSession.subject }}</strong></div>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
-          <button class="modal-cancel full-btn" @click="showDetails = false">Close</button>
+          <button class="modal-cancel" @click="showDetails = false">Close</button>
+          <button class="modal-submit" @click="downloadQueueDetails">Download Queue Details</button>
         </div>
       </div>
     </div>
@@ -239,9 +259,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
 import BottomNav from '@/components/student/BottomNav.vue'
 import { useStudentData } from '@/composables/useStudentData.js'
+import { computed, onMounted, ref } from 'vue'
 
 const { sessions, cancelSession, updateSession, isLoadingSessions, sessionsError, loadSessions } = useStudentData()
 
@@ -255,7 +275,7 @@ const CONSULTATION_REASONS = [
   'Other Academic Concern',
 ]
 
-const tabs       = ['All', 'Pending', 'Approved', 'Reschedule', 'Completed', 'Cancelled']
+const tabs       = ['All', 'Pending', 'Approved', 'Reschedule', 'Completed', 'Cancelled', 'Archived']
 const activeTab  = ref('All')
 
 const filteredSessions = computed(() =>
@@ -269,6 +289,7 @@ function pillClass(s) {
     Reschedule: 'pill-red',
     Completed: 'pill-gray',
     Cancelled: 'pill-red',
+    Archived: 'pill-gray',
   }[s] || 'pill-gray'
 }
 
@@ -406,6 +427,86 @@ function queueLineLabel(session) {
 function queueWaitNote(session) {
   if (hasConsultationStarted(session)) return ''
   return 'Please wait for the start of consultation hours.'
+}
+
+const qrCells = computed(() => {
+  const seed = String(activeSession.value?.ticketNumber || activeSession.value?.id || 'queue')
+  const size = 9
+  const cells = []
+
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      const edge = row < 2 || row > size - 3 || col < 2 || col > size - 3
+      const corner = (row < 3 && col < 3) || (row < 3 && col > size - 4) || (row > size - 4 && col < 3)
+      const hash = (seed.charCodeAt((row + col) % seed.length) + row * 7 + col * 5) % 2
+      cells.push(edge || corner ? 1 : hash === 0)
+    }
+  }
+
+  return cells
+})
+
+function downloadQueueDetails() {
+  const session = activeSession.value
+  if (!session) return
+
+  const ticketNumber = String(session.ticketNumber || `#${session.id || 'queue'}`).trim()
+  const title = 'CIT Scheduler Consultation Ticket'
+  const details = [
+    `Teacher: ${session.teacher || '-'}`,
+    `Subject: ${session.subject || '-'}`,
+    `Date: ${formatWeekday(session.date)}, ${formatDate(session.date)}`,
+    `Time: ${formatTimeRange(session.timeStart, session.timeEnd)}`,
+    `Reason: ${session.reason || session.notes || 'N/A'}`,
+  ]
+
+  const canvasWidth = 900
+  const canvasHeight = 780
+  const canvas = document.createElement('canvas')
+  canvas.width = canvasWidth
+  canvas.height = canvasHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  ctx.fillStyle = '#f5f7fb'
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+
+  ctx.fillStyle = '#111827'
+  ctx.font = '28px Poppins, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText(title, 48, 64)
+
+  ctx.strokeStyle = '#d1d5db'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(48, 84)
+  ctx.lineTo(canvasWidth - 48, 84)
+  ctx.stroke()
+
+  ctx.font = '22px Poppins, sans-serif'
+  ctx.fillStyle = '#1f2937'
+  ctx.fillText(`Ticket: ${ticketNumber}`, 48, 130)
+
+  const bodyTop = 180
+  const lineHeight = 46
+  ctx.font = '20px Poppins, sans-serif'
+  details.forEach((line, index) => {
+    const y = bodyTop + index * lineHeight
+    ctx.fillText(line, 48, y)
+  })
+
+  ctx.fillStyle = '#4b5563'
+  ctx.font = '18px Poppins, sans-serif'
+  ctx.fillText('Present this image to your teacher at consultation time.', 48, canvasHeight - 72)
+
+  const url = canvas.toDataURL('image/png')
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `consultation-ticket-${ticketNumber.replace(/\s+/g, '-').toLowerCase()}.png`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  showToast('Consultation ticket image downloaded.')
 }
 
 function detailNotes(session) {
@@ -576,7 +677,7 @@ function showToast(msg) {
 }
 
 onMounted(() => {
-  loadSessions(true)
+  loadSessions(true, { includeArchived: true })
 })
 </script>
 
@@ -910,5 +1011,77 @@ onMounted(() => {
 @keyframes fadeUp {
   from { opacity: 0; transform: translateX(-50%) translateY(10px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+/* Queue ticket */
+.queue-card {
+  margin-top: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f4f7fb 100%);
+}
+.queue-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.queue-card-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+.queue-card-subtitle {
+  font-size: 0.76rem;
+  color: #6b7280;
+  margin-top: 2px;
+}
+.queue-ticket-badge {
+  background: #4b5563;
+  color: #fff;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.queue-qr-panel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+}
+.qr-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 8px);
+  gap: 2px;
+}
+.qr-cell {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: #e5e7eb;
+}
+.qr-cell.filled {
+  background: #111827;
+}
+.queue-ticket-details {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+.queue-ticket-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: #4b5563;
+}
+.queue-ticket-line strong {
+  color: #111827;
+  text-align: right;
 }
 </style>
