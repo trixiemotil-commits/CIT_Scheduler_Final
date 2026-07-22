@@ -1,7 +1,7 @@
 <template>
   <div class="layout">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
-    <aside class="sidebar">
+    <aside class="sidebar admin-sidebar">
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
           <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
@@ -235,7 +235,7 @@
               <input v-model.trim="teacherSearchQuery" type="text" class="teacher-search-input" placeholder="Search teacher name..." />
             </div>
             <div v-if="filteredTeacherList.length" class="teacher-grid">
-              <button v-for="teacher in filteredTeacherList" :key="teacher.name" class="teacher-card" @click="selectedTeacher = teacher.name">
+              <button v-for="teacher in filteredTeacherList" :key="teacher.name" class="teacher-card" @click="chooseTeacher(teacher)">
                 <img v-if="teacher.avatar" :src="teacher.avatar" :alt="teacher.name" class="teacher-avatar-img" />
                 <div v-else class="teacher-avatar">{{ getTeacherInitials(teacher.name) }}</div>
                 <div class="teacher-name">Prof. {{ teacher.name }}</div>
@@ -430,6 +430,7 @@ const roomSearchQuery = ref('')
 /* ── View Mode ── */
 const viewMode         = ref(null)   // null | 'room' | 'teacher'
 const selectedTeacher  = ref(null)
+const selectedTeacherId = ref(null)
 const teacherList      = ref([])
 const teacherSearchQuery = ref('')
 const loadingTeachers  = ref(false)
@@ -473,16 +474,17 @@ async function loadTeachers() {
   loadingTeachers.value = true
   try {
     const res = await apiRequest('/users?role=teacher')
-    if (res.users && Array.isArray(res.users)) {
-      teacherList.value = res.users
-        .filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
-        .map(u => {
-          const name = `${u.firstName} ${u.lastName}`.trim()
-          return {
-            name,
-            avatar: getTeacherAvatar(name, u.avatar || ''),
-          }
-        })
+      if (res.users && Array.isArray(res.users)) {
+        teacherList.value = res.users
+          .filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
+          .map(u => {
+            const name = `${u.firstName} ${u.lastName}`.trim()
+            return {
+              id: u._id,
+              name,
+              avatar: getTeacherAvatar(name, u.avatar || ''),
+            }
+          })
         .filter(teacher => teacher.name.length > 0)
         .sort((a, b) => a.name.localeCompare(b.name))
     }
@@ -508,6 +510,14 @@ watch(selectedTeacher, () => {
     fetchConsultationsForTeacher()
   }
 })
+
+function chooseTeacher(teacher) {
+  selectedTeacher.value = teacher.name
+  selectedTeacherId.value = teacher.id || null
+  // reload schedules so substitute assignments are merged into entries
+  loadScheduleData()
+  fetchConsultationsForTeacher()
+}
 
 /* ── Teacher-filtered grid helpers ── */
 function getEntriesForTeacherCell(rowSlot, day) {
@@ -623,15 +633,16 @@ function syncEntriesFromApi(apiEntries) {
   resetEntriesStore()
   if (!Array.isArray(apiEntries)) return
   apiEntries.forEach(entry => {
-    const tableLabel = entry.tableLabel || entry.teacher
+    const tableLabel = entry.tableLabel || entry.teacher || ''
     const entryType = String(entry.entryType || '').trim().toLowerCase()
     const isLunch = entryType === 'lunch' || entry.color === 'color-gray' || /\blunch\b/i.test(String(entry.subject || ''))
     const rawSection = entry.section || ''
     const section = isLunch ? '' : rawSection
     const day = entry.day
     const slot = `${entry.timeIn} - ${entry.timeOut}`
-    if (!tableLabel || (!rawSection && !isLunch) || !day || !entry.timeIn || !entry.timeOut) return
-    const key = `${tableLabel}|${rawSection || `__lunch_${entry.id || slot}`}|${slot}|${day}`
+    const sectionKey = String(rawSection || `__entry_${entry.id || slot}`).trim()
+    if (!tableLabel || !day || !entry.timeIn || !entry.timeOut) return
+    const key = `${tableLabel}|${sectionKey}|${slot}|${day}`
     const inferredCampus = inferCampus(entry)
     const roomBasedColor = colorForRoom(entry.room)
     entries[key] = {
@@ -715,6 +726,58 @@ async function loadScheduleData() {
   loading.value = true
   try {
     const payload = await apiRequest('/schedules')
+
+    // If admin is viewing a specific teacher, also fetch substitute assignments for today
+    if (viewMode.value === 'teacher' && selectedTeacher.value) {
+      try {
+        const dateStr = new Date().toLocaleDateString('en-CA')
+        const subs = await apiRequest(`/substitutes?date=${encodeURIComponent(dateStr)}${selectedTeacherId.value ? `&teacherId=${encodeURIComponent(selectedTeacherId.value)}` : ''}`)
+        const assignments = Array.isArray(subs.assignments) ? subs.assignments : []
+        if (assignments.length) {
+          assignments.forEach((a) => {
+            const adate = new Date(a.date)
+            const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][adate.getDay()]
+            const original = a.originalTeacher || {}
+            const substitute = a.substituteTeacher || {}
+            const substituteName = substitute.name || `${substitute.firstName || ''} ${substitute.lastName || ''}`.trim()
+            const originalName = `${original.firstName || ''} ${original.lastName || ''}`.trim()
+            const selectedName = selectedTeacher.value || substituteName || originalName || 'Substitute'
+            ;(a.entries || []).forEach((e) => {
+              const isSelectedSubstitute = selectedTeacherId.value && String(substitute._id || substitute.id || '') === String(selectedTeacherId.value)
+              const subjectNote = isSelectedSubstitute
+                ? `${e.subject || 'Substitute'} (Sub for ${originalName})`
+                : `${e.subject || 'Substitute'} (Subbed by ${substituteName})`
+
+              payload.entries = payload.entries || []
+              payload.entries.push({
+                id: e.id || null,
+                day: dayName,
+                timeIn: e.timeIn,
+                timeOut: e.timeOut,
+                subject: subjectNote,
+                room: e.room || '',
+                section: e.section || '',
+                year: e.year || '',
+                entryType: e.entryType || 'class',
+                teacher: selectedName,
+                tableLabel: selectedName,
+                campus: e.campus || '',
+                color: e.color || 'color-gray',
+                parallel: Boolean(e.parallel),
+                parallelGroupId: e.parallelGroupId || '',
+                parallelCount: Number(e.parallelCount || 1),
+                parallelSlots: Array.isArray(e.parallelSlots) ? e.parallelSlots.map((slot) => ({ ...slot })) : [],
+                originalTeacherName: originalName,
+                isSubstitute: true,
+              })
+            })
+          })
+        }
+      } catch (_err) {
+        // continue silently if substitutes fetch fails
+      }
+    }
+
     syncEntriesFromApi(payload.entries)
   } catch (_) {
     // silent

@@ -1,7 +1,7 @@
 <template>
   <div class="layout">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
-    <aside class="sidebar">
+    <aside class="sidebar admin-sidebar">
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
           <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
@@ -1234,6 +1234,55 @@ async function refreshScheduleData(preferredLabel = '') {
     apiRequest('/schedules/tables'),
     apiRequest('/schedules'),
   ])
+
+  // If a teacher is selected, attempt to fetch today's substitute assignments for that teacher and merge
+  if (selectedTeacher.value && teacherUserMap.value[selectedTeacher.value]) {
+    try {
+      const teacherUser = teacherUserMap.value[selectedTeacher.value]
+      const dateStr = new Date().toLocaleDateString('en-CA')
+      const subs = await apiRequest(`/substitutes?date=${encodeURIComponent(dateStr)}&teacherId=${encodeURIComponent(teacherUser._id)}`)
+      const assignments = Array.isArray(subs.assignments) ? subs.assignments : []
+      if (assignments.length) {
+        assignments.forEach((a) => {
+          const adate = new Date(a.date)
+          const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][adate.getDay()]
+          const original = a.originalTeacher || {}
+          const substitute = a.substituteTeacher || {}
+          const substituteName = substitute.name || `${substitute.firstName || ''} ${substitute.lastName || ''}`.trim()
+          const originalName = original && original.firstName ? `${original.firstName} ${original.lastName}`.trim() : selectedTeacher.value
+          const selectedName = selectedTeacher.value || substituteName || originalName || 'Substitute'
+          const isSelectedSub = String(substitute._id || substitute.id || '') === String(teacherUser._id)
+          ;(a.entries || []).forEach((e) => {
+            const subjectNote = isSelectedSub
+              ? `${e.subject || 'Substitute'} (Sub for ${originalName})`
+              : `${e.subject || 'Substitute'} (Subbed by ${substituteName})`
+            schedulesPayload.entries = schedulesPayload.entries || []
+            schedulesPayload.entries.push({
+              day: dayName,
+              timeIn: e.timeIn,
+              timeOut: e.timeOut,
+              subject: subjectNote,
+              room: e.room || '',
+              section: e.section || '',
+              year: e.year || '',
+              entryType: e.entryType || 'class',
+              teacher: selectedName,
+              tableLabel: selectedName,
+              campus: e.campus || '',
+              color: e.color || 'color-gray',
+              parallel: Boolean(e.parallel),
+              parallelGroupId: e.parallelGroupId || '',
+              parallelCount: Number(e.parallelCount || 1),
+              parallelSlots: Array.isArray(e.parallelSlots) ? e.parallelSlots.map((slot) => ({ ...slot })) : [],
+              originalTeacherName: originalName,
+            })
+          })
+        })
+      }
+    } catch (_err) {
+      // ignore errors fetching substitutes
+    }
+  }
 
   syncPagesFromApi(tablesPayload.tables, preferredLabel)
   syncEntriesFromApi(schedulesPayload.entries)

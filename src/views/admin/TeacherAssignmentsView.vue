@@ -1,7 +1,7 @@
 <template>
   <div class="layout">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
-    <aside class="sidebar">
+    <aside class="sidebar admin-sidebar">
       <!-- Profile -->
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
@@ -135,12 +135,51 @@
               <!-- Substitute Teacher -->
               <div v-if="teacher.status === 'On Leave'" class="substitute-teacher-wrap">
                 <label class="substitute-label">Substitute Teacher:</label>
-                <select class="substitute-dropdown" :value="teacher.substituteTeacher || ''" @change="(e) => updateSubstituteTeacher(teacher, e.target.value)">
-                  <option value="">Select a substitute teacher</option>
-                  <option v-for="sub in getAvailableSubstitutes(teacher)" :key="sub.id" :value="sub.name">
-                    {{ sub.name }}
-                  </option>
-                </select>
+                <div v-if="getTeacherWeeklySchedule(teacher).length" class="substitute-info">
+                  <span class="substitute-class-label">Today's schedule:</span>
+                  <ul class="substitute-schedule-list">
+                    <li v-for="entry in getTeacherWeeklySchedule(teacher)" :key="`${entry.day}-${entry.timeIn}-${entry.timeOut}-${entry.subject}`" class="substitute-schedule-item">
+                      <div class="substitute-entry-header">
+                        <div>
+                          <strong>{{ entry.subject }}</strong>
+                          <div class="substitute-entry-meta">{{ entry.day }} — {{ entry.timeIn }} - {{ entry.timeOut }}</div>
+                        </div>
+                        <div class="substitute-entry-assign">
+                          <label class="substitute-entry-label">Substitute</label>
+                          <div class="substitute-select-row">
+                            <select
+                              class="substitute-dropdown"
+                              v-model="teacher.substituteAssignments[getEntryKey(entry)]"
+                              @change="() => markUnsaved(teacher)"
+                            >
+                              <option value="">Select substitute teacher</option>
+                              <option
+                                v-for="sub in getAvailableSubstitutesForEntry(teacher, entry)"
+                                :key="sub.id"
+                                :value="sub.id"
+                              >
+                                {{ sub.name }}
+                              </option>
+                            </select>
+                            <div class="substitute-selected-name" v-if="teacher.substituteAssignments && teacher.substituteAssignments[getEntryKey(entry)]">
+                              {{ getTeacherNameById(teacher.substituteAssignments[getEntryKey(entry)]) }}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+                <div v-else class="substitute-info">
+                  <span>Loading weekly schedule...</span>
+                </div>
+                <button
+                  class="substitute-save-btn"
+                  :disabled="savingSubstitute[teacher.id]"
+                  @click="saveSubstituteAssignment(teacher)"
+                >
+                  {{ savingSubstitute[teacher.id] ? 'Saving...' : 'Save Substitutes' }}
+                </button>
               </div>
               <!-- Designated Areas -->
               <div v-if="teacher.designatedAreas.length" class="designated-areas">
@@ -282,6 +321,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import Swal from 'sweetalert2'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -310,9 +350,21 @@ function confirmLogout() {
   router.push('/')
 }
 
+function markUnsaved(teacher) {
+  if (!teacher || !teacher.id) return
+  unsavedChanges.value = { ...(unsavedChanges.value || {}), [teacher.id]: true }
+}
+
+function canAutoRefresh() {
+  return !Object.keys(unsavedChanges.value || {}).length
+}
+
 const statusTabs = ['All', 'In School', 'On-Meeting', 'On-leave']
 
 const teachers = ref([])
+const scheduleCache = ref({})
+const scheduleLoading = ref({})
+const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 async function apiRequest(path, options = {}) {
   const token = getToken()
@@ -355,6 +407,102 @@ function mapTeacherStatus(status) {
   return 'In School'
 }
 
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr || typeof timeStr !== 'string') return null
+  const normalized = timeStr.trim().toUpperCase()
+  const match = normalized.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/)
+  if (!match) return null
+  let hour = Number(match[1])
+  const minute = Number(match[2])
+  const period = match[3]
+  if (hour === 12) {
+    hour = period === 'AM' ? 0 : 12
+  } else if (period === 'PM') {
+    hour += 12
+  }
+  return hour * 60 + minute
+}
+
+function isTimeRangeOverlap(startA, endA, startB, endB) {
+  const aStart = parseTimeToMinutes(startA)
+  const aEnd = parseTimeToMinutes(endA)
+  const bStart = parseTimeToMinutes(startB)
+  const bEnd = parseTimeToMinutes(endB)
+  if (aStart === null || aEnd === null || bStart === null || bEnd === null) return false
+  return aStart < bEnd && bStart < aEnd
+}
+
+function normalizeTeacherName(name) {
+  return typeof name === 'string' ? name.trim().toLowerCase() : ''
+}
+
+function getScheduleForTeacher(teacherName) {
+  return Array.isArray(scheduleCache.value[normalizeTeacherName(teacherName)])
+    ? scheduleCache.value[normalizeTeacherName(teacherName)]
+    : []
+}
+
+async function loadTeacherSchedule(teacherName) {
+  const key = normalizeTeacherName(teacherName)
+  if (!teacherName || scheduleLoading.value[key] || scheduleCache.value[key]) {
+    return
+  }
+
+  scheduleLoading.value[key] = true
+  try {
+    const payload = await apiRequest(`/schedules?teacher=${encodeURIComponent(teacherName)}`)
+    scheduleCache.value[key] = Array.isArray(payload.entries) ? payload.entries : []
+  } catch (error) {
+    console.error(`Failed to load schedule for ${teacherName}:`, error)
+    scheduleCache.value[key] = []
+  } finally {
+    scheduleLoading.value[key] = false
+  }
+}
+
+function getLeaveScheduleEntries(teacher) {
+  const entries = getScheduleForTeacher(teacher.name)
+  if (!entries.length) {
+    if (!scheduleLoading.value[normalizeTeacherName(teacher.name)]) {
+      loadTeacherSchedule(teacher.name)
+    }
+    return []
+  }
+
+  return [...entries]
+    .filter((entry) => entry.day && entry.timeIn && entry.timeOut && entry.subject)
+    .map((entry) => ({
+      ...entry,
+      dayIndex: DAY_ORDER.indexOf(entry.day),
+      startMinutes: parseTimeToMinutes(entry.timeIn) ?? 0,
+    }))
+    .filter((entry) => entry.dayIndex >= 0)
+    .sort((a, b) => {
+      if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex
+      return a.startMinutes - b.startMinutes
+    })
+}
+
+function getTeacherWeeklySchedule(teacher) {
+  const today = new Date().getDay()
+  const currentDay = DAY_ORDER[today - 1] || ''
+  return getLeaveScheduleEntries(teacher).filter((entry) => entry.day === currentDay)
+}
+
+function hasSubstituteConflict(candidate, leaveEntries) {
+  const schedule = getScheduleForTeacher(candidate.name)
+  if (!schedule.length) {
+    if (!scheduleLoading.value[normalizeTeacherName(candidate.name)]) {
+      loadTeacherSchedule(candidate.name)
+    }
+    return false
+  }
+
+  return leaveEntries.some((leaveEntry) =>
+    schedule.some((entry) => isTimeRangeOverlap(leaveEntry.timeIn, leaveEntry.timeOut, entry.timeIn, entry.timeOut))
+  )
+}
+
 function mapTeacherStatusToApi(status) {
   if (status === 'On-Meeting') return 'On Meeting'
   if (status === 'On Leave') return 'On Leave'
@@ -383,9 +531,61 @@ function mapTeacherFromApi(user) {
     phone: user.phone || '',
     department: user.department || '',
     designatedAreas: user.department ? [user.department] : [],
-    substituteTeacher: null,
+    substituteTeacher: user.substituteTeacher || null,
+    substituteAssignments: user.substituteAssignments || {},
     _lastStatus: mapTeacherStatus(user.teacher_status),
   }
+}
+
+function getEntryKey(entry) {
+  return `${entry.day || ''}|${entry.timeIn || ''}-${entry.timeOut || ''}|${entry.subject || ''}`.trim()
+}
+
+function getAssignedSubstitute(teacher, entry) {
+  if (!teacher.substituteAssignments) teacher.substituteAssignments = {}
+  return teacher.substituteAssignments[getEntryKey(entry)] || ''
+}
+
+function updateEntrySubstitute(teacher, entry, substituteId) {
+  if (!teacher.substituteAssignments) teacher.substituteAssignments = {}
+  teacher.substituteAssignments[getEntryKey(entry)] = substituteId || null
+}
+
+function getTeacherNameById(id) {
+  if (!id) return ''
+  const found = teachers.value.find((t) => String(t.id) === String(id))
+  return found ? found.name : id
+}
+
+function getAvailableSubstitutesForEntry(currentTeacher, entry) {
+  const candidates = teachers.value.filter((t) => t.id !== currentTeacher.id && t.status === 'In School')
+
+  const filtered = candidates.filter((candidate) => {
+    const schedule = getScheduleForTeacher(candidate.name)
+    if (!schedule.length) {
+      if (!scheduleLoading.value[normalizeTeacherName(candidate.name)]) {
+        loadTeacherSchedule(candidate.name)
+      }
+      return true
+    }
+
+    return !schedule.some((candidateEntry) =>
+      candidateEntry.day === entry.day &&
+      isTimeRangeOverlap(entry.timeIn, entry.timeOut, candidateEntry.timeIn, candidateEntry.timeOut)
+    )
+  })
+
+  // Ensure the currently assigned substitute (if any) is included so selection doesn't disappear
+  const assignedId = getAssignedSubstitute(currentTeacher, entry)
+  if (assignedId) {
+    const exists = filtered.some((c) => String(c.id) === String(assignedId))
+    if (!exists) {
+      const assignedTeacher = teachers.value.find((t) => String(t.id) === String(assignedId))
+      if (assignedTeacher) filtered.unshift(assignedTeacher)
+    }
+  }
+
+  return filtered
 }
 
 async function loadTeachers() {
@@ -394,6 +594,10 @@ async function loadTeachers() {
     teachers.value = Array.isArray(payload.users)
       ? payload.users.map(mapTeacherFromApi)
       : []
+
+    teachers.value
+      .filter((teacher) => teacher.status === 'On Leave')
+      .forEach((teacher) => loadTeacherSchedule(teacher.name))
   } catch (error) {
     teachers.value = []
     console.error('Failed to load teachers:', error)
@@ -499,12 +703,154 @@ const updateTeacherStatus = async (teacher) => {
 }
 
 const getAvailableSubstitutes = (currentTeacher) => {
-  return teachers.value.filter(t => t.id !== currentTeacher.id && t.status === 'In School')
+  const todayEntries = getTeacherWeeklySchedule(currentTeacher)
+  const candidates = teachers.value.filter((t) => t.id !== currentTeacher.id && t.status === 'In School')
+
+  if (!todayEntries.length) {
+    candidates.forEach((candidate) => {
+      if (!getScheduleForTeacher(candidate.name).length && !scheduleLoading.value[normalizeTeacherName(candidate.name)]) {
+        loadTeacherSchedule(candidate.name)
+      }
+    })
+    return candidates
+  }
+
+  return candidates.filter((candidate) => {
+    const candidateSchedule = getScheduleForTeacher(candidate.name)
+    if (!candidateSchedule.length) {
+      if (!scheduleLoading.value[normalizeTeacherName(candidate.name)]) {
+        loadTeacherSchedule(candidate.name)
+      }
+      return false
+    }
+    return !hasSubstituteConflict(candidate, todayEntries)
+  })
 }
+
+const getTeacherSubstituteClass = (teacher) => {
+  const leaveEntries = getLeaveScheduleEntries(teacher)
+  return leaveEntries.length ? leaveEntries[0] : null
+}
+
+const savingSubstitute = ref({})
+const unsavedChanges = ref({})
 
 const updateSubstituteTeacher = (teacher, substituteName) => {
   teacher.substituteTeacher = substituteName || null
-  console.log('Substitute teacher updated:', teacher)
+  if (substituteName && !getScheduleForTeacher(substituteName).length && !scheduleLoading.value[normalizeTeacherName(substituteName)]) {
+    loadTeacherSchedule(substituteName)
+  }
+}
+
+const saveSubstituteAssignment = async (teacher) => {
+  const substituteAssignments = Object.fromEntries(
+    Object.entries(teacher.substituteAssignments || {}).filter(([_key, substituteId]) => substituteId)
+  )
+
+  if (!Object.keys(substituteAssignments).length) {
+    alert('Please select at least one substitute teacher for the scheduled subjects.')
+    return
+  }
+
+  savingSubstitute.value[teacher.id] = true
+  try {
+    const payload = {
+      firstName: teacher.firstName || teacher.name?.split(' ')[0] || '',
+      lastName: teacher.lastName || teacher.name?.split(' ').slice(1).join(' ') || 'Teacher',
+      email: teacher.email,
+      role: 'teacher',
+      roles: ['teacher'],
+      phone: teacher.phone || '',
+      account_status: teacher.account_status || 'Active',
+      teacher_status: mapTeacherStatusToApi(teacher.status),
+      employeeId: teacher.employeeId || '',
+      studentId: teacher.studentId || '',
+      substituteAssignments,
+    }
+
+    const response = await apiRequest(`/users/${teacher.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+
+    if (response?.user) {
+      const mapped = mapTeacherFromApi(response.user)
+      Object.assign(teacher, mapped)
+      // clear unsaved flag for this teacher
+      if (unsavedChanges.value && unsavedChanges.value[teacher.id]) {
+        delete unsavedChanges.value[teacher.id]
+      }
+      await Swal.fire({
+        icon: 'success',
+        title: 'Substitute saved',
+        text: `Substitute assignments have been saved for ${teacher.name}.`,
+        confirmButtonColor: '#4b5563',
+        customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
+      })
+      try {
+        // create substitute assignment records for each selected entry (for today)
+        const today = new Date().toLocaleDateString('en-CA')
+        const assignments = Object.entries(teacher.substituteAssignments || {}).filter(([_k, v]) => v)
+        for (const [key, substituteId] of assignments) {
+          const entry = getTeacherWeeklySchedule(teacher).find((en) => getEntryKey(en) === key)
+          if (!entry) continue
+          const payload = {
+            originalTeacher: teacher.id,
+            substituteTeacher: substituteId,
+            date: today,
+            entries: [
+              {
+                id: entry.id || null,
+                subject: entry.subject || '',
+                room: entry.room || '',
+                section: entry.section || '',
+                year: entry.year || '',
+                timeIn: entry.timeIn,
+                timeOut: entry.timeOut,
+                teacher: teacher.name || '',
+                tableLabel: entry.tableLabel || teacher.name || '',
+                campus: entry.campus || '',
+                color: entry.color || 'color-gray',
+                entryType: entry.entryType || 'class',
+                parallel: Boolean(entry.parallel),
+                parallelGroupId: entry.parallelGroupId || null,
+                parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map((s) => ({ ...s })) : [],
+                addedAt: entry.addedAt || undefined,
+              },
+            ],
+          }
+          await apiRequest('/substitutes', { method: 'POST', body: JSON.stringify(payload) }).catch(() => null)
+        }
+      } catch (e) {
+        console.error('Failed to create substitute records:', e)
+      }
+      return
+    }
+
+    // clear unsaved flag for this teacher
+    if (unsavedChanges.value && unsavedChanges.value[teacher.id]) {
+      delete unsavedChanges.value[teacher.id]
+    }
+
+    await Swal.fire({
+      icon: 'success',
+      title: 'Substitute saved',
+      text: `${teacher.substituteTeacher} has been assigned.`,
+      confirmButtonColor: '#4b5563',
+      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
+    })
+  } catch (error) {
+    console.error('Failed to save substitute assignment:', error)
+    await Swal.fire({
+      icon: 'error',
+      title: 'Save failed',
+      text: error.message || 'Failed to save substitute assignment.',
+      confirmButtonColor: '#4b5563',
+      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
+    })
+  } finally {
+    savingSubstitute.value[teacher.id] = false
+  }
 }
 
 const handleImageUpload = (event) => {
@@ -547,19 +893,25 @@ const addNewTeacher = () => {
 let teacherRefreshInterval
 
 function refreshTeachersWhenVisible() {
-  if (!document.hidden) loadTeachers()
+  if (!document.hidden) loadTeachersIfAllowed()
+}
+
+function loadTeachersIfAllowed() {
+  if (canAutoRefresh()) {
+    loadTeachers()
+  }
 }
 
 onMounted(() => {
   loadTeachers()
-  teacherRefreshInterval = window.setInterval(loadTeachers, 15000)
-  window.addEventListener('focus', loadTeachers)
+  teacherRefreshInterval = window.setInterval(loadTeachersIfAllowed, 15000)
+  window.addEventListener('focus', loadTeachersIfAllowed)
   document.addEventListener('visibilitychange', refreshTeachersWhenVisible)
 })
 
 onUnmounted(() => {
   window.clearInterval(teacherRefreshInterval)
-  window.removeEventListener('focus', loadTeachers)
+  window.removeEventListener('focus', loadTeachersIfAllowed)
   document.removeEventListener('visibilitychange', refreshTeachersWhenVisible)
 })
 </script>
@@ -1045,6 +1397,43 @@ onUnmounted(() => {
   outline: none;
   border-color: #4b5563;
   box-shadow: 0 0 0 2px rgba(48, 53, 58, 0.1);
+}
+
+.substitute-save-btn {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  background-color: #4b5563;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.substitute-save-btn:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.substitute-schedule-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.substitute-schedule-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #333;
 }
 
 /* ════════════════════════ CAROUSEL INDICATORS ════════════════════════ */

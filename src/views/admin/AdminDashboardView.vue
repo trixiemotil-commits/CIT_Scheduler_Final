@@ -1,7 +1,7 @@
 <template>
   <div class="layout admin-dashboard">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
-    <aside class="sidebar">
+    <aside class="sidebar admin-sidebar">
       <!-- Profile -->
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">

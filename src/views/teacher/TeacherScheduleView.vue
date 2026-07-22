@@ -1,7 +1,7 @@
 <template>
   <div class="layout">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
-    <aside class="sidebar">
+    <aside class="sidebar teacher-sidebar">
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
           <img :src="userAvatar" alt="Teacher" class="avatar" />
@@ -10,6 +10,7 @@
         <div class="role">Teachers Portal</div>
         <div class="email">{{ userEmail }}</div>
       </div>
+      <TeacherSidebarStatus />
       <nav class="sidebar-nav">
         <RouterLink
           v-for="item in navItems"
@@ -281,6 +282,7 @@
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
 import { timeOptions } from '@/composables/useSchedule.js'
+import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -605,15 +607,45 @@ async function loadSchedule() {
       return
     }
 
-    const [directPayload, consultationPayload, requestPayload] = await Promise.all([
+    const dateStr = new Date().toLocaleDateString('en-CA')
+    const [directPayload, consultationPayload, requestPayload, substitutePayload] = await Promise.all([
       apiRequest(`/schedules?teacher=${encodeURIComponent(teacherName)}`),
       apiRequest(`/consultations?teacher=${encodeURIComponent(teacherName)}`).catch(() => ({ consultations: [] })),
       apiRequest('/consultations/requests').catch(() => ({ requests: [] })),
+      apiRequest(`/substitutes?date=${encodeURIComponent(dateStr)}&teacherId=${encodeURIComponent(user.value?.id || '')}`).catch(() => ({ assignments: [] })),
     ])
     const apiEntries = Array.isArray(directPayload.entries) ? directPayload.entries : []
     const consultations = Array.isArray(consultationPayload.consultations) ? consultationPayload.consultations : []
     const requests = Array.isArray(requestPayload.requests) ? requestPayload.requests : []
+    const substituteAssignments = Array.isArray(substitutePayload.assignments) ? substitutePayload.assignments : []
     const approvedCountByAvailability = buildApprovedCountByAvailability(requests)
+
+    // merge substitute assignments where the current teacher is the substitute
+    if (substituteAssignments.length) {
+      substituteAssignments.forEach((a) => {
+        const adate = new Date(a.date)
+        const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][adate.getDay()]
+        const original = a.originalTeacher
+        const substituteName = userName.value || `${a.substituteTeacher?.firstName || ''} ${a.substituteTeacher?.lastName || ''}`.trim()
+        ;(a.entries || []).forEach((e) => {
+          apiEntries.push({
+            day: dayName,
+            timeIn: e.timeIn,
+            timeOut: e.timeOut,
+            subject: e.subject ? `${e.subject} (Sub for ${original?.firstName || ''} ${original?.lastName || ''})` : 'Substitute',
+            room: e.room || '',
+            section: e.section || '',
+            year: e.year || '',
+            entryType: 'class',
+            teacher: substituteName,
+            tableLabel: substituteName,
+            originalTeacherName: `${original?.firstName || ''} ${original?.lastName || ''}`.trim(),
+            color: 'color-gray',
+            isSubstitute: true,
+          })
+        })
+      })
+    }
 
     scheduleData.value = mapEntriesToSchedule(apiEntries)
     consultationData.value = mapConsultationsToSchedule(consultations, approvedCountByAvailability)

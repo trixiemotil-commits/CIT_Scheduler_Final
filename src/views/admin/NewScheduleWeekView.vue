@@ -1,7 +1,7 @@
  <template>
   <div class="layout">
     <!-- ═══ SIDEBAR ═══ -->
-    <aside class="sidebar">
+    <aside class="sidebar admin-sidebar">
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
           <img src="https://i.pravatar.cc/100?img=47" alt="Admin" class="avatar" />

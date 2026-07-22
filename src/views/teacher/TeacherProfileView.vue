@@ -1,7 +1,7 @@
 <template>
   <div class="layout">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
-    <aside class="sidebar">
+    <aside class="sidebar teacher-sidebar">
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
           <img :src="profile.avatar" alt="Teacher" class="avatar" />
@@ -10,6 +10,7 @@
         <div class="role">Teachers Portal</div>
         <div class="email">{{ profile.email }}</div>
       </div>
+      <TeacherSidebarStatus />
       <nav class="sidebar-nav">
         <RouterLink
           v-for="item in navItems"
@@ -188,7 +189,8 @@
 </template>
 
 <script setup>
-import { getToken, getUser, logout } from '@/auth.js'
+import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
+import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import Swal from 'sweetalert2'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -367,8 +369,7 @@ async function saveProfile() {
       }),
     })
 
-    const updatedUser = payload.user || {}
-    localStorage.setItem('cit_user', JSON.stringify(updatedUser))
+    const updatedUser = saveMergedUser(payload.user || {})
 
     profile.value = {
       fullName: updatedUser.name || `${updatedUser.firstName || ''} ${updatedUser.lastName || ''}`.trim() || 'Teacher',

@@ -10,6 +10,10 @@ function clearSession() {
   localStorage.removeItem('cit_user')
 }
 
+function getRoles(user) {
+  return Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
+}
+
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -89,6 +93,34 @@ export function logout() {
 export function getUser() {
   const raw = localStorage.getItem('cit_user')
   return raw ? JSON.parse(raw) : null
+}
+
+export function saveMergedUser(freshUser) {
+  const currentUser = getUser()
+  const roles = getRoles(freshUser)
+  const currentRole = String(currentUser?.role || '').toLowerCase()
+  const roleExists = roles.map(role => String(role).toLowerCase()).includes(currentRole)
+  const mergedUser = {
+    ...freshUser,
+    role: roleExists ? currentRole : freshUser.role,
+    roles,
+  }
+
+  localStorage.setItem('cit_user', JSON.stringify(mergedUser))
+  return mergedUser
+}
+
+export function setActiveRole(role) {
+  const user = getUser()
+  const requestedRole = String(role || '').toLowerCase()
+  const roles = getRoles(user)
+  const canUseRole = roles.map(item => String(item).toLowerCase()).includes(requestedRole)
+
+  if (!user || !requestedRole || !canUseRole) return user
+
+  const updatedUser = { ...user, role: requestedRole, roles }
+  localStorage.setItem('cit_user', JSON.stringify(updatedUser))
+  return updatedUser
 }
 
 export function getToken() {

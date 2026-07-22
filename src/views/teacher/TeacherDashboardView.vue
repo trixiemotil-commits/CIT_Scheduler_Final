@@ -1,7 +1,7 @@
 <template>
   <div class="layout">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
-    <aside class="sidebar">
+    <aside class="sidebar teacher-sidebar">
       <!-- Profile -->
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
@@ -10,45 +10,8 @@
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
         <div class="email">{{ user.email || 'teacher@gmail.com' }}</div>
-        <p v-if="teacherStatusMessage" :class="['presence-feedback', teacherStatusError ? 'is-error' : '']">{{ teacherStatusMessage }}</p>
-        <div class="sidebar-status-panel">
-          <div class="sidebar-status-head">
-            <span>Work Status</span>
-            <span :class="['sidebar-status-dot', teacherIsClockedOut ? 'is-offline' : (teacherStatus === 'On School' ? 'is-in-school' : 'is-on-leave')]"></span>
-          </div>
-          <div class="status-row">
-            <label class="status-label">Work status</label>
-            <div class="sidebar-status-action-row">
-              <span class="sidebar-status-value">{{ teacherStatusDisplay }}</span>
-              <button
-                class="sidebar-status-button"
-                type="button"
-                :disabled="workStatusDisabled"
-                @click="showClockOutConfirm = true"
-              >
-                Clock Out
-              </button>
-            </div>
-          </div>
-          <div class="sidebar-time-in">Time in: {{ formattedTimeIn }}</div>
-        </div>
-
-        <div class="sidebar-status-panel">
-          <div class="sidebar-status-head">
-            <span>Availability</span>
-            <span :class="['sidebar-status-dot', resolvedSecondStatus === 'Available for Consultation' ? 'is-in-school' : (resolvedSecondStatus === 'Unavailable' ? 'is-on-leave' : 'is-offline')]"></span>
-          </div>
-          <div class="status-row">
-            <label class="status-label">Availability</label>
-            <select v-model="teacherAvailabilityChoice" class="sidebar-status-select" aria-label="Availability">
-              <option v-for="option in availabilityOptions" :key="option.value" :value="option.value" :disabled="option.disabled">
-                {{ option.label }}
-              </option>
-            </select>
-          </div>
-          <div style="margin-top:6px;font-size:0.68rem;color:#667085">{{ resolvedSecondSubtext }}</div>
-        </div>
       </div>
+      <TeacherSidebarStatus />
 
       <nav class="sidebar-nav">
         <RouterLink
@@ -337,7 +300,8 @@
 </template>
 
 <script setup>
-import { getToken, getUser, logout } from '@/auth.js'
+import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
+import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -484,11 +448,10 @@ async function saveTeacherStatus({ record = false, durationMinutes = 0 } = {}) {
         statusDurationMinutes: durationMinutes,
       }),
     })
-    const updatedUser = payload.user || {}
+    const updatedUser = saveMergedUser(payload.user || {})
     teacherStatus.value = updatedUser.teacher_status || teacherStatus.value
     teacherAvailability.value = updatedUser.teacher_availability || teacherAvailability.value
     teacherTimeIn.value = updatedUser.teacher_time_in || teacherTimeIn.value
-    localStorage.setItem('cit_user', JSON.stringify(updatedUser))
     teacherStatusMessage.value = record ? 'Time in recorded and status saved.' : 'Status saved. Students can request consultations only when you are available and in school.'
     clearTimeout(statusMessageTimer)
     statusMessageTimer = setTimeout(() => {
@@ -700,7 +663,7 @@ function recordTimeIn() {
 async function loadTeacherStatus() {
   try {
     const payload = await apiRequest('/auth/me')
-    const currentUser = payload.user || {}
+    const currentUser = saveMergedUser(payload.user || {})
     teacherStatus.value = currentUser.teacher_status || 'On School'
     teacherAvailability.value = currentUser.teacher_availability || 'Available'
     teacherTimeIn.value = currentUser.teacher_time_in || null
@@ -1158,20 +1121,125 @@ function confirmLogout() {
 .presence-clock { width: 10px; color: #667085; font-size: 1rem; }
 .presence-separator { height: 1px; margin: 6px 4px; background: #eaecf0; }
 .presence-time { padding: 4px 9px 2px 29px; color: #98a2b3; font-size: 0.68rem; }
-.presence-feedback { width: 100%; margin: 6px 0 0; color: #1b4332; font-size: .68rem; line-height: 1.35; text-align: center; }
-.presence-feedback.is-error { color: #b42318; }
-.sidebar-status-panel { width: 100%; margin-top: 12px; padding: 11px; border: 1px solid #dce8e1; border-radius: 10px; background: #f8fcfa; text-align: left; }
-.sidebar-status-head { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; color: #1b4332; font-size: 0.78rem; font-weight: 700; }
-.sidebar-status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.presence-feedback {
+  position: fixed;
+  top: 22px;
+  right: 24px;
+  z-index: 3000;
+  max-width: min(320px, calc(100vw - 32px));
+  margin: 0;
+  padding: 12px 14px;
+  color: #173f2a;
+  background: linear-gradient(145deg, #f6fbf8, #dcefe4);
+  border: 1px solid rgba(64, 145, 108, 0.28);
+  border-radius: 12px;
+  box-shadow:
+    0 16px 34px rgba(31, 35, 39, 0.18),
+    inset 0 1px rgba(255, 255, 255, 0.82);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.presence-feedback.is-error {
+  color: #8a1f18;
+  background: linear-gradient(145deg, #fff7f6, #ffe2df);
+  border-color: rgba(230, 57, 70, 0.28);
+}
+.sidebar-status-panel {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 11px;
+  background: linear-gradient(145deg, rgba(245, 247, 247, 0.72), rgba(199, 204, 208, 0.58));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.76),
+    0 4px 10px rgba(42, 48, 54, 0.1);
+  text-align: left;
+}
+.sidebar-status-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  margin-bottom: 6px;
+  color: #30353a;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.sidebar-status-dot { width: 7px; height: 7px; border-radius: 50%; }
 .sidebar-status-dot.is-in-school { background: #40916c; }
 .sidebar-status-dot.is-on-leave { background: #e63946; }
 .sidebar-status-dot.is-offline { background: #98a2b3; }
-.sidebar-status-select { width: 100%; height: 32px; margin-top: 6px; padding: 0 7px; border: 1px solid #cfe3d8; border-radius: 6px; background: #fff; color: #344054; font: inherit; font-size: 0.73rem; }
-.sidebar-status-action-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-.sidebar-status-value { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 12px; background: #fff; border: 1px solid #cfe3d8; border-radius: 8px; color: #344054; font: inherit; font-size: 0.84rem; font-weight: 600; }
-.sidebar-status-button { min-width: 120px; height: 34px; padding: 0 14px; border: 1px solid #1b4332; border-radius: 8px; background: #1b4332; color: #fff; font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: background .2s ease; }
-.sidebar-status-button:disabled { cursor: not-allowed; opacity: 0.6; background: #94a19d; border-color: #7b8a84; }
-.sidebar-time-in { margin-top: 8px; color: #667085; font-size: 0.7rem; line-height: 1.35; }
+.sidebar-status-select {
+  width: 100%;
+  height: 28px;
+  margin-top: 0;
+  padding: 0 8px;
+  border: 1px solid rgba(116, 123, 129, 0.32);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #30353a;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.sidebar-status-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
+}
+.sidebar-status-value {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 28px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 9px;
+  overflow: hidden;
+  color: #30353a;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(116, 123, 129, 0.28);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-status-button {
+  min-width: 74px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #30353a;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #424950, #23282e);
+  color: #fff;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .2s ease, transform .2s ease;
+}
+.sidebar-status-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background: #8d949a;
+  border-color: #747b81;
+}
+.sidebar-time-in,
+.sidebar-status-subtext {
+  margin-top: 5px;
+  color: #69727c;
+  font-size: 0.62rem;
+  line-height: 1.25;
+}
 .sidebar-status-actions { display: flex; gap: 6px; margin-top: 9px; }
 .sidebar-status-actions button { flex: 1; height: 30px; border: 1px solid #1b4332; border-radius: 6px; background: #fff; color: #1b4332; font: inherit; font-size: 0.72rem; font-weight: 600; cursor: pointer; }
 .sidebar-status-actions .sidebar-save-status { background: #1b4332; color: #fff; }
@@ -1179,8 +1247,15 @@ function confirmLogout() {
 .sidebar-toggle-available { height: 30px; padding: 6px 10px; border-radius: 6px; background: #1b4332; color: #fff; border: none; cursor: pointer; }
 .sidebar-toggle-unavailable { height: 30px; padding: 6px 10px; border-radius: 6px; background: transparent; color: #344054; border: 1px solid #cfe3d8; cursor: pointer; }
 
-.status-row { display:flex; flex-direction:column; gap:6px; margin-top:6px }
-.status-label { font-size:0.7rem; color:#425; font-weight:600 }
+.status-row { display:flex; flex-direction:column; gap:5px; margin-top:0 }
+.status-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .sidebar-status-message { margin: 8px 0 0; color: #1b4332; font-size: 0.68rem; line-height: 1.35; }
 .sidebar-status-message.is-error { color: #b42318; }
 

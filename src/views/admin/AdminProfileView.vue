@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="layout">
     <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SIDEBAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-    <aside class="sidebar">
+    <aside class="sidebar admin-sidebar">
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
           <img :src="profile.avatar" alt="Admin" class="avatar" />
@@ -184,7 +184,7 @@
 </template>
 
 <script setup>
-import { getToken, getUser, logout } from '@/auth.js'
+import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
 import Swal from 'sweetalert2'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -282,8 +282,7 @@ function setProfile(apiUser) {
 async function loadProfile() {
   try {
     const response = await apiRequest('/auth/me')
-    setProfile(response.user)
-    localStorage.setItem('cit_user', JSON.stringify(response.user))
+    setProfile(saveMergedUser(response.user))
   } catch (error) {
     Swal.fire({ icon: 'error', title: 'Unable to load profile', text: error.message })
   }
@@ -379,8 +378,7 @@ async function saveProfile() {
         avatar: editForm.value.avatar,
       }),
     })
-    setProfile(response.user)
-    localStorage.setItem('cit_user', JSON.stringify(response.user))
+    setProfile(saveMergedUser(response.user))
     closeEdit()
     Swal.fire({
       toast: true, position: 'top-end', icon: 'success',

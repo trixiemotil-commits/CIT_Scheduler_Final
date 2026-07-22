@@ -1,7 +1,7 @@
 
 <template>
   <div class="layout">
-    <aside class="sidebar">
+    <aside class="sidebar teacher-sidebar">
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
           <img :src="user.avatar || 'https://i.pravatar.cc/100?img=47'" alt="Teacher" class="avatar" />
@@ -10,6 +10,8 @@
         <div class="role">Teachers Portal</div>
         <div class="email">{{ user.email || 'teacher@gmail.com' }}</div>
       </div>
+
+      <TeacherSidebarStatus />
 
       <nav class="sidebar-nav">
         <RouterLink
@@ -165,6 +167,7 @@
 
 <script setup>
 import { getUser, logout } from '@/auth.js'
+import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 

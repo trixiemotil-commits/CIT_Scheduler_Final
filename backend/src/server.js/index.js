@@ -7,6 +7,7 @@ const authRoutes = require("../routes/authRoutes");
 const rbacRoutes = require("../routes/rbacRoutes");
 const userRoutes = require("../routes/userRoutes");
 const scheduleRoutes = require("../routes/scheduleRoutes");
+const substituteRoutes = require("../routes/substituteRoutes");
 const consultationRoutes = require("../routes/consultationRoutes");
 const activityLogRoutes = require("../routes/activityLogRoutes");
 const activityLogger = require("../middleware/activityLogger");
@@ -28,6 +29,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/rbac", rbacRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/schedules", scheduleRoutes);
+app.use("/api/substitutes", substituteRoutes);
 app.use("/api/consultations", consultationRoutes);
 app.use("/api/activity-logs", activityLogRoutes);
 

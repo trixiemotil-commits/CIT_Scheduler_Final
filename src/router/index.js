@@ -1,4 +1,4 @@
-import { getToken, getUser, isLoggedIn } from '@/auth.js'
+import { getToken, getUser, isLoggedIn, setActiveRole } from '@/auth.js'
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
 import LoginView from '@/views/LoginView.vue'
 import AddScheduleView from '@/views/admin/AddScheduleView.vue'
@@ -60,11 +60,18 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
-  const role = (getUser()?.role || '').toString().toLowerCase()
+  const user = getUser()
+  let role = (user?.role || '').toString().toLowerCase()
+  const requiredRole = to.meta.role ? String(to.meta.role).toLowerCase() : ''
+  const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [role].filter(Boolean)
+  const canUseRequiredRole = requiredRole && roles.map(item => String(item).toLowerCase()).includes(requiredRole)
 
   if (to.meta.requiresAuth && !isLoggedIn()) {
     next('/')
-  } else if (to.meta.role && role !== String(to.meta.role).toLowerCase()) {
+  } else if (requiredRole && role !== requiredRole && canUseRequiredRole) {
+    setActiveRole(requiredRole)
+    next()
+  } else if (requiredRole && role !== requiredRole) {
     if (role === 'teacher') next('/teacher/dashboard')
     else if (role === 'admin') next('/admin/dashboard')
     else if (role === 'student') next('/student/dashboard')

@@ -53,16 +53,18 @@ function toClientUser(user) {
     teacher_status: user.teacher_status || (getUserRoles(user).includes("teacher") ? "On School" : ""),
     teacher_availability: user.teacher_availability || (getUserRoles(user).includes("teacher") ? "Available" : ""),
     teacher_time_in: user.teacher_time_in || null,
+    substituteTeacher: user.substituteTeacher || "",
+    substituteAssignments: user.substituteAssignments ? Object.fromEntries(user.substituteAssignments) : {},
     status: user.account_status || fallbackAccountStatus(user.role),
     employeeId: user.employeeId || "",
     studentId: user.studentId || "",
     avatar: user.avatar,
     dateAdded: user.createdAt,
   };
+}
 
 function fallbackAccountStatus(role) {
   return role === "student" ? "Pending" : "Active";
-}
 }
 
 function normalizeRole(role) {
@@ -202,6 +204,7 @@ async function updateUser(req, res) {
       phone = "",
       account_status,
       teacher_status = "On School",
+      substituteTeacher = "",
       status,
       employeeId = "",
       studentId = "",
@@ -263,6 +266,10 @@ async function updateUser(req, res) {
       user.account_status = sanitizeAccountStatus(requestedStatus);
     }
     user.teacher_status = normalizedRoles.includes("teacher") ? sanitizeTeacherStatus(teacher_status) : undefined;
+    user.substituteTeacher = normalizeString(substituteTeacher) || "";
+    if (typeof req.body.substituteAssignments === 'object' && req.body.substituteAssignments !== null) {
+      user.substituteAssignments = req.body.substituteAssignments;
+    }
     user.employeeId = normalizedEmployeeId || undefined;
 
     if (normalizedStudentId) {

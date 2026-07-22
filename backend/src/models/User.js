@@ -115,6 +115,16 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    substituteTeacher: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    substituteAssignments: {
+      type: Map,
+      of: String,
+      default: {},
+    },
     avatar: {
       type: String,
       default: null,
