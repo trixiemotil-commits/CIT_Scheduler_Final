@@ -22,9 +22,29 @@ function endOfDayUTC(date) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999))
 }
 
+function startOfDay(date) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function endOfDay(date) {
+  const d = new Date(date)
+  d.setHours(23, 59, 59, 999)
+  return d
+}
+
 function nextDaySixAMUTC(date) {
   const d = new Date(date)
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 6, 0, 0, 0))
+}
+
+function isLunchBreakEntry(entry = {}) {
+  return (
+    String(entry.entryType || '').trim().toLowerCase() === 'lunch' ||
+    String(entry.color || '').trim().toLowerCase() === 'color-gray' ||
+    /\blunch(?:\s+break)?\b/i.test(String(entry.subject || ''))
+  )
 }
 
 async function createAssignment(req, res) {
@@ -40,7 +60,12 @@ async function createAssignment(req, res) {
 
     // compute expiresAt: next day at 6:00am UTC
     const expiresAt = nextDaySixAMUTC(dt)
-    const cleanEntries = Array.isArray(entries) ? entries : []
+    const cleanEntries = Array.isArray(entries)
+      ? entries.filter((entry) => !isLunchBreakEntry(entry))
+      : []
+    if (!cleanEntries.length) {
+      return res.status(400).json({ message: 'Lunch breaks cannot be assigned to a substitute.' })
+    }
 
     // For idempotency: try to find an existing assignment for same original/substitute/date
     // Use a normalized UTC day key to avoid timezone mismatch
@@ -61,7 +86,7 @@ async function createAssignment(req, res) {
       })
     } else {
       // merge entries: add only when no existing entry matches timeIn,timeOut,section,subject
-      const existing = assignment.entries || []
+      const existing = (assignment.entries || []).filter((entry) => !isLunchBreakEntry(entry))
       for (const e of cleanEntries) {
         const found = existing.some((ex) =>
           String(ex.timeIn || '') === String(e.timeIn || '') &&
@@ -87,14 +112,86 @@ async function createAssignment(req, res) {
   }
 }
 
+async function syncAssignments(req, res) {
+  try {
+    const { originalTeacher, date, substituteAssignments, assignments } = req.body || {}
+    if (!originalTeacher || !date || !Array.isArray(assignments)) {
+      return res.status(400).json({ message: 'Original teacher, date, and assignments are required.' })
+    }
+
+    const target = parseDateOnly(date) || new Date(date)
+    if (isNaN(target.getTime())) {
+      return res.status(400).json({ message: 'Invalid date.' })
+    }
+
+    const grouped = new Map()
+    for (const item of assignments) {
+      const substituteTeacher = item?.substituteTeacher
+      const cleanEntries = Array.isArray(item?.entries)
+        ? item.entries.filter((entry) => !isLunchBreakEntry(entry))
+        : []
+      if (!substituteTeacher || !cleanEntries.length) continue
+      const key = String(substituteTeacher)
+      const current = grouped.get(key) || []
+      current.push(...cleanEntries)
+      grouped.set(key, current)
+    }
+
+    const dateKey = startOfDayUTC(target)
+    const expiresAt = nextDaySixAMUTC(target)
+    const operations = [
+      {
+        deleteMany: {
+          filter: {
+            originalTeacher,
+            date: { $gte: startOfDayUTC(target), $lte: endOfDayUTC(target) },
+          },
+        },
+      },
+      ...Array.from(grouped.entries()).map(([substituteTeacher, entries]) => ({
+        insertOne: {
+          document: {
+            originalTeacher,
+            substituteTeacher,
+            date: dateKey,
+            entries,
+            expiresAt,
+          },
+        },
+      })),
+    ]
+
+    await SubstituteAssignment.bulkWrite(operations, { ordered: true })
+    await User.findByIdAndUpdate(originalTeacher, {
+      $set: {
+        substituteAssignments:
+          substituteAssignments && typeof substituteAssignments === 'object'
+            ? substituteAssignments
+            : {},
+      },
+    })
+
+    return res.json({
+      message: grouped.size ? 'Substitute assignments updated.' : 'Substitute assignments removed.',
+      assignmentCount: grouped.size,
+    })
+  } catch (error) {
+    console.error('Failed to synchronize substitute assignments:', error)
+    return res.status(500).json({ message: 'Failed to update substitute assignments.', error: error.message })
+  }
+}
+
 async function listAssignments(req, res) {
   try {
-    const { date, teacherId } = req.query || {}
+    const { date } = req.query || {}
+    const teacherId = req.user?.role === 'teacher' ? req.user.id : req.query?.teacherId
+    if (!teacherId) {
+      return res.json({ assignments: [] })
+    }
     const target = date ? (parseDateOnly(date) || new Date(date)) : new Date()
-    const q = { date: { $gte: startOfDayUTC(target), $lte: endOfDayUTC(target) } }
-
-    if (teacherId) {
-      q.$or = [{ substituteTeacher: teacherId }, { originalTeacher: teacherId }]
+    const q = {
+      date: { $gte: startOfDayUTC(target), $lte: endOfDayUTC(target) },
+      $or: [{ substituteTeacher: teacherId }, { originalTeacher: teacherId }],
     }
 
     let assignments = await SubstituteAssignment.find(q)
@@ -104,9 +201,7 @@ async function listAssignments(req, res) {
 
     if (!assignments.length && date) {
       const fallbackQ = { date: { $gte: startOfDay(target), $lte: endOfDay(target) } }
-      if (teacherId) {
-        fallbackQ.$or = [{ substituteTeacher: teacherId }, { originalTeacher: teacherId }]
-      }
+      fallbackQ.$or = [{ substituteTeacher: teacherId }, { originalTeacher: teacherId }]
       assignments = await SubstituteAssignment.find(fallbackQ)
         .sort({ createdAt: -1 })
         .populate('originalTeacher', 'firstName lastName email')
@@ -127,6 +222,13 @@ async function getAssignment(req, res) {
       .populate('originalTeacher', 'firstName lastName email')
       .populate('substituteTeacher', 'firstName lastName email')
     if (!assignment) return res.status(404).json({ message: 'Assignment not found.' })
+    if (
+      req.user?.role === 'teacher' &&
+      String(assignment.originalTeacher?._id || assignment.originalTeacher) !== String(req.user.id) &&
+      String(assignment.substituteTeacher?._id || assignment.substituteTeacher) !== String(req.user.id)
+    ) {
+      return res.status(403).json({ message: 'This substitute schedule is only visible to the involved teachers.' })
+    }
     return res.json({ assignment })
   } catch (error) {
     console.error('Failed to get substitute assignment:', error)
@@ -146,9 +248,38 @@ async function deleteAssignment(req, res) {
   }
 }
 
+async function deleteAssignmentsForTeacher(req, res) {
+  try {
+    const { originalTeacher, date } = req.query || {}
+    if (!originalTeacher || !date) {
+      return res.status(400).json({ message: 'Original teacher and date are required.' })
+    }
+
+    const target = parseDateOnly(date) || new Date(date)
+    if (isNaN(target.getTime())) {
+      return res.status(400).json({ message: 'Invalid date.' })
+    }
+
+    const result = await SubstituteAssignment.deleteMany({
+      originalTeacher,
+      date: { $gte: startOfDayUTC(target), $lte: endOfDayUTC(target) },
+    })
+
+    return res.json({
+      message: 'Substitute assignments removed.',
+      deletedCount: result.deletedCount || 0,
+    })
+  } catch (error) {
+    console.error('Failed to remove substitute assignments:', error)
+    return res.status(500).json({ message: 'Failed to remove substitute assignments.', error: error.message })
+  }
+}
+
 module.exports = {
   createAssignment,
   listAssignments,
   getAssignment,
   deleteAssignment,
+  deleteAssignmentsForTeacher,
+  syncAssignments,
 }

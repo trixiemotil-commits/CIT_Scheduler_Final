@@ -105,6 +105,7 @@
                   >
                     <!-- Compact view -->
                     <template v-if="expandedDay !== DAYS[ci]">
+                      <div v-if="cell.cls.isSubstitute" class="teacher-subbed-indication">{{ cell.cls.subbedLabel }}</div>
                       <div v-if="cell.cls.room" class="cell-room-sm">{{ cell.cls.room }}</div>
                       <div class="cell-subject-sm">{{ cell.cls.subject }}</div>
                       <div v-if="cell.cls.color === 'orange'" class="cell-campus-sm">Main Campus</div>
@@ -113,6 +114,9 @@
                     </template>
                     <!-- Expanded view -->
                     <template v-else>
+                      <div v-if="cell.cls.isSubstitute" class="teacher-subbed-indication teacher-subbed-indication-expanded">
+                        {{ cell.cls.subbedLabel }}
+                      </div>
                       <div v-if="cell.cls.entryType !== 'lunch'" class="cell-badge-row">
                         <span :class="['cell-badge', cell.cls.parallel ? 'badge-p' : 'badge-np']">
                           {{ cell.cls.parallel ? 'Parallel' : 'Non-parallel' }}
@@ -203,6 +207,9 @@
         <div class="view-modal">
           <button class="modal-close" @click="closeModal">✕</button>
           <h2 class="modal-title">View Schedule</h2>
+          <div v-if="selectedClass.isSubstitute" class="teacher-subbed-indication modal-subbed-indication">
+            {{ selectedClass.subbedLabel }}
+          </div>
           <div class="modal-info-row">
             <span class="modal-key">Subject:</span>
             <span class="modal-val">{{ selectedClass.subject }}</span>
@@ -240,6 +247,9 @@
         <div class="teacher-modal">
           <button class="modal-close" @click="closeModal">✕</button>
           <h2 class="modal-title">Teacher Schedule</h2>
+          <div v-if="selectedClass.isSubstitute" class="teacher-subbed-indication modal-subbed-indication">
+            {{ selectedClass.subbedLabel }}
+          </div>
           <div class="modal-teacher-row">
             <img :src="selectedClass.avatar" class="modal-teacher-avatar" alt="" />
             <div class="modal-teacher-info">
@@ -555,6 +565,8 @@ function mapEntriesToSchedule(entries) {
       parallel: isLunch ? false : Boolean(entry.parallel),
       color: scheduleColor(entry.color, entry.campus, entry.room, entry.subject),
       teacher: entry.teacher || userName.value || 'Teacher',
+      isSubstitute: Boolean(entry.isSubstitute),
+      subbedLabel: entry.subbedLabel || '',
       avatar,
       parallelSections: [],
       startIndex: span.startIndex,
@@ -612,7 +624,7 @@ async function loadSchedule() {
       apiRequest(`/schedules?teacher=${encodeURIComponent(teacherName)}`),
       apiRequest(`/consultations?teacher=${encodeURIComponent(teacherName)}`).catch(() => ({ consultations: [] })),
       apiRequest('/consultations/requests').catch(() => ({ requests: [] })),
-      apiRequest(`/substitutes?date=${encodeURIComponent(dateStr)}&teacherId=${encodeURIComponent(user.value?.id || '')}`).catch(() => ({ assignments: [] })),
+      apiRequest(`/substitutes?date=${encodeURIComponent(dateStr)}&teacherId=${encodeURIComponent(user.value?.id || user.value?._id || '')}`).catch(() => ({ assignments: [] })),
     ])
     const apiEntries = Array.isArray(directPayload.entries) ? directPayload.entries : []
     const consultations = Array.isArray(consultationPayload.consultations) ? consultationPayload.consultations : []
@@ -620,28 +632,51 @@ async function loadSchedule() {
     const substituteAssignments = Array.isArray(substitutePayload.assignments) ? substitutePayload.assignments : []
     const approvedCountByAvailability = buildApprovedCountByAvailability(requests)
 
-    // merge substitute assignments where the current teacher is the substitute
+    // Show the relationship on the original teacher's class and add the same
+    // class to the substitute teacher's schedule.
     if (substituteAssignments.length) {
       substituteAssignments.forEach((a) => {
         const adate = new Date(a.date)
         const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][adate.getDay()]
-        const original = a.originalTeacher
-        const substituteName = userName.value || `${a.substituteTeacher?.firstName || ''} ${a.substituteTeacher?.lastName || ''}`.trim()
+        const original = a.originalTeacher || {}
+        const substitute = a.substituteTeacher || {}
+        const originalName = `${original.firstName || ''} ${original.lastName || ''}`.trim()
+        const substituteName = `${substitute.firstName || ''} ${substitute.lastName || ''}`.trim()
+        const currentTeacherId = String(user.value?.id || user.value?._id || '')
+        const isOriginalTeacher = String(original._id || original.id || '') === currentTeacherId
+        const isSubstituteTeacher = String(substitute._id || substitute.id || '') === currentTeacherId
+
         ;(a.entries || []).forEach((e) => {
+          if (isOriginalTeacher) {
+            const originalEntry = apiEntries.find((entry) =>
+              entry.day === dayName &&
+              entry.timeIn === e.timeIn &&
+              entry.timeOut === e.timeOut &&
+              String(entry.section || '') === String(e.section || '') &&
+              String(entry.subject || '').trim() === String(e.subject || '').trim()
+            )
+            if (originalEntry) {
+              originalEntry.isSubstitute = true
+              originalEntry.subbedLabel = `SUBBED BY ${substituteName || 'SUBSTITUTE TEACHER'}`
+            }
+          }
+
+          if (!isSubstituteTeacher) return
           apiEntries.push({
             day: dayName,
             timeIn: e.timeIn,
             timeOut: e.timeOut,
-            subject: e.subject ? `${e.subject} (Sub for ${original?.firstName || ''} ${original?.lastName || ''})` : 'Substitute',
+            subject: e.subject || 'Substitute class',
             room: e.room || '',
             section: e.section || '',
             year: e.year || '',
             entryType: 'class',
-            teacher: substituteName,
-            tableLabel: substituteName,
-            originalTeacherName: `${original?.firstName || ''} ${original?.lastName || ''}`.trim(),
-            color: 'color-gray',
+            teacher: userName.value || substituteName,
+            tableLabel: userName.value || substituteName,
+            originalTeacherName: originalName,
+            color: e.color || 'color-yellow',
             isSubstitute: true,
+            subbedLabel: `SUBBED TO ${originalName || 'ORIGINAL TEACHER'}`,
           })
         })
       })
@@ -1135,6 +1170,32 @@ function confirmLogout() {
 
 .td-class:hover {
   filter: brightness(0.94);
+}
+.teacher-subbed-indication {
+  display: block;
+  width: 100%;
+  margin-bottom: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 5px;
+  background: #b42318;
+  color: #fff;
+  padding: 3px 5px;
+  box-sizing: border-box;
+  font-size: 0.63rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0.035em;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.teacher-subbed-indication-expanded {
+  font-size: 0.72rem;
+  padding: 5px 8px;
+}
+.modal-subbed-indication {
+  margin: 0 0 16px;
+  font-size: 0.76rem;
+  padding: 7px 10px;
 }
 
 .td-class.col-expanded {

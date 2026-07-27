@@ -585,7 +585,7 @@ function confirmLogout() {
 .entry-time-range { font-size: 0.58rem; opacity: 0.7; font-style: italic; margin-top: 2px; }
 .click-to-add { display: block; }
 
-.color-green  { background: #4b5563; color: #fff; }
+.color-green  { background: #2d8a59; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
 .color-blue   { background: #4a90d9; color: #fff; }
 .color-purple { background: #7b5ea7; color: #fff; }

@@ -445,6 +445,13 @@
                         :class="[getEntriesForCell30(slot, day)[0].color, { 'entry-readonly': !selectedTeacher }]"
                         :style="entryStyle30(slot, getEntriesForCell30(slot, day)[0])"
                       >
+                        <div
+                          v-if="getEntriesForCell30(slot, day)[0].isSubstitute"
+                          class="subbed-indication"
+                          :title="getEntriesForCell30(slot, day)[0].subbedLabel"
+                        >
+                          {{ getEntriesForCell30(slot, day)[0].subbedLabel }}
+                        </div>
                         <div class="entry-teacher">{{ getEntriesForCell30(slot, day)[0].teacher }}</div>
                         <div class="entry-subject">{{ getEntriesForCell30(slot, day)[0].subject }}</div>
                         <div class="entry-time-range">{{ getEntriesForCell30(slot, day)[0].slot }}</div>
@@ -1210,6 +1217,7 @@ async function loadAddTeachers() {
         .map(u => {
           const name = `${u.firstName} ${u.lastName}`.trim()
           return {
+            id: u._id || u.id,
             name,
             avatar: getTeacherAvatar(name, u.avatar || ''),
           }
@@ -1345,8 +1353,9 @@ async function addListEntry() {
   }
 }
 
-watch(selectedTeacher, () => {
+watch(selectedTeacher, async (teacher) => {
   fetchConsultationsForTeacher()
+  if (teacher) await refreshScheduleData(teacher)
 })
 
 /* ── Pages / tables ── */
@@ -1573,7 +1582,11 @@ function syncEntriesFromApi(apiEntries) {
       parallelCount: entry.parallelCount || 1,
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map(s => ({ ...s })) : [],
       entryType: isLunch ? 'lunch' : (entry.entryType || 'class'),
-      color: isLunch ? 'color-gray' : (roomBasedColor || 'color-yellow'),
+      isSubstitute: Boolean(entry.isSubstitute),
+      subbedLabel: entry.subbedLabel || '',
+      color: isLunch
+        ? 'color-gray'
+        : (inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || 'color-yellow')),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -1584,6 +1597,45 @@ async function refreshScheduleData(preferredLabel = '') {
     apiRequest('/schedules/tables'),
     apiRequest('/schedules'),
   ])
+
+  const teacherUser = selectedTeacher.value ? teacherUserMap.value[selectedTeacher.value] : null
+  const teacherId = teacherUser?._id || teacherUser?.id
+  if (addMode.value === 'teacher' && selectedTeacher.value && teacherId) {
+    try {
+      const date = new Date().toLocaleDateString('en-CA')
+      const substitutePayload = await apiRequest(
+        `/substitutes?date=${encodeURIComponent(date)}&teacherId=${encodeURIComponent(teacherId)}`
+      )
+      const assignments = Array.isArray(substitutePayload.assignments) ? substitutePayload.assignments : []
+      assignments.forEach((assignment) => {
+        const assignmentDate = new Date(assignment.date)
+        const day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][assignmentDate.getDay()]
+        const original = assignment.originalTeacher || {}
+        const substitute = assignment.substituteTeacher || {}
+        const originalName = `${original.firstName || ''} ${original.lastName || ''}`.trim()
+        const substituteName = `${substitute.firstName || ''} ${substitute.lastName || ''}`.trim()
+        const isSelectedSubstitute = String(substitute._id || substitute.id || '') === String(teacherId)
+
+        ;(assignment.entries || []).forEach((entry) => {
+          schedulesPayload.entries = schedulesPayload.entries || []
+          schedulesPayload.entries.push({
+            ...entry,
+            day,
+            subject: entry.subject || 'Substitute class',
+            teacher: selectedTeacher.value,
+            tableLabel: selectedTeacher.value,
+            isSubstitute: true,
+            subbedLabel: isSelectedSubstitute
+              ? `SUBBED TO ${originalName || 'ORIGINAL TEACHER'}`
+              : `SUBBED BY ${substituteName || 'SUBSTITUTE TEACHER'}`,
+          })
+        })
+      })
+    } catch (_error) {
+      // Keep the regular schedule usable if substitute details are unavailable.
+    }
+  }
+
   syncPagesFromApi(tablesPayload.tables, preferredLabel)
   syncEntriesFromApi(schedulesPayload.entries)
 }
@@ -3033,6 +3085,22 @@ onMounted(async () => {
 }
 .sched-entry:hover { filter: brightness(0.95); }
 .sched-entry.entry-readonly:hover { filter: none; }
+.subbed-indication {
+  width: 100%;
+  margin-bottom: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 5px;
+  background: #b42318;
+  color: #fff;
+  padding: 3px 6px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0.035em;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .entry-teacher { font-size: 0.85rem; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 52px; }
 .entry-subject { font-size: 0.78rem; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 52px; }
 .entry-time-range { font-size: 0.7rem; opacity: 0.75; font-style: italic; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3046,10 +3114,13 @@ onMounted(async () => {
 .click-to-add { display: flex; align-items: center; justify-content: center; height: 100%; text-align: center; font-size: 0.72rem; color: #aaa; user-select: none; padding: 4px; }
 
 /* Colors */
-.color-green  { background: #4b5563; color: #fff; }
+.free-time-cell { background: #ede9fe; }
+.free-time-cell .click-to-add { color: #6d28d9; }
+.color-green  { background: #1f6b45; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
 .color-orange { background: #f4a261; color: #5a2d00; }
 .color-blue   { background: #4a90d9; color: #fff; }
+.color-gray   { background: #9ca3af; color: #1f2937; }
 .color-purple { background: #7b5ea7; color: #fff; }
 .color-red    { background: #e63946; color: #fff; }
 .consult-entry { cursor: default; pointer-events: none; }

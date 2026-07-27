@@ -164,6 +164,15 @@
                             <div class="substitute-selected-name" v-if="teacher.substituteAssignments && teacher.substituteAssignments[getEntryKey(entry)]">
                               {{ getTeacherNameById(teacher.substituteAssignments[getEntryKey(entry)]) }}
                             </div>
+                            <button
+                              v-if="teacher.substituteAssignments && teacher.substituteAssignments[getEntryKey(entry)]"
+                              type="button"
+                              class="substitute-remove-btn"
+                              title="Remove this substitute"
+                              @click="removeEntrySubstitute(teacher, entry)"
+                            >
+                              Remove
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -178,7 +187,7 @@
                   :disabled="savingSubstitute[teacher.id]"
                   @click="saveSubstituteAssignment(teacher)"
                 >
-                  {{ savingSubstitute[teacher.id] ? 'Saving...' : 'Save Substitutes' }}
+                  {{ savingSubstitute[teacher.id] ? 'Updating...' : 'Update Substitutes' }}
                 </button>
               </div>
               <!-- Designated Areas -->
@@ -471,6 +480,7 @@ function getLeaveScheduleEntries(teacher) {
 
   return [...entries]
     .filter((entry) => entry.day && entry.timeIn && entry.timeOut && entry.subject)
+    .filter((entry) => !isLunchBreakEntry(entry))
     .map((entry) => ({
       ...entry,
       dayIndex: DAY_ORDER.indexOf(entry.day),
@@ -481,6 +491,14 @@ function getLeaveScheduleEntries(teacher) {
       if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex
       return a.startMinutes - b.startMinutes
     })
+}
+
+function isLunchBreakEntry(entry = {}) {
+  return (
+    String(entry.entryType || '').trim().toLowerCase() === 'lunch' ||
+    String(entry.color || '').trim().toLowerCase() === 'color-gray' ||
+    /\blunch(?:\s+break)?\b/i.test(String(entry.subject || ''))
+  )
 }
 
 function getTeacherWeeklySchedule(teacher) {
@@ -549,6 +567,12 @@ function getAssignedSubstitute(teacher, entry) {
 function updateEntrySubstitute(teacher, entry, substituteId) {
   if (!teacher.substituteAssignments) teacher.substituteAssignments = {}
   teacher.substituteAssignments[getEntryKey(entry)] = substituteId || null
+}
+
+function removeEntrySubstitute(teacher, entry) {
+  if (!teacher.substituteAssignments) teacher.substituteAssignments = {}
+  delete teacher.substituteAssignments[getEntryKey(entry)]
+  markUnsaved(teacher)
 }
 
 function getTeacherNameById(id) {
@@ -743,99 +767,64 @@ const updateSubstituteTeacher = (teacher, substituteName) => {
 }
 
 const saveSubstituteAssignment = async (teacher) => {
+  const eligibleEntryKeys = new Set(getTeacherWeeklySchedule(teacher).map(getEntryKey))
   const substituteAssignments = Object.fromEntries(
-    Object.entries(teacher.substituteAssignments || {}).filter(([_key, substituteId]) => substituteId)
+    Object.entries(teacher.substituteAssignments || {}).filter(
+      ([key, substituteId]) => substituteId && eligibleEntryKeys.has(key)
+    )
   )
-
-  if (!Object.keys(substituteAssignments).length) {
-    alert('Please select at least one substitute teacher for the scheduled subjects.')
-    return
-  }
+  teacher.substituteAssignments = substituteAssignments
 
   savingSubstitute.value[teacher.id] = true
   try {
-    const payload = {
-      firstName: teacher.firstName || teacher.name?.split(' ')[0] || '',
-      lastName: teacher.lastName || teacher.name?.split(' ').slice(1).join(' ') || 'Teacher',
-      email: teacher.email,
-      role: 'teacher',
-      roles: ['teacher'],
-      phone: teacher.phone || '',
-      account_status: teacher.account_status || 'Active',
-      teacher_status: mapTeacherStatusToApi(teacher.status),
-      employeeId: teacher.employeeId || '',
-      studentId: teacher.studentId || '',
-      substituteAssignments,
-    }
-
-    const response = await apiRequest(`/users/${teacher.id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
+    const scheduleByKey = new Map(
+      getTeacherWeeklySchedule(teacher).map((entry) => [getEntryKey(entry), entry])
+    )
+    const assignments = Object.entries(substituteAssignments).flatMap(([key, substituteTeacher]) => {
+      const entry = scheduleByKey.get(key)
+      if (!entry) return []
+      return [{
+        substituteTeacher,
+        entries: [{
+          id: entry.id || null,
+          subject: entry.subject || '',
+          room: entry.room || '',
+          section: entry.section || '',
+          year: entry.year || '',
+          timeIn: entry.timeIn,
+          timeOut: entry.timeOut,
+          teacher: teacher.name || '',
+          tableLabel: entry.tableLabel || teacher.name || '',
+          campus: entry.campus || '',
+          color: entry.color || 'color-yellow',
+          entryType: entry.entryType || 'class',
+          parallel: Boolean(entry.parallel),
+          parallelGroupId: entry.parallelGroupId || null,
+          parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map((slot) => ({ ...slot })) : [],
+          addedAt: entry.addedAt || undefined,
+        }],
+      }]
     })
 
-    if (response?.user) {
-      const mapped = mapTeacherFromApi(response.user)
-      Object.assign(teacher, mapped)
-      // clear unsaved flag for this teacher
-      if (unsavedChanges.value && unsavedChanges.value[teacher.id]) {
-        delete unsavedChanges.value[teacher.id]
-      }
-      await Swal.fire({
-        icon: 'success',
-        title: 'Substitute saved',
-        text: `Substitute assignments have been saved for ${teacher.name}.`,
-        confirmButtonColor: '#4b5563',
-        customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
-      })
-      try {
-        // create substitute assignment records for each selected entry (for today)
-        const today = new Date().toLocaleDateString('en-CA')
-        const assignments = Object.entries(teacher.substituteAssignments || {}).filter(([_k, v]) => v)
-        for (const [key, substituteId] of assignments) {
-          const entry = getTeacherWeeklySchedule(teacher).find((en) => getEntryKey(en) === key)
-          if (!entry) continue
-          const payload = {
-            originalTeacher: teacher.id,
-            substituteTeacher: substituteId,
-            date: today,
-            entries: [
-              {
-                id: entry.id || null,
-                subject: entry.subject || '',
-                room: entry.room || '',
-                section: entry.section || '',
-                year: entry.year || '',
-                timeIn: entry.timeIn,
-                timeOut: entry.timeOut,
-                teacher: teacher.name || '',
-                tableLabel: entry.tableLabel || teacher.name || '',
-                campus: entry.campus || '',
-                color: entry.color || 'color-gray',
-                entryType: entry.entryType || 'class',
-                parallel: Boolean(entry.parallel),
-                parallelGroupId: entry.parallelGroupId || null,
-                parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map((s) => ({ ...s })) : [],
-                addedAt: entry.addedAt || undefined,
-              },
-            ],
-          }
-          await apiRequest('/substitutes', { method: 'POST', body: JSON.stringify(payload) }).catch(() => null)
-        }
-      } catch (e) {
-        console.error('Failed to create substitute records:', e)
-      }
-      return
-    }
+    await apiRequest('/substitutes', {
+      method: 'PUT',
+      body: JSON.stringify({
+        originalTeacher: teacher.id,
+        date: new Date().toLocaleDateString('en-CA'),
+        substituteAssignments,
+        assignments,
+      }),
+    })
 
-    // clear unsaved flag for this teacher
     if (unsavedChanges.value && unsavedChanges.value[teacher.id]) {
       delete unsavedChanges.value[teacher.id]
     }
-
     await Swal.fire({
       icon: 'success',
-      title: 'Substitute saved',
-      text: `${teacher.substituteTeacher} has been assigned.`,
+      title: assignments.length ? 'Substitutes updated' : 'Substitutes removed',
+      text: assignments.length
+        ? `Substitute assignments have been updated for ${teacher.name}.`
+        : `All substitute assignments have been removed for ${teacher.name}.`,
       confirmButtonColor: '#4b5563',
       customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
     })
@@ -1397,6 +1386,37 @@ onUnmounted(() => {
   outline: none;
   border-color: #4b5563;
   box-shadow: 0 0 0 2px rgba(48, 53, 58, 0.1);
+}
+.substitute-select-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.substitute-select-row .substitute-dropdown {
+  flex: 1 1 210px;
+}
+.substitute-selected-name {
+  flex: 1 1 100%;
+  color: #4b5563;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.substitute-remove-btn {
+  flex: 0 0 auto;
+  border: 1px solid #f1aeb5;
+  border-radius: 6px;
+  background: #fff5f5;
+  color: #b42318;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.substitute-remove-btn:hover {
+  border-color: #dc3545;
+  background: #ffe3e3;
 }
 
 .substitute-save-btn {

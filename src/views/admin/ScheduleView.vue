@@ -148,6 +148,11 @@
                         :class="[getEntriesForCell(slot, day)[0].color, { 'entry-readonly': !selectedTeacher || getEntriesForCell(slot, day)[0].entryType === 'lunch' }]"
                         :style="entryStyle(slot, getEntriesForCell(slot, day)[0])"
                       >
+                        <span
+                          v-if="getEntriesForCell(slot, day)[0].isSubstitute"
+                          class="subbed-badge"
+                          :title="getEntriesForCell(slot, day)[0].subbedLabel"
+                        >{{ getEntriesForCell(slot, day)[0].subbedLabel || 'SUBSTITUTE' }}</span>
                         <div class="entry-teacher">{{ getEntriesForCell(slot, day)[0].teacher }}</div>
                         <div class="entry-subject">{{ getEntriesForCell(slot, day)[0].subject }}</div>
                         <div class="entry-time-range">{{ getEntriesForCell(slot, day)[0].slot }}</div>
@@ -1138,7 +1143,11 @@ function syncEntriesFromApi(apiEntries) {
       parallelGroupId: entry.parallelGroupId || null,
       parallelCount: entry.parallelCount || 1,
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map((slotItem) => ({ ...slotItem })) : [],
-      color: isLunch ? 'color-gray' : (roomBasedColor || 'color-yellow'),
+      isSubstitute: Boolean(entry.isSubstitute),
+      subbedLabel: entry.subbedLabel || '',
+      color: isLunch
+        ? 'color-gray'
+        : (inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || 'color-yellow')),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -1253,15 +1262,12 @@ async function refreshScheduleData(preferredLabel = '') {
           const selectedName = selectedTeacher.value || substituteName || originalName || 'Substitute'
           const isSelectedSub = String(substitute._id || substitute.id || '') === String(teacherUser._id)
           ;(a.entries || []).forEach((e) => {
-            const subjectNote = isSelectedSub
-              ? `${e.subject || 'Substitute'} (Sub for ${originalName})`
-              : `${e.subject || 'Substitute'} (Subbed by ${substituteName})`
             schedulesPayload.entries = schedulesPayload.entries || []
             schedulesPayload.entries.push({
               day: dayName,
               timeIn: e.timeIn,
               timeOut: e.timeOut,
-              subject: subjectNote,
+              subject: e.subject || 'Substitute class',
               room: e.room || '',
               section: e.section || '',
               year: e.year || '',
@@ -1275,6 +1281,11 @@ async function refreshScheduleData(preferredLabel = '') {
               parallelCount: Number(e.parallelCount || 1),
               parallelSlots: Array.isArray(e.parallelSlots) ? e.parallelSlots.map((slot) => ({ ...slot })) : [],
               originalTeacherName: originalName,
+              substituteTeacherName: substituteName,
+              subbedLabel: isSelectedSub
+                ? `SUBBED TO ${originalName || 'ORIGINAL TEACHER'}`
+                : `SUBBED BY ${substituteName || 'SUBSTITUTE TEACHER'}`,
+              isSubstitute: true,
             })
           })
         })
@@ -2330,6 +2341,25 @@ function confirmLogout() {
 .sched-entry.entry-readonly:hover {
   filter: none;
 }
+.subbed-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #b42318;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  max-width: 58%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
 
 .entry-teacher {
   font-size: 0.92rem; font-weight: 700; line-height: 1.2;
@@ -2414,10 +2444,13 @@ function confirmLogout() {
 }
 
 /* Entry colors */
-.color-green  { background: #4b5563; color: #fff; }
+.free-time-cell { background: #ede9fe; }
+.free-time-cell .click-to-add { color: #6d28d9; }
+.color-green  { background: #1f6b45; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
 .color-orange { background: #f4a261; color: #5a2d00; }
 .color-blue   { background: #4a90d9; color: #fff; }
+.color-gray   { background: #9ca3af; color: #1f2937; }
 
 /* ── Consultation ── */
 .consult-entry { cursor: default; pointer-events: none; }

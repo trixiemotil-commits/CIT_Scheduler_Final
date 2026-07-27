@@ -194,7 +194,20 @@
                       }"
                     >
                       <template v-if="getEntriesForRoomCell(slot, day).length">
-                        <div class="sched-entry" :class="getEntriesForRoomCell(slot, day)[0].color" :style="roomEntryStyle(slot, getEntriesForRoomCell(slot, day)[0])">
+                        <div
+                          class="sched-entry sched-entry-clickable"
+                          :class="getEntriesForRoomCell(slot, day)[0].color"
+                          :style="roomEntryStyle(slot, getEntriesForRoomCell(slot, day)[0])"
+                          role="button"
+                          tabindex="0"
+                          @click="openScheduleDetails(getEntriesForRoomCell(slot, day))"
+                          @keydown.enter.space.prevent="openScheduleDetails(getEntriesForRoomCell(slot, day))"
+                        >
+                          <span
+                            v-if="getEntriesForRoomCell(slot, day)[0].isSubstitute"
+                            class="subbed-badge"
+                            :title="getEntriesForRoomCell(slot, day)[0].subbedLabel"
+                          >{{ getEntriesForRoomCell(slot, day)[0].subbedLabel || 'SUBSTITUTE' }}</span>
                           <div class="entry-teacher">{{ getEntriesForRoomCell(slot, day)[0].teacher }}</div>
                           <div class="entry-subject">{{ getEntriesForRoomCell(slot, day)[0].subject }}</div>
                           <div class="entry-time-range">{{ getEntriesForRoomCell(slot, day)[0].slot }}</div>
@@ -288,7 +301,20 @@
                     }"
                   >
                       <template v-if="getEntriesForTeacherCell(slot, day).length">
-                        <div class="sched-entry" :class="getEntriesForTeacherCell(slot, day)[0].color" :style="roomEntryStyle(slot, getEntriesForTeacherCell(slot, day)[0])">
+                        <div
+                          class="sched-entry sched-entry-clickable"
+                          :class="getEntriesForTeacherCell(slot, day)[0].color"
+                          :style="roomEntryStyle(slot, getEntriesForTeacherCell(slot, day)[0])"
+                          role="button"
+                          tabindex="0"
+                          @click="openScheduleDetails(getEntriesForTeacherCell(slot, day))"
+                          @keydown.enter.space.prevent="openScheduleDetails(getEntriesForTeacherCell(slot, day))"
+                        >
+                          <span
+                            v-if="getEntriesForTeacherCell(slot, day)[0].isSubstitute"
+                            class="subbed-badge"
+                            :title="getEntriesForTeacherCell(slot, day)[0].subbedLabel"
+                          >{{ getEntriesForTeacherCell(slot, day)[0].subbedLabel || 'SUBSTITUTE' }}</span>
                           <div class="entry-teacher">{{ getEntriesForTeacherCell(slot, day)[0].subject }}</div>
                           <div class="entry-subject">{{ getEntriesForTeacherCell(slot, day)[0].slot }}</div>
                           <div
@@ -322,6 +348,45 @@
         </div>
       </template>
     </main>
+
+    <!-- ═══ Schedule Details Modal ═══ -->
+    <Teleport to="body">
+      <div v-if="selectedScheduleEntry" class="modal-overlay" @click.self="closeScheduleDetails">
+        <div class="schedule-details-modal" role="dialog" aria-modal="true" aria-labelledby="schedule-details-title">
+          <button class="schedule-modal-close" type="button" aria-label="Close schedule details" @click="closeScheduleDetails">&times;</button>
+          <div class="schedule-modal-heading">
+            <span v-if="selectedScheduleEntry.isSubstitute" class="schedule-modal-subbed">
+              {{ selectedScheduleEntry.subbedLabel || 'Substitute schedule' }}
+            </span>
+            <h2 id="schedule-details-title">{{ selectedScheduleEntry.subject || 'Schedule Details' }}</h2>
+            <p>{{ selectedScheduleEntry.day }} &bull; {{ selectedScheduleEntry.slot }}</p>
+          </div>
+          <div class="schedule-detail-grid">
+            <div class="schedule-detail-item">
+              <span>Teacher</span>
+              <strong>{{ selectedScheduleEntry.teacher || selectedTeacher || '—' }}</strong>
+            </div>
+            <div class="schedule-detail-item">
+              <span>Room</span>
+              <strong>{{ selectedScheduleEntry.room || '—' }}</strong>
+            </div>
+            <div class="schedule-detail-item">
+              <span>Section</span>
+              <strong>{{ selectedScheduleSections || '—' }}</strong>
+            </div>
+            <div class="schedule-detail-item">
+              <span>Year</span>
+              <strong>{{ selectedScheduleEntry.year || '—' }}</strong>
+            </div>
+            <div v-if="selectedScheduleEntry.campus" class="schedule-detail-item schedule-detail-wide">
+              <span>Campus</span>
+              <strong>{{ selectedScheduleEntry.campus }}</strong>
+            </div>
+          </div>
+          <button class="schedule-modal-done" type="button" @click="closeScheduleDetails">Close</button>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- ═══ Logout Confirm Modal ═══ -->
     <Teleport to="body">
@@ -369,8 +434,25 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const timeSlots30 = timeOptions
 
 const showLogoutModal = ref(false)
+const selectedScheduleEntries = ref([])
 const loading = ref(false)
 const consultationSlots = ref([])
+
+const selectedScheduleEntry = computed(() => selectedScheduleEntries.value[0] || null)
+const selectedScheduleSections = computed(() => {
+  const sections = selectedScheduleEntries.value.map((entry) => entry.section).filter(Boolean)
+  return [...new Set(sections)].join(', ')
+})
+
+function openScheduleDetails(scheduleEntries) {
+  selectedScheduleEntries.value = Array.isArray(scheduleEntries)
+    ? scheduleEntries.filter(Boolean)
+    : [scheduleEntries].filter(Boolean)
+}
+
+function closeScheduleDetails() {
+  selectedScheduleEntries.value = []
+}
 
 function confirmLogout() {
   showLogoutModal.value = false
@@ -480,7 +562,7 @@ async function loadTeachers() {
           .map(u => {
             const name = `${u.firstName} ${u.lastName}`.trim()
             return {
-              id: u._id,
+              id: u._id || u.id,
               name,
               avatar: getTeacherAvatar(name, u.avatar || ''),
             }
@@ -662,7 +744,11 @@ function syncEntriesFromApi(apiEntries) {
       parallelGroupId: entry.parallelGroupId || null,
       parallelCount: entry.parallelCount || 1,
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map(s => ({ ...s })) : [],
-      color: isLunch ? 'color-gray' : (roomBasedColor || 'color-yellow'),
+      isSubstitute: Boolean(entry.isSubstitute),
+      subbedLabel: entry.subbedLabel || '',
+      color: isLunch
+        ? 'color-gray'
+        : (inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || 'color-yellow')),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -728,10 +814,10 @@ async function loadScheduleData() {
     const payload = await apiRequest('/schedules')
 
     // If admin is viewing a specific teacher, also fetch substitute assignments for today
-    if (viewMode.value === 'teacher' && selectedTeacher.value) {
+    if (viewMode.value === 'teacher' && selectedTeacher.value && selectedTeacherId.value) {
       try {
         const dateStr = new Date().toLocaleDateString('en-CA')
-        const subs = await apiRequest(`/substitutes?date=${encodeURIComponent(dateStr)}${selectedTeacherId.value ? `&teacherId=${encodeURIComponent(selectedTeacherId.value)}` : ''}`)
+        const subs = await apiRequest(`/substitutes?date=${encodeURIComponent(dateStr)}&teacherId=${encodeURIComponent(selectedTeacherId.value)}`)
         const assignments = Array.isArray(subs.assignments) ? subs.assignments : []
         if (assignments.length) {
           assignments.forEach((a) => {
@@ -744,17 +830,13 @@ async function loadScheduleData() {
             const selectedName = selectedTeacher.value || substituteName || originalName || 'Substitute'
             ;(a.entries || []).forEach((e) => {
               const isSelectedSubstitute = selectedTeacherId.value && String(substitute._id || substitute.id || '') === String(selectedTeacherId.value)
-              const subjectNote = isSelectedSubstitute
-                ? `${e.subject || 'Substitute'} (Sub for ${originalName})`
-                : `${e.subject || 'Substitute'} (Subbed by ${substituteName})`
-
               payload.entries = payload.entries || []
               payload.entries.push({
                 id: e.id || null,
                 day: dayName,
                 timeIn: e.timeIn,
                 timeOut: e.timeOut,
-                subject: subjectNote,
+                subject: e.subject || 'Substitute class',
                 room: e.room || '',
                 section: e.section || '',
                 year: e.year || '',
@@ -768,6 +850,10 @@ async function loadScheduleData() {
                 parallelCount: Number(e.parallelCount || 1),
                 parallelSlots: Array.isArray(e.parallelSlots) ? e.parallelSlots.map((slot) => ({ ...slot })) : [],
                 originalTeacherName: originalName,
+                substituteTeacherName: substituteName,
+                subbedLabel: isSelectedSubstitute
+                  ? `SUBBED TO ${originalName || 'ORIGINAL TEACHER'}`
+                  : `SUBBED BY ${substituteName || 'SUBSTITUTE TEACHER'}`,
                 isSubstitute: true,
               })
             })
@@ -1423,6 +1509,40 @@ function printSchedule() {
   overflow: hidden;
   cursor: default;
 }
+.sched-entry-clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+.sched-entry-clickable:hover,
+.sched-entry-clickable:focus-visible {
+  filter: brightness(1.06);
+  box-shadow: 0 4px 12px rgba(17, 24, 39, 0.24);
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: -3px;
+}
+.subbed-badge {
+  position: relative;
+  width: 100%;
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 5px;
+  background: #b42318;
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.sched-entry:has(.subbed-badge) .entry-teacher,
+.sched-entry:has(.subbed-badge) .entry-subject {
+  padding-right: 0;
+}
 .entry-teacher {
   font-size: 0.88rem; font-weight: 700; line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1455,10 +1575,13 @@ function printSchedule() {
 }
 
 /* Entry colors */
-.color-green  { background: #4b5563; color: #fff; }
+.free-time-cell { background: #ede9fe; }
+.free-time-label { color: #6d28d9; font-weight: 600; }
+.color-green  { background: #1f6b45; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
 .color-orange { background: #f4a261; color: #5a2d00; }
 .color-blue   { background: #4a90d9; color: #fff; }
+.color-gray   { background: #9ca3af; color: #1f2937; }
 .color-purple { background: #7b5ea7; color: #fff; }
 .color-red    { background: #e63946; color: #fff; }
 
@@ -1468,6 +1591,106 @@ function printSchedule() {
   background: rgba(0,0,0,0.35);
   display: flex; align-items: center; justify-content: center;
   z-index: 1000;
+}
+.schedule-details-modal {
+  position: relative;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border-radius: 18px;
+  background: #fff;
+  padding: 28px;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.22);
+}
+.schedule-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.schedule-modal-heading {
+  padding-right: 32px;
+  margin-bottom: 22px;
+}
+.schedule-modal-heading h2 {
+  margin: 7px 0 4px;
+  color: #111827;
+  font-size: 1.35rem;
+}
+.schedule-modal-heading p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+.schedule-modal-subbed {
+  display: inline-block;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #fee4e2;
+  color: #b42318;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.schedule-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.schedule-detail-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+  padding: 12px;
+}
+.schedule-detail-item span {
+  color: #6b7280;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.schedule-detail-item strong {
+  overflow-wrap: anywhere;
+  color: #1f2937;
+  font-size: 0.92rem;
+}
+.schedule-detail-wide {
+  grid-column: 1 / -1;
+}
+.schedule-modal-done {
+  display: block;
+  margin: 22px 0 0 auto;
+  border: 0;
+  border-radius: 9px;
+  background: #4b5563;
+  color: #fff;
+  padding: 10px 24px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.schedule-modal-done:hover {
+  background: #374151;
+}
+@media (max-width: 520px) {
+  .schedule-details-modal { padding: 24px 18px 20px; }
+  .schedule-detail-grid { grid-template-columns: 1fr; }
+  .schedule-detail-wide { grid-column: auto; }
 }
 .logout-modal-box {
   background: #fff; border-radius: 20px;
