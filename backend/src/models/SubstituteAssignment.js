@@ -28,6 +28,7 @@ const SubstituteAssignmentSchema = new mongoose.Schema(
     originalTeacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     substituteTeacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     date: { type: Date, required: true },
+    academicTermId: { type: mongoose.Schema.Types.ObjectId, ref: 'AcademicTerm', default: null, index: true },
     entries: { type: [SubstituteEntrySchema], default: [] },
     // expiresAt drives MongoDB TTL index to remove records after expiration
     expiresAt: { type: Date, index: { expireAfterSeconds: 0 } },

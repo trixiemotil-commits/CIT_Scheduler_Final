@@ -67,6 +67,16 @@ async function listTerms(req, res) {
   }
 }
 
+async function getInUseTerm(_req, res) {
+  try {
+    const term = await AcademicTerm.findOne({ isInUse: true }).sort({ usedAt: -1, createdAt: -1 }).lean();
+    return res.json({ term });
+  } catch (error) {
+    console.error("Failed to load in-use academic term:", error);
+    return res.status(500).json({ message: "Failed to load in-use academic term.", error: error.message });
+  }
+}
+
 async function getPublishedTerm(_req, res) {
   try {
     const term = await AcademicTerm.findOne({ isPublished: true }).sort({ publishedAt: -1, createdAt: -1 }).lean();
@@ -151,6 +161,30 @@ async function updateTerm(req, res) {
   }
 }
 
+async function useTerm(req, res) {
+  try {
+    const termId = normalizeString(req.params?.id);
+    if (!termId) {
+      return res.status(400).json({ message: "Invalid term id." });
+    }
+
+    const target = await AcademicTerm.findById(termId);
+    if (!target) {
+      return res.status(404).json({ message: "Academic term not found." });
+    }
+
+    await AcademicTerm.updateMany({}, { $set: { isInUse: false, usedAt: null } });
+    target.isInUse = true;
+    target.usedAt = new Date();
+    await target.save();
+
+    return res.json({ term: target });
+  } catch (error) {
+    console.error("Failed to set academic term in use:", error);
+    return res.status(500).json({ message: "Failed to set academic term in use.", error: error.message });
+  }
+}
+
 async function publishTerm(req, res) {
   try {
     const termId = normalizeString(req.params?.id);
@@ -177,9 +211,11 @@ async function publishTerm(req, res) {
 
 module.exports = {
   listTerms,
+  getInUseTerm,
   getPublishedTerm,
   createTerm,
   updateTerm,
+  useTerm,
   publishTerm,
   getTermKey,
 };

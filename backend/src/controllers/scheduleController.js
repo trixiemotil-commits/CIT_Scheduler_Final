@@ -1,8 +1,10 @@
+const mongoose = require("mongoose");
 const ScheduleEntry = require("../models/ScheduleEntry");
 const ScheduleTable = require("../models/ScheduleTable");
 const User = require("../models/User");
 const ConsultationAvailability = require("../models/ConsultationAvailability");
 const ConsultationRequest = require("../models/ConsultationRequest");
+const AcademicTerm = require("../models/AcademicTerm");
 
 const YEAR_VALUES = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 const DAY_VALUES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -10,6 +12,27 @@ let ensureDefaultsPromise = null;
 
 function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function resolveAcademicTermReference(value) {
+  if (!value) return null;
+  if (value instanceof mongoose.Types.ObjectId) return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return mongoose.Types.ObjectId.isValid(trimmed) ? new mongoose.Types.ObjectId(trimmed) : null;
+  }
+  return null;
+}
+
+async function getActiveAcademicTermReference() {
+  try {
+    const term = await AcademicTerm.findOne({ isInUse: true }).sort({ usedAt: -1, createdAt: -1 }).select("_id").lean();
+    return term?._id || null;
+  } catch (error) {
+    console.error("Failed to resolve active academic term:", error);
+    return null;
+  }
 }
 
 function parseTimeToMinutes(value) {
@@ -64,6 +87,7 @@ function toClientEntry(entry) {
     id: entry._id.toString(),
     tableLabel: entry.tableLabel,
     entryType: entry.entryType || "class",
+    academicTermId: entry.academicTermId?.toString?.() || null,
     year: entry.year,
     section: entry.section,
     day: entry.day,
@@ -156,7 +180,7 @@ function normalizeParallelSlots(parallelSlots) {
     .filter((slot) => slot.section);
 }
 
-function buildEntryDocs(payload) {
+function buildEntryDocs(payload, academicTermId = null) {
   const teacher  = normalizeString(payload.teacher);
   const tableLabel = teacher;  // schedules are stored per teacher
   const year = normalizeString(payload.baseYear || payload.year);
@@ -217,6 +241,7 @@ function buildEntryDocs(payload) {
       parallelCount,
       parallelSlots: slots,
       color: colorForSchedule(slot.room, subject),
+      academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
       addedAt,
     }));
   }
@@ -248,12 +273,13 @@ function buildEntryDocs(payload) {
       parallelCount: 1,
       parallelSlots: [],
       color: colorForSchedule(room, subject),
+      academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
       addedAt,
     },
   ];
 }
 
-function buildLunchBreakDoc(payload) {
+function buildLunchBreakDoc(payload, academicTermId = null) {
   const teacher = normalizeString(payload.teacher);
   const tableLabel = teacher;
   const day = normalizeString(payload.day);
@@ -291,6 +317,7 @@ function buildLunchBreakDoc(payload) {
     parallelCount: 1,
     parallelSlots: [],
     color: "color-gray",
+    academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
     addedAt: new Date(),
   };
 }
@@ -349,10 +376,18 @@ async function findConflict(doc, excludedIds = []) {
     overlapFilter._id = { $nin: excludedIds };
   }
 
+  // If this doc targets the active (in-use) academic term, restrict
+  // conflict checks to entries that belong to the same term. Otherwise
+  // keep legacy behavior (check across terms).
+  const activeTermRef = await getActiveAcademicTermReference();
+  const restrictToTerm = Boolean(doc.academicTermId && activeTermRef && String(doc.academicTermId) === String(activeTermRef));
+  const termFilter = restrictToTerm ? { academicTermId: doc.academicTermId } : {};
+
   // Rule 1: same teacher at the same time (any room)
   const teacherConflict = await ScheduleEntry.findOne({
     ...overlapFilter,
     teacher: doc.teacher,
+    ...termFilter,
   }).lean();
 
   if (teacherConflict) {
@@ -364,6 +399,7 @@ async function findConflict(doc, excludedIds = []) {
     const roomConflict = await ScheduleEntry.findOne({
       ...overlapFilter,
       room: doc.room,
+      ...termFilter,
     }).lean();
 
     if (roomConflict) {
@@ -372,7 +408,8 @@ async function findConflict(doc, excludedIds = []) {
   }
 
   // Rule 3: teacher has a consultation slot that overlaps this class time
-  const consultSlots = await ConsultationAvailability.find({ teacher: doc.teacher, dayOfWeek: doc.day }).lean();
+  const consultQuery = { teacher: doc.teacher, dayOfWeek: doc.day, ...(restrictToTerm ? { academicTermId: doc.academicTermId } : {}) };
+  const consultSlots = await ConsultationAvailability.find(consultQuery).lean();
   for (const slot of consultSlots) {
     const slotStart = parseTimeToMinutes(slot.startTime);
     const slotEnd   = parseTimeToMinutes(slot.endTime);
@@ -424,6 +461,11 @@ async function listSchedules(req, res) {
     const tableLabel = normalizeString(req.query.tableLabel);
     const teacher = normalizeString(req.query.teacher);
     const filter = {};
+    const academicTermId = resolveAcademicTermReference(req.query?.academicTermId) || await getActiveAcademicTermReference();
+
+    if (academicTermId) {
+      filter.academicTermId = academicTermId;
+    }
 
     if (tableLabel) {
       filter.tableLabel = tableLabel;
@@ -458,8 +500,9 @@ async function listSchedules(req, res) {
 async function createSchedule(req, res) {
   try {
     const payload = req.body || {};
+    const academicTermId = resolveAcademicTermReference(payload?.academicTermId) || await getActiveAcademicTermReference();
     const isLunchBreak = normalizeString(payload.entryType).toLowerCase() === "lunch";
-    const docs = isLunchBreak ? [buildLunchBreakDoc(payload)] : buildEntryDocs(payload);
+    const docs = isLunchBreak ? [buildLunchBreakDoc(payload, academicTermId)] : buildEntryDocs(payload, academicTermId);
     await ensureTableExists(docs[0].tableLabel);
 
     for (const doc of docs) {
@@ -492,7 +535,8 @@ async function createSchedule(req, res) {
 
 async function createLunchBreak(req, res) {
   try {
-    const doc = buildLunchBreakDoc(req.body || {});
+    const academicTermId = resolveAcademicTermReference(req.body?.academicTermId) || await getActiveAcademicTermReference();
+    const doc = buildLunchBreakDoc(req.body || {}, academicTermId);
     await ensureTableExists(doc.tableLabel);
 
     const conflictMessage = await findConflict(doc);
@@ -588,7 +632,8 @@ async function replaceSchedule(req, res) {
       return res.status(400).json({ message: "Missing old and next schedule payload." });
     }
 
-    const docs = buildEntryDocs(next);
+    const academicTermId = resolveAcademicTermReference(next?.academicTermId) || await getActiveAcademicTermReference();
+    const docs = buildEntryDocs(next, academicTermId);
     await ensureTableExists(docs[0].tableLabel);
 
     const excludedIds = await getExcludedIds(oldDescriptor);

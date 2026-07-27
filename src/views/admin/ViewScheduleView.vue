@@ -81,9 +81,18 @@
             <template v-else-if="viewMode === 'teacher'">{{ selectedTeacher ? 'Weekly teacher schedule — read only' : 'Select a teacher to view their schedule' }}</template>
           </p>
         </div>
+        <div class="header-right">
+          <div v-if="selectedTermLabel" class="term-banner">
+            <span>Viewing: {{ selectedTermLabel }}</span>
+          </div>
+          <div v-if="hasTermSwitcher" class="term-switcher header-term-switcher">
+            <button type="button" class="term-switch-btn" :class="{ active: isSelectedTerm(activeTerm) }" @click="selectTerm(activeTerm)">In-use</button>
+            <button type="button" class="term-switch-btn" :class="{ active: isSelectedTerm(publishedTerm) }" @click="selectTerm(publishedTerm)">Published</button>
+          </div>
+        </div>
       </header>
 
-      <!-- ── Mode Selection ── -->
+      <!-- ── Mode Selection -->
       <div v-if="!viewMode" class="mode-select-container">
         <p class="step-hint">Choose how you want to view schedules</p>
         <div class="mode-grid">
@@ -412,6 +421,7 @@
 </template>
 
 <script setup>
+import Swal from 'sweetalert2'
 import { getToken, getUser, logout } from '@/auth.js'
 import {
     colorForRoom,
@@ -429,6 +439,48 @@ const currentRoute = computed(() => route.path)
 
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const activeTerm = ref(null)
+const publishedTerm = ref(null)
+const selectedTerm = ref(null)
+const activeTermLabel = computed(() => {
+  if (!activeTerm.value) return ''
+  return `${activeTerm.value.schoolYear} · ${activeTerm.value.semester}`
+})
+const selectedTermLabel = computed(() => {
+  if (!selectedTerm.value) return activeTermLabel.value
+  return `${selectedTerm.value.schoolYear} · ${selectedTerm.value.semester}`
+})
+function getTermId(term) {
+  if (!term) return ''
+  return String(term._id || term.id || '').trim()
+}
+function getTermLabel(term) {
+  if (!term) return ''
+  return `${term.schoolYear || ''} · ${term.semester || ''}`.trim()
+}
+function getSelectedTermId() {
+  return getTermId(selectedTerm.value || activeTerm.value || publishedTerm.value)
+}
+function hasTermSwitcher() {
+  const inUseId = getTermId(activeTerm.value)
+  const publishedId = getTermId(publishedTerm.value)
+  return Boolean(inUseId && publishedId && inUseId !== publishedId)
+}
+function isSelectedTerm(term) {
+  return getTermId(term) === getTermId(selectedTerm.value)
+}
+function selectTerm(term) {
+  selectedTerm.value = term || activeTerm.value || publishedTerm.value || null
+}
+
+watch(selectedTerm, async () => {
+  if (viewMode.value === 'room' || viewMode.value === 'teacher') {
+    await loadScheduleData()
+  }
+  if (viewMode.value === 'teacher') {
+    await fetchConsultationsForTeacher()
+  }
+})
 
 /* 30-minute grid slots (matches AddScheduleView) */
 const timeSlots30 = timeOptions
@@ -552,6 +604,45 @@ function getTeacherAvatar(name = '', avatar = '') {
   return `https://ui-avatars.com/api/?name=${safeName}&background=DDECE5&color=1B4332`
 }
 
+async function loadTermContext() {
+  try {
+    const [inUseResponse, publishedResponse] = await Promise.all([
+      apiRequest('/academic-terms/in-use').catch(() => ({ term: null })),
+      apiRequest('/academic-terms/published').catch(() => ({ term: null })),
+    ])
+    activeTerm.value = inUseResponse.term || null
+    publishedTerm.value = publishedResponse.term || null
+    if (!selectedTerm.value) {
+      const inUseId = getTermId(activeTerm.value)
+      const publishedId = getTermId(publishedTerm.value)
+      if (inUseId && (!publishedId || inUseId === publishedId)) {
+        selectedTerm.value = activeTerm.value || publishedTerm.value || null
+      }
+    }
+  } catch (_) {
+    activeTerm.value = null
+    publishedTerm.value = null
+  }
+}
+
+async function ensureTermSelection() {
+  const inUseId = getTermId(activeTerm.value)
+  const publishedId = getTermId(publishedTerm.value)
+  if (!inUseId || !publishedId || inUseId === publishedId) {
+    selectedTerm.value = activeTerm.value || publishedTerm.value || null
+    return
+  }
+
+  if (selectedTerm.value) {
+    const selectedId = getTermId(selectedTerm.value)
+    if (selectedId === inUseId || selectedId === publishedId) {
+      return
+    }
+  }
+
+  selectedTerm.value = activeTerm.value || publishedTerm.value || null
+}
+
 async function loadTeachers() {
   if (teacherList.value.length) return
   loadingTeachers.value = true
@@ -581,7 +672,10 @@ async function fetchConsultationsForTeacher() {
     return
   }
   try {
-    const res = await apiRequest(`/consultations?teacher=${encodeURIComponent(selectedTeacher.value)}`)
+    const termId = getSelectedTermId()
+    const query = new URLSearchParams({ teacher: selectedTeacher.value })
+    if (termId) query.set('academicTermId', termId)
+    const res = await apiRequest(`/consultations?${query.toString()}`)
     consultationSlots.value = res.consultations || []
   } catch (_) {
     consultationSlots.value = []
@@ -812,13 +906,17 @@ const roomHasNoEntries = computed(() => {
 async function loadScheduleData() {
   loading.value = true
   try {
-    const payload = await apiRequest('/schedules')
+    const termId = getSelectedTermId()
+    const scheduleQuery = termId ? `?academicTermId=${encodeURIComponent(termId)}` : ''
+    const payload = await apiRequest(`/schedules${scheduleQuery}`)
 
     // If admin is viewing a specific teacher, also fetch substitute assignments for today
     if (viewMode.value === 'teacher' && selectedTeacher.value && selectedTeacherId.value) {
       try {
         const dateStr = new Date().toLocaleDateString('en-CA')
-        const subs = await apiRequest(`/substitutes?date=${encodeURIComponent(dateStr)}&teacherId=${encodeURIComponent(selectedTeacherId.value)}`)
+        const substituteQuery = new URLSearchParams({ date: dateStr, teacherId: selectedTeacherId.value })
+        if (termId) substituteQuery.set('academicTermId', termId)
+        const subs = await apiRequest(`/substitutes?${substituteQuery.toString()}`)
         const assignments = Array.isArray(subs.assignments) ? subs.assignments : []
         if (assignments.length) {
           assignments.forEach((a) => {
@@ -873,7 +971,11 @@ async function loadScheduleData() {
   }
 }
 
-onMounted(loadScheduleData)
+onMounted(async () => {
+  await loadTermContext()
+  await ensureTermSelection()
+  await loadScheduleData()
+})
 
 /* ── Print (color-coded, 30-min intervals) ── */
 function printSchedule() {
@@ -1106,7 +1208,8 @@ function printSchedule() {
   gap: 16px;
 }
 .header-left { display: flex; flex-direction: column; gap: 4px; }
-.header-right { flex-shrink: 0; padding-top: 4px; }
+.header-right { flex-shrink: 0; padding-top: 4px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.term-banner { color: #334155; font-size: 0.95rem; font-weight: 600; }
 .page-title { font-size: 2rem; font-weight: 600; color: #4b5563; letter-spacing: -0.5px; line-height: 1.2; }
 .page-sub   { font-size: 0.95rem; color: #777; margin-top: 2px; }
 

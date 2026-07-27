@@ -30,6 +30,14 @@ const academicTermSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    isInUse: {
+      type: Boolean,
+      default: false,
+    },
+    usedAt: {
+      type: Date,
+      default: null,
+    },
     isPublished: {
       type: Boolean,
       default: false,
@@ -50,6 +58,7 @@ const academicTermSchema = new mongoose.Schema(
 );
 
 academicTermSchema.index({ schoolYear: 1, semester: 1 }, { unique: true });
+academicTermSchema.index({ isInUse: 1 });
 academicTermSchema.index({ isPublished: 1 });
 
 module.exports = mongoose.model("AcademicTerm", academicTermSchema);

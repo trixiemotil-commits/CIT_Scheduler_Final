@@ -1,8 +1,10 @@
+const mongoose = require("mongoose");
 const ConsultationAvailability = require("../models/ConsultationAvailability");
 const ScheduleEntry = require("../models/ScheduleEntry");
 const ConsultationRequest = require("../models/ConsultationRequest");
 const ConsultationLog = require("../models/ConsultationLog");
 const User = require("../models/User");
+const AcademicTerm = require("../models/AcademicTerm");
 
 const MAX_WEEKLY_MINUTES = 240; // 4 hours
 
@@ -35,6 +37,10 @@ function minutesTo24h(totalMinutes) {
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+function normalizeString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function normalizeTeacherFullName(userDoc) {
   return `${userDoc.firstName || ""} ${userDoc.lastName || ""}`.trim();
 }
@@ -60,6 +66,27 @@ async function findTeacherUserByIdentifier(identifier) {
     teachers.find((t) => normalizeTeacherFullName(t).toLowerCase() === normalizedKey)
     || null
   );
+}
+
+function resolveAcademicTermReference(value) {
+  if (!value) return null;
+  if (value instanceof mongoose.Types.ObjectId) return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return mongoose.Types.ObjectId.isValid(trimmed) ? new mongoose.Types.ObjectId(trimmed) : null;
+  }
+  return null;
+}
+
+async function getActiveAcademicTermReference() {
+  try {
+    const term = await AcademicTerm.findOne({ isInUse: true }).sort({ usedAt: -1, createdAt: -1 }).select("_id").lean();
+    return term?._id || null;
+  } catch (error) {
+    console.error("Failed to resolve active academic term:", error);
+    return null;
+  }
 }
 
 function nowContext() {
@@ -215,6 +242,7 @@ function toClient(doc) {
     startTime: doc.startTime,
     endTime: doc.endTime,
     durationMinutes: slotDurationMinutes(doc.startTime, doc.endTime),
+    academicTermId: doc.academicTermId?.toString?.() || null,
   };
 }
 
@@ -886,6 +914,11 @@ async function listConsultations(req, res) {
     if (req.query.teacher) filter.teacher = req.query.teacher;
     if (req.query.employeeId) filter.employeeId = req.query.employeeId;
 
+    const academicTermId = resolveAcademicTermReference(req.query?.academicTermId) || await getActiveAcademicTermReference();
+    if (academicTermId) {
+      filter.academicTermId = academicTermId;
+    }
+
     const docs = await ConsultationAvailability.find(filter).sort({ dayOfWeek: 1, startTime: 1 });
     return res.json({ consultations: docs.map(toClient) });
   } catch (error) {
@@ -927,7 +960,8 @@ async function createConsultation(req, res) {
       return res.status(409).json({ message: classConflict });
     }
 
-    const doc = await ConsultationAvailability.create({ employeeId, teacher, dayOfWeek, startTime, endTime });
+    const academicTermId = resolveAcademicTermReference(req.body?.academicTermId) || await getActiveAcademicTermReference();
+    const doc = await ConsultationAvailability.create({ employeeId, teacher, dayOfWeek, startTime, endTime, academicTermId });
     return res.status(201).json({ message: "Consultation slot created.", consultation: toClient(doc) });
   } catch (error) {
     if (error?.code === 11000) {
@@ -978,6 +1012,7 @@ async function updateConsultation(req, res) {
     target.dayOfWeek  = newDay;
     target.startTime  = newStart;
     target.endTime    = newEnd;
+    target.academicTermId = target.academicTermId || (await getActiveAcademicTermReference()) || null;
     await target.save();
 
     return res.json({ message: "Consultation slot updated.", consultation: toClient(target) });
@@ -1008,6 +1043,11 @@ async function getWeeklySummary(req, res) {
     const filter = {};
     if (req.query.teacher)    filter.teacher    = req.query.teacher;
     if (req.query.employeeId) filter.employeeId = req.query.employeeId;
+
+    const academicTermId = resolveAcademicTermReference(req.query?.academicTermId) || await getActiveAcademicTermReference();
+    if (academicTermId) {
+      filter.academicTermId = academicTermId;
+    }
 
     const docs = await ConsultationAvailability.find(filter);
     const weeklyUsedMinutes = docs.reduce((sum, d) => sum + slotDurationMinutes(d.startTime, d.endTime), 0);

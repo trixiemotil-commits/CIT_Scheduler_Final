@@ -2,18 +2,22 @@ const express = require("express");
 const { authRequired, authorizeRoles } = require("../middleware/authMiddleware");
 const {
   listTerms,
+  getInUseTerm,
   getPublishedTerm,
   createTerm,
   updateTerm,
+  useTerm,
   publishTerm,
 } = require("../controllers/academicTermController");
 
 const router = express.Router();
 
+router.get("/in-use", authRequired, authorizeRoles("admin", "teacher", "student"), getInUseTerm);
 router.get("/published", authRequired, authorizeRoles("admin", "teacher", "student"), getPublishedTerm);
 router.get("/", authRequired, authorizeRoles("admin"), listTerms);
 router.post("/", authRequired, authorizeRoles("admin"), createTerm);
 router.patch("/:id", authRequired, authorizeRoles("admin"), updateTerm);
+router.post("/:id/use", authRequired, authorizeRoles("admin"), useTerm);
 router.post("/:id/publish", authRequired, authorizeRoles("admin"), publishTerm);
 
 module.exports = router;

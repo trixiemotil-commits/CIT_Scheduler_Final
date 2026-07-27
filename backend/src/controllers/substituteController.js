@@ -1,5 +1,11 @@
+const mongoose = require('mongoose')
 const SubstituteAssignment = require('../models/SubstituteAssignment')
 const User = require('../models/User')
+const AcademicTerm = require('../models/AcademicTerm')
+
+function normalizeString(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
 
 function parseDateOnly(date) {
   if (typeof date !== 'string') return null
@@ -15,6 +21,27 @@ function parseDateOnly(date) {
 function startOfDayUTC(date) {
   const d = new Date(date)
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0))
+}
+
+function resolveAcademicTermReference(value) {
+  if (!value) return null
+  if (value instanceof mongoose.Types.ObjectId) return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    return mongoose.Types.ObjectId.isValid(trimmed) ? new mongoose.Types.ObjectId(trimmed) : null
+  }
+  return null
+}
+
+async function getActiveAcademicTermReference() {
+  try {
+    const term = await AcademicTerm.findOne({ isInUse: true }).sort({ usedAt: -1, createdAt: -1 }).select('_id').lean()
+    return term?._id || null
+  } catch (error) {
+    console.error('Failed to resolve active academic term:', error)
+    return null
+  }
 }
 
 function endOfDayUTC(date) {
@@ -58,6 +85,8 @@ async function createAssignment(req, res) {
     const dt = parsedDate || new Date(date)
     if (isNaN(dt.getTime())) return res.status(400).json({ message: 'Invalid date.' })
 
+    const academicTermId = resolveAcademicTermReference(req.body?.academicTermId) || await getActiveAcademicTermReference()
+
     // compute expiresAt: next day at 6:00am UTC
     const expiresAt = nextDaySixAMUTC(dt)
     const cleanEntries = Array.isArray(entries)
@@ -81,6 +110,7 @@ async function createAssignment(req, res) {
         originalTeacher,
         substituteTeacher,
         date: dateKey,
+        academicTermId,
         entries: cleanEntries,
         expiresAt,
       })
@@ -98,6 +128,7 @@ async function createAssignment(req, res) {
       }
       assignment.entries = existing
       assignment.expiresAt = expiresAt
+      assignment.academicTermId = assignment.academicTermId || academicTermId || null
       await assignment.save()
     }
 
@@ -138,6 +169,7 @@ async function syncAssignments(req, res) {
     }
 
     const dateKey = startOfDayUTC(target)
+    const academicTermId = resolveAcademicTermReference(req.body?.academicTermId) || await getActiveAcademicTermReference()
     const expiresAt = nextDaySixAMUTC(target)
     const operations = [
       {
@@ -154,6 +186,7 @@ async function syncAssignments(req, res) {
             originalTeacher,
             substituteTeacher,
             date: dateKey,
+            academicTermId,
             entries,
             expiresAt,
           },
@@ -189,9 +222,14 @@ async function listAssignments(req, res) {
       return res.json({ assignments: [] })
     }
     const target = date ? (parseDateOnly(date) || new Date(date)) : new Date()
+    const academicTermId = resolveAcademicTermReference(req.query?.academicTermId) || await getActiveAcademicTermReference()
     const q = {
       date: { $gte: startOfDayUTC(target), $lte: endOfDayUTC(target) },
       $or: [{ substituteTeacher: teacherId }, { originalTeacher: teacherId }],
+    }
+
+    if (academicTermId) {
+      q.academicTermId = academicTermId
     }
 
     let assignments = await SubstituteAssignment.find(q)

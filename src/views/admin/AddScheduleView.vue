@@ -48,10 +48,6 @@
       <!-- Page Header -->
       <header class="main-header">
         <div class="header-left">
-          <div v-if="publishedTermLabel" class="term-banner">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 4v16"/></svg>
-            <span>Published term: {{ publishedTermLabel }}</span>
-          </div>
           <div v-if="addMode" class="breadcrumb">
             <button class="bc-btn" @click="resetAddMode">Add Schedule</button>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
@@ -88,6 +84,15 @@
             <template v-else-if="addMode === 'teacher'">{{ selectedTeacher ? 'Click cells to add or edit entries' : 'Select a teacher to assign schedules' }}</template>
             <template v-else-if="addMode === 'room'">{{ contextRoom ? 'Click empty slots to add entries for this room' : contextFloor ? 'Select a room' : 'Choose a floor first' }}</template>
           </p>
+        </div>
+        <div class="header-right">
+          <div v-if="selectedTermLabel" class="term-banner">
+            <span>Viewing: {{ selectedTermLabel }}</span>
+          </div>
+          <div v-if="hasTermSwitcher" class="term-switcher header-term-switcher">
+            <button type="button" class="term-switch-btn" :class="{ active: isSelectedTerm(activeTerm) }" @click="selectTerm(activeTerm)">In-use</button>
+            <button type="button" class="term-switch-btn" :class="{ active: isSelectedTerm(publishedTerm) }" @click="selectTerm(publishedTerm)">Published</button>
+          </div>
         </div>
         <div v-if="scheduleViewMode === 'list' || ((addMode === 'teacher' && selectedTeacher) || (addMode === 'room' && contextRoom))" class="header-actions">
           <div class="view-toggle">
@@ -1129,20 +1134,48 @@ const currentRoute = computed(() => route.path)
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const teacherUserMap = ref({})
+const activeTerm = ref(null)
 const publishedTerm = ref(null)
-const publishedTermLabel = computed(() => {
-  if (!publishedTerm.value) return ''
-  return `${publishedTerm.value.schoolYear} · ${publishedTerm.value.semester}`
+const selectedTerm = ref(null)
+const activeTermLabel = computed(() => {
+  if (!activeTerm.value) return ''
+  return `${activeTerm.value.schoolYear} · ${activeTerm.value.semester}`
 })
+const selectedTermLabel = computed(() => {
+  if (!selectedTerm.value) return activeTermLabel.value
+  return `${selectedTerm.value.schoolYear} · ${selectedTerm.value.semester}`
+})
+function getTermId(term) {
+  if (!term) return ''
+  return String(term._id || term.id || '').trim()
+}
+function getTermLabel(term) {
+  if (!term) return ''
+  return `${term.schoolYear || ''} · ${term.semester || ''}`.trim()
+}
+function getSelectedTermId() {
+  return getTermId(selectedTerm.value || activeTerm.value || publishedTerm.value)
+}
+function hasTermSwitcher() {
+  const inUseId = getTermId(activeTerm.value)
+  const publishedId = getTermId(publishedTerm.value)
+  return Boolean(inUseId && publishedId && inUseId !== publishedId)
+}
+function isSelectedTerm(term) {
+  return getTermId(term) === getTermId(selectedTerm.value)
+}
+function selectTerm(term) {
+  selectedTerm.value = term || activeTerm.value || publishedTerm.value || null
+}
 const effectiveYears = computed(() => {
-  const sectionCounts = publishedTerm.value?.sectionCounts || {}
+  const sectionCounts = activeTerm.value?.sectionCounts || {}
   const mapped = Object.keys(sectionCounts)
     .filter(year => Number(sectionCounts[year]) > 0)
     .sort((a, b) => years.indexOf(a) - years.indexOf(b))
   return mapped.length ? mapped : years
 })
 const effectiveRoomOptions = computed(() => {
-  const rooms = Array.isArray(publishedTerm.value?.rooms) ? publishedTerm.value.rooms : []
+  const rooms = Array.isArray(activeTerm.value?.rooms) ? activeTerm.value.rooms : []
   if (rooms.length) {
     return rooms.map((room) => {
       if (typeof room === 'string') {
@@ -1159,8 +1192,8 @@ const effectiveRoomOptions = computed(() => {
 })
 
 function getSectionsForYear(year) {
-  const count = Number(publishedTerm.value?.sectionCounts?.[year])
-  const names = Array.isArray(publishedTerm.value?.sectionNames?.[year]) ? publishedTerm.value.sectionNames[year] : []
+  const count = Number(activeTerm.value?.sectionCounts?.[year])
+  const names = Array.isArray(activeTerm.value?.sectionNames?.[year]) ? activeTerm.value.sectionNames[year] : []
   if (Number.isFinite(count) && count > 0) {
     if (names.length) {
       return names.slice(0, count)
@@ -1250,13 +1283,43 @@ function getTeacherAvatar(name = '', avatar = '') {
   return `https://ui-avatars.com/api/?name=${safeName}&background=DDECE5&color=1B4332`
 }
 
-async function loadPublishedTerm() {
+async function loadTermContext() {
   try {
-    const response = await apiRequest('/academic-terms/published')
-    publishedTerm.value = response.term || null
+    const [inUseResponse, publishedResponse] = await Promise.all([
+      apiRequest('/academic-terms/in-use').catch(() => ({ term: null })),
+      apiRequest('/academic-terms/published').catch(() => ({ term: null })),
+    ])
+    activeTerm.value = inUseResponse.term || null
+    publishedTerm.value = publishedResponse.term || null
+    if (!selectedTerm.value) {
+      const inUseId = getTermId(activeTerm.value)
+      const publishedId = getTermId(publishedTerm.value)
+      if (inUseId && (!publishedId || inUseId === publishedId)) {
+        selectedTerm.value = activeTerm.value || publishedTerm.value || null
+      }
+    }
   } catch (_) {
+    activeTerm.value = null
     publishedTerm.value = null
   }
+}
+
+async function ensureTermSelection() {
+  const inUseId = getTermId(activeTerm.value)
+  const publishedId = getTermId(publishedTerm.value)
+  if (!inUseId || !publishedId || inUseId === publishedId) {
+    selectedTerm.value = activeTerm.value || publishedTerm.value || null
+    return
+  }
+
+  if (selectedTerm.value) {
+    const selectedId = getTermId(selectedTerm.value)
+    if (selectedId === inUseId || selectedId === publishedId) {
+      return
+    }
+  }
+
+  selectedTerm.value = activeTerm.value || publishedTerm.value || null
 }
 
 async function loadAddTeachers() {
@@ -1420,10 +1483,22 @@ const consultationSlots = ref([])
 async function fetchConsultationsForTeacher() {
   if (!selectedTeacher.value) { consultationSlots.value = []; return }
   try {
-    const res = await apiRequest(`/consultations?teacher=${encodeURIComponent(selectedTeacher.value)}`)
+    const termId = getSelectedTermId()
+    const query = new URLSearchParams({ teacher: selectedTeacher.value })
+    if (termId) query.set('academicTermId', termId)
+    const res = await apiRequest(`/consultations?${query.toString()}`)
     consultationSlots.value = res.consultations || []
   } catch (_) { consultationSlots.value = [] }
 }
+
+watch(selectedTerm, async () => {
+  if (selectedTeacher.value || addMode.value === 'teacher' || addMode.value === 'room') {
+    await refreshScheduleData(selectedTeacher.value || '')
+  }
+  if (selectedTeacher.value) {
+    await fetchConsultationsForTeacher()
+  }
+})
 
 /* ── 30-min grid helpers ── */
 
@@ -1646,9 +1721,11 @@ function syncEntriesFromApi(apiEntries) {
 }
 
 async function refreshScheduleData(preferredLabel = '') {
+  const termId = getSelectedTermId()
+  const scheduleQuery = termId ? `?academicTermId=${encodeURIComponent(termId)}` : ''
   const [tablesPayload, schedulesPayload] = await Promise.all([
     apiRequest('/schedules/tables'),
-    apiRequest('/schedules'),
+    apiRequest(`/schedules${scheduleQuery}`),
   ])
 
   const teacherUser = selectedTeacher.value ? teacherUserMap.value[selectedTeacher.value] : null
@@ -1656,9 +1733,9 @@ async function refreshScheduleData(preferredLabel = '') {
   if (addMode.value === 'teacher' && selectedTeacher.value && teacherId) {
     try {
       const date = new Date().toLocaleDateString('en-CA')
-      const substitutePayload = await apiRequest(
-        `/substitutes?date=${encodeURIComponent(date)}&teacherId=${encodeURIComponent(teacherId)}`
-      )
+      const substituteQuery = new URLSearchParams({ date, teacherId })
+      if (termId) substituteQuery.set('academicTermId', termId)
+      const substitutePayload = await apiRequest(`/substitutes?${substituteQuery.toString()}`)
       const assignments = Array.isArray(substitutePayload.assignments) ? substitutePayload.assignments : []
       assignments.forEach((assignment) => {
         const assignmentDate = new Date(assignment.date)
@@ -1703,6 +1780,10 @@ function checkScheduleConflict(payload, skipFilter = null) {
     ? (payload.parallelSlots || []).map(s => s.room).filter(Boolean)
     : [payload.room].filter(Boolean)
 
+  const selectedId = getSelectedTermId()
+  const inUseId = getTermId(activeTerm.value)
+  const restrictByTerm = Boolean(selectedId && inUseId && selectedId === inUseId)
+
   if (payload.parallel) {
     const slots = (payload.parallelSlots || []).filter(Boolean)
     const sections = slots.map(s => String(s.section || '').trim()).filter(Boolean)
@@ -1729,6 +1810,10 @@ function checkScheduleConflict(payload, skipFilter = null) {
 
   Object.entries(entries).forEach(([key, entry]) => {
     if (skipFilter && skipFilter(key, entry)) return
+    if (restrictByTerm) {
+      const entryTermId = String(entry.academicTermId || '').trim()
+      if (!entryTermId || entryTermId !== String(selectedId)) return
+    }
     const isSameDay     = entry.day === payload.day
     const isTimeOverlap = newTimeIn < parseTime(entry.timeOut) && newTimeOut > parseTime(entry.timeIn)
     if (!isSameDay || !isTimeOverlap) return
@@ -2135,6 +2220,7 @@ async function saveLunchBreakFromPicker() {
     campus: lunchBreakContext.campus,
     parallel: false,
     room: '',
+    academicTermId: getSelectedTermId() || undefined,
   }
   const skipFilter = lunchBreakContext.editing
     ? (_key, entry) => entry.id === lunchBreakContext.id
@@ -2285,6 +2371,8 @@ function buildSchedulePayload(source) {
     parallel:   Boolean(source.parallel),
     parallelCount: source.parallel ? source.parallelCount : 1,
   }
+  const termId = getSelectedTermId()
+  if (termId) payload.academicTermId = termId
   if (source.parallel) {
     payload.parallelSlots = source.parallelSlots.map(s => ({ section: s.section, room: s.room }))
   } else {
@@ -2467,7 +2555,8 @@ async function saveConsultSlot() {
   try {
     const teacherUser = teacherUserMap.value[selectedTeacher.value]
     const employeeId  = teacherUser?.employeeId || selectedTeacher.value
-    const payload = { employeeId, teacher: selectedTeacher.value, dayOfWeek: consultForm.dayOfWeek, startTime: consultForm.startTime, endTime: consultForm.endTime }
+    const termId = getSelectedTermId()
+    const payload = { employeeId, teacher: selectedTeacher.value, dayOfWeek: consultForm.dayOfWeek, startTime: consultForm.startTime, endTime: consultForm.endTime, academicTermId: termId || undefined }
     if (consultEditId.value) {
       await apiRequest(`/consultations/${consultEditId.value}`, { method: 'PUT', body: JSON.stringify(payload) })
     } else {
@@ -2606,7 +2695,8 @@ function confirmLogout() { showLogoutModal.value = false; logout(); router.push(
 /* ── onMounted ── */
 onMounted(async () => {
   try {
-    await loadPublishedTerm()
+    await loadTermContext()
+    await ensureTermSelection()
     const response = await apiRequest('/users?role=teacher')
     if (response.users && Array.isArray(response.users)) {
       const teachers = response.users.filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
@@ -2621,7 +2711,6 @@ onMounted(async () => {
         })
       }
     }
-    await loadPublishedTerm()
     await refreshScheduleData()
   } catch (error) {
     await showScheduleError(error, 'Unable to load schedules')
@@ -2697,6 +2786,11 @@ onMounted(async () => {
 .page-title { font-size: 2rem; font-weight: 600; color: #4b5563; letter-spacing: -0.5px; line-height: 1.2; }
 .page-sub   { font-size: 0.95rem; color: #777; margin-top: 4px; }
 .header-actions { display: flex; align-items: center; gap: 10px; padding-top: 6px; flex-shrink: 0; }
+.term-switcher.header-term-switcher { display: flex; align-items: center; gap: 8px; }
+.term-current-label { color: #4b5563; font-size: 0.9rem; font-weight: 600; }
+.term-switch-btn { border: 1px solid #cbd5e1; background: #fff; color: #334155; padding: 8px 13px; border-radius: 999px; font-size: 0.85rem; cursor: pointer; transition: background 0.18s, border-color 0.18s; }
+.term-switch-btn.active { background: #4b5563; border-color: #4b5563; color: #fff; }
+.term-switch-btn:hover { background: #e2e8f0; }
 
 /* ── Buttons ── */
 .new-sched-btn {
@@ -2998,6 +3092,7 @@ onMounted(async () => {
 
 /* breadcrumb */
 .header-left { display: flex; flex-direction: column; gap: 4px; }
+.header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex-shrink: 0; }
 .breadcrumb { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .bc-btn { background: none; border: none; font-family: inherit; font-size: 0.83rem; color: #9ca3af; font-weight: 500; cursor: pointer; padding: 0; transition: color 0.15s; text-decoration: underline; text-underline-offset: 2px; }
 .bc-btn:hover { color: #4b5563; }

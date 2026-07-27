@@ -1561,6 +1561,9 @@ function checkScheduleConflict(payload, skipFilter = null) {
   const newTimeOut = parseTime(payload.timeOut)
   const conflicts  = []
   const seen       = new Set()
+  const selectedId = getSelectedTermId()
+  const inUseId = getTermId(activeTerm.value)
+  const restrictByTerm = Boolean(selectedId && inUseId && selectedId === inUseId)
 
   // All rooms claimed by the new payload (covers parallel slots too)
   const newRooms = payload.parallel
@@ -1569,6 +1572,10 @@ function checkScheduleConflict(payload, skipFilter = null) {
 
   Object.entries(entries).forEach(([key, entry]) => {
     if (skipFilter && skipFilter(key, entry)) return
+    if (restrictByTerm) {
+      const entryTermId = String(entry.academicTermId || '').trim()
+      if (!entryTermId || entryTermId !== String(selectedId)) return
+    }
 
     const isSameDay     = entry.day === payload.day
     const isTimeOverlap = newTimeIn < parseTime(entry.timeOut) && newTimeOut > parseTime(entry.timeIn)

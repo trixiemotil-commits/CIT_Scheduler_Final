@@ -38,7 +38,7 @@
       <header class="main-header">
         <div>
           <h1 class="page-title">Academic Terms</h1>
-          <p class="page-sub">Create semesters, define section counts and rooms, and publish the term that other users should use.</p>
+          <p class="page-sub">Create semesters, define section counts and rooms, then mark a term for admin use and publish it for teachers and students.</p>
         </div>
         <button class="new-sched-btn" @click="resetForm(); showCreateForm = true">New Term</button>
       </header>
@@ -46,21 +46,29 @@
       <section class="card">
         <div class="card-header">
           <div>
-            <h2 class="card-title">Current Published Term</h2>
-            <p class="card-sub">The active term is used by the scheduling workflow and other screens.</p>
+            <h2 class="card-title">Current Terms</h2>
+            <p class="card-sub">The in-use term is for admin scheduling and the published term is for teachers and students.</p>
           </div>
         </div>
-        <div v-if="publishedTerm" class="published-term">
-          <div>
-            <div class="pill">{{ publishedTerm.schoolYear }} · {{ publishedTerm.semester }}</div>
-            <div class="published-meta">Published {{ formatDate(publishedTerm.publishedAt) }}</div>
+        <div v-if="inUseTerm || publishedTerm" class="published-term">
+          <div class="term-status-stack">
+            <div v-if="inUseTerm" class="status-card">
+              <div class="pill active">In Use</div>
+              <div class="term-name">{{ inUseTerm.schoolYear }} · {{ inUseTerm.semester }}</div>
+              <div class="published-meta">Used {{ formatDate(inUseTerm.usedAt) }}</div>
+            </div>
+            <div v-if="publishedTerm" class="status-card">
+              <div class="pill">Published</div>
+              <div class="term-name">{{ publishedTerm.schoolYear }} · {{ publishedTerm.semester }}</div>
+              <div class="published-meta">Published {{ formatDate(publishedTerm.publishedAt) }}</div>
+            </div>
           </div>
           <div class="published-details">
-            <div><strong>Sections</strong><br>{{ describeSectionCounts(publishedTerm.sectionCounts, publishedTerm.sectionNames) }}</div>
-            <div><strong>Rooms</strong><br>{{ publishedTerm.rooms?.length || 0 }} room(s)</div>
+            <div v-if="inUseTerm"><strong>In-use sections</strong><br>{{ describeSectionCounts(inUseTerm.sectionCounts, inUseTerm.sectionNames) }}</div>
+            <div v-if="publishedTerm"><strong>Published sections</strong><br>{{ describeSectionCounts(publishedTerm.sectionCounts, publishedTerm.sectionNames) }}</div>
           </div>
         </div>
-        <div v-else class="empty-state">No term is published yet.</div>
+        <div v-else class="empty-state">No term is in use or published yet.</div>
       </section>
 
       <section class="card">
@@ -154,14 +162,18 @@
             <div class="term-main">
               <div class="term-title-row">
                 <h3>{{ term.schoolYear }} · {{ term.semester }}</h3>
-                <span v-if="term.isPublished" class="pill active">Published</span>
+                <div class="tag-row">
+                  <span v-if="term.isInUse" class="pill active">In Use</span>
+                  <span v-if="term.isPublished" class="pill">Published</span>
+                </div>
               </div>
               <p class="term-sub">Sections: {{ describeSectionCounts(term.sectionCounts, term.sectionNames) }}</p>
               <p class="term-sub">Rooms: {{ term.rooms?.map(getRoomLabel).join(', ') || 'None' }}</p>
             </div>
             <div class="term-actions">
               <button class="secondary-btn" @click="editTerm(term)">Edit</button>
-              <button class="save-btn" @click="publishTerm(term._id)">Publish</button>
+              <button class="save-btn" @click="useTerm(term._id)">Use</button>
+              <button class="secondary-btn" @click="publishTerm(term._id)">Publish</button>
             </div>
           </div>
         </div>
@@ -201,7 +213,7 @@ const yearOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 const roomFloors = [
   { label: '2nd Floor', rooms: ['201', '202', '204', '205', '208', '209'] },
   { label: '3rd Floor', rooms: ['301', '302', '303', '304', '305', '306', '307', '308', '309'] },
-  { label: '4th Floor', rooms: ['401', '402', '403', '404', '405', '406 (Comlab 1)', '407 (Comlab 2)', '408 (Comlab 3)', '409 (Comlab 4)'] },
+  { label: '4th Floor', rooms: ['401', '402', '403', '404', '405', '406', '407', '408', '409'] },
 ]
 
 const allRoomChoices = roomFloors.flatMap((floor) =>
@@ -239,6 +251,7 @@ async function apiRequest(path, options = {}) {
 }
 
 const terms = ref([])
+const inUseTerm = ref(null)
 const publishedTerm = ref(null)
 const showCreateForm = ref(false)
 const showLogoutModal = ref(false)
@@ -261,7 +274,7 @@ watch(selectedRoomNames, (roomNames, oldRoomNames = []) => {
         delete roomTypeMap[roomName]
       }
     })
-})
+}, { deep: true })
 
 function resetForm() {
   selectedTermId.value = ''
@@ -352,11 +365,13 @@ function editTerm(term) {
 }
 
 async function loadTerms() {
-  const [termsResponse, publishedResponse] = await Promise.all([
+  const [termsResponse, inUseResponse, publishedResponse] = await Promise.all([
     apiRequest('/academic-terms'),
-    apiRequest('/academic-terms/published'),
+    apiRequest('/academic-terms/in-use').catch(() => ({ term: null })),
+    apiRequest('/academic-terms/published').catch(() => ({ term: null })),
   ])
   terms.value = termsResponse.terms || []
+  inUseTerm.value = inUseResponse.term || null
   publishedTerm.value = publishedResponse.term || null
 }
 
@@ -395,11 +410,21 @@ async function submitTerm() {
   }
 }
 
+async function useTerm(termId) {
+  try {
+    await apiRequest(`/academic-terms/${termId}/use`, { method: 'POST' })
+    await loadTerms()
+    await Swal.fire({ icon: 'success', title: 'Term set in use', text: 'This term is now the admin scheduling term.' })
+  } catch (error) {
+    await Swal.fire({ icon: 'error', title: 'Unable to use term', text: error.message })
+  }
+}
+
 async function publishTerm(termId) {
   try {
     await apiRequest(`/academic-terms/${termId}/publish`, { method: 'POST' })
     await loadTerms()
-    await Swal.fire({ icon: 'success', title: 'Term published', text: 'This term is now available to the scheduling workflow.' })
+    await Swal.fire({ icon: 'success', title: 'Term published', text: 'This term is now available to teachers and students.' })
   } catch (error) {
     await Swal.fire({ icon: 'error', title: 'Unable to publish term', text: error.message })
   }
@@ -447,6 +472,10 @@ onMounted(async () => {
 .published-term { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 16px 18px; border-radius: 12px; background: #f8fafc; }
 .published-meta { margin-top: 6px; color: #6b7280; font-size: 0.86rem; }
 .published-details { display: flex; gap: 20px; color: #374151; font-size: 0.92rem; }
+.term-status-stack { display: flex; flex-direction: column; gap: 12px; }
+.status-card { display: flex; flex-direction: column; gap: 4px; }
+.term-name { font-weight: 600; color: #111827; }
+.tag-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .pill { display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; background: #e0f2fe; color: #0369a1; font-size: 0.8rem; font-weight: 600; }
 .pill.active { background: #dcfce7; color: #15803d; }
 .empty-state { padding: 12px 0; color: #6b7280; }

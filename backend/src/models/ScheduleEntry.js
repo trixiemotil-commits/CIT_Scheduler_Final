@@ -112,6 +112,12 @@ const scheduleEntrySchema = new mongoose.Schema(
       trim: true,
       default: "color-green",
     },
+    academicTermId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AcademicTerm",
+      default: null,
+      index: true,
+    },
     addedAt: {
       type: Date,
       default: Date.now,
