@@ -19,13 +19,16 @@ import StudentNotificationsView from '@/views/student/StudentNotificationsView.v
 import StudentProfileView from '@/views/student/StudentProfileView.vue'
 import StudentSettingsView from '@/views/student/StudentSettingsView.vue'
 import StudentTeachersView from '@/views/student/StudentTeachersView.vue'
+import StudentTabsView from '@/views/student/StudentTabsView.vue'
 import TeacherConsultationView from '@/views/teacher/TeacherConsultationView.vue'
 import TeacherDashboardView from '@/views/teacher/TeacherDashboardView.vue'
 import TeacherEventsView from '@/views/teacher/TeacherEventsView.vue'
 import TeacherProfileView from '@/views/teacher/TeacherProfileView.vue'
 import TeacherScheduleView from '@/views/teacher/TeacherScheduleView.vue'
 import TeacherSettingsView from '@/views/teacher/TeacherSettingsView.vue'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from '@ionic/vue-router'
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -49,13 +52,21 @@ const router = createRouter({
     { path: '/teacher/consultation',  name: 'teacher-consultation',  component: TeacherConsultationView,  meta: { requiresAuth: true, role: 'teacher' } },
     { path: '/teacher/settings',      name: 'teacher-settings',      component: TeacherSettingsView,      meta: { requiresAuth: true, role: 'teacher' } },
     { path: '/teacher/profile',       name: 'teacher-profile',       component: TeacherProfileView,       meta: { requiresAuth: true, role: 'teacher' } },
-    { path: '/student/dashboard',     name: 'student-dashboard',     component: StudentDashboardView,     meta: { requiresAuth: true, role: 'student' } },
-    { path: '/student/teachers',      name: 'student-teachers',      component: StudentTeachersView,      meta: { requiresAuth: true, role: 'student' } },
-    { path: '/student/events',        name: 'student-events',        component: StudentEventsView,        meta: { requiresAuth: true, role: 'student' } },
-    { path: '/student/consultations', name: 'student-consultations', component: StudentConsultationsView, meta: { requiresAuth: true, role: 'student' } },
-    { path: '/student/profile',       name: 'student-profile',       component: StudentProfileView,       meta: { requiresAuth: true, role: 'student' } },
-    { path: '/student/settings',      name: 'student-settings',      component: StudentSettingsView,      meta: { requiresAuth: true, role: 'student' } },
-    { path: '/student/notifications', name: 'student-notifications', component: StudentNotificationsView, meta: { requiresAuth: true, role: 'student' } },
+    {
+      path: '/student',
+      component: StudentTabsView,
+      meta: { requiresAuth: true, role: 'student' },
+      children: [
+        { path: '', redirect: '/student/dashboard' },
+        { path: 'dashboard',     name: 'student-dashboard',     component: StudentDashboardView },
+        { path: 'teachers',      name: 'student-teachers',      component: StudentTeachersView },
+        { path: 'events',        name: 'student-events',        component: StudentEventsView },
+        { path: 'consultations', name: 'student-consultations', component: StudentConsultationsView },
+        { path: 'profile',       name: 'student-profile',       component: StudentProfileView },
+        { path: 'settings',      name: 'student-settings',      component: StudentSettingsView },
+        { path: 'notifications', name: 'student-notifications', component: StudentNotificationsView },
+      ],
+    },
   ]
 })
 
@@ -104,7 +115,7 @@ router.afterEach((to) => {
   const routeLabel = activityRouteLabels[to.path]
   if (!token || !routeLabel || !['teacher', 'student'].includes(role)) return
 
-  fetch('/api/activity-logs/navigation', {
+  fetch(`${API_BASE}/activity-logs/navigation`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ routeLabel, routePath: to.path }),

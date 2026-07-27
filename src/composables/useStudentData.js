@@ -1,4 +1,5 @@
 import { getToken } from '@/auth.js'
+import { notifyStudentDataChanged } from '@/composables/useAutoRefresh.js'
 import { computed, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -237,6 +238,7 @@ async function cancelSession(id) {
   if (idx !== -1) {
     sessions.value[idx] = { ...sessions.value[idx], status: 'Cancelled' }
   }
+  notifyStudentDataChanged('consultation-cancelled')
 }
 
 async function updateSession(id, changes, options = {}) {
@@ -281,6 +283,7 @@ async function updateSession(id, changes, options = {}) {
   if (idx !== -1) {
     sessions.value[idx] = { ...sessions.value[idx], ...changes }
   }
+  notifyStudentDataChanged('consultation-updated')
 }
 
 export function useStudentData() {

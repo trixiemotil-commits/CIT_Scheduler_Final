@@ -155,6 +155,19 @@ async function isStudentAssignedToTeacher(teacherUser, studentYear, studentSecti
   return Boolean(match);
 }
 
+async function getStudentAcademicContext(userId) {
+  if (!userId) return { year: "", section: "" };
+
+  const student = await User.findById(userId)
+    .select("yearLevel grade section")
+    .lean();
+
+  return {
+    year: String(student?.yearLevel || student?.grade || "").trim(),
+    section: String(student?.section || "").trim(),
+  };
+}
+
 function isRequestWithinAvailability(requestMinutes, startTime, endTime) {
   const slotStart = parseTimeToMinutes(startTime);
   const slotEnd = parseTimeToMinutes(endTime);
@@ -338,6 +351,10 @@ function toClientLog(doc) {
 // GET /api/consultations/teachers
 async function listTeachersForStudents(req, res) {
   try {
+    const studentContext = req.user?.role === "student"
+      ? await getStudentAcademicContext(req.user.id)
+      : { year: "", section: "" };
+
     const teacherUsers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
       .select("role firstName lastName employeeId department account_status teacher_status teacher_status_expires_at teacher_availability avatar")
       .lean();
@@ -383,6 +400,17 @@ async function listTeachersForStudents(req, res) {
           if (subject && year && section) subjectAssignmentSet.add(`${subject}||${year}||${section}`);
         }
 
+        const studentSubjects = scheduleEntries
+          .filter((entry) => (
+            studentContext.year
+            && studentContext.section
+            && String(entry?.year || "").trim() === studentContext.year
+            && String(entry?.section || "").trim().toLowerCase() === studentContext.section.toLowerCase()
+          ))
+          .map((entry) => String(entry?.subject || "").trim())
+          .filter(Boolean);
+        const uniqueStudentSubjects = [...new Set(studentSubjects)];
+        const isSubjectTeacher = uniqueStudentSubjects.length > 0;
         const canAcceptRequests = status !== "On Leave" && teacherUser.teacher_availability !== "Unavailable" && availabilitySlots.length > 0
 
         return {
@@ -394,6 +422,8 @@ async function listTeachersForStudents(req, res) {
           status,
           teacherAvailability: teacherUser.teacher_availability || "Available",
           available: canAcceptRequests,
+          isSubjectTeacher,
+          studentSubjects: uniqueStudentSubjects,
           subjects: Array.from(subjectSet),
           assignedYears: Array.from(yearSet),
           assignedSections: Array.from(sectionSet),
@@ -445,9 +475,12 @@ async function createConsultationRequest(req, res) {
 
     const teacherName = normalizeTeacherFullName(teacherUser);
     const teacherStatus = await resolveTeacherStatus(teacherUser);
-    const studentYear = String(req.user?.yearLevel || req.user?.grade || "").trim();
-    const studentSection = String(req.user?.section || "").trim();
-    const isSubjectTeacher = await isStudentAssignedToTeacher(teacherUser, studentYear, studentSection);
+    const studentContext = await getStudentAcademicContext(req.user.id);
+    const isSubjectTeacher = await isStudentAssignedToTeacher(
+      teacherUser,
+      studentContext.year,
+      studentContext.section
+    );
 
     if (!isSubjectTeacher) {
       if (teacherStatus === "On Leave") {
@@ -695,9 +728,12 @@ async function updateConsultationRequestByStudent(req, res) {
 
     const teacherName = normalizeTeacherFullName(teacherUser);
     const teacherStatus = await resolveTeacherStatus(teacherUser);
-    const studentYear = String(req.user?.yearLevel || req.user?.grade || "").trim();
-    const studentSection = String(req.user?.section || "").trim();
-    const isSubjectTeacher = await isStudentAssignedToTeacher(teacherUser, studentYear, studentSection);
+    const studentContext = await getStudentAcademicContext(req.user.id);
+    const isSubjectTeacher = await isStudentAssignedToTeacher(
+      teacherUser,
+      studentContext.year,
+      studentContext.section
+    );
 
     if (!isSubjectTeacher) {
       if (teacherStatus === "On Leave") {

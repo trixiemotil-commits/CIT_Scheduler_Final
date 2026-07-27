@@ -14,14 +14,41 @@ function getRoles(user) {
   return Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
 }
 
+function validateAuthPayload(payload) {
+  const user = payload?.user
+  const token = payload?.token
+
+  if (!token || !user || typeof user !== 'object') {
+    const mobileHint = API_BASE.startsWith('/')
+      ? ' The mobile app needs VITE_API_BASE_URL set to the full address of the backend server.'
+      : ''
+    throw new Error(`The server returned an invalid login response.${mobileHint}`)
+  }
+
+  const roles = getRoles(user)
+  const role = String(user.role || roles[0] || '').toLowerCase()
+  if (!role) throw new Error('This account does not have an assigned role.')
+
+  return {
+    ...payload,
+    token,
+    user: { ...user, role, roles },
+  }
+}
+
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
-  })
+  let response
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      }
+    })
+  } catch (_error) {
+    throw new Error('Unable to connect to the CIT Scheduler server. Check your internet connection and API address.')
+  }
 
   let body = {}
   try {
@@ -41,21 +68,21 @@ export async function login(email, password, recaptchaToken = null) {
   const body = { email, password }
   if (recaptchaToken) body.recaptchaToken = recaptchaToken
 
-  const payload = await request('/auth/login', {
+  const payload = validateAuthPayload(await request('/auth/login', {
     method: 'POST',
     body: JSON.stringify(body)
-  })
+  }))
 
   saveSession(payload)
   return payload
 }
 
 export async function selectRole(role) {
-  const payload = await request('/auth/select-role', {
+  const payload = validateAuthPayload(await request('/auth/select-role', {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}` },
     body: JSON.stringify({ role })
-  })
+  }))
   saveSession(payload)
   return payload.user
 }
@@ -92,7 +119,15 @@ export function logout() {
 
 export function getUser() {
   const raw = localStorage.getItem('cit_user')
-  return raw ? JSON.parse(raw) : null
+  if (!raw) return null
+
+  try {
+    const user = JSON.parse(raw)
+    return user && typeof user === 'object' ? user : null
+  } catch (_error) {
+    clearSession()
+    return null
+  }
 }
 
 export function saveMergedUser(freshUser) {

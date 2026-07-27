@@ -1,5 +1,8 @@
 <template>
-  <div class="mobile-app">
+  <IonPage>
+    <IonContent :fullscreen="true">
+      <StudentRefresher :refresh="refreshConsultations" />
+      <div class="mobile-app">
     <!-- Header -->
     <div class="app-header">
       <button class="back-btn" @click="$router.back()">
@@ -254,16 +257,22 @@
     <!-- Toast -->
     <div v-if="toastMsg" class="toast">{{ toastMsg }}</div>
 
-    <BottomNav active="consultations" />
-  </div>
+      </div>
+    </IonContent>
+  </IonPage>
 </template>
 
 <script setup>
-import BottomNav from '@/components/student/BottomNav.vue'
+import { IonContent, IonPage } from '@ionic/vue'
+import StudentRefresher from '@/components/student/StudentRefresher.vue'
+import { useAutoRefresh } from '@/composables/useAutoRefresh.js'
 import { useStudentData } from '@/composables/useStudentData.js'
 import { computed, onMounted, ref } from 'vue'
 
 const { sessions, cancelSession, updateSession, isLoadingSessions, sessionsError, loadSessions } = useStudentData()
+const { refresh: refreshConsultations } = useAutoRefresh(
+  () => loadSessions(true, { includeArchived: true })
+)
 
 const CONSULTATION_REASONS = [
   'Lesson Clarification',
@@ -683,13 +692,13 @@ onMounted(() => {
 
 <style scoped>
 .mobile-app {
-  max-width: 430px; min-height: 100dvh;
+  max-width: 430px; min-height: 100%;
   margin: 0 auto;
   background:
     radial-gradient(1100px 380px at 50% -260px, #e7e9ea 0%, rgba(231, 244, 237, 0) 70%),
     #f5f6f8;
   display: flex; flex-direction: column;
-  padding-bottom: 72px;
+  padding-bottom: 16px;
   padding-top: env(safe-area-inset-top, 0px);
   font-family: 'Poppins', sans-serif;
 }

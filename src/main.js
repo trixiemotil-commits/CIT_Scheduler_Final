@@ -1,10 +1,24 @@
 import { createApp } from 'vue'
+import { IonicVue } from '@ionic/vue'
 import App from './App.vue'
 import RoleSwitchButton from './components/RoleSwitchButton.vue'
+
+/* Ionic's required base styles. Custom project styles load afterwards so the
+   existing admin, teacher, and student branding remains in control. */
+import '@ionic/vue/css/core.css'
+import '@ionic/vue/css/normalize.css'
+import '@ionic/vue/css/structure.css'
+import '@ionic/vue/css/typography.css'
+import '@ionic/vue/css/padding.css'
+import '@ionic/vue/css/flex-utils.css'
+import '@ionic/vue/css/display.css'
+
+import './theme/variables.css'
 import './assets/main.css'
 import router from './router'
 
 const app = createApp(App)
+app.use(IonicVue)
 app.use(router)
 app.component('RoleSwitchButton', RoleSwitchButton)
 
@@ -45,20 +59,22 @@ window.addEventListener('unhandledrejection', (ev) => {
   } catch (e) { /* ignore */ }
 })
 
-try {
-  app.mount('#app')
-} catch (err) {
-  console.error('Mount failed:', err)
-  const el = document.createElement('pre')
-  el.style.whiteSpace = 'pre-wrap'
-  el.style.background = '#fee'
-  el.style.color = '#900'
-  el.style.padding = '12px'
-  el.style.border = '1px solid #900'
-  el.style.position = 'fixed'
-  el.style.left = '12px'
-  el.style.top = '12px'
-  el.style.zIndex = 99999
-  el.textContent = `Mount failed: ${String(err.message || err)}`
-  document.body.appendChild(el)
-}
+router.isReady().then(() => {
+  try {
+    app.mount('#app')
+  } catch (err) {
+    console.error('Mount failed:', err)
+    const el = document.createElement('pre')
+    el.style.whiteSpace = 'pre-wrap'
+    el.style.background = '#fee'
+    el.style.color = '#900'
+    el.style.padding = '12px'
+    el.style.border = '1px solid #900'
+    el.style.position = 'fixed'
+    el.style.left = '12px'
+    el.style.top = '12px'
+    el.style.zIndex = 99999
+    el.textContent = `Mount failed: ${String(err.message || err)}`
+    document.body.appendChild(el)
+  }
+})

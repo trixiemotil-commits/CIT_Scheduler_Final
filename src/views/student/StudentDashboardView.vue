@@ -1,5 +1,8 @@
 <template>
-  <div class="mobile-app">
+  <IonPage>
+    <IonContent :fullscreen="true">
+      <StudentRefresher :refresh="refreshDashboard" />
+      <div class="mobile-app">
     <!-- Header -->
     <div class="app-header">
       <div class="header-left">
@@ -65,21 +68,24 @@
       </div>
       <button class="view-events-btn" @click="$router.push('/student/events')">View All Events</button>
     </div>
-    <!-- Bottom Nav -->
-    <BottomNav active="home" />
-  </div>
+      </div>
+    </IonContent>
+  </IonPage>
 </template>
 
 <script setup>
+import { IonContent, IonPage } from '@ionic/vue'
 import { computed } from 'vue'
 import { getUser } from '@/auth.js'
-import BottomNav from '@/components/student/BottomNav.vue'
+import StudentRefresher from '@/components/student/StudentRefresher.vue'
+import { useAutoRefresh } from '@/composables/useAutoRefresh.js'
 import { useStudentData } from '@/composables/useStudentData.js'
 
 const user     = getUser() || { name: 'Anna Cooper', email: 'student@gmail.com' }
 const initials = computed(() => user.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'A')
 
-const { sessions, stats } = useStudentData()
+const { sessions, stats, loadSessions } = useStudentData()
+const { refresh: refreshDashboard } = useAutoRefresh(() => loadSessions(true))
 
 const recentConsultations = computed(() => sessions.value.slice(0, 4))
 
@@ -111,12 +117,12 @@ function formatDate(dateStr) {
 <style scoped>
 .mobile-app {
   max-width: 430px;
-  min-height: 100dvh;
+  min-height: 100%;
   margin: 0 auto;
   background: #f3f5f7;
   display: flex;
   flex-direction: column;
-  padding-bottom: 72px;
+  padding-bottom: 16px;
   padding-top: env(safe-area-inset-top, 0px);
   font-family: 'Poppins', sans-serif;
 }

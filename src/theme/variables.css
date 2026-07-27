@@ -1,0 +1,17 @@
+:root {
+  --ion-font-family: 'Poppins', sans-serif;
+  --ion-color-primary: #4b5563;
+  --ion-color-primary-rgb: 75, 85, 99;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #424b57;
+  --ion-color-primary-tint: #5d6673;
+  --ion-background-color: #f3f5f7;
+  --ion-background-color-rgb: 243, 245, 247;
+  --ion-text-color: #25292e;
+  --ion-text-color-rgb: 37, 41, 46;
+  --ion-toolbar-background: #ffffff;
+  --ion-tab-bar-background: #ffffff;
+  --ion-tab-bar-color: #8a929c;
+  --ion-tab-bar-color-selected: #30363d;
+}

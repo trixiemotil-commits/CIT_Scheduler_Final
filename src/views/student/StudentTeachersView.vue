@@ -1,5 +1,8 @@
 <template>
-  <div class="mobile-app">
+  <IonPage>
+    <IonContent :fullscreen="true">
+      <StudentRefresher :refresh="refreshTeachers" />
+      <div class="mobile-app">
     <!-- Header -->
     <div class="app-header">
       <button class="back-btn" @click="$router.back()">
@@ -200,13 +203,16 @@
       </div>
     </div>
 
-    <BottomNav active="teachers" />
-  </div>
+      </div>
+    </IonContent>
+  </IonPage>
 </template>
 
 <script setup>
+import { IonContent, IonPage } from '@ionic/vue'
 import { getToken, getUser } from '@/auth.js'
-import BottomNav from '@/components/student/BottomNav.vue'
+import StudentRefresher from '@/components/student/StudentRefresher.vue'
+import { notifyStudentDataChanged, useAutoRefresh } from '@/composables/useAutoRefresh.js'
 import { computed, onMounted, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -335,6 +341,7 @@ async function apiRequest(path, options = {}) {
 
 function mapTeacher(teacher) {
   const subjects = Array.isArray(teacher.subjects) ? teacher.subjects.filter(Boolean) : []
+  const studentSubjects = Array.isArray(teacher.studentSubjects) ? teacher.studentSubjects.filter(Boolean) : []
   const assignedYearSections = Array.isArray(teacher.assignedYearSections) ? teacher.assignedYearSections : []
   const subjectAssignments = Array.isArray(teacher.subjectAssignments) ? teacher.subjectAssignments : []
   const resolvedStatus = normalizeTeacherStatus(teacher)
@@ -351,8 +358,13 @@ function mapTeacher(teacher) {
       .filter(Boolean)
     : []
 
-  const resolvedSubjects = matchedSubjects.length ? [...new Set(matchedSubjects)] : subjects
-  const subjectTeacherMatch = matchedSubjects.length > 0
+  const backendSubjectTeacher = typeof teacher.isSubjectTeacher === 'boolean'
+    ? teacher.isSubjectTeacher
+    : null
+  const subjectTeacherMatch = backendSubjectTeacher ?? matchedSubjects.length > 0
+  const resolvedSubjects = subjectTeacherMatch
+    ? [...new Set(studentSubjects.length ? studentSubjects : matchedSubjects)]
+    : subjects
 
   const isStatusAvailable = ['In School'].includes(resolvedStatus)
   const hasSlots = consultationSlots.length > 0
@@ -375,19 +387,26 @@ function mapTeacher(teacher) {
   }
 }
 
-async function loadTeachers() {
-  loadingTeachers.value = true
-  loadError.value = ''
+async function loadTeachers(options = {}) {
+  const silent = Boolean(options.silent)
+  if (!silent) {
+    loadingTeachers.value = true
+    loadError.value = ''
+  }
   try {
     const payload = await apiRequest('/consultations/teachers')
     teachers.value = (payload.teachers || []).map(mapTeacher)
   } catch (error) {
-    teachers.value = []
-    loadError.value = error.message || 'Failed to load teachers.'
+    if (!silent) {
+      teachers.value = []
+      loadError.value = error.message || 'Failed to load teachers.'
+    }
   } finally {
-    loadingTeachers.value = false
+    if (!silent) loadingTeachers.value = false
   }
 }
+
+const { refresh: refreshTeachers } = useAutoRefresh(() => loadTeachers({ silent: true }))
 
 function matchesSearch(teacher) {
   const query = String(search.value || '').trim().toLowerCase()
@@ -572,6 +591,7 @@ function submitRequest() {
     .then(() => {
       showReqModal.value = false
       showToast(`Request sent to ${selectedTeacher.value.name}.`)
+      notifyStudentDataChanged('consultation-created')
       return loadTeachers()
     })
     .catch((error) => {
@@ -591,10 +611,10 @@ onMounted(() => {
 
 <style scoped>
 .mobile-app {
-  max-width: 430px; min-height: 100dvh;
+  max-width: 430px; min-height: 100%;
   margin: 0 auto; background: #f5f6f8;
   display: flex; flex-direction: column;
-  padding-bottom: 72px;
+  padding-bottom: 16px;
   padding-top: env(safe-area-inset-top, 0px);
   font-family: 'Poppins', sans-serif;
 }

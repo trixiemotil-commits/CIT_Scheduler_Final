@@ -559,13 +559,14 @@ async function handleLogin() {
     }
 
     const payload = await login(signIn.email, signIn.password, recaptchaToken)
-    const roles = Array.isArray(payload.user.roles) && payload.user.roles.length ? payload.user.roles : [payload.user.role]
+    const user = payload?.user
+    const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
     if (roles.length > 1) {
       availableRoles.value = roles
       activeTab.value = 'role-select'
       return
     }
-    router.push(routeByRole(payload.user.role))
+    router.push(routeByRole(user.role))
   } catch (error) {
     loginError.value = error.message || 'Invalid email or password.'
     try { resetRecaptcha(signinWidgetId) } catch (_) {}

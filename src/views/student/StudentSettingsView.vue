@@ -1,5 +1,7 @@
 <template>
-  <div class="mobile-app">
+  <IonPage>
+    <IonContent :fullscreen="true">
+      <div class="mobile-app">
     <div class="app-header">
       <button class="back-btn" @click="$router.back()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -71,13 +73,14 @@
       </div>
     </div>
 
-    <BottomNav active="profile" />
-  </div>
+      </div>
+    </IonContent>
+  </IonPage>
 </template>
 
 <script setup>
+import { IonContent, IonPage } from '@ionic/vue'
 import { getUser } from '@/auth.js'
-import BottomNav from '@/components/student/BottomNav.vue'
 import { computed, ref } from 'vue'
 
 const user = getUser() || { name: 'Anna Cooper', email: 'anna.cooper@student.edu' }
@@ -116,12 +119,12 @@ function handleUpdatePassword() {
 <style scoped>
 .mobile-app {
   max-width: 430px;
-  min-height: 100dvh;
+  min-height: 100%;
   margin: 0 auto;
   background: #f3f5f7;
   display: flex;
   flex-direction: column;
-  padding-bottom: 72px;
+  padding-bottom: 16px;
   padding-top: env(safe-area-inset-top, 0px);
   font-family: 'Poppins', sans-serif;
 }
