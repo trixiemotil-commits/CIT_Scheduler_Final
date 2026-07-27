@@ -14,6 +14,7 @@
       </div>
       <button class="header-notif-btn" @click="$router.push('/student/notifications')" aria-label="Notifications">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span v-if="unreadCount > 0" class="notif-dot"></span>
       </button>
     </div>
 
@@ -74,12 +75,13 @@
 </template>
 
 <script setup>
-import { IonContent, IonPage } from '@ionic/vue'
-import { computed } from 'vue'
-import { getUser } from '@/auth.js'
+import { getToken, getUser } from '@/auth.js'
 import StudentRefresher from '@/components/student/StudentRefresher.vue'
 import { useAutoRefresh } from '@/composables/useAutoRefresh.js'
+import useNotifications from '@/composables/useNotifications.js'
 import { useStudentData } from '@/composables/useStudentData.js'
+import { IonContent, IonPage } from '@ionic/vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 const user     = getUser() || { name: 'Anna Cooper', email: 'student@gmail.com' }
 const initials = computed(() => user.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'A')
@@ -89,10 +91,75 @@ const { refresh: refreshDashboard } = useAutoRefresh(() => loadSessions(true))
 
 const recentConsultations = computed(() => sessions.value.slice(0, 4))
 
-const recentEvents = [
-  { id: 1, title: 'Faculty Meeting', date: 'Mar 10', location: 'Room 301' },
-  { id: 2, title: 'CIT Foundation Day', date: 'Mar 15', location: 'Auditorium' },
-]
+onMounted(() => {
+  loadNotifications()
+  loadRecentEvents()
+  useNotifications.addNotificationListener(handleNotification)
+})
+
+onUnmounted(() => {
+  useNotifications.removeNotificationListener(handleNotification)
+})
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const unreadCount = ref(0)
+const recentEvents = ref([])
+
+function handleNotification(notification) {
+  if (!notification?.read) unreadCount.value += 1
+}
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    ...options,
+  })
+
+  let body = {}
+  try {
+    body = await response.json()
+  } catch (_error) {
+    body = {}
+  }
+
+  if (!response.ok) {
+    throw new Error(body.message || 'Request failed.')
+  }
+
+  return body
+}
+
+async function loadNotifications() {
+  try {
+    const payload = await apiRequest('/notifications')
+    const notifs = Array.isArray(payload.notifications) ? payload.notifications : []
+    unreadCount.value = notifs.filter((n) => !n.read).length
+  } catch (_err) {
+    unreadCount.value = 0
+  }
+}
+
+async function loadRecentEvents() {
+  try {
+    const payload = await apiRequest('/events?status=active')
+    const events = Array.isArray(payload.events) ? payload.events : []
+    recentEvents.value = events.slice(0, 2).map((event) => ({
+      ...event,
+      date: formatDate(event.date),
+    }))
+  } catch (_err) {
+    recentEvents.value = []
+  }
+}
 
 function badgeClass(status) {
   return {
@@ -159,6 +226,18 @@ function formatDate(dateStr) {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  position: relative;
+}
+
+.header-notif-btn .notif-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9);
 }
 
 /* Stats */

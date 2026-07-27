@@ -302,6 +302,7 @@
 <script setup>
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
+import useNotifications from '@/composables/useNotifications'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -363,24 +364,18 @@ function notificationGroup(createdAt) {
 
 async function loadConsultationNotifications() {
   try {
-    const payload = await apiRequest('/consultations/requests')
-    const requests = Array.isArray(payload.requests) ? payload.requests : []
-    notifications.value = requests.slice(0, 20).map(request => {
-      const name = request.studentName || 'Student'
-      const subject = request.subject || 'the selected subject'
-      const day = request.consultationDayOfWeek || 'Schedule TBA'
-      const time = request.consultationStartTime && request.consultationEndTime
-        ? `${request.consultationStartTime} – ${request.consultationEndTime}`
-        : 'Time TBA'
+    const payload = await apiRequest('/notifications')
+    const notifs = Array.isArray(payload.notifications) ? payload.notifications : []
+    notifications.value = notifs.slice(0, 50).map(n => {
       return {
-        id: request.id,
-        avatar: request.studentAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=DDECE5&color=1B4332`,
-        studentName: name,
-        subject,
-        consultationTime: `${day} · ${time}`,
-        read: request.status !== 'PENDING' || readNotificationIds.value.has(request.id),
-        group: notificationGroup(request.createdAt || request.requestDate),
-        request,
+        id: n.id,
+        avatar: n.data?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.title||'Notif')}&background=DDECE5&color=1B4332`,
+        studentName: n.data?.studentName || n.title || 'Notification',
+        subject: n.data?.subject || '',
+        consultationTime: n.data?.consultationTime || '',
+        read: Boolean(n.read),
+        group: notificationGroup(n.createdAt),
+        request: n,
       }
     })
   } catch (_) {
@@ -393,13 +388,28 @@ function toggleNotifications() {
   if (showNotif.value) loadConsultationNotifications()
 }
 
+function _onNotif(n) {
+  try {
+    if (!n || !n.id) return
+    const item = {
+      id: n.id,
+      avatar: n.data?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.title||'Notif')}&background=DDECE5&color=1B4332`,
+      studentName: n.data?.studentName || n.title || 'Notification',
+      subject: n.data?.subject || '',
+      consultationTime: n.data?.consultationTime || '',
+      read: Boolean(n.read),
+      group: notificationGroup(n.createdAt),
+      request: n,
+    }
+    notifications.value = [item, ...notifications.value].slice(0, 100)
+  } catch (_) {}
+}
+
 function markNotificationRead(notificationId) {
   if (!notificationId) return
-  const updatedReadIds = new Set(readNotificationIds.value)
-  updatedReadIds.add(notificationId)
-  readNotificationIds.value = updatedReadIds
-  localStorage.setItem('cit_teacher_read_notifications', JSON.stringify([...updatedReadIds]))
-
+  // Persist read state server-side
+  apiRequest(`/notifications/${notificationId}/read`, { method: 'PATCH' }).catch(() => {})
+  // update local view
   notifications.value = notifications.value.map(notification =>
     notification.id === notificationId ? { ...notification, read: true } : notification
   )
@@ -1036,10 +1046,13 @@ onMounted(() => {
   loadEvents()
   notificationRefreshTimer = window.setInterval(loadConsultationNotifications, 15000)
   initDailyStatusTimers()
+  useNotifications.addNotificationListener(_onNotif)
 })
 
 onUnmounted(() => {
   window.clearInterval(notificationRefreshTimer)
+  useNotifications.removeNotificationListener(_onNotif)
+  useNotifications.closeNotifications()
 })
 
 /* ── Logout ── */

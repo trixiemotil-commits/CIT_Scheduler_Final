@@ -34,18 +34,67 @@
 </template>
 
 <script setup>
+import { getToken } from '@/auth.js'
+import useNotifications from '@/composables/useNotifications'
 import { IonContent, IonPage } from '@ionic/vue'
-import { ref, computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-const notifications = ref([
-  { id: 1, title: 'Consultation Approved', desc: 'Your Math Consultation with Ms. Johnson has been approved. Jun 12 at 10:00 AM.', time: '2 hrs ago', group: 'TODAY', read: false },
-  { id: 2, title: 'Reminder', desc: 'Science Review with Mr. Davis is tomorrow at 2:00 PM. Please prepare.', time: '4 hrs ago', group: 'TODAY', read: false },
-  { id: 3, title: 'Session Rejected', desc: 'English Literature was declined by Ms. Park. Please reschedule.', time: '6 hrs ago', group: 'TODAY', read: false },
-  { id: 4, title: 'Session Completed', desc: 'History with Mr. Wilson completed. Rate your experience!', time: 'Jun 5', group: 'YESTERDAY', read: true },
-  { id: 5, title: 'Password Changed', desc: 'Your account password was successfully updated.', time: 'Jun 4', group: 'YESTERDAY', read: true },
-  { id: 6, title: '2FA Enabled', desc: 'Two-Factor Authentication was enabled on your account.', time: 'Jun 1', group: 'EARLIER', read: true },
-  { id: 7, title: 'Welcome', desc: 'Your EduConnect account is set up. Start booking sessions!', time: 'May 30', group: 'EARLIER', read: true },
-])
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
+async function apiRequest(path, options = {}) {
+  const token = getToken()
+  if (!token) throw new Error('Session expired. Please log in again.')
+  const resp = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    ...options,
+  })
+  const body = await resp.json().catch(() => ({}))
+  if (!resp.ok) throw new Error(body.message || 'Request failed')
+  return body
+}
+
+const notifications = ref([])
+
+async function loadNotifications() {
+  try {
+    const payload = await apiRequest('/notifications')
+    const notifs = Array.isArray(payload.notifications) ? payload.notifications : []
+    notifications.value = notifs.map(n => ({
+      id: n.id,
+      title: n.title || n.type,
+      desc: n.message || '',
+      time: new Date(n.createdAt).toLocaleString(),
+      group: (Date.now() - new Date(n.createdAt).getTime()) < (24*60*60*1000) ? 'TODAY' : 'EARLIER',
+      read: Boolean(n.read),
+    }))
+  } catch (err) {
+    notifications.value = []
+  }
+}
+
+onMounted(() => loadNotifications())
+
+// subscribe to SSE notifications to update the list in realtime
+function _onNotif(n) {
+  // prepend new notification
+  const item = {
+    id: n.id,
+    title: n.title || n.type,
+    desc: n.message || '',
+    time: new Date(n.createdAt).toLocaleString(),
+    group: (Date.now() - new Date(n.createdAt).getTime()) < (24*60*60*1000) ? 'TODAY' : 'EARLIER',
+    read: Boolean(n.read),
+  }
+  notifications.value = [item, ...notifications.value]
+}
+
+onMounted(() => {
+  useNotifications.addNotificationListener(_onNotif)
+})
+
+onUnmounted(() => {
+  useNotifications.removeNotificationListener(_onNotif)
+})
 
 const unreadCount = computed(() => notifications.value.filter((n) => !n.read).length)
 const groupOrder = ['TODAY', 'YESTERDAY', 'EARLIER']
@@ -55,10 +104,15 @@ const groupedNotifications = computed(() =>
     .filter((g) => g.items.length)
 )
 
-function markAll() {
-  notifications.value.forEach((n) => {
-    n.read = true
-  })
+async function markAll() {
+  try {
+    await apiRequest('/notifications/mark-all-read', { method: 'PATCH' })
+    notifications.value.forEach((n) => { n.read = true })
+  } catch (_err) {
+    // fallback to per-notification marking
+    await Promise.all(notifications.value.filter(n => !n.read).map(n => apiRequest(`/notifications/${n.id}/read`, { method: 'PATCH' }).catch(() => {})))
+    notifications.value.forEach((n) => { n.read = true })
+  }
 }
 </script>
 

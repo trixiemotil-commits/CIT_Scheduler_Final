@@ -51,16 +51,46 @@ const message = ref('')
 const error = ref(false)
 let messageTimer
 
-function normalizeTeacherStatus(status) {
-  const normalized = String(status || '').trim().toLowerCase()
-  if (normalized === 'on school' || normalized === 'in school') return 'On School'
-  if (normalized === 'on meeting' || normalized === 'on-meeting') return 'On Meeting'
-  if (normalized === 'on leave' || normalized === 'on-leave') return 'On Leave'
-  if (normalized === 'off campus' || normalized === 'off-campus') return 'Off Campus'
+function normalizeTeacherStatus(statusOrObj) {
+  // Accept either a status string or a user object similar to server-side logic.
+  if (statusOrObj && typeof statusOrObj === 'object') {
+    const t = statusOrObj
+    const account = String(t.account_status || '').trim()
+    if (account && account !== 'Active') return 'On Leave'
+
+    if (t.teacher_status_expires_at) {
+      try {
+        const expires = new Date(t.teacher_status_expires_at)
+        if (!Number.isNaN(expires.getTime()) && expires <= new Date()) {
+          return 'On School'
+        }
+      } catch (e) {
+        // ignore parsing errors and fall through
+      }
+    }
+
+    const statusRaw = String(t.teacher_status || t.status || '').trim().toLowerCase()
+    if (statusRaw === 'on leave' || statusRaw === 'leave') return 'On Leave'
+    if (statusRaw === 'on meeting' || statusRaw === 'on-meeting') return 'On Meeting'
+    if (statusRaw === 'off campus' || statusRaw === 'off-campus') return 'Off Campus'
+    return 'On School'
+  }
+
+  const normalized = String(statusOrObj || '').trim()
+  const lower = normalized.toLowerCase()
+  if (lower === 'on leave' || lower === 'leave') return 'On Leave'
+  if (lower === 'on meeting' || lower === 'on-meeting') return 'On Meeting'
+  if (lower === 'off campus' || lower === 'off-campus') return 'Off Campus'
   return 'On School'
 }
 
-const normalizedStatus = computed(() => normalizeTeacherStatus(teacherStatus.value))
+const normalizedStatus = computed(() => {
+  // Prefer authoritative profile on user.value to keep teacher view consistent with server-side resolution
+  if (user.value && typeof user.value === 'object') {
+    return normalizeTeacherStatus(user.value)
+  }
+  return normalizeTeacherStatus(teacherStatus.value)
+})
 const isOffline = computed(() => normalizedStatus.value === 'On Leave')
 
 const statusDisplay = computed(() => {
@@ -164,6 +194,8 @@ async function saveStatus() {
     showMessage('Status saved.')
   } catch (err) {
     showMessage(err.message || 'Unable to save status.', true)
+    // Revert to server state to avoid local-only divergence
+    try { await loadStatus() } catch (_) { /* ignore */ }
   } finally {
     saving.value = false
   }

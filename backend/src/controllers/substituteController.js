@@ -1,7 +1,9 @@
 const mongoose = require('mongoose')
 const SubstituteAssignment = require('../models/SubstituteAssignment')
 const User = require('../models/User')
+const ConsultationRequest = require('../models/ConsultationRequest')
 const AcademicTerm = require('../models/AcademicTerm')
+const Notification = require('../models/Notification')
 
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : ''
@@ -74,6 +76,111 @@ function isLunchBreakEntry(entry = {}) {
   )
 }
 
+function substituteEntrySignature(substituteTeacher, entry = {}) {
+  return [
+    String(substituteTeacher || ''),
+    normalizeString(entry.year),
+    normalizeString(entry.section),
+    normalizeString(entry.subject),
+    normalizeString(entry.timeIn),
+    normalizeString(entry.timeOut),
+  ].join('|')
+}
+
+function teacherFullName(teacher, fallback = 'A teacher') {
+  const name = `${teacher?.firstName || ''} ${teacher?.lastName || ''}`.trim()
+  return name || fallback
+}
+
+async function notifyStudentsOfSubstitutes({
+  originalTeacher,
+  date,
+  newAssignments,
+  previousSignatures,
+  actorId,
+}) {
+  const original = await User.findById(originalTeacher).select('firstName lastName').lean()
+  const originalName = teacherFullName(original, 'Your teacher')
+  const notifications = []
+  const queuedNotificationKeys = new Set()
+
+  for (const [substituteTeacherId, entries] of newAssignments.entries()) {
+    const substitute = await User.findById(substituteTeacherId).select('firstName lastName').lean()
+    const substituteName = teacherFullName(substitute, 'A substitute teacher')
+
+    for (const entry of entries) {
+      const assignmentKey = substituteEntrySignature(substituteTeacherId, entry)
+      const year = normalizeString(entry.year)
+      const sections = [
+        normalizeString(entry.section),
+        ...(Array.isArray(entry.parallelSlots)
+          ? entry.parallelSlots.map((slot) => normalizeString(slot?.section))
+          : []),
+      ].filter(Boolean)
+      const uniqueSections = [...new Set(sections)]
+      if (!year || !uniqueSections.length) continue
+
+      const students = await User.find({
+        account_status: 'Active',
+        yearLevel: year,
+        section: { $in: uniqueSections },
+        $or: [
+          { role: 'student' },
+          { roles: 'student' },
+        ],
+      }).select('_id').lean()
+
+      const subject = normalizeString(entry.subject) || 'your class'
+      const timeRange = entry.timeIn && entry.timeOut
+        ? ` from ${entry.timeIn} to ${entry.timeOut}`
+        : ''
+
+      for (const student of students) {
+        const queueKey = `${student._id}|${assignmentKey}`
+        if (queuedNotificationKeys.has(queueKey)) continue
+
+        // This also backfills notifications for assignments saved before this fix,
+        // while avoiding a duplicate when an unchanged assignment is saved again.
+        if (previousSignatures.has(assignmentKey)) {
+          const alreadyNotified = await Notification.exists({
+            recipientId: student._id,
+            type: 'substitute_assignment',
+            'related.originalTeacherId': String(originalTeacher),
+            'related.assignmentKey': assignmentKey,
+            'related.date': date,
+          })
+          if (alreadyNotified) continue
+        }
+
+        queuedNotificationKeys.add(queueKey)
+        notifications.push({
+          recipientId: student._id,
+          actorId: actorId || null,
+          type: 'substitute_assignment',
+          title: 'Substitute teacher assigned',
+          message: `${substituteName} will substitute for ${originalName} in ${subject}${timeRange} on ${date}.`,
+          related: {
+            originalTeacherId: String(originalTeacher),
+            substituteTeacherId: String(substituteTeacherId),
+            date,
+            assignmentKey,
+            subject,
+            year,
+            section: normalizeString(entry.section),
+          },
+          data: { route: '/student/dashboard' },
+        })
+      }
+    }
+  }
+
+  if (notifications.length) {
+    // create() runs Notification save hooks so connected students receive the alert over SSE.
+    await Notification.create(notifications)
+  }
+  return notifications.length
+}
+
 async function createAssignment(req, res) {
   try {
     const { originalTeacher, substituteTeacher, date, entries } = req.body || {}
@@ -136,6 +243,77 @@ async function createAssignment(req, res) {
       .populate('originalTeacher', 'firstName lastName email')
       .populate('substituteTeacher', 'firstName lastName email')
 
+    // Notify substitute teacher about the assignment
+    try {
+      if (populated && populated.substituteTeacher) {
+        await Notification.create({
+          recipientId: populated.substituteTeacher._id,
+          actorId: req.user?.id || null,
+          type: 'substitute_assignment',
+          title: 'Substitute assignment',
+          message: `You have been assigned as a substitute for ${populated.originalTeacher ? `${populated.originalTeacher.firstName || ''} ${populated.originalTeacher.lastName || ''}`.trim() : 'a teacher'} on ${date}.`,
+          related: { substituteAssignmentId: populated._id.toString(), date },
+        })
+      }
+    } catch (err) {
+      console.warn('Failed to create substitute notification:', err.message)
+    }
+
+    // Notify affected students:
+    // - students who have PENDING/APPROVED consultation requests for the original teacher
+    // - students assigned to the original teacher's schedule entries for that date
+    try {
+      // obtain authoritative teacher identity (employeeId + full name)
+      let teacherDoc = null
+      try {
+        teacherDoc = populated.originalTeacher && populated.originalTeacher._id
+          ? await User.findById(String(populated.originalTeacher._id)).select('employeeId firstName lastName').lean()
+          : null
+      } catch (e) { teacherDoc = null }
+
+      const originalName = teacherDoc ? `${teacherDoc.firstName || ''} ${teacherDoc.lastName || ''}`.trim() : (populated.originalTeacher ? `${populated.originalTeacher.firstName || ''} ${populated.originalTeacher.lastName || ''}`.trim() : originalTeacher)
+      const lookupKeys = [teacherDoc?.employeeId, originalName].filter(Boolean)
+
+      // 1) students with active requests
+      const reqStudents = await ConsultationRequest.find({
+        employeeId: { $in: lookupKeys },
+        status: { $in: ['PENDING','APPROVED'] },
+      }).select('studentId').lean()
+      const studentIds = new Set(reqStudents.map(r => String(r.studentId)).filter(Boolean))
+
+      // 2) students from schedule entries (for broader notification)
+      const scheduleEntries = await require('../models/ScheduleEntry').find({ teacher: originalName }).select('year section').lean()
+      const yearSectionPairs = scheduleEntries
+        .map((e) => ({ year: String(e.year || '').trim(), section: String(e.section || '').trim() }))
+        .filter((p) => p.year && p.section)
+
+      if (yearSectionPairs.length) {
+        const orClauses = yearSectionPairs.map((p) => ({ yearLevel: p.year, section: p.section }))
+        // also attempt matching by 'grade' field if present
+        const orClausesGrade = yearSectionPairs.map((p) => ({ grade: p.year, section: p.section }))
+        const studentsFromSchedule = await User.find({ role: 'student', $or: [...orClauses, ...orClausesGrade] }).select('_id').lean()
+        for (const s of studentsFromSchedule) studentIds.add(String(s._id))
+      }
+
+      // create notifications for each studentId (best-effort)
+      for (const sid of Array.from(studentIds)) {
+        try {
+          await Notification.create({
+            recipientId: sid,
+            actorId: req.user?.id || null,
+            type: 'substitute_assignment',
+            title: 'Substitute teacher assigned',
+            message: `${originalName} will be substituted on ${date}. Please check your schedule.`,
+            related: { substituteAssignmentId: populated._id.toString(), date },
+          })
+        } catch (err) {
+          // ignore individual failures
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to notify students about substitute assignment:', err.message)
+    }
+
     return res.status(200).json({ message: 'Substitute assignment saved.', assignment: populated })
   } catch (error) {
     console.error('Failed to create substitute assignment:', error)
@@ -171,6 +349,17 @@ async function syncAssignments(req, res) {
     const dateKey = startOfDayUTC(target)
     const academicTermId = resolveAcademicTermReference(req.body?.academicTermId) || await getActiveAcademicTermReference()
     const expiresAt = nextDaySixAMUTC(target)
+    const previousAssignments = await SubstituteAssignment.find({
+      originalTeacher,
+      date: { $gte: startOfDayUTC(target), $lte: endOfDayUTC(target) },
+    }).select('substituteTeacher entries').lean()
+    const previousSignatures = new Set(
+      previousAssignments.flatMap((assignment) => (
+        (assignment.entries || []).map((entry) => (
+          substituteEntrySignature(assignment.substituteTeacher, entry)
+        ))
+      ))
+    )
     const operations = [
       {
         deleteMany: {
@@ -204,9 +393,23 @@ async function syncAssignments(req, res) {
       },
     })
 
+    let notifiedStudents = 0
+    try {
+      notifiedStudents = await notifyStudentsOfSubstitutes({
+        originalTeacher,
+        date,
+        newAssignments: grouped,
+        previousSignatures,
+        actorId: req.user?.id,
+      })
+    } catch (notificationError) {
+      console.warn('Substitutes updated, but student notifications failed:', notificationError.message)
+    }
+
     return res.json({
       message: grouped.size ? 'Substitute assignments updated.' : 'Substitute assignments removed.',
       assignmentCount: grouped.size,
+      notifiedStudents,
     })
   } catch (error) {
     console.error('Failed to synchronize substitute assignments:', error)

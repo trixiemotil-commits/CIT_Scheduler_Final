@@ -3,6 +3,8 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { sendPasswordOtpEmail } = require("../config/mail");
+const ConsultationRequest = require('../models/ConsultationRequest')
+const Notification = require('../models/Notification')
 
 // Verify reCAPTCHA token with Google
 async function verifyRecaptcha(token, remoteIp = null) {
@@ -403,6 +405,7 @@ async function updateMe(req, res) {
     if (avatar) {
       user.avatar = avatar;
     }
+    const prevTeacherStatus = user.teacher_status
     if (isTeacher) {
       if (teacherStatus) user.teacher_status = teacherStatus;
       if (teacherAvailability) user.teacher_availability = teacherAvailability;
@@ -415,6 +418,37 @@ async function updateMe(req, res) {
     }
 
     await user.save();
+
+    // If teacher status changed, notify recent students with active requests for this teacher
+    try {
+      const newStatus = user.teacher_status
+      if (isTeacher && String(prevTeacherStatus || '') !== String(newStatus || '')) {
+        const teacherName = `${user.firstName || ''} ${user.lastName || ''}`.trim()
+        const employeeKey = user.employeeId || teacherName
+        const studentReqs = await ConsultationRequest.find({
+          employeeId: { $in: [employeeKey, teacherName].filter(Boolean) },
+          status: { $in: ['PENDING','APPROVED'] },
+        }).select('studentId').limit(200).lean()
+
+        const studentIds = [...new Set(studentReqs.map(r => String(r.studentId)).filter(Boolean))]
+        for (const sid of studentIds) {
+          try {
+            await Notification.create({
+              recipientId: sid,
+              actorId: user._id,
+              type: 'teacher_status',
+              title: `Teacher ${newStatus}`,
+              message: `${teacherName} is now ${newStatus}.`,
+              related: { teacherId: user._id.toString(), status: newStatus },
+            })
+          } catch (err) {
+            console.warn('Failed to create teacher status notification for student', sid, err.message)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to create teacher status notifications:', err.message)
+    }
 
     return res.status(200).json({ message: "Profile updated successfully.", user: toSafeUser(user) });
   } catch (error) {

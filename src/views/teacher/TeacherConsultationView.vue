@@ -731,6 +731,14 @@ function submitReject() {
   showConfirmModal.value = true
 }
 
+function getRejectReasonText() {
+  if (!rejectionReason.value) return ''
+  if (rejectionReason.value === 'Other') {
+    return otherReason.value.trim()
+  }
+  return rejectionReason.value.trim()
+}
+
 function cancelConfirm() {
   showConfirmModal.value = false
   pendingRejectTarget.value = null
@@ -744,7 +752,7 @@ async function confirmReject() {
   }
 
   try {
-    await patchRequestStatus(pendingRejectTarget.value.id, 'resched', 'Resched Successful')
+    await patchRequestStatus(pendingRejectTarget.value.id, 'resched', 'Resched Successful', getRejectReasonText())
   } catch (error) {
     Swal.fire('Unable to resched', error.message || 'Failed to update request status.', 'error')
   }

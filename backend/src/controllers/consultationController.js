@@ -4,6 +4,7 @@ const ScheduleEntry = require("../models/ScheduleEntry");
 const ConsultationRequest = require("../models/ConsultationRequest");
 const ConsultationLog = require("../models/ConsultationLog");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 const AcademicTerm = require("../models/AcademicTerm");
 
 const MAX_WEEKLY_MINUTES = 240; // 4 hours
@@ -608,6 +609,20 @@ async function createConsultationRequest(req, res) {
       notes: "Consultation request created.",
     });
 
+    // Notify teacher about new consultation request
+    try {
+      await Notification.create({
+        recipientId: teacherUser._id,
+        actorId: req.user.id,
+        type: 'consultation_request',
+        title: 'New consultation request',
+        message: `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}.`,
+        related: { consultationRequestId: requestDoc._id.toString() },
+      })
+    } catch (err) {
+      console.warn('Failed to create notification for teacher:', err.message)
+    }
+
     return res.status(201).json({
       message: "Consultation request submitted.",
       request: toClientRequest(requestDoc),
@@ -855,6 +870,18 @@ async function updateConsultationRequestStatus(req, res) {
     }
 
     requestDoc.status = nextStatus;
+    if (String(nextStatus).toUpperCase() === 'RESCHED' && statusNotes) {
+      const existingPurpose = String(requestDoc.purpose || '')
+      const cleanedNotes = String(statusNotes || '').trim()
+      if (cleanedNotes) {
+        const filteredLines = existingPurpose
+          .split(/\r?\n/)
+          .filter((line) => !/^Resched Reason:/i.test(line))
+          .filter(Boolean)
+        filteredLines.push(`Resched Reason: ${cleanedNotes}`)
+        requestDoc.purpose = filteredLines.join('\n')
+      }
+    }
     await requestDoc.save();
 
     const reqDate = new Date(requestDoc.requestDate);
@@ -872,6 +899,26 @@ async function updateConsultationRequestStatus(req, res) {
       timeOut: timeIn,
       notes: logNotes,
     });
+
+    // Create notification for student when request status changes to APPROVED or RESCHED
+    try {
+      const upper = String(nextStatus || '').toUpperCase()
+      if (['APPROVED', 'RESCHED'].includes(upper)) {
+        const message = statusNotes
+          ? `Your consultation request (${requestDoc.subject}) was updated to ${upper}. Reason: ${statusNotes}`
+          : `Your consultation request (${requestDoc.subject}) was updated to ${upper}.`
+        await Notification.create({
+          recipientId: requestDoc.studentId,
+          actorId: req.user?.id || null,
+          type: 'consultation_status',
+          title: `Consultation ${upper}`,
+          message,
+          related: { consultationRequestId: requestDoc._id.toString(), status: upper },
+        })
+      }
+    } catch (err) {
+      console.warn('Failed to create notification for student:', err.message)
+    }
 
     return res.json({ message: "Consultation request updated.", request: toClientRequest(requestDoc) });
   } catch (error) {

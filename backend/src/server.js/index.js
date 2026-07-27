@@ -10,6 +10,8 @@ const scheduleRoutes = require("../routes/scheduleRoutes");
 const academicTermRoutes = require("../routes/academicTermRoutes");
 const substituteRoutes = require("../routes/substituteRoutes");
 const consultationRoutes = require("../routes/consultationRoutes");
+const notificationRoutes = require("../routes/notificationRoutes");
+const eventRoutes = require("../routes/eventRoutes");
 const activityLogRoutes = require("../routes/activityLogRoutes");
 const activityLogger = require("../middleware/activityLogger");
 
@@ -21,6 +23,10 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({
   origin: [
     'http://localhost:5173',
+    'http://localhost',
+    'https://localhost',
+    'capacitor://localhost',
+    'ionic://localhost',
     'https://deployed-cit-sched.vercel.app',
     'https://deployed-cit-sched-git-main-iggyt0929-1567s-projects.vercel.app',
   ],
@@ -40,6 +46,8 @@ app.use("/api/schedules", scheduleRoutes);
 app.use("/api/academic-terms", academicTermRoutes);
 app.use("/api/substitutes", substituteRoutes);
 app.use("/api/consultations", consultationRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/events", eventRoutes);
 app.use("/api/activity-logs", activityLogRoutes);
 
 app.use((error, _req, res, next) => {

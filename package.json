@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "npx concurrently \"cd backend && npm run dev\" \"npm run dev\"",
     "build": "vite build",
     "build:android": "vite build --mode android",
     "android:build": "npm run build:android && cap sync android && cd android && gradlew.bat assembleDebug --no-daemon",

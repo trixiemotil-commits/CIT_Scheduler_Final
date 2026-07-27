@@ -278,7 +278,12 @@
                 <label class="form-label">Date</label>
                 <div class="fi-wrap">
                   <svg class="fi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  <input v-model="eventForm.date" type="date" class="form-input fi-input" />
+                  <input
+                    v-model="eventForm.date"
+                    type="date"
+                    :min="editingEvent ? undefined : todayDate"
+                    class="form-input fi-input"
+                  />
                 </div>
               </div>
 
@@ -441,7 +446,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 // v-click-outside directive
@@ -510,6 +515,13 @@ const imgInput       = ref(null)
 const eventTeachers = ref([])
 const teacherSearchQuery = ref('')
 const showTeacherPicker = ref(false)
+const todayDate = (() => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+})()
 
 /* ── Time Picker ── */
 const showTimePicker = ref(false)
@@ -552,12 +564,7 @@ function confirmTime() {
   showTimePicker.value = false
 }
 
-const events = ref([
-  { id: 1, title: 'Faculty Meeting',    description: 'Quarterly faculty alignment and planning meeting.',    date: '2026-03-10', time: '09:00', location: 'Room 301',         status: 'active'   },
-  { id: 2, title: 'CIT Foundation Day', description: 'Annual celebration of the CIT founding anniversary.', date: '2026-03-15', time: '08:00', location: 'Auditorium',       status: 'active'   },
-  { id: 3, title: 'Enrollment Period',  description: 'Regular enrollment for the upcoming semester.',       date: '2026-04-01', time: '07:00', location: 'Registrar Office', status: 'active'   },
-  { id: 4, title: 'IT Summit 2025',     description: 'Annual IT summit for tech updates and networking.',   date: '2025-11-20', time: '09:00', location: 'Main Hall',        status: 'archived' },
-])
+const events = ref([])
 
 const activeEvents   = computed(() => events.value.filter(e => e.status === 'active'))
 const archivedEvents = computed(() => events.value.filter(e => e.status === 'archived'))
@@ -591,6 +598,32 @@ async function loadEventTeachers() {
     })
   } catch (_error) {
     eventTeachers.value = []
+  }
+}
+
+async function eventRequest(path = '', options = {}) {
+  const token = getToken()
+  if (!token) throw new Error('Session expired. Please log in again.')
+
+  const response = await fetch(`${API_BASE}/events${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.message || 'Unable to save the event.')
+  return payload
+}
+
+async function loadEvents() {
+  try {
+    const payload = await eventRequest()
+    events.value = Array.isArray(payload.events) ? payload.events : []
+  } catch (error) {
+    window.alert(error.message)
   }
 }
 
@@ -651,22 +684,48 @@ function removeImage() {
   if (imgInput.value) imgInput.value.value = ''
 }
 
-function saveEvent() {
+async function saveEvent() {
   if (!eventForm.value.title.trim()) return
-  if (editingEvent.value) {
-    Object.assign(editingEvent.value, { ...eventForm.value })
-  } else {
-    events.value.push({ id: Date.now(), ...eventForm.value, status: 'active' })
+  if (!editingEvent.value && eventForm.value.date && eventForm.value.date < todayDate) {
+    window.alert('New events cannot use a past date.')
+    return
   }
-  showEventModal.value = false
+  try {
+    const path = editingEvent.value ? `/${editingEvent.value.id}` : ''
+    const method = editingEvent.value ? 'PATCH' : 'POST'
+    await eventRequest(path, {
+      method,
+      body: JSON.stringify({
+        ...eventForm.value,
+        ...(editingEvent.value ? { status: editingEvent.value.status } : {}),
+      }),
+    })
+    await loadEvents()
+    showEventModal.value = false
+  } catch (error) {
+    window.alert(error.message)
+  }
 }
 
-function archiveEvent(ev) {
-  ev.status = ev.status === 'active' ? 'archived' : 'active'
+async function archiveEvent(ev) {
+  try {
+    await eventRequest(`/${ev.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...ev, status: ev.status === 'active' ? 'archived' : 'active' }),
+    })
+    await loadEvents()
+  } catch (error) {
+    window.alert(error.message)
+  }
 }
 
-function deleteEvent(ev) {
-  events.value = events.value.filter(e => e.id !== ev.id)
+async function deleteEvent(ev) {
+  try {
+    await eventRequest(`/${ev.id}`, { method: 'DELETE' })
+    await loadEvents()
+  } catch (error) {
+    window.alert(error.message)
+  }
 }
 
 /* ── View Event Modal ── */
@@ -677,6 +736,8 @@ function openViewEvent(ev) {
   viewEvent.value = ev
   showViewModal.value = true
 }
+
+onMounted(loadEvents)
 </script>
 
 <style scoped>

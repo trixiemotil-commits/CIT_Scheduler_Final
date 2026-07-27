@@ -3,10 +3,10 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     vue(),
-    VitePWA({
+    ...(mode === 'android' ? [] : [VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'favicon.svg', 'apple-touch-icon-180x180.png', 'pwa-*.png', 'maskable-icon-512x512.png'],
       manifest: {
@@ -36,7 +36,7 @@ export default defineConfig({
           }
         ]
       }
-    })
+    })])
   ],
   resolve: {
     alias: {
@@ -51,4 +51,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

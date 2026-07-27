@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { Capacitor } from '@capacitor/core'
 import { IonicVue } from '@ionic/vue'
 import App from './App.vue'
 import RoleSwitchButton from './components/RoleSwitchButton.vue'
@@ -59,8 +60,27 @@ window.addEventListener('unhandledrejection', (ev) => {
   } catch (e) { /* ignore */ }
 })
 
-router.isReady().then(() => {
+async function clearNativeWebCache() {
+  if (!Capacitor.isNativePlatform()) return
+
   try {
+    const registrations = await navigator.serviceWorker?.getRegistrations?.()
+    await Promise.all((registrations || []).map((registration) => registration.unregister()))
+  } catch (_error) {
+    // Service workers may not be available in every Android WebView.
+  }
+
+  try {
+    const cacheNames = await window.caches?.keys?.()
+    await Promise.all((cacheNames || []).map((cacheName) => window.caches.delete(cacheName)))
+  } catch (_error) {
+    // Cache Storage may not be available in every Android WebView.
+  }
+}
+
+router.isReady().then(async () => {
+  try {
+    await clearNativeWebCache()
     app.mount('#app')
   } catch (err) {
     console.error('Mount failed:', err)

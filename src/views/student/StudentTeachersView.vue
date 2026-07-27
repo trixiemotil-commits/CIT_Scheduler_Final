@@ -38,6 +38,7 @@
         <div v-for="t in visibleSubjectTeachers" :key="t.id" class="teacher-card">
           <div class="teacher-top">
             <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
+            <span v-if="t.status === 'On Leave'" class="status-badge" title="Teacher is on leave"></span>
             <div class="teacher-meta">
               <div class="teacher-name">{{ t.name }}</div>
               <div class="teacher-type-pill subject">Subject Teacher</div>
@@ -66,6 +67,7 @@
         <div v-for="t in visibleAvailableTeachers" :key="t.id" class="teacher-card">
           <div class="teacher-top">
             <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
+            <span v-if="t.status === 'On Leave'" class="status-badge" title="Teacher is on leave"></span>
             <div class="teacher-meta">
               <div class="teacher-name">{{ t.name }}</div>
               <div class="teacher-type-pill available">Available Teacher</div>
@@ -209,11 +211,12 @@
 </template>
 
 <script setup>
-import { IonContent, IonPage } from '@ionic/vue'
 import { getToken, getUser } from '@/auth.js'
 import StudentRefresher from '@/components/student/StudentRefresher.vue'
 import { notifyStudentDataChanged, useAutoRefresh } from '@/composables/useAutoRefresh.js'
-import { computed, onMounted, ref } from 'vue'
+import useNotifications from '@/composables/useNotifications'
+import { IonContent, IonPage } from '@ionic/vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -407,6 +410,19 @@ async function loadTeachers(options = {}) {
 }
 
 const { refresh: refreshTeachers } = useAutoRefresh(() => loadTeachers({ silent: true }))
+
+// Use SSE to receive notifications in real-time and refresh when teacher status changes
+function _onNotification(n) {
+  try {
+    if (!n || !n.type) return
+    if (String(n.type || '').trim() === 'teacher_status') {
+      // refresh teachers silently
+      refreshTeachers().catch(() => {})
+      // mark the notification read best-effort
+      try { apiRequest(`/notifications/${n.id}/read`, { method: 'PATCH' }).catch(() => {}) } catch (_) {}
+    }
+  } catch (_) {}
+}
 
 function matchesSearch(teacher) {
   const query = String(search.value || '').trim().toLowerCase()
@@ -606,6 +622,12 @@ function showToast(msg) {
 
 onMounted(() => {
   loadTeachers()
+  useNotifications.addNotificationListener(_onNotification)
+})
+
+onUnmounted(() => {
+  useNotifications.removeNotificationListener(_onNotification)
+  useNotifications.closeNotifications()
 })
 </script>
 
@@ -727,6 +749,11 @@ onMounted(() => {
   background: #7b8794;
   color: #fff;
   cursor: not-allowed;
+}
+
+.status-badge {
+  width: 10px; height: 10px; border-radius: 50%; background: #e63946; display: inline-block;
+  margin-left: 8px; margin-top: 6px; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(230,57,70,0.12);
 }
 
 /* ── Modals ── */

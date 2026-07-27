@@ -1,6 +1,7 @@
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
+      <StudentRefresher :refresh="refreshEvents" />
       <div class="mobile-app">
     <div class="app-header">
       <button class="back-btn" @click="$router.back()">
@@ -17,6 +18,9 @@
       </header>
 
       <div class="events-grid">
+        <p v-if="eventsLoading">Loading events…</p>
+        <p v-else-if="eventsError">{{ eventsError }}</p>
+        <p v-else-if="!events.length">No active events have been posted.</p>
         <article
           v-for="ev in events"
           :key="ev.id"
@@ -50,7 +54,10 @@
       <div v-if="showViewModal" class="modal-overlay" @click.self="showViewModal = false">
         <div class="ev-view-box" v-if="viewEvent">
           <div class="ev-view-handle"></div>
-          <div class="ev-view-hero">
+          <div
+            class="ev-view-hero"
+            :style="viewEvent.image ? { backgroundImage: `url(${viewEvent.image})` } : undefined"
+          >
             <div class="ev-view-hero-overlay"></div>
             <div class="ev-view-hero-content">
               <span class="ev-view-badge">Active</span>
@@ -116,35 +123,41 @@
 </template>
 
 <script setup>
+import { getToken } from '@/auth.js'
+import StudentRefresher from '@/components/student/StudentRefresher.vue'
+import { useAutoRefresh } from '@/composables/useAutoRefresh.js'
 import { IonContent, IonPage } from '@ionic/vue'
 import { ref } from 'vue'
 
-const events = ref([
-  {
-    id: 1,
-    title: 'Faculty Meeting',
-    description: 'Quarterly faculty alignment and planning meeting.',
-    date: '2026-03-10',
-    time: '09:00',
-    location: 'Room 301',
-  },
-  {
-    id: 2,
-    title: 'CIT Foundation Day',
-    description: 'Annual celebration of the CIT founding anniversary.',
-    date: '2026-03-15',
-    time: '08:00',
-    location: 'Auditorium',
-  },
-  {
-    id: 3,
-    title: 'Enrollment Period',
-    description: 'Regular enrollment for the upcoming semester.',
-    date: '2026-04-01',
-    time: '07:00',
-    location: 'Registrar Office',
-  },
-])
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const events = ref([])
+const eventsLoading = ref(true)
+const eventsError = ref('')
+
+async function loadEvents() {
+  const token = getToken()
+  if (!token) {
+    eventsError.value = 'Session expired. Please log in again.'
+    eventsLoading.value = false
+    return
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/events?status=active`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(payload.message || 'Unable to load events.')
+    events.value = Array.isArray(payload.events) ? payload.events : []
+    eventsError.value = ''
+  } catch (error) {
+    eventsError.value = error.message
+  } finally {
+    eventsLoading.value = false
+  }
+}
+
+const { refresh: refreshEvents } = useAutoRefresh(loadEvents)
 
 const showViewModal = ref(false)
 const viewEvent = ref(null)
@@ -339,6 +352,9 @@ function formatDisplayTime(time24) {
   position: relative;
   min-height: 108px;
   background: radial-gradient(circle at 75% 15%, #2f8b5f 0%, #4b5563 45%, #112a1f 100%);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
 }
 
 .ev-view-hero-overlay {
