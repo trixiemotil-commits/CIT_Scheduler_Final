@@ -2,6 +2,7 @@ import { getToken, getUser, isLoggedIn, setActiveRole } from '@/auth.js'
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
 import LoginView from '@/views/LoginView.vue'
 import AddScheduleView from '@/views/admin/AddScheduleView.vue'
+import AcademicTermsView from '@/views/admin/AcademicTermsView.vue'
 import AdminDashboardView from '@/views/admin/AdminDashboardView.vue'
 import ActivityLogsView from '@/views/admin/ActivityLogsView.vue'
 import AdminProfileView from '@/views/admin/AdminProfileView.vue'
@@ -40,6 +41,7 @@ const router = createRouter({
     { path: '/admin/schedule', name: 'admin-schedule', component: ScheduleView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/schedule/view', name: 'admin-schedule-view', component: ViewScheduleView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/schedule/add', name: 'admin-schedule-add', component: AddScheduleView, meta: { requiresAuth: true, role: 'admin' } },
+    { path: '/admin/academic-terms', name: 'admin-academic-terms', component: AcademicTermsView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/schedule/new-week', name: 'new-schedule-week', component: NewScheduleWeekView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/teachers', name: 'admin-teachers', component: TeacherAssignmentsView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/events', name: 'admin-events', component: EventsView, meta: { requiresAuth: true, role: 'admin' } },

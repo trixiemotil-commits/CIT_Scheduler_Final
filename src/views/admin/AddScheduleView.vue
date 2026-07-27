@@ -48,6 +48,10 @@
       <!-- Page Header -->
       <header class="main-header">
         <div class="header-left">
+          <div v-if="publishedTermLabel" class="term-banner">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 4v16"/></svg>
+            <span>Published term: {{ publishedTermLabel }}</span>
+          </div>
           <div v-if="addMode" class="breadcrumb">
             <button class="bc-btn" @click="resetAddMode">Add Schedule</button>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
@@ -289,7 +293,7 @@
                   <td>
                         <select v-model="listAddForm.year" class="form-select small">
                       <option value="" disabled>Year</option>
-                      <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+                      <option v-for="y in effectiveYears" :key="y" :value="y">{{ y }}</option>
                     </select>
                   </td>
                       <td>
@@ -313,13 +317,13 @@
                   <td>
                     <select v-model="listAddForm.room" class="form-select">
                       <option value="" disabled>Select Room</option>
-                      <option v-for="r in roomOptions" :key="r" :value="r">{{ r }}</option>
+                      <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
                     </select>
                   </td>
                   <td>
                     <select v-model="listAddForm.section" class="form-select">
                       <option value="" disabled>Select Section</option>
-                      <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
+                      <option v-for="s in getSectionsForYear(listAddForm.year)" :key="s" :value="s">{{ s }}</option>
                     </select>
                   </td>
                   <td>
@@ -359,7 +363,7 @@
             <div v-if="addMode === 'teacher'" class="sched-select-wrap">
               <select class="sched-select" v-model="filterSection">
                 <option value="All">All Sections</option>
-                <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
+                <option v-for="s in getSectionsForYear(form.year)" :key="s" :value="s">{{ s }}</option>
               </select>
               <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
@@ -367,7 +371,7 @@
             <div v-if="addMode === 'teacher'" class="sched-select-wrap">
               <select class="sched-select" v-model="yearDropdown">
                 <option value="All">All Years</option>
-                <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+                <option v-for="y in effectiveYears" :key="y" :value="y">{{ y }}</option>
               </select>
               <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
@@ -598,7 +602,7 @@
               <div class="form-select-wrap">
                 <select v-model="form.year" class="form-select">
                   <option value="" disabled>Select Year</option>
-                  <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+                  <option v-for="y in effectiveYears" :key="y" :value="y">{{ y }}</option>
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
@@ -619,7 +623,7 @@
               <div v-else class="form-select-wrap">
                 <select v-model="form.section" class="form-select">
                   <option value="" disabled>Select Section</option>
-                  <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
+                  <option v-for="s in getSectionsForYear(form.year)" :key="s" :value="s">{{ s }}</option>
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
@@ -645,7 +649,7 @@
                 <div v-else class="form-select-wrap">
                   <select v-model="form.room" class="form-select">
                     <option value="" disabled>Select Room</option>
-                    <option v-for="r in roomOptions" :key="r" :value="r">{{ r }}</option>
+                    <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
                   </select>
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
@@ -671,7 +675,7 @@
                   <div v-else class="form-select-wrap">
                     <select v-model="ps.section" class="form-select">
                       <option value="" disabled>Select Section</option>
-                      <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
+                      <option v-for="s in getSectionsForYear(form.year)" :key="s" :value="s">{{ s }}</option>
                     </select>
                     <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                   </div>
@@ -682,7 +686,7 @@
                   <div v-else class="form-select-wrap">
                     <select v-model="ps.room" class="form-select">
                       <option value="" disabled>Select Room</option>
-                      <option v-for="r in roomOptions" :key="r" :value="r">{{ r }}</option>
+                      <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
                     </select>
                     <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                   </div>
@@ -850,7 +854,7 @@
                 <div class="form-select-wrap">
                   <select v-model="addForm.year" class="form-select">
                     <option value="" disabled>Select Year</option>
-                    <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+                    <option v-for="y in effectiveYears" :key="y" :value="y">{{ y }}</option>
                   </select>
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
@@ -885,12 +889,12 @@
                 <div v-else class="form-select-wrap">
                   <select v-model="addForm.section" class="form-select">
                     <option value="" disabled>Select Section</option>
-                    <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
+                    <option v-for="s in getSectionsForYear(addForm.year)" :key="s" :value="s">{{ s }}</option>
                   </select>
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
                 <datalist id="add-section-suggestions">
-                  <option v-for="s in sections" :key="s" :value="s" />
+                  <option v-for="s in getSectionsForYear(addForm.year)" :key="s" :value="s" />
                 </datalist>
               </div>
               <div class="form-row-inline">
@@ -910,12 +914,12 @@
                   <div v-else class="form-select-wrap">
                     <select v-model="addForm.room" class="form-select">
                       <option value="" disabled>Select Room</option>
-                      <option v-for="r in roomOptions" :key="r" :value="r">{{ r }}</option>
+                      <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
                     </select>
                     <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                   </div>
                   <datalist id="add-room-suggestions">
-                    <option v-for="r in roomOptions" :key="r" :value="r" />
+                    <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name" />
                   </datalist>
                 </div>
               </template>
@@ -939,12 +943,12 @@
                     <div v-else class="form-select-wrap">
                       <select v-model="ps.section" class="form-select">
                         <option value="" disabled>Select Section</option>
-                        <option v-for="s in sections" :key="s" :value="s">{{ s }}</option>
+                        <option v-for="s in getSectionsForYear(addForm.year)" :key="s" :value="s">{{ s }}</option>
                       </select>
                       <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                     </div>
                     <datalist id="add-section-suggestions">
-                      <option v-for="s in sections" :key="s" :value="s" />
+                      <option v-for="s in getSectionsForYear(addForm.year)" :key="s" :value="s" />
                     </datalist>
                   </div>
                   <div class="form-row-inline">
@@ -953,7 +957,7 @@
                     <div v-else class="form-select-wrap">
                       <select v-model="ps.room" class="form-select">
                         <option value="" disabled>Select Room</option>
-                        <option v-for="r in roomOptions" :key="r" :value="r">{{ r }}</option>
+                        <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
                       </select>
                       <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                     </div>
@@ -1125,6 +1129,46 @@ const currentRoute = computed(() => route.path)
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const teacherUserMap = ref({})
+const publishedTerm = ref(null)
+const publishedTermLabel = computed(() => {
+  if (!publishedTerm.value) return ''
+  return `${publishedTerm.value.schoolYear} · ${publishedTerm.value.semester}`
+})
+const effectiveYears = computed(() => {
+  const sectionCounts = publishedTerm.value?.sectionCounts || {}
+  const mapped = Object.keys(sectionCounts)
+    .filter(year => Number(sectionCounts[year]) > 0)
+    .sort((a, b) => years.indexOf(a) - years.indexOf(b))
+  return mapped.length ? mapped : years
+})
+const effectiveRoomOptions = computed(() => {
+  const rooms = Array.isArray(publishedTerm.value?.rooms) ? publishedTerm.value.rooms : []
+  if (rooms.length) {
+    return rooms.map((room) => {
+      if (typeof room === 'string') {
+        const type = /comlab/i.test(room) ? 'Comlab' : 'Lecture'
+        return { name: room, label: `${room} (${type})`, type }
+      }
+      return { name: room.name || '', label: `${room.name}${room.type === 'Comlab' ? ' (Comlab)' : ''}`, type: room.type || 'Lecture' }
+    }).filter((item) => item.name)
+  }
+  return roomOptions.map((room) => {
+    const type = /comlab/i.test(room) ? 'Comlab' : 'Lecture'
+    return { name: room, label: `${room}${type === 'Comlab' ? ' (Comlab)' : ''}`, type }
+  })
+})
+
+function getSectionsForYear(year) {
+  const count = Number(publishedTerm.value?.sectionCounts?.[year])
+  const names = Array.isArray(publishedTerm.value?.sectionNames?.[year]) ? publishedTerm.value.sectionNames[year] : []
+  if (Number.isFinite(count) && count > 0) {
+    if (names.length) {
+      return names.slice(0, count)
+    }
+    return Array.from({ length: count }, (_, index) => `South ${index + 1}`)
+  }
+  return sections
+}
 
 async function apiRequest(path, options = {}) {
   const token = getToken()
@@ -1204,6 +1248,15 @@ function getTeacherAvatar(name = '', avatar = '') {
   if (avatar) return avatar
   const safeName = encodeURIComponent(name || 'Teacher')
   return `https://ui-avatars.com/api/?name=${safeName}&background=DDECE5&color=1B4332`
+}
+
+async function loadPublishedTerm() {
+  try {
+    const response = await apiRequest('/academic-terms/published')
+    publishedTerm.value = response.term || null
+  } catch (_) {
+    publishedTerm.value = null
+  }
 }
 
 async function loadAddTeachers() {
@@ -2553,6 +2606,7 @@ function confirmLogout() { showLogoutModal.value = false; logout(); router.push(
 /* ── onMounted ── */
 onMounted(async () => {
   try {
+    await loadPublishedTerm()
     const response = await apiRequest('/users?role=teacher')
     if (response.users && Array.isArray(response.users)) {
       const teachers = response.users.filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
@@ -2567,6 +2621,7 @@ onMounted(async () => {
         })
       }
     }
+    await loadPublishedTerm()
     await refreshScheduleData()
   } catch (error) {
     await showScheduleError(error, 'Unable to load schedules')
