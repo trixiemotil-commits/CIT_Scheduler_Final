@@ -24,6 +24,7 @@ function eventPayload(body = {}) {
     description: cleanString(body.description),
     date: cleanString(body.date),
     time: cleanString(body.time),
+    endTime: cleanString(body.endTime),
     location: cleanString(body.location),
     image: typeof body.image === "string" ? body.image : "",
     teacherIds: cleanTeacherIds(body.teacherIds),
@@ -49,7 +50,7 @@ async function notifyStudentsOfEvent(event, actorId) {
   if (!students.length) return 0;
 
   const dateText = event.date ? ` on ${event.date}` : "";
-  const timeText = event.time ? ` at ${event.time}` : "";
+  const timeText = event.time ? ` at ${event.time}${event.endTime ? `–${event.endTime}` : ""}` : "";
   const locationText = event.location ? ` in ${event.location}` : "";
   const notifications = students.map((student) => ({
     recipientId: student._id,
@@ -95,6 +96,12 @@ async function createEvent(req, res) {
     if (payload.date && payload.date < localDateString()) {
       return res.status(400).json({ message: "New events cannot use a past date." });
     }
+    if (!payload.date || !payload.time || !payload.endTime) {
+      return res.status(400).json({ message: "Event date, start time, and end time are required." });
+    }
+    if (payload.endTime <= payload.time) {
+      return res.status(400).json({ message: "Event end time must be later than its start time." });
+    }
 
     const event = await Event.create({
       ...payload,
@@ -128,11 +135,17 @@ async function updateEvent(req, res) {
     }
 
     const payload = eventPayload(req.body);
+    const requestedStatus = cleanString(req.body.status).toLowerCase();
     if (!payload.title) {
       return res.status(400).json({ message: "Event title is required." });
     }
+    if (requestedStatus !== "archived" && (!payload.date || !payload.time || !payload.endTime)) {
+      return res.status(400).json({ message: "Event date, start time, and end time are required." });
+    }
+    if (requestedStatus !== "archived" && payload.endTime <= payload.time) {
+      return res.status(400).json({ message: "Event end time must be later than its start time." });
+    }
 
-    const requestedStatus = cleanString(req.body.status).toLowerCase();
     Object.assign(existing, payload);
     if (["active", "archived"].includes(requestedStatus)) {
       existing.status = requestedStatus;

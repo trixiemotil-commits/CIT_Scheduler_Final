@@ -58,6 +58,9 @@
             <div v-if="ev.image" class="event-card-img-wrap">
               <img :src="ev.image" class="event-card-img" alt="" />
             </div>
+            <div v-else class="event-card-default-cover" :style="eventCoverStyle(ev)">
+              <span>{{ eventInitials(ev.title) }}</span><small>CIT SCHEDULER EVENT</small>
+            </div>
             <div class="event-card-head">
               <span class="event-badge event-badge--active">Active</span>
             </div>
@@ -70,7 +73,7 @@
               </span>
               <span class="event-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                {{ ev.time }}
+                {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
               </span>
               <span class="event-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -89,6 +92,9 @@
             <div v-if="ev.image" class="event-card-img-wrap">
               <img :src="ev.image" class="event-card-img" alt="" />
             </div>
+            <div v-else class="event-card-default-cover" :style="eventCoverStyle(ev)">
+              <span>{{ eventInitials(ev.title) }}</span><small>CIT SCHEDULER EVENT</small>
+            </div>
             <div class="event-card-head">
               <span class="event-badge event-badge--archived">Archived</span>
             </div>
@@ -101,7 +107,7 @@
               </span>
               <span class="event-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                {{ ev.time }}
+                {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
               </span>
               <span class="event-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -121,7 +127,7 @@
     <Teleport to="body">
       <div v-if="showViewModal" class="modal-overlay" @click.self="showViewModal = false">
         <div class="ev-view-box" v-if="viewEvent">
-          <div class="ev-view-hero" :style="viewEvent.image ? `background-image:url('${viewEvent.image}')` : ''">
+          <div class="ev-view-hero" :style="viewEvent.image ? `background-image:url('${viewEvent.image}')` : eventCoverStyle(viewEvent)">
             <div class="ev-view-hero-overlay"></div>
             <div class="ev-view-hero-content">
               <span :class="['ev-view-badge', viewEvent.status === 'active' ? 'ev-view-badge--active' : 'ev-view-badge--archived']">
@@ -151,7 +157,7 @@
                 </div>
                 <div class="ev-view-info-text">
                   <span class="ev-view-info-label">Time</span>
-                  <span class="ev-view-info-val">{{ viewEvent.time ? formatDisplayTime(viewEvent.time) : '—' }}</span>
+                  <span class="ev-view-info-val">{{ viewEvent.time ? `${formatDisplayTime(viewEvent.time)}${viewEvent.endTime ? ` – ${formatDisplayTime(viewEvent.endTime)}` : ''}` : '—' }}</span>
                 </div>
               </div>
               <div class="ev-view-info-item">
@@ -345,6 +351,7 @@
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
+import { eventCoverStyle, eventInitials } from '@/utils/eventCover.js'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 

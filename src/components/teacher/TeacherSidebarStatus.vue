@@ -25,12 +25,12 @@
 
     <div class="sidebar-status-panel">
       <div class="sidebar-status-head">
-        <span>Availability</span>
+        <span>Office Hours</span>
         <span :class="['sidebar-status-dot', availabilityDotClass]"></span>
       </div>
       <select v-model="availabilityChoice" class="sidebar-status-select" aria-label="Availability">
-        <option value="Available" :disabled="!canChangeAvailability">Available for consultations</option>
-        <option value="Unavailable" :disabled="!canChangeAvailability">Unavailable for consultations</option>
+        <option value="Available" :disabled="!canChangeAvailability">Open for consultations</option>
+        <option value="Unavailable" :disabled="!canChangeAvailability">Closed for consultations</option>
       </select>
       <div class="sidebar-status-subtext">{{ availabilitySubtext }}</div>
     </div>
@@ -40,6 +40,7 @@
 <script setup>
 import { getToken, getUser, saveMergedUser } from '@/auth.js'
 import { computed, onMounted, ref } from 'vue'
+import Swal from 'sweetalert2'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const user = ref(getUser() || {})
@@ -201,10 +202,20 @@ async function saveStatus() {
   }
 }
 
-function clockOut() {
+async function clockOut() {
+  const result = await Swal.fire({
+    title: 'Clock out?',
+    text: 'Your work status will be set to Offline and your office hours will close.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, Clock Out',
+    cancelButtonText: 'Stay Clocked In',
+    confirmButtonColor: '#4b5563',
+  })
+  if (!result.isConfirmed) return
   teacherStatus.value = 'On Leave'
   teacherAvailability.value = 'Unavailable'
-  saveStatus()
+  await saveStatus()
 }
 
 onMounted(loadStatus)

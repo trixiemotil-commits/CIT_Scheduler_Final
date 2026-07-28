@@ -59,6 +59,8 @@ function toClientUser(user) {
     employeeId: user.employeeId || "",
     studentId: user.studentId || "",
     avatar: user.avatar,
+    yearLevel: user.yearLevel || "",
+    section: user.section || "",
     dateAdded: user.createdAt,
   };
 }
@@ -119,6 +121,8 @@ async function createUser(req, res) {
       status,
       employeeId = "",
       studentId = "",
+      yearLevel = "",
+      section = "",
       avatar = null,
     } = req.body;
 
@@ -182,6 +186,8 @@ async function createUser(req, res) {
       teacher_status: normalizedRoles.includes("teacher") ? sanitizeTeacherStatus(teacher_status) : undefined,
       employeeId: normalizedEmployeeId || undefined,
       studentId: normalizedStudentId || undefined,
+      yearLevel: normalizedRoles.includes("student") ? normalizeString(yearLevel) : "",
+      section: normalizedRoles.includes("student") ? normalizeString(section) : "",
       avatar: avatar || null,
     });
 
@@ -208,6 +214,8 @@ async function updateUser(req, res) {
       status,
       employeeId = "",
       studentId = "",
+      yearLevel = "",
+      section = "",
     } = req.body;
 
     if (!firstName || !lastName || !email || !role) {
@@ -274,6 +282,8 @@ async function updateUser(req, res) {
 
     if (normalizedStudentId) {
       user.studentId = normalizedStudentId;
+      user.yearLevel = normalizeString(yearLevel);
+      user.section = normalizeString(section);
     } else {
       user.studentId = undefined;
     }

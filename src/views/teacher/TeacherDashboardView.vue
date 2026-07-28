@@ -950,7 +950,7 @@ const isCurrentlyInEvent = computed(() => {
   return events.value.some(ev => {
     const evDate = ev.date || ev.eventDate || ''
     if (evDate && !evDate.startsWith(todayISO)) return false
-    const timeRange = ev.startTime && ev.endTime ? `${ev.startTime} – ${ev.endTime}` : (ev.time || '')
+    const timeRange = ev.endTime ? `${ev.startTime || ev.time || ''} – ${ev.endTime}` : (ev.startTime || ev.time || '')
     if (!timeRange) return false
     return isNowWithin(timeRange)
   })
@@ -961,7 +961,7 @@ const isCurrentlyInMeeting = computed(() => {
   return events.value.some(ev => {
     const evDate = ev.date || ev.eventDate || ''
     if (evDate && !evDate.startsWith(todayISO)) return false
-    const timeRange = ev.startTime && ev.endTime ? `${ev.startTime} – ${ev.endTime}` : (ev.time || '')
+    const timeRange = ev.endTime ? `${ev.startTime || ev.time || ''} – ${ev.endTime}` : (ev.startTime || ev.time || '')
     if (!timeRange) return false
     const within = isNowWithin(timeRange)
     if (!within) return false
@@ -1499,8 +1499,9 @@ function confirmLogout() {
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.14);
-  z-index: 999;
+  z-index: 5000;
   overflow: hidden;
+  max-height: min(680px, calc(100vh - 110px));
 }
 .notif-panel-header { padding: 22px 22px 0; }
 .notif-panel-title { font-size: 1.4rem; font-weight: 700; color: #111; }

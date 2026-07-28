@@ -22,6 +22,11 @@ const eventSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    endTime: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     location: {
       type: String,
       trim: true,

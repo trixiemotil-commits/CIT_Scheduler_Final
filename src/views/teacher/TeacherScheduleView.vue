@@ -63,7 +63,7 @@
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
             </div>
-            <button class="icon-btn print-btn" @click="printSchedule" title="Print schedule">
+            <button class="icon-btn print-btn" @click="printSchedule" :disabled="isLoading" title="Print schedule">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 22h12v-9H6z"/><path d="M6 14h12"/></svg>
               Print
             </button>
@@ -293,7 +293,7 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import { timeOptions } from '@/composables/useSchedule.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -764,10 +764,16 @@ const subjectOptions = computed(() => {
     })
     .map((c) => ({ code: c.code, label: c.code }))
 
-  return [
-    ...subjects,
-    { code: CONSULTATION_FILTER_CODE, label: 'Consultation Hours' },
-  ]
+  if (consultationData.value.length) {
+    subjects.push({ code: CONSULTATION_FILTER_CODE, label: 'Consultation Hours' })
+  }
+  return subjects
+})
+
+watch(consultationData, (slots) => {
+  if (!slots.length && selectedSubject.value === CONSULTATION_FILTER_CODE) {
+    selectedSubject.value = ''
+  }
 })
 
 /* ── Expand day column ── */
@@ -778,8 +784,8 @@ function toggleExpand(day) {
 
 /* ── Build table matrix (handles rowspan occupation) ── */
 const tableMatrix = computed(() => {
-  const data = scheduleData.value
-  const consultations = consultationData.value
+  const data = filteredClasses.value
+  const consultations = filteredConsultations.value
   const occupied = Array.from({ length: DAYS.length }, () => new Array(TIME_SLOTS.length).fill(false))
 
   return TIME_SLOTS.map((slot, ri) =>
@@ -811,6 +817,7 @@ function openModal(cls) { selectedClass.value = cls; showModal.value = true }
 function closeModal()   { showModal.value = false }
 
 function printSchedule() {
+  if (isLoading.value) return
   const previousExpandedDay = expandedDay.value
   expandedDay.value = null
 
@@ -1641,5 +1648,140 @@ function confirmLogout() {
 @media (max-width: 900px) {
   .main { padding: 20px 16px 32px; }
   .sidebar { width: 200px; min-width: 200px; }
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+
+  :global(html),
+  :global(body),
+  :global(#app) {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  .layout {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+
+  .sidebar,
+  .main-header,
+  .sched-topbar-right,
+  .modal-overlay {
+    display: none !important;
+  }
+
+  .main {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .schedule-card {
+    display: block !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  .schedule-card::before {
+    content: "CIT Scheduler — Weekly Teaching Schedule";
+    display: block;
+    margin-bottom: 3mm;
+    color: #111;
+    font-size: 17pt;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .sched-topbar {
+    display: block !important;
+    margin: 0 0 3mm !important;
+    padding: 0 0 2mm !important;
+    border-bottom: 1px solid #777 !important;
+    text-align: center;
+  }
+
+  .sched-topbar-left {
+    min-width: 0 !important;
+  }
+
+  .sched-grid-title {
+    margin: 0 !important;
+    font-size: 11pt !important;
+  }
+
+  .sched-grid-sub {
+    display: none !important;
+  }
+
+  .table-scroll {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .sched-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-size: 7pt !important;
+  }
+
+  .th-time,
+  .th-day {
+    position: static !important;
+    width: auto !important;
+    padding: 2mm 1mm !important;
+    color: #fff !important;
+    background: #4b5563 !important;
+    border: 1px solid #333 !important;
+    font-size: 7pt !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .th-time {
+    width: 16mm !important;
+  }
+
+  .td-time,
+  .td-empty,
+  .td-class {
+    width: auto !important;
+    min-width: 0 !important;
+    height: 6.5mm !important;
+    padding: 1mm !important;
+    border: 1px solid #aaa !important;
+    font-size: 6.5pt !important;
+    overflow: hidden !important;
+    break-inside: avoid;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .free-time-label {
+    font-size: 6pt !important;
+  }
 }
 </style>

@@ -133,7 +133,7 @@
                 >
                   <option value="In School">In School</option>
                   <option value="On Leave">On Leave</option>
-                  <option value="On-Meeting">On Meeting</option>
+                  <option value="On Meeting">On Meeting</option>
                 </select>
               </div>
 
@@ -373,7 +373,7 @@ function canAutoRefresh() {
   return !Object.keys(unsavedChanges.value || {}).length
 }
 
-const statusTabs = ['All', 'In School', 'On-Meeting', 'On-leave']
+const statusTabs = ['All', 'In School', 'On Meeting', 'On Leave']
 
 const teachers = ref([])
 const scheduleCache = ref({})
@@ -416,7 +416,7 @@ async function apiRequest(path, options = {}) {
 }
 
 function mapTeacherStatus(status) {
-  if (status === 'On Meeting') return 'On-Meeting'
+  if (status === 'On Meeting' || status === 'On-Meeting') return 'On Meeting'
   if (status === 'On Leave') return 'On Leave'
   return 'In School'
 }
@@ -527,7 +527,7 @@ function hasSubstituteConflict(candidate, leaveEntries) {
 }
 
 function mapTeacherStatusToApi(status) {
-  if (status === 'On-Meeting') return 'On Meeting'
+  if (status === 'On Meeting' || status === 'On-Meeting') return 'On Meeting'
   if (status === 'On Leave') return 'On Leave'
   return 'On School'
 }
@@ -635,7 +635,7 @@ async function loadTeachers() {
 
 const filteredTeachers = computed(() => {
   if (activeTab.value === 'All') return teachers.value
-  if (activeTab.value === 'On-leave') return teachers.value.filter(t => t.status === 'On Leave')
+  if (activeTab.value === 'On Leave') return teachers.value.filter(t => t.status === 'On Leave')
   return teachers.value.filter(t => t.status === activeTab.value)
 })
 

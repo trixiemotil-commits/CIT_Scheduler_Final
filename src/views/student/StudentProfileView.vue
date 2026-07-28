@@ -67,17 +67,18 @@
           </div>
           <div class="field-group">
             <label class="field-label">Year Level</label>
-            <select v-model="form.yearLevel" class="field-select">
+            <select v-model="form.yearLevel" class="field-select" disabled>
               <option value="" disabled>Select Year Level</option>
               <option v-for="opt in yearLevelOptions" :key="opt" :value="opt">{{ opt }}</option>
             </select>
           </div>
           <div class="field-group">
             <label class="field-label">Section</label>
-            <select v-model="form.section" class="field-select">
+            <select v-model="form.section" class="field-select" disabled>
               <option value="" disabled>Select Section</option>
               <option v-for="opt in sectionOptions" :key="opt" :value="opt">{{ opt }}</option>
             </select>
+            <small class="admin-managed-note">Managed by the administrator for the current semester.</small>
           </div>
           <div v-if="saveError" class="msg-err">{{ saveError }}</div>
         </div>
@@ -254,8 +255,6 @@ async function saveProfile() {
         firstName,
         lastName,
         email: form.value.email,
-        yearLevel: form.value.yearLevel,
-        section: form.value.section,
         avatar: user.value.avatar || undefined,
       }),
     })
@@ -568,4 +567,5 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
   font-size: 1rem;
   font-weight: 600;
 }
+.admin-managed-note{display:block;margin-top:6px;color:#7a8289;font-size:.7rem;line-height:1.4}.field-select:disabled{cursor:not-allowed;opacity:.72;background:#eef0f2}
 </style>

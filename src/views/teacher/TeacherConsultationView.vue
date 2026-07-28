@@ -797,7 +797,6 @@ const statusOptions = [
   { value: 'approved',  label: 'Approved'  },
   { value: 'resched',   label: 'Resched'   },
   { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 function editReq(id) {

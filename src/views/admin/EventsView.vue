@@ -81,6 +81,10 @@
             <div v-if="ev.image" class="event-card-img-wrap">
               <img :src="ev.image" class="event-card-img" alt="" />
             </div>
+            <div v-else class="event-card-default-cover" :style="eventCoverStyle(ev)">
+              <span>{{ eventInitials(ev.title) }}</span>
+              <small>CIT SCHEDULER EVENT</small>
+            </div>
             <div class="event-card-head">
               <span class="event-badge event-badge--active">Active</span>
               <div class="event-card-actions">
@@ -103,7 +107,7 @@
               </span>
               <span class="event-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                {{ ev.time }}
+                {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
               </span>
               <span class="event-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -121,6 +125,10 @@
           <div v-for="ev in archivedEvents" :key="ev.id" class="event-card event-card--archived event-card--clickable" @click="openViewEvent(ev)">
             <div v-if="ev.image" class="event-card-img-wrap">
               <img :src="ev.image" class="event-card-img" alt="" />
+            </div>
+            <div v-else class="event-card-default-cover" :style="eventCoverStyle(ev)">
+              <span>{{ eventInitials(ev.title) }}</span>
+              <small>CIT SCHEDULER EVENT</small>
             </div>
             <div class="event-card-head">
               <span class="event-badge event-badge--archived">Archived</span>
@@ -144,7 +152,7 @@
               </span>
               <span class="event-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                {{ ev.time }}
+                {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
               </span>
               <span class="event-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -166,7 +174,7 @@
         <div class="ev-view-box" v-if="viewEvent">
 
           <!-- Hero -->
-          <div class="ev-view-hero" :style="viewEvent.image ? `background-image:url('${viewEvent.image}')` : ''">
+          <div class="ev-view-hero" :style="viewEvent.image ? `background-image:url('${viewEvent.image}')` : eventCoverStyle(viewEvent)">
             <div class="ev-view-hero-overlay"></div>
             <div class="ev-view-hero-content">
               <span :class="['ev-view-badge', viewEvent.status === 'active' ? 'ev-view-badge--active' : 'ev-view-badge--archived']">
@@ -200,7 +208,7 @@
                 </div>
                 <div class="ev-view-info-text">
                   <span class="ev-view-info-label">Time</span>
-                  <span class="ev-view-info-val">{{ viewEvent.time ? formatDisplayTime(viewEvent.time) : '—' }}</span>
+                  <span class="ev-view-info-val">{{ viewEvent.time ? `${formatDisplayTime(viewEvent.time)}${viewEvent.endTime ? ` – ${formatDisplayTime(viewEvent.endTime)}` : ''}` : '—' }}</span>
                 </div>
               </div>
               <div class="ev-view-info-item">
@@ -276,68 +284,18 @@
             <!-- Date & Time -->
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Date</label>
-                <div class="fi-wrap">
-                  <svg class="fi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  <input
-                    v-model="eventForm.date"
-                    type="date"
-                    :min="editingEvent ? undefined : todayDate"
-                    class="form-input fi-input"
-                  />
-                </div>
+                <label class="form-label">Date <span class="form-required">*</span></label>
+                <SystemDatePicker v-model="eventForm.date" placeholder="Select event date" :min="editingEvent ? '' : todayDate" />
               </div>
 
-              <!-- Custom Time Picker -->
               <div class="form-group">
-                <label class="form-label">Time</label>
-                <div class="time-picker-wrap" v-click-outside="() => showTimePicker = false">
-                  <div class="time-display" :class="{ 'time-display--open': showTimePicker }" @click="showTimePicker = !showTimePicker">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    <span :class="eventForm.time ? 'td-val' : 'td-placeholder'">{{ eventForm.time ? formatDisplayTime(eventForm.time) : 'Select time' }}</span>
-                    <svg class="td-chevron" :class="{ 'td-chevron--open': showTimePicker }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                  </div>
-                  <div v-if="showTimePicker" class="time-picker-panel">
-                    <div class="tp-cols">
-                      <!-- Hours -->
-                      <div class="tp-col">
-                        <div class="tp-col-label">HH</div>
-                        <div class="tp-col-scroll">
-                          <div
-                            v-for="h in pickerHours" :key="h"
-                            :class="['tp-cell', { 'tp-cell--active': tempHour === h }]"
-                            @click="tempHour = h"
-                          >{{ h }}</div>
-                        </div>
-                      </div>
-                      <div class="tp-sep">:</div>
-                      <!-- Minutes -->
-                      <div class="tp-col">
-                        <div class="tp-col-label">MM</div>
-                        <div class="tp-col-scroll">
-                          <div
-                            v-for="m in pickerMinutes" :key="m"
-                            :class="['tp-cell', { 'tp-cell--active': tempMinute === m }]"
-                            @click="tempMinute = m"
-                          >{{ m }}</div>
-                        </div>
-                      </div>
-                      <!-- AM/PM -->
-                      <div class="tp-col tp-col--period">
-                        <div class="tp-col-label">AM/PM</div>
-                        <div class="tp-ampm">
-                          <div :class="['tp-ampm-cell', { 'tp-ampm-cell--active': tempPeriod === 'AM' }]" @click="tempPeriod = 'AM'">AM</div>
-                          <div :class="['tp-ampm-cell', { 'tp-ampm-cell--active': tempPeriod === 'PM' }]" @click="tempPeriod = 'PM'">PM</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="tp-preview">{{ tempHour }}:{{ tempMinute }} {{ tempPeriod }}</div>
-                    <button type="button" class="tp-confirm-btn" @click="confirmTime">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      Confirm Time
-                    </button>
-                  </div>
-                </div>
+                <label class="form-label">Start Time <span class="form-required">*</span></label>
+                <SystemClockPicker v-model="eventForm.time" placeholder="Select start time" />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">End Time <span class="form-required">*</span></label>
+                <SystemClockPicker v-model="eventForm.endTime" placeholder="Select end time" :min="eventForm.time" />
               </div>
             </div>
 
@@ -447,6 +405,8 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import SystemClockPicker from '@/components/SystemClockPicker.vue'
+import SystemDatePicker from '@/components/SystemDatePicker.vue'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -510,7 +470,7 @@ function confirmLogout() {
 const showEventModal = ref(false)
 const editingEvent   = ref(null)
 const eventsTab      = ref('active')
-const eventForm      = ref({ title: '', description: '', date: '', time: '', location: '', image: '', teacherIds: [] })
+const eventForm      = ref({ title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [] })
 const imagePreview   = ref('')
 const imgInput       = ref(null)
 const eventTeachers = ref([])
@@ -602,6 +562,28 @@ async function loadEventTeachers() {
   }
 }
 
+const eventCoverGradients = [
+  ['#465361', '#222a31'],
+  ['#526574', '#28343d'],
+  ['#59636d', '#30363c'],
+  ['#475c5a', '#263633'],
+  ['#61586a', '#342e3b'],
+]
+
+function eventInitials(title = '') {
+  const initials = title.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join('')
+  return initials.toUpperCase() || 'EV'
+}
+
+function eventCoverStyle(event = {}) {
+  const source = String(event.title || event.id || 'event')
+  const hash = [...source].reduce((total, character) => total + character.charCodeAt(0), 0)
+  const [start, end] = eventCoverGradients[hash % eventCoverGradients.length]
+  return {
+    background: `radial-gradient(circle at 78% 22%, rgba(255,255,255,.2), transparent 28%), linear-gradient(135deg, ${start}, ${end})`,
+  }
+}
+
 async function eventRequest(path = '', options = {}) {
   const token = getToken()
   if (!token) throw new Error('Session expired. Please log in again.')
@@ -639,7 +621,7 @@ function toggleVisibleTeachers() {
 
 function openAddEvent() {
   editingEvent.value = null
-  eventForm.value = { title: '', description: '', date: '', time: '', location: '', image: '', teacherIds: [] }
+  eventForm.value = { title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [] }
   imagePreview.value = ''
   showTimePicker.value = false
   showTeacherPicker.value = false
@@ -652,7 +634,7 @@ function openAddEvent() {
 
 function openEditEvent(ev) {
   editingEvent.value = ev
-  eventForm.value = { title: ev.title, description: ev.description, date: ev.date, time: ev.time, location: ev.location, image: ev.image || '', teacherIds: [...(ev.teacherIds || [])] }
+  eventForm.value = { title: ev.title, description: ev.description, date: ev.date, time: ev.time, endTime: ev.endTime || '', location: ev.location, image: ev.image || '', teacherIds: [...(ev.teacherIds || [])] }
   imagePreview.value = ev.image || ''
   showTimePicker.value = false
   showTeacherPicker.value = false
@@ -689,6 +671,14 @@ async function saveEvent() {
   if (!eventForm.value.title.trim()) return
   if (!editingEvent.value && eventForm.value.date && eventForm.value.date < todayDate) {
     window.alert('New events cannot use a past date.')
+    return
+  }
+  if (!eventForm.value.date || !eventForm.value.time || !eventForm.value.endTime) {
+    window.alert('Date, start time, and end time are required.')
+    return
+  }
+  if (eventForm.value.endTime <= eventForm.value.time) {
+    window.alert('End time must be later than start time.')
     return
   }
   try {
@@ -1086,6 +1076,44 @@ onMounted(loadEvents)
   transition: transform 0.3s ease;
 }
 .event-card:hover .event-card-img { transform: scale(1.03); }
+.event-card-default-cover {
+  width: 100%;
+  height: 160px;
+  border-radius: 10px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #fff;
+  overflow: hidden;
+  position: relative;
+}
+.event-card-default-cover::before {
+  content: "";
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 50%;
+}
+.event-card-default-cover span {
+  position: relative;
+  font-size: 2.15rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-shadow: 0 3px 10px rgba(0,0,0,.25);
+}
+.event-card-default-cover small {
+  position: relative;
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  opacity: .78;
+}
 
 .event-card--clickable { cursor: pointer; }
 .event-card--clickable:hover {
@@ -1322,7 +1350,7 @@ onMounted(loadEvents)
 
 .event-form { display: flex; flex-direction: column; gap: 18px; padding: 26px 28px 28px; }
 .form-group { display: flex; flex-direction: column; gap: 7px; }
-.form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-row   { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .form-optional { color: #999; font-weight: 400; text-transform: none; }
 
 .teacher-picker { position: relative; }
@@ -1517,4 +1545,7 @@ onMounted(loadEvents)
   box-shadow: 0 4px 14px rgba(48, 53, 58,0.25);
 }
 .ev-submit-btn:hover { opacity: 0.9; box-shadow: 0 6px 18px rgba(48, 53, 58,0.32); }
+@media (max-width: 720px) {
+  .form-row { grid-template-columns: 1fr; }
+}
 </style>

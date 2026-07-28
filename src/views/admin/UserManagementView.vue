@@ -368,6 +368,20 @@
             </div>
           </div>
 
+          <div v-if="userForm.role === 'Student'" class="form-row">
+            <div class="form-group">
+              <label class="form-label">Year Level</label>
+              <select v-model="userForm.yearLevel" class="form-input">
+                <option value="">Select year level</option>
+                <option v-for="year in studentYearOptions" :key="year" :value="year">{{ year }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Section</label>
+              <input v-model.trim="userForm.section" class="form-input" type="text" placeholder="e.g. South 1" />
+            </div>
+          </div>
+
           <!-- ── Section: Credentials (Add only) ── -->
           <template v-if="!editingUser">
             <div class="reg-section-title">
@@ -730,6 +744,8 @@ function mapUserForUi(user) {
     phone: user.phone || '',
     studentId: user.studentId || '',
     employeeId: user.employeeId || '',
+    yearLevel: user.yearLevel || '',
+    section: user.section || '',
   }
 }
 
@@ -856,6 +872,8 @@ function buildUserPayload(includePassword) {
     role: roles[0],
     roles,
     status: editingUser.value ? (userForm.value.status || 'Active') : 'Active',
+    yearLevel: roles.includes('student') ? trimValue(userForm.value.yearLevel) : '',
+    section: roles.includes('student') ? trimValue(userForm.value.section) : '',
   }
 
   if (schoolId) {
@@ -889,7 +907,8 @@ const formError       = ref('')
 const showRegisterConfirm = ref(false)
 const showApproveAllConfirm = ref(false)
 const isSavingUser    = ref(false)
-const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', password: '', confirmPassword: '' })
+const studentYearOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', yearLevel: '', section: '', password: '', confirmPassword: '' })
 const userForm  = ref(emptyForm())
 
 function openAddUser() {
@@ -910,6 +929,8 @@ function openEditUser(user) {
     schoolId:   user.schoolId || '',
     role:       user.role,
     status:     user.status,
+    yearLevel:  user.yearLevel || '',
+    section:    user.section || '',
     password:   '',
     confirmPassword: '',
   }

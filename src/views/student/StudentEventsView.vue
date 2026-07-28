@@ -8,20 +8,16 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <div class="header-title">Events</div>
-          <button class="add-event-mobile-btn" @click="openAddEvent">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
         </div>
 
         <section class="events-wrap">
           <header class="events-head">
             <h1 class="events-title">Events</h1>
-            <p class="events-sub">Manage and track school events</p>
+            <p class="events-sub">View school events and announcements</p>
           </header>
 
           <div class="events-tabs-mobile">
             <button :class="['tab-btn', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active</button>
-            <button :class="['tab-btn', { active: eventsTab === 'archived' }]" @click="eventsTab = 'archived'">Archived{{ archivedEvents.length > 0 ? ` (${archivedEvents.length})` : '' }}</button>
           </div>
 
           <div class="events-grid">
@@ -35,9 +31,13 @@
                 class="event-card"
                 @click="openViewEvent(ev)"
               >
+                <img v-if="ev.image" :src="ev.image" class="event-card-cover-image" alt="" />
+                <div v-else class="event-card-default-cover" :style="eventCoverStyle(ev)">
+                  <span>{{ eventInitials(ev.title) }}</span><small>CIT SCHEDULER EVENT</small>
+                </div>
                 <div class="event-card-head">
                   <span class="event-badge">Active</span>
-                  <div class="event-card-actions">
+                  <div v-if="false" class="event-card-actions">
                     <button class="ec-btn ec-btn--edit" @click.stop="openEditEvent(ev)">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
@@ -55,7 +55,7 @@
                   </span>
                   <span class="meta-item">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    {{ ev.time }}
+                    {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
                   </span>
                   <span class="meta-item">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -74,9 +74,13 @@
                 class="event-card event-card--archived"
                 @click="openViewEvent(ev)"
               >
+                <img v-if="ev.image" :src="ev.image" class="event-card-cover-image" alt="" />
+                <div v-else class="event-card-default-cover" :style="eventCoverStyle(ev)">
+                  <span>{{ eventInitials(ev.title) }}</span><small>CIT SCHEDULER EVENT</small>
+                </div>
                 <div class="event-card-head">
                   <span class="event-badge event-badge--archived">Archived</span>
-                  <div class="event-card-actions">
+                  <div v-if="false" class="event-card-actions">
                     <button class="ec-btn ec-btn--restore" @click.stop="archiveEvent(ev)">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.47"/></svg>
                     </button>
@@ -94,7 +98,7 @@
                   </span>
                   <span class="meta-item">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    {{ ev.time }}
+                    {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
                   </span>
                   <span class="meta-item">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -118,6 +122,10 @@
               </button>
             </div>
             <div class="modal-body-mobile">
+              <img v-if="viewEvent.image" :src="viewEvent.image" class="modal-event-cover" alt="" />
+              <div v-else class="modal-event-cover event-card-default-cover" :style="eventCoverStyle(viewEvent)">
+                <span>{{ eventInitials(viewEvent.title) }}</span><small>CIT SCHEDULER EVENT</small>
+              </div>
               <p class="modal-desc">{{ viewEvent.description }}</p>
               <div class="modal-info-grid">
                 <div class="info-item">
@@ -126,17 +134,13 @@
                 </div>
                 <div class="info-item">
                   <span class="info-label">Time</span>
-                  <span class="info-val">{{ viewEvent.time ? formatDisplayTime(viewEvent.time) : '—' }}</span>
+                  <span class="info-val">{{ viewEvent.time ? `${formatDisplayTime(viewEvent.time)}${viewEvent.endTime ? ` – ${formatDisplayTime(viewEvent.endTime)}` : ''}` : '—' }}</span>
                 </div>
                 <div class="info-item">
                   <span class="info-label">Location</span>
                   <span class="info-val">{{ viewEvent.location || '—' }}</span>
                 </div>
               </div>
-              <button class="modal-edit-btn" @click="showViewModal = false; openEditEvent(viewEvent)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                Edit Event
-              </button>
             </div>
           </div>
         </div>
@@ -144,7 +148,7 @@
 
       <!-- Add / Edit Event Modal -->
       <Teleport to="body">
-        <div v-if="showEventModal" class="modal-overlay-mobile" @click.self="showEventModal = false">
+        <div v-if="false && showEventModal" class="modal-overlay-mobile" @click.self="showEventModal = false">
           <div class="event-modal-mobile">
             <div class="modal-header-mobile">
               <h2>{{ editingEvent ? 'Edit Event' : 'Add Event' }}</h2>
@@ -200,6 +204,7 @@
 <script setup>
 import { getToken } from '@/auth.js'
 import StudentRefresher from '@/components/student/StudentRefresher.vue'
+import { eventCoverStyle, eventInitials } from '@/utils/eventCover.js'
 import { IonContent, IonPage } from '@ionic/vue'
 import { computed, onMounted, ref } from 'vue'
 
@@ -561,12 +566,16 @@ onMounted(loadEvents)
 /* Modals */
 .modal-overlay-mobile {
   position: fixed;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: min(430px, 100vw);
+  transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: flex-end;
+  justify-content: center;
   z-index: 1000;
-  animation: slideUp 0.3s ease-out;
 }
 
 @keyframes slideUp {
@@ -579,9 +588,11 @@ onMounted(loadEvents)
   background: #fff;
   border-radius: 20px 20px 0 0;
   width: 100%;
-  max-height: 90vh;
+  max-width: 430px;
+  max-height: 88dvh;
   overflow-y: auto;
   animation: slideUp 0.3s ease-out;
+  box-shadow: 0 -12px 35px rgba(0, 0, 0, 0.2);
 }
 
 .modal-header-mobile {

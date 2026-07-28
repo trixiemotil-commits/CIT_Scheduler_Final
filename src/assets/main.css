@@ -273,17 +273,14 @@ select {
   border-color: #bfc4c8 !important;
 }
 
-/* Keep states readable, but mute them into the monochrome palette. */
-.card-in-school,
-.card-on-leave,
-.card-on-meeting {
-  background: var(--metal-surface-soft) !important;
-  border-color: #969da3 !important;
-}
+/* Teacher availability uses distinct safety colors. */
+.card-in-school { background: #f0fdf4 !important; border-color: #22c55e !important; }
+.card-on-leave { background: #fef2f2 !important; border-color: #ef4444 !important; }
+.card-on-meeting { background: #fefce8 !important; border-color: #eab308 !important; }
+.badge-in-school { color: #fff !important; background: #16a34a !important; }
+.badge-on-leave { color: #fff !important; background: #dc2626 !important; }
+.badge-on-meeting { color: #422006 !important; background: #eab308 !important; }
 
-.badge-in-school,
-.badge-on-leave,
-.badge-on-meeting,
 .badge-approved,
 .badge-pending,
 .badge-completed,
@@ -291,6 +288,83 @@ select {
 .badge-resched {
   color: #fff !important;
   background: linear-gradient(145deg, #7b838b, #464d54) !important;
+}
+
+/* Keep teacher controls at the bottom of every sidebar, immediately above account actions. */
+.teacher-sidebar > .sidebar-profile { order: 0; }
+.teacher-sidebar > .sidebar-nav { order: 1; }
+.teacher-sidebar > .teacher-sidebar-status { order: 2; margin-top: auto !important; }
+.teacher-sidebar > .role-switch-btn { order: 3; }
+.teacher-sidebar > .logout-btn { order: 4; }
+
+/* Consultation workflow colors. */
+.teacher-sidebar ~ .main .badge-pending,
+.teacher-sidebar ~ main .badge-pending { background: #f59e0b !important; color: #422006 !important; }
+.teacher-sidebar ~ .main .badge-approved,
+.teacher-sidebar ~ main .badge-approved { background: #16a34a !important; color: #fff !important; }
+.teacher-sidebar ~ .main .badge-resched,
+.teacher-sidebar ~ main .badge-resched { background: #2563eb !important; color: #fff !important; }
+.teacher-sidebar ~ .main .badge-completed,
+.teacher-sidebar ~ main .badge-completed { background: #64748b !important; color: #fff !important; }
+
+/* Shared event artwork when an administrator did not upload an image. */
+.event-card-default-cover,
+.event-card-cover-image {
+  width: 100%;
+  height: 160px;
+  border-radius: 10px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
+.event-card-cover-image {
+  display: block;
+  object-fit: cover;
+}
+
+.event-card-default-cover {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #fff;
+  overflow: hidden;
+  position: relative;
+}
+
+.event-card-default-cover::before {
+  content: "";
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 50%;
+}
+
+.event-card-default-cover span {
+  position: relative;
+  font-size: 2.15rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-shadow: 0 3px 10px rgba(0,0,0,.25);
+}
+
+.event-card-default-cover small {
+  position: relative;
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  opacity: .78;
+}
+
+.modal-event-cover {
+  width: 100%;
+  height: 180px;
+  border-radius: 12px;
+  object-fit: cover;
+  margin-bottom: 14px;
 }
 
 .area-tag,
