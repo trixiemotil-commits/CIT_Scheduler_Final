@@ -184,7 +184,10 @@
       <!-- ── Today's Class ── -->
       <section class="today-class">
         <div class="today-class-header">
-          <h2 class="today-class-title">Today's Class</h2>
+          <div>
+            <h2 class="today-class-title">Today's Schedule</h2>
+            <p class="today-class-sub">Monday through Saturday</p>
+          </div>
           <div class="legend">
             <span class="legend-item"><span class="legend-dot lecture"></span>Lecture</span>
             <span class="legend-item"><span class="legend-dot laboratory"></span>Laboratory</span>
@@ -192,49 +195,61 @@
           </div>
         </div>
 
-        <div class="table-wrap">
-          <table class="class-table">
-            <thead>
-              <tr>
-                <th>TIME</th>
-                <th>SUBJECT CODE &amp; NAME</th>
-                <th>CLASS YEAR &amp; SECTION</th>
-                <th>PARALLEL CLASS</th>
-                <th>ROOM</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="classesLoading || classesError || !todayClasses.length">
-                <td colspan="5" class="td-empty-state">
-                  {{ classesLoading ? 'Loading classes...' : (classesError || `No classes or consultation hours scheduled for ${todayDayName}.`) }}
-                </td>
-              </tr>
-              <tr v-else v-for="(cls, i) in todayClasses" :key="i">
-                <td class="td-time">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+        <div class="carousel-shell">
+          <div class="carousel-topbar">
+            <button class="carousel-nav-btn" type="button" @click="prevCarouselDay" :disabled="carouselDays.length <= 1" aria-label="Previous day">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <div class="carousel-day-badge">{{ activeCarouselDay }} · {{ activeCarouselDateLabel }}</div>
+            <button class="carousel-nav-btn" type="button" @click="nextCarouselDay" :disabled="carouselDays.length <= 1" aria-label="Next day">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="carousel-content">
+            <div v-if="classesLoading" class="carousel-state">Loading classes...</div>
+            <div v-else-if="classesError" class="carousel-state">{{ classesError }}</div>
+            <div v-else-if="!activeCarouselClasses.length" class="carousel-state">No classes scheduled for {{ activeCarouselDay }}.</div>
+            <div v-else class="classes-grid">
+              <div v-for="(cls, i) in activeCarouselClasses" :key="`${activeCarouselDay}-${i}`" class="class-item" @click="goToSchedule" style="cursor: pointer;">
+                <div class="class-time-badge">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"/>
                     <polyline points="12 6 12 12 16 14"/>
                   </svg>
-                  {{ cls.time }}
-                </td>
-                <td v-if="cls.isConsultation" colspan="4" class="td-consultation-center">
-                  <span class="consultation-chip">Consultation Hours</span>
-                </td>
-                <template v-else>
-                  <td class="td-subject">{{ cls.subject }}</td>
-                  <td class="td-section">{{ cls.section }}</td>
-                  <td class="td-parallel">
-                    <span :class="['parallel-badge', cls.parallel ? 'badge-parallel' : 'badge-not']">
-                      {{ cls.parallel ? 'Parallel' : 'Not Parallel' }}
-                    </span>
-                  </td>
-                  <td class="td-room">
-                    <span :class="['room-badge', cls.roomColor]">{{ cls.room }}</span>
-                  </td>
-                </template>
-              </tr>
-            </tbody>
-          </table>
+                  <span>{{ cls.time }}</span>
+                </div>
+                <div class="class-details">
+                  <div v-if="cls.isConsultation" class="consultation-badge">Consultation Hours</div>
+                  <template v-else>
+                    <h4 class="class-subject">{{ cls.subject }}</h4>
+                    <p class="class-section">{{ cls.section }}</p>
+                  </template>
+                </div>
+                <div v-if="!cls.isConsultation" class="class-meta">
+                  <span :class="['badge', cls.parallel ? 'badge-parallel' : 'badge-single']">
+                    {{ cls.parallel ? 'Parallel' : 'Single' }}
+                  </span>
+                  <span :class="['badge', 'badge-room', cls.roomColor]">{{ cls.room }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="carousel-indicators">
+            <button
+              v-for="day in carouselDays"
+              :key="day"
+              :class="['indicator-dot', { active: activeCarouselDay === day }]"
+              type="button"
+              :aria-label="`Show ${day} schedule`"
+              @click="activeCarouselIndex = carouselDays.indexOf(day)"
+            />
+          </div>
         </div>
       </section>
     </main>
@@ -303,7 +318,7 @@
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import useNotifications from '@/composables/useNotifications'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 // v-click-outside directive
@@ -419,6 +434,10 @@ function openNotification(notification) {
   markNotificationRead(notification.id)
   showNotif.value = false
   router.push('/teacher/consultation')
+}
+
+function goToSchedule() {
+  router.push('/teacher/schedule')
 }
 
 /* ── Teacher status ── */
@@ -829,6 +848,46 @@ const classesLoading = ref(false)
 const classesError = ref('')
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const todayDayName = ref(dayNames[new Date().getDay()])
+const carouselDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const activeCarouselIndex = ref(0)
+const dayClasses = ref({})
+const activeCarouselDay = computed(() => carouselDays[activeCarouselIndex.value] || carouselDays[0])
+const activeCarouselClasses = computed(() => dayClasses.value[activeCarouselDay.value] || [])
+
+function getWeekStartDate(referenceDate = new Date()) {
+  const date = new Date(referenceDate)
+  const day = date.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  date.setDate(date.getDate() + diff)
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+function formatCarouselDate(dayName) {
+  const weekStart = getWeekStartDate()
+  const dayIndex = carouselDays.indexOf(dayName)
+  if (dayIndex < 0) return ''
+  const date = new Date(weekStart)
+  date.setDate(weekStart.getDate() + dayIndex)
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+const activeCarouselDateLabel = computed(() => formatCarouselDate(activeCarouselDay.value))
+
+function prevCarouselDay() {
+  activeCarouselIndex.value = (activeCarouselIndex.value + carouselDays.length - 1) % carouselDays.length
+}
+
+function nextCarouselDay() {
+  activeCarouselIndex.value = (activeCarouselIndex.value + 1) % carouselDays.length
+}
+
+watch(todayDayName, (day) => {
+  const matchIndex = carouselDays.indexOf(day)
+  if (matchIndex >= 0) {
+    activeCarouselIndex.value = matchIndex
+  }
+}, { immediate: true })
 
 const events = ref([])
 
@@ -939,11 +998,11 @@ function roomBadgeClass(room, campus, colorToken) {
   return /^cl\.?/i.test((room || '').trim()) ? 'room-green' : 'room-yellow'
 }
 
-function mapTodayClasses(entries) {
+function mapClassesForDay(entries, dayName) {
   const groups = new Map()
 
   entries
-    .filter((entry) => entry.day === todayDayName.value)
+    .filter((entry) => entry.day === dayName)
     .forEach((entry) => {
       const groupKey = entry.parallel && entry.parallelGroupId
         ? `parallel:${entry.parallelGroupId}`
@@ -995,9 +1054,9 @@ function mapTodayClasses(entries) {
     .sort((a, b) => a.sortValue - b.sortValue)
 }
 
-function mapTodayConsultations(slots) {
+function mapConsultationsForDay(slots, dayName) {
   return (Array.isArray(slots) ? slots : [])
-    .filter((slot) => slot?.dayOfWeek === todayDayName.value)
+    .filter((slot) => slot?.dayOfWeek === dayName)
     .map((slot) => ({
       time: `${slot.startTime} – ${slot.endTime}`,
       subject: 'Consultation Hours',
@@ -1028,11 +1087,20 @@ async function loadTodayClasses() {
     const consultations = Array.isArray(consultPayload.consultations) ? consultPayload.consultations : []
 
     todayClasses.value = [
-      ...mapTodayClasses(entries),
-      ...mapTodayConsultations(consultations),
+      ...mapClassesForDay(entries, todayDayName.value),
+      ...mapConsultationsForDay(consultations, todayDayName.value),
     ].sort((a, b) => a.sortValue - b.sortValue)
+
+    dayClasses.value = {}
+    carouselDays.forEach((dayName) => {
+      dayClasses.value[dayName] = [
+        ...mapClassesForDay(entries, dayName),
+        ...mapConsultationsForDay(consultations, dayName),
+      ].sort((a, b) => a.sortValue - b.sortValue)
+    })
   } catch (error) {
     todayClasses.value = []
+    dayClasses.value = {}
     classesError.value = error.message || 'Unable to load classes.'
   } finally {
     classesLoading.value = false
@@ -1430,25 +1498,25 @@ function confirmLogout() {
 .stat-cards {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  gap: 18px;
   margin-bottom: 32px;
 }
 .stat-card {
-  background: #fff;
-  border: 1.5px solid #ececec;
-  border-radius: 16px;
-  padding: 28px 28px 24px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  border: 1px solid #374151;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
-.stat-left { display: flex; flex-direction: column; gap: 4px; }
-.stat-label { font-size: 0.9rem; color: #555; font-weight: 500; }
-.stat-value { font-size: 3rem; font-weight: 700; color: #30353a; line-height: 1.1; }
-.stat-sub   { font-size: 0.82rem; color: #aaa; }
-.stat-icon  { display: flex; align-items: center; flex-shrink: 0; }
+.stat-left { display: flex; flex-direction: column; gap: 8px; }
+.stat-label { font-size: 0.95rem; color: #d1d5db; font-weight: 600; letter-spacing: 0.02em; }
+.stat-value { font-size: 2.8rem; font-weight: 800; color: #fff; line-height: 1; }
+.stat-sub   { font-size: 0.85rem; color: #9ca3af; margin-top: 2px; }
+.stat-icon  { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; flex-shrink: 0; color: #9ca3af; }
 
 /* ── Today's Class ── */
 .today-class { flex: 1; display: flex; flex-direction: column; }
@@ -1456,109 +1524,194 @@ function confirmLogout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
 }
 .today-class-title {
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: #111;
+  font-size: 1.32rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
 }
-.legend { display: flex; align-items: center; gap: 16px; }
-.legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #555; }
+.today-class-sub {
+  margin-top: 4px;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+.legend { display: flex; align-items: center; gap: 18px; }
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 0.85rem; color: #6b7280; font-weight: 500; }
 .legend-dot {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
 }
-.legend-dot.lecture    { background: #e4c86e; }
-.legend-dot.laboratory { background: #626a72; }
-.legend-dot.main-campus { background: #f4a261; }
+.legend-dot.lecture    { background: #fbbf24; }
+.legend-dot.laboratory { background: #6b7280; }
+.legend-dot.main-campus { background: #f97316; }
 
-/* Table */
-.table-wrap {
+/* Carousel */
+.carousel-shell {
   background: #fff;
-  border: 1.5px solid #e0e0e0;
-  border-radius: 14px;
-  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
-.class-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
+.carousel-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 18px;
 }
-.class-table thead tr {
-  background: #f5f6f8;
+.carousel-nav-btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
-.class-table th {
-  padding: 13px 16px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #555;
+.carousel-nav-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+.carousel-nav-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.carousel-day-badge {
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: #1f2937;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  min-width: 200px;
   text-align: center;
-  letter-spacing: 0.03em;
-  border-bottom: 1.5px solid #e4e4e4;
 }
-.class-table th:first-child { text-align: left; }
-.class-table tbody tr {
-  border-bottom: 1px solid #f0f0f0;
-  transition: background 0.15s;
+.carousel-content {
+  min-height: 260px;
+  border-radius: 12px;
+  background: #f9fafb;
+  padding: 16px;
 }
-.class-table tbody tr:last-child { border-bottom: none; }
-.class-table tbody tr:hover { background: #f9fafb; }
-.class-table td { padding: 13px 16px; color: #333; text-align: center; vertical-align: middle; }
-.td-empty-state { text-align: center !important; color: #667085 !important; font-weight: 500; padding: 18px !important; }
-
-.td-time {
+.carousel-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  color: #9ca3af;
+  font-weight: 500;
+  text-align: center;
+}
+.classes-grid {
+  display: grid;
+  gap: 12px;
+}
+.class-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.class-time-badge {
   display: flex;
   align-items: center;
   gap: 7px;
   white-space: nowrap;
-  color: #444;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 700;
+  min-width: 140px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f3f4f6;
+}
+.class-details {
+  flex: 1;
+  min-width: 0;
+}
+.class-subject {
+  color: #111827;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin: 0 0 3px 0;
+}
+.class-section {
+  color: #6b7280;
   font-size: 0.85rem;
-  text-align: left;
+  margin: 0;
 }
-.td-subject { text-align: left; color: #222; font-weight: 500; }
-.td-section { color: #555; }
-.td-consultation-center {
-  text-align: center !important;
-}
-
-.consultation-chip {
+.consultation-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: #e8f0fb;
-  border: 1px solid #4a90d9;
-  color: #2f6fb0;
-  font-size: 0.86rem;
-  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+  color: #1e40af;
+  font-size: 0.85rem;
+  font-weight: 700;
 }
-
-/* Parallel badge */
-.parallel-badge {
+.class-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.badge {
   display: inline-block;
-  padding: 4px 14px;
-  border-radius: 20px;
+  padding: 5px 10px;
+  border-radius: 6px;
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 700;
 }
-.badge-parallel { background: #e0e3e5; color: #4b5259; }
-.badge-not      { background: #f0f0f0; color: #666; }
+.badge-parallel { background: #f3f4f6; color: #374151; }
+.badge-single   { background: #f0fdf4; color: #166534; }
+.badge-room {
+  font-size: 0.8rem;
+}
+.badge-room.room-green  { background: #dbeafe; color: #0c4a6e; }
+.badge-room.room-orange { background: #fed7aa; color: #9a3412; }
+.badge-room.room-yellow { background: #fef3c7; color: #92400e; }
+.badge-room.room-beige  { background: #f3e8ff; color: #6b21a8; }
 
-/* Room badge */
-.room-badge {
-  display: inline-block;
-  padding: 5px 14px;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  font-weight: 600;
+.carousel-indicators {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
 }
-.room-green  { background: #d8dcdf; color: #30353a; }
-.room-orange { background: #ffe8c2; color: #b06000; }
-.room-yellow { background: #fff3cd; color: #9a6e00; }
-.room-beige  { background: #fef9e7; color: #9a6e00; }
+.indicator-dot {
+  width: 8px;
+  height: 8px;
+  border: none;
+  border-radius: 999px;
+  background: #d1d5db;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+.indicator-dot:hover {
+  background: #9ca3af;
+}
+.indicator-dot.active {
+  width: 24px;
+  background: #1f2937;
+}
 
 /* ── Logout Modal ── */
 .modal-overlay {

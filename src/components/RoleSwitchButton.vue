@@ -39,11 +39,11 @@ async function switchRole() {
 
 <style scoped>
 .role-switch-btn {
-  margin: 0 18px 10px; width: calc(100% - 36px); border: 1px solid #b7d8c6;
-  background: #edf7f0; color: #1b6b41; border-radius: 9px; padding: 10px 12px;
+  margin: 16px 0 10px; width: 100%; border: 1px solid #b7d8c6;
+  background: #edf7f0; color: #1b6b41; border-radius: 10px; padding: 11px 12px;
   display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
-  font: inherit; font-size: .84rem; font-weight: 600;
+  font: inherit; font-size: 0.85rem; font-weight: 600; border: none;
 }
 .role-switch-btn:hover:not(:disabled) { background: #dcefe2; }
-.role-switch-btn:disabled { opacity: .65; cursor: wait; }
+.role-switch-btn:disabled { opacity: 0.65; cursor: wait; }
 </style>
