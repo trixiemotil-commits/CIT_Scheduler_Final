@@ -126,10 +126,14 @@
 
               <!-- Status Dropdown -->
               <div class="teacher-status-wrap">
-                <select v-model="teacher.status" class="status-dropdown" @change="updateTeacherStatus(teacher)">
+                <select
+                  v-model="teacher.status"
+                  :class="['status-dropdown', `status-${teacher.status.toLowerCase().replace(/\s+/g, '-')}`]"
+                  @change="updateTeacherStatus(teacher)"
+                >
                   <option value="In School">In School</option>
                   <option value="On Leave">On Leave</option>
-                  <option value="On-Meeting">On-Meeting</option>
+                  <option value="On-Meeting">On Meeting</option>
                 </select>
               </div>
 
@@ -1202,18 +1206,18 @@ onUnmounted(() => {
 }
 
 .card-in-school {
-  border: 2px solid #69727c;
-  background-color: #f3f4f6;
+  border: 2px solid #22c55e;
+  background-color: #f0fdf4;
 }
 
 .card-on-leave {
-  border: 2px solid #F44336;
-  background-color: #ffebee;
+  border: 2px solid #ef4444;
+  background-color: #fef2f2;
 }
 
 .card-on-meeting {
-  border: 2px solid #FFC107;
-  background-color: #fffde7;
+  border: 2px solid #eab308;
+  background-color: #fefce8;
 }
 
 .status-badge {
@@ -1228,18 +1232,18 @@ onUnmounted(() => {
 }
 
 .badge-in-school {
-  background-color: #69727c;
+  background-color: #16a34a;
   color: white;
 }
 
 .badge-on-leave {
-  background-color: #F44336;
+  background-color: #dc2626;
   color: white;
 }
 
 .badge-on-meeting {
-  background-color: #FFC107;
-  color: #333;
+  background-color: #eab308;
+  color: #422006;
 }
 
 .teacher-avatar-wrap {
@@ -1311,6 +1315,24 @@ onUnmounted(() => {
   outline: none;
   border-color: #4b5563;
   box-shadow: 0 0 0 2px rgba(48, 53, 58, 0.1);
+}
+
+.status-dropdown.status-in-school {
+  border-color: #22c55e;
+  background-color: #f0fdf4;
+  color: #166534;
+}
+
+.status-dropdown.status-on-leave {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+  color: #991b1b;
+}
+
+.status-dropdown.status-on-meeting {
+  border-color: #eab308;
+  background-color: #fefce8;
+  color: #854d0e;
 }
 
 .designated-areas {

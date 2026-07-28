@@ -212,15 +212,15 @@ onMounted(loadStatus)
 
 <style scoped>
 .teacher-sidebar-status {
-  grid-column: 1 / -1;
+  /* grid-column: 1 / -1; */
   width: 100%;
   margin: -10px 0 12px;
   padding: 10px 0 12px;
-  border-top: 1px solid rgba(72, 78, 84, 0.17);
+  /* border-top: 1px solid rgba(72, 78, 84, 0.17);
   border-bottom: 1px solid rgba(72, 78, 84, 0.17);
   box-shadow:
     inset 0 1px rgba(255, 255, 255, 0.46),
-    0 1px rgba(255, 255, 255, 0.46);
+    0 1px rgba(255, 255, 255, 0.46); */
 }
 
 .sidebar-status-panel {

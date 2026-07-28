@@ -1,5 +1,8 @@
 <template>
-  <RouterLink to="/admin/academic-terms" class="nav-item unified-academic-link">
+  <RouterLink
+    to="/admin/academic-terms"
+    class="nav-item unified-academic-link"
+  >
     <span class="nav-icon">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M4 4h16v16H4z" /><path d="M8 8h8M8 12h8M8 16h5" />
@@ -31,7 +34,6 @@ import { RouterLink } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const publishedTermId = ref('')
-
 onMounted(async () => {
   const token = getToken()
   if (!token) return
@@ -47,10 +49,3 @@ onMounted(async () => {
   }
 })
 </script>
-
-<style scoped>
-.current-term-schedule-link {
-  background: #344657 !important;
-  color: #fff !important;
-}
-</style>
