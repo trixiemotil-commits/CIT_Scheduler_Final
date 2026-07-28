@@ -31,8 +31,8 @@ function normalizeSectionCounts(value) {
   Object.entries(source).forEach(([yearKey, count]) => {
     const year = normalizeString(yearKey)
     const numeric = Number(count)
-    if (!year || Number.isNaN(numeric) || numeric < 1) return
-    next[year] = Math.min(10, Math.max(1, Math.floor(numeric)))
+    if (!year || !Number.isFinite(numeric) || numeric < 1) return
+    next[year] = Math.max(1, Math.floor(numeric))
   })
   return next
 }

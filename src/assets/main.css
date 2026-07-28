@@ -806,3 +806,13 @@ body,
     padding-inline: 14px !important;
   }
 }
+/* Schedule management now starts from Academic Terms. Exact legacy links are
+   hidden; the published-term link includes a query string and remains visible. */
+.admin-sidebar a[href="/admin/schedule/view"],
+.admin-sidebar a[href="/admin/schedule/add"] {
+  display: none !important;
+}
+
+.admin-sidebar a[href="/admin/academic-terms"]:not(.unified-academic-link) {
+  display: none !important;
+}

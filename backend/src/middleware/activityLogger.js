@@ -1,4 +1,5 @@
 const ActivityLog = require("../models/ActivityLog");
+const { getRequestIp, getDeviceDescription } = require("../utils/requestMetadata");
 
 function describeActivity(method, path) {
   if (path.includes("/consultations/requests")) {
@@ -14,7 +15,7 @@ function describeActivity(method, path) {
 function activityLogger(req, res, next) {
   res.on("finish", () => {
     const role = req.user?.role;
-    if (!req.user || !["teacher", "student"].includes(role) || req.method === "GET" || res.statusCode >= 400 || req.path.startsWith("/api/activity-logs")) {
+    if (!req.user || !["teacher", "student"].includes(role) || req.method === "GET" || res.statusCode >= 400 || req.originalUrl.startsWith("/api/activity-logs")) {
       return;
     }
 
@@ -25,6 +26,8 @@ function activityLogger(req, res, next) {
       action: describeActivity(req.method, req.path),
       path: req.path,
       method: req.method,
+      ipAddress: getRequestIp(req),
+      device: getDeviceDescription(req),
     }).catch((error) => console.error("Unable to save activity log:", error.message));
   });
 

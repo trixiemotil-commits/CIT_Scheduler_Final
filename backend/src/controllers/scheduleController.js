@@ -27,7 +27,7 @@ function resolveAcademicTermReference(value) {
 
 async function getActiveAcademicTermReference() {
   try {
-    const term = await AcademicTerm.findOne({ isInUse: true }).sort({ usedAt: -1, createdAt: -1 }).select("_id").lean();
+    const term = await AcademicTerm.findOne({ isPublished: true }).sort({ publishedAt: -1, createdAt: -1 }).select("_id").lean();
     return term?._id || null;
   } catch (error) {
     console.error("Failed to resolve active academic term:", error);
@@ -96,6 +96,7 @@ function toClientEntry(entry) {
     teacher: entry.teacher,
     subject: entry.subject,
     room: entry.room,
+    roomType: entry.roomType || "Lecture",
     campus: entry.campus || "South Campus",
     parallel: entry.parallel,
     parallelGroupId: entry.parallelGroupId,
@@ -176,6 +177,7 @@ function normalizeParallelSlots(parallelSlots) {
     .map((slot) => ({
       section: normalizeString(slot?.section),
       room: normalizeString(slot?.room),
+      roomType: normalizeString(slot?.roomType) === "Comlab/Laboratory" ? "Comlab/Laboratory" : "Lecture",
     }))
     .filter((slot) => slot.section);
 }
@@ -235,12 +237,13 @@ function buildEntryDocs(payload, academicTermId = null) {
       teacher,
       subject,
       room: slot.room,
+      roomType: slot.roomType,
       campus,
       parallel: true,
       parallelGroupId,
       parallelCount,
       parallelSlots: slots,
-      color: colorForSchedule(slot.room, subject),
+      color: slot.roomType === "Comlab/Laboratory" ? "color-green" : colorForSchedule("", subject),
       academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
       addedAt,
     }));
@@ -252,6 +255,7 @@ function buildEntryDocs(payload, academicTermId = null) {
   }
 
   const room = normalizeString(payload.room);
+  const roomType = normalizeString(payload.roomType) === "Comlab/Laboratory" ? "Comlab/Laboratory" : "Lecture";
 
   return [
     {
@@ -267,12 +271,13 @@ function buildEntryDocs(payload, academicTermId = null) {
       teacher,
       subject,
       room,
+      roomType,
       campus,
       parallel: false,
       parallelGroupId: null,
       parallelCount: 1,
       parallelSlots: [],
-      color: colorForSchedule(room, subject),
+      color: roomType === "Comlab/Laboratory" ? "color-green" : colorForSchedule("", subject),
       academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
       addedAt,
     },
@@ -328,11 +333,14 @@ function getDescriptorFilter(oldDescriptor) {
     throw new Error("Missing original table label.");
   }
 
+  const academicTermId = resolveAcademicTermReference(oldDescriptor?.academicTermId);
+  const termFilter = academicTermId ? { academicTermId } : {};
   const parallelGroupId = normalizeString(oldDescriptor?.parallelGroupId);
   if (parallelGroupId) {
     return {
       tableLabel,
       parallelGroupId,
+      ...termFilter,
     };
   }
 
@@ -351,6 +359,7 @@ function getDescriptorFilter(oldDescriptor) {
     day,
     timeIn,
     timeOut,
+    ...termFilter,
   };
 }
 
@@ -376,12 +385,8 @@ async function findConflict(doc, excludedIds = []) {
     overlapFilter._id = { $nin: excludedIds };
   }
 
-  // If this doc targets the active (in-use) academic term, restrict
-  // conflict checks to entries that belong to the same term. Otherwise
-  // keep legacy behavior (check across terms).
-  const activeTermRef = await getActiveAcademicTermReference();
-  const restrictToTerm = Boolean(doc.academicTermId && activeTermRef && String(doc.academicTermId) === String(activeTermRef));
-  const termFilter = restrictToTerm ? { academicTermId: doc.academicTermId } : {};
+  // Schedules in other academic terms must never block this term.
+  const termFilter = { academicTermId: doc.academicTermId || null };
 
   // Rule 1: same teacher at the same time (any room)
   const teacherConflict = await ScheduleEntry.findOne({
@@ -408,7 +413,11 @@ async function findConflict(doc, excludedIds = []) {
   }
 
   // Rule 3: teacher has a consultation slot that overlaps this class time
-  const consultQuery = { teacher: doc.teacher, dayOfWeek: doc.day, ...(restrictToTerm ? { academicTermId: doc.academicTermId } : {}) };
+  const consultQuery = {
+    teacher: doc.teacher,
+    dayOfWeek: doc.day,
+    academicTermId: doc.academicTermId || null,
+  };
   const consultSlots = await ConsultationAvailability.find(consultQuery).lean();
   for (const slot of consultSlots) {
     const slotStart = parseTimeToMinutes(slot.startTime);
@@ -590,7 +599,7 @@ async function updateLunchBreak(req, res) {
       timeOut: req.body?.timeOut,
       campus: existing.campus,
       room: "",
-    });
+    }, existing.academicTermId);
 
     const conflictMessage = await findConflict(next, [existing._id]);
     if (conflictMessage) {

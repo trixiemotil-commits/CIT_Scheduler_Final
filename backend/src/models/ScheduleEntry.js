@@ -7,6 +7,7 @@ const parallelSlotSchema = new mongoose.Schema(
   {
     section: { type: String, trim: true, required: true },
     room: { type: String, trim: true, default: "" },
+    roomType: { type: String, enum: ["Lecture", "Comlab/Laboratory"], default: "Lecture" },
   },
   { _id: false }
 );
@@ -82,6 +83,11 @@ const scheduleEntrySchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
+    },
+    roomType: {
+      type: String,
+      enum: ["Lecture", "Comlab/Laboratory"],
+      default: "Lecture",
     },
     campus: {
       type: String,

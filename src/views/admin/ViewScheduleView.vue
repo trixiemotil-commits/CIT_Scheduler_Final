@@ -30,6 +30,7 @@
           <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33"/></svg></span>
           <span>Settings</span>
         </RouterLink>
+        <PublishedTermScheduleLink />
       </nav>
       <RoleSwitchButton />
 
@@ -48,28 +49,7 @@
       <!-- Page Header -->
       <header class="main-header">
         <div class="header-left">
-          <div v-if="viewMode" class="breadcrumb">
-            <button class="bc-btn" @click="resetAll">View Schedules</button>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-            <template v-if="viewMode === 'room'">
-              <button class="bc-btn" :class="{ 'bc-active': !selectedFloor }" @click="selectedFloor = null; selectedRoom = null">By Room</button>
-              <template v-if="selectedFloor">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                <button class="bc-btn" :class="{ 'bc-active': !selectedRoom }" @click="selectedRoom = null">{{ selectedFloor }}</button>
-              </template>
-              <template v-if="selectedRoom">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                <span class="bc-current">Room {{ selectedRoom }}</span>
-              </template>
-            </template>
-            <template v-else-if="viewMode === 'teacher'">
-              <button class="bc-btn" :class="{ 'bc-active': !selectedTeacher }" @click="selectedTeacher = null">By Teacher</button>
-              <template v-if="selectedTeacher">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                <span class="bc-current">Prof. {{ selectedTeacher }}</span>
-              </template>
-            </template>
-          </div>
+          <div class="breadcrumb"><button class="bc-btn back-only" @click="router.back()">&larr; Back</button></div>
           <h1 class="page-title">
             <template v-if="!viewMode">View Schedules</template>
             <template v-else-if="viewMode === 'room'">{{ selectedRoom ? `Room ${selectedRoom}` : selectedFloor ? selectedFloor : 'By Room' }}</template>
@@ -84,10 +64,6 @@
         <div class="header-right">
           <div v-if="selectedTermLabel" class="term-banner">
             <span>Viewing: {{ selectedTermLabel }}</span>
-          </div>
-          <div v-if="hasTermSwitcher" class="term-switcher header-term-switcher">
-            <button type="button" class="term-switch-btn" :class="{ active: isSelectedTerm(activeTerm) }" @click="selectTerm(activeTerm)">In-use</button>
-            <button type="button" class="term-switch-btn" :class="{ active: isSelectedTerm(publishedTerm) }" @click="selectTerm(publishedTerm)">Published</button>
           </div>
         </div>
       </header>
@@ -119,7 +95,10 @@
         <div v-if="!selectedFloor" class="step-container">
           <p class="step-hint">Choose a floor to see available rooms</p>
           <div class="floor-grid">
-              <div v-for="floor in floors" :key="floor.label" class="floor-card floor-card-expanded">
+              <div v-if="!availableFloors.length" class="empty-state">
+                <p>No rooms are enabled for this academic term.</p>
+              </div>
+              <div v-for="floor in availableFloors" :key="floor.label" class="floor-card floor-card-expanded">
                 <div class="floor-card-header">
                   <div class="floor-number">{{ floor.number }}</div>
                   <div class="floor-card-meta">
@@ -459,7 +438,7 @@ function getTermLabel(term) {
   return `${term.schoolYear || ''} · ${term.semester || ''}`.trim()
 }
 function getSelectedTermId() {
-  return getTermId(selectedTerm.value || activeTerm.value || publishedTerm.value)
+  return getTermId(selectedTerm.value || publishedTerm.value)
 }
 function hasTermSwitcher() {
   const inUseId = getTermId(activeTerm.value)
@@ -470,7 +449,7 @@ function isSelectedTerm(term) {
   return getTermId(term) === getTermId(selectedTerm.value)
 }
 function selectTerm(term) {
-  selectedTerm.value = term || activeTerm.value || publishedTerm.value || null
+  selectedTerm.value = term || publishedTerm.value || null
 }
 
 watch(selectedTerm, async () => {
@@ -558,6 +537,19 @@ const floors = [
   },
 ]
 
+const enabledTermRooms = computed(() => {
+  const rooms = Array.isArray(selectedTerm.value?.rooms) ? selectedTerm.value.rooms : []
+  return rooms.map(room => typeof room === 'string' ? room : room.name).filter(Boolean)
+})
+
+const availableFloors = computed(() => floors
+  .map(floor => ({
+    ...floor,
+    rooms: enabledTermRooms.value.filter(room => String(room).startsWith(floor.number)),
+  }))
+  .filter(floor => floor.rooms.length)
+)
+
 const selectedFloor = ref(null)
 const selectedRoom  = ref(null)
 const roomSearchQuery = ref('')
@@ -606,19 +598,10 @@ function getTeacherAvatar(name = '', avatar = '') {
 
 async function loadTermContext() {
   try {
-    const [inUseResponse, publishedResponse] = await Promise.all([
-      apiRequest('/academic-terms/in-use').catch(() => ({ term: null })),
-      apiRequest('/academic-terms/published').catch(() => ({ term: null })),
-    ])
-    activeTerm.value = inUseResponse.term || null
+    const publishedResponse = await apiRequest('/academic-terms/published').catch(() => ({ term: null }))
+    activeTerm.value = null
     publishedTerm.value = publishedResponse.term || null
-    if (!selectedTerm.value) {
-      const inUseId = getTermId(activeTerm.value)
-      const publishedId = getTermId(publishedTerm.value)
-      if (inUseId && (!publishedId || inUseId === publishedId)) {
-        selectedTerm.value = activeTerm.value || publishedTerm.value || null
-      }
-    }
+    if (!selectedTerm.value) selectedTerm.value = publishedTerm.value || null
   } catch (_) {
     activeTerm.value = null
     publishedTerm.value = null
@@ -626,21 +609,34 @@ async function loadTermContext() {
 }
 
 async function ensureTermSelection() {
-  const inUseId = getTermId(activeTerm.value)
-  const publishedId = getTermId(publishedTerm.value)
-  if (!inUseId || !publishedId || inUseId === publishedId) {
-    selectedTerm.value = activeTerm.value || publishedTerm.value || null
-    return
+  if (selectedTerm.value) return
+  selectedTerm.value = publishedTerm.value || null
+}
+
+async function applyRouteContext() {
+  const requestedTermId = String(route.query.academicTermId || '').trim()
+  if (requestedTermId) {
+    const response = await apiRequest('/academic-terms')
+    selectedTerm.value = (response.terms || []).find(term => getTermId(term) === requestedTermId) || selectedTerm.value
   }
 
-  if (selectedTerm.value) {
-    const selectedId = getTermId(selectedTerm.value)
-    if (selectedId === inUseId || selectedId === publishedId) {
-      return
+  const requestedMode = String(route.query.mode || '')
+  if (requestedMode === 'room') {
+    viewMode.value = 'room'
+    selectedRoom.value = String(route.query.room || '') || null
+    if (selectedRoom.value) {
+      selectedFloor.value = floors.find(floor => floor.rooms.some(room =>
+        room === selectedRoom.value
+        || room.startsWith(`${selectedRoom.value} `)
+        || selectedRoom.value.startsWith(`${room} `)
+      ))?.label || null
     }
+  } else if (requestedMode === 'teacher') {
+    viewMode.value = 'teacher'
+    await loadTeachers()
+    selectedTeacher.value = String(route.query.teacher || '') || null
+    selectedTeacherId.value = teacherList.value.find(teacher => teacher.name === selectedTeacher.value)?.id || null
   }
-
-  selectedTerm.value = activeTerm.value || publishedTerm.value || null
 }
 
 async function loadTeachers() {
@@ -777,7 +773,7 @@ const teacherHasNoEntries = computed(() => {
 })
 
 const currentFloorRooms = computed(
-  () => floors.find(f => f.label === selectedFloor.value)?.rooms ?? []
+  () => availableFloors.value.find(f => f.label === selectedFloor.value)?.rooms ?? []
 )
 
 const filteredCurrentFloorRooms = computed(() => {
@@ -973,6 +969,7 @@ async function loadScheduleData() {
 
 onMounted(async () => {
   await loadTermContext()
+  await applyRouteContext()
   await ensureTermSelection()
   await loadScheduleData()
 })

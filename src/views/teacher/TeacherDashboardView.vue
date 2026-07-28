@@ -133,7 +133,7 @@
         <div class="stat-card">
           <div class="stat-left">
             <div class="stat-label">Pending Requests</div>
-            <div class="stat-value">24</div>
+            <div class="stat-value">{{ consultationStatsLoading ? '—' : pendingRequestCount }}</div>
             <div class="stat-sub">Awaiting response</div>
           </div>
           <div class="stat-icon">
@@ -153,7 +153,7 @@
         <div class="stat-card">
           <div class="stat-left">
             <div class="stat-label">Upcoming Consults</div>
-            <div class="stat-value">24</div>
+            <div class="stat-value">{{ consultationStatsLoading ? '—' : upcomingConsultCount }}</div>
             <div class="stat-sub">This week</div>
           </div>
           <div class="stat-icon">
@@ -335,6 +335,48 @@ const route = useRoute()
 const currentRoute = computed(() => route.path)
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const pendingRequestCount = ref(0)
+const upcomingConsultCount = ref(0)
+const consultationStatsLoading = ref(true)
+let consultationStatsRefreshTimer
+
+function consultationDateOnly(value) {
+  const text = String(value || '')
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(text)
+  if (!match) return null
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+async function loadConsultationStats() {
+  try {
+    const payload = await apiRequest('/consultations/requests')
+    const requests = Array.isArray(payload.requests) ? payload.requests : []
+
+    pendingRequestCount.value = requests.filter(
+      (request) => String(request.status || '').toUpperCase() === 'PENDING'
+    ).length
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const endOfWeek = new Date(today)
+    const daysUntilSunday = (7 - today.getDay()) % 7
+    endOfWeek.setDate(today.getDate() + daysUntilSunday)
+    endOfWeek.setHours(23, 59, 59, 999)
+
+    upcomingConsultCount.value = requests.filter((request) => {
+      if (String(request.status || '').toUpperCase() !== 'APPROVED') return false
+      const consultationDate = consultationDateOnly(request.consultationDate)
+      return consultationDate && consultationDate >= today && consultationDate <= endOfWeek
+    }).length
+  } catch (error) {
+    console.error('Unable to load teacher consultation statistics:', error)
+    pendingRequestCount.value = 0
+    upcomingConsultCount.value = 0
+  } finally {
+    consultationStatsLoading.value = false
+  }
+}
 
 /* ── Nav ── */
 const navItems = [
@@ -417,6 +459,7 @@ function _onNotif(n) {
       request: n,
     }
     notifications.value = [item, ...notifications.value].slice(0, 100)
+    loadConsultationStats()
   } catch (_) {}
 }
 
@@ -1111,14 +1154,17 @@ onMounted(() => {
   loadTeacherStatus()
   loadTodayClasses()
   loadConsultationNotifications()
+  loadConsultationStats()
   loadEvents()
   notificationRefreshTimer = window.setInterval(loadConsultationNotifications, 15000)
+  consultationStatsRefreshTimer = window.setInterval(loadConsultationStats, 15000)
   initDailyStatusTimers()
   useNotifications.addNotificationListener(_onNotif)
 })
 
 onUnmounted(() => {
   window.clearInterval(notificationRefreshTimer)
+  window.clearInterval(consultationStatsRefreshTimer)
   useNotifications.removeNotificationListener(_onNotif)
   useNotifications.closeNotifications()
 })
@@ -1502,21 +1548,21 @@ function confirmLogout() {
   margin-bottom: 32px;
 }
 .stat-card {
-  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-  border: 1px solid #374151;
-  border-radius: 14px;
+  background: linear-gradient(145deg, #20252a 0%, #090c0f 100%);
+  border: 1px solid #343b42;
+  border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
 .stat-left { display: flex; flex-direction: column; gap: 8px; }
-.stat-label { font-size: 0.95rem; color: #d1d5db; font-weight: 600; letter-spacing: 0.02em; }
+.stat-label { font-size: 0.95rem; color: #f0f2f4; font-weight: 600; letter-spacing: 0.02em; }
 .stat-value { font-size: 2.8rem; font-weight: 800; color: #fff; line-height: 1; }
-.stat-sub   { font-size: 0.85rem; color: #9ca3af; margin-top: 2px; }
-.stat-icon  { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; flex-shrink: 0; color: #9ca3af; }
+.stat-sub   { font-size: 0.85rem; color: #d2d6da; margin-top: 2px; }
+.stat-icon  { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; flex-shrink: 0; color: #d2d6da; }
 
 /* ── Today's Class ── */
 .today-class { flex: 1; display: flex; flex-direction: column; }

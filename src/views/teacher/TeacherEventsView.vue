@@ -40,7 +40,7 @@
       <header class="main-header">
         <div>
           <h1 class="page-title">Events</h1>
-          <p class="page-sub">Manage and track school events</p>
+          <p class="page-sub">View school events posted by admin</p>
         </div>
       </header>
 
@@ -48,15 +48,7 @@
       <div class="events-topbar">
         <div class="events-tabs">
           <button :class="['ev-tab', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active Events</button>
-          <button :class="['ev-tab', { active: eventsTab === 'archived' }]" @click="eventsTab = 'archived'">
-            Archived
-            <span v-if="archivedEvents.length" class="ev-tab-count">{{ archivedEvents.length }}</span>
-          </button>
         </div>
-        <button class="add-event-btn" @click="openAddEvent">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Event
-        </button>
       </div>
 
       <!-- Events Grid -->
@@ -68,16 +60,6 @@
             </div>
             <div class="event-card-head">
               <span class="event-badge event-badge--active">Active</span>
-              <div class="event-card-actions">
-                <button class="ec-btn ec-btn--edit" @click.stop="openEditEvent(ev)" title="Edit">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                  Edit
-                </button>
-                <button class="ec-btn ec-btn--archive" @click.stop="archiveEvent(ev)" title="Archive">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-                  Archive
-                </button>
-              </div>
             </div>
             <div class="event-card-title">{{ ev.title }}</div>
             <div class="event-card-desc">{{ ev.description }}</div>
@@ -98,7 +80,7 @@
           </div>
           <div v-if="!activeEvents.length" class="events-empty">
             <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <span>No active events. Click <strong>Add Event</strong> to create one.</span>
+            <span>No active events have been posted.</span>
           </div>
         </template>
 
@@ -109,16 +91,6 @@
             </div>
             <div class="event-card-head">
               <span class="event-badge event-badge--archived">Archived</span>
-              <div class="event-card-actions">
-                <button class="ec-btn ec-btn--restore" @click.stop="archiveEvent(ev)" title="Restore">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.47"/></svg>
-                  Restore
-                </button>
-                <button class="ec-btn ec-btn--delete" @click.stop="deleteEvent(ev)" title="Delete permanently">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                  Delete
-                </button>
-              </div>
             </div>
             <div class="event-card-title">{{ ev.title }}</div>
             <div class="event-card-desc">{{ ev.description }}</div>
@@ -201,10 +173,6 @@
             </div>
             <div class="ev-view-actions">
               <button class="ev-view-close-btn" @click="showViewModal = false">Close</button>
-              <button class="ev-view-edit-btn" @click="showViewModal = false; openEditEvent(viewEvent)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                Edit Event
-              </button>
             </div>
           </div>
         </div>

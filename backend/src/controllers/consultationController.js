@@ -82,7 +82,7 @@ function resolveAcademicTermReference(value) {
 
 async function getActiveAcademicTermReference() {
   try {
-    const term = await AcademicTerm.findOne({ isInUse: true }).sort({ usedAt: -1, createdAt: -1 }).select("_id").lean();
+    const term = await AcademicTerm.findOne({ isPublished: true }).sort({ publishedAt: -1, createdAt: -1 }).select("_id").lean();
     return term?._id || null;
   } catch (error) {
     console.error("Failed to resolve active academic term:", error);
@@ -216,12 +216,16 @@ function slotDurationMinutes(startTime, endTime) {
 }
 
 // Returns a conflict message if the teacher has a regular class scheduled that overlaps the proposed consultation
-async function checkClassConflict(teacher, dayOfWeek, startTime, endTime, excludeConsultId = null) {
+async function checkClassConflict(teacher, dayOfWeek, startTime, endTime, academicTermId = null) {
   const newStart = parseTimeToMinutes(startTime);
   const newEnd   = parseTimeToMinutes(endTime);
   if (newStart === null || newEnd === null) return null;
 
-  const entries = await ScheduleEntry.find({ teacher, day: dayOfWeek }).lean();
+  const entries = await ScheduleEntry.find({
+    teacher,
+    day: dayOfWeek,
+    academicTermId: academicTermId || null,
+  }).lean();
   for (const entry of entries) {
     const entryStart = entry.timeInMinutes  ?? parseTimeToMinutes(entry.timeIn);
     const entryEnd   = entry.timeOutMinutes ?? parseTimeToMinutes(entry.timeOut);
@@ -988,8 +992,13 @@ async function createConsultation(req, res) {
       return res.status(400).json({ message: "endTime must be after startTime." });
     }
 
-    // Check weekly total for this teacher (excluding today's slot if updating)
-    const existing = await ConsultationAvailability.find({ employeeId });
+    const academicTermId = resolveAcademicTermReference(req.body?.academicTermId) || await getActiveAcademicTermReference();
+
+    // Weekly limits apply independently to each academic term.
+    const existing = await ConsultationAvailability.find({
+      employeeId,
+      academicTermId: academicTermId || null,
+    });
     const weeklyUsed = existing.reduce((sum, d) => sum + slotDurationMinutes(d.startTime, d.endTime), 0);
 
     if (weeklyUsed + duration > MAX_WEEKLY_MINUTES) {
@@ -1002,12 +1011,11 @@ async function createConsultation(req, res) {
     }
 
     // Check that no regular class is scheduled at the same time
-    const classConflict = await checkClassConflict(teacher, dayOfWeek, startTime, endTime);
+    const classConflict = await checkClassConflict(teacher, dayOfWeek, startTime, endTime, academicTermId);
     if (classConflict) {
       return res.status(409).json({ message: classConflict });
     }
 
-    const academicTermId = resolveAcademicTermReference(req.body?.academicTermId) || await getActiveAcademicTermReference();
     const doc = await ConsultationAvailability.create({ employeeId, teacher, dayOfWeek, startTime, endTime, academicTermId });
     return res.status(201).json({ message: "Consultation slot created.", consultation: toClient(doc) });
   } catch (error) {
@@ -1037,8 +1045,16 @@ async function updateConsultation(req, res) {
       return res.status(400).json({ message: "endTime must be after startTime." });
     }
 
-    // Weekly total excluding this slot
-    const others = await ConsultationAvailability.find({ employeeId: target.employeeId, _id: { $ne: target._id } });
+    const academicTermId = resolveAcademicTermReference(req.body?.academicTermId)
+      || target.academicTermId
+      || await getActiveAcademicTermReference();
+
+    // Weekly totals and conflicts apply only within this slot's term.
+    const others = await ConsultationAvailability.find({
+      employeeId: target.employeeId,
+      academicTermId: academicTermId || null,
+      _id: { $ne: target._id },
+    });
     const weeklyUsed = others.reduce((sum, d) => sum + slotDurationMinutes(d.startTime, d.endTime), 0);
 
     if (weeklyUsed + newDuration > MAX_WEEKLY_MINUTES) {
@@ -1051,7 +1067,7 @@ async function updateConsultation(req, res) {
     }
 
     // Check that no regular class is scheduled at the same time
-    const classConflict = await checkClassConflict(target.teacher, newDay, newStart, newEnd);
+    const classConflict = await checkClassConflict(target.teacher, newDay, newStart, newEnd, academicTermId);
     if (classConflict) {
       return res.status(409).json({ message: classConflict });
     }
@@ -1059,7 +1075,7 @@ async function updateConsultation(req, res) {
     target.dayOfWeek  = newDay;
     target.startTime  = newStart;
     target.endTime    = newEnd;
-    target.academicTermId = target.academicTermId || (await getActiveAcademicTermReference()) || null;
+    target.academicTermId = academicTermId || null;
     await target.save();
 
     return res.json({ message: "Consultation slot updated.", consultation: toClient(target) });

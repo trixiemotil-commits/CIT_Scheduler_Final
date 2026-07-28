@@ -38,7 +38,7 @@ function resolveAcademicTermReference(value) {
 
 async function getActiveAcademicTermReference() {
   try {
-    const term = await AcademicTerm.findOne({ isInUse: true }).sort({ usedAt: -1, createdAt: -1 }).select('_id').lean()
+    const term = await AcademicTerm.findOne({ isPublished: true }).sort({ publishedAt: -1, createdAt: -1 }).select('_id').lean()
     return term?._id || null
   } catch (error) {
     console.error('Failed to resolve active academic term:', error)

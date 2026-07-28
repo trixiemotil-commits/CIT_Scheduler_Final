@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core'
 import { IonicVue } from '@ionic/vue'
 import App from './App.vue'
 import RoleSwitchButton from './components/RoleSwitchButton.vue'
+import PublishedTermScheduleLink from './components/PublishedTermScheduleLink.vue'
 
 /* Ionic's required base styles. Custom project styles load afterwards so the
    existing admin, teacher, and student branding remains in control. */
@@ -22,6 +23,7 @@ const app = createApp(App)
 app.use(IonicVue)
 app.use(router)
 app.component('RoleSwitchButton', RoleSwitchButton)
+app.component('PublishedTermScheduleLink', PublishedTermScheduleLink)
 
 // Global error handlers to surface runtime errors to the page for debugging
 window.addEventListener('error', (ev) => {

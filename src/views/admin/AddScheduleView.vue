@@ -30,6 +30,7 @@
           <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33"/></svg></span>
           <span>Settings</span>
         </RouterLink>
+        <PublishedTermScheduleLink />
       </nav>
       <RoleSwitchButton />
 
@@ -48,28 +49,7 @@
       <!-- Page Header -->
       <header class="main-header">
         <div class="header-left">
-          <div v-if="addMode" class="breadcrumb">
-            <button class="bc-btn" @click="resetAddMode">Add Schedule</button>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-            <template v-if="addMode === 'teacher'">
-              <button class="bc-btn" :class="{ 'bc-active': !!selectedTeacher }" @click="selectedTeacher = ''">By Teacher</button>
-              <template v-if="selectedTeacher">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                <span class="bc-current">Prof. {{ selectedTeacher }}</span>
-              </template>
-            </template>
-            <template v-else-if="addMode === 'room'">
-              <button class="bc-btn" :class="{ 'bc-active': !contextFloor && !contextRoom }" @click="contextFloor = null; contextRoom = null">By Room</button>
-              <template v-if="contextFloor">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                <button class="bc-btn" :class="{ 'bc-active': !!contextFloor && !contextRoom }" @click="contextRoom = null">{{ contextFloor }}</button>
-              </template>
-              <template v-if="contextRoom">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                <span class="bc-current">Room {{ contextRoom }}</span>
-              </template>
-            </template>
-          </div>
+          <div class="breadcrumb"><button class="bc-btn back-only" @click="router.back()">&larr; Back</button></div>
           <h1 class="page-title">
             <template v-if="scheduleViewMode === ''">Choose View Mode</template>
             <template v-else-if="scheduleViewMode === 'list'">All Schedules</template>
@@ -88,10 +68,6 @@
         <div class="header-right">
           <div v-if="selectedTermLabel" class="term-banner">
             <span>Viewing: {{ selectedTermLabel }}</span>
-          </div>
-          <div v-if="hasTermSwitcher" class="term-switcher header-term-switcher">
-            <button type="button" class="term-switch-btn" :class="{ active: isSelectedTerm(activeTerm) }" @click="selectTerm(activeTerm)">In-use</button>
-            <button type="button" class="term-switch-btn" :class="{ active: isSelectedTerm(publishedTerm) }" @click="selectTerm(publishedTerm)">Published</button>
           </div>
         </div>
         <div v-if="scheduleViewMode === 'list' || ((addMode === 'teacher' && selectedTeacher) || (addMode === 'room' && contextRoom))" class="header-actions">
@@ -320,10 +296,16 @@
                     </select>
                   </td>
                   <td>
-                    <select v-model="listAddForm.room" class="form-select">
-                      <option value="" disabled>Select Room</option>
-                      <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
-                    </select>
+                    <div class="room-type-stack">
+                      <select v-model="listAddForm.room" class="form-select">
+                        <option value="" disabled>Select Room</option>
+                        <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
+                      </select>
+                      <select v-model="listAddForm.roomType" class="form-select">
+                        <option value="Lecture">Lecture</option>
+                        <option value="Comlab/Laboratory">Comlab/Laboratory</option>
+                      </select>
+                    </div>
                   </td>
                   <td>
                     <select v-model="listAddForm.section" class="form-select">
@@ -659,6 +641,16 @@
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
               </div>
+              <div class="form-row-inline">
+                <label class="form-label">Room Type</label>
+                <div class="form-select-wrap">
+                  <select v-model="form.roomType" class="form-select">
+                    <option value="Lecture">Lecture</option>
+                    <option value="Comlab/Laboratory">Comlab/Laboratory</option>
+                  </select>
+                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </div>
             </template>
             <template v-else>
               <div class="form-row-inline">
@@ -692,6 +684,16 @@
                     <select v-model="ps.room" class="form-select">
                       <option value="" disabled>Select Room</option>
                       <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
+                    </select>
+                    <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+                </div>
+                <div class="form-row-inline">
+                  <label class="form-label">Room Type {{ i + 1 }}</label>
+                  <div class="form-select-wrap">
+                    <select v-model="ps.roomType" class="form-select">
+                      <option value="Lecture">Lecture</option>
+                      <option value="Comlab/Laboratory">Comlab/Laboratory</option>
                     </select>
                     <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                   </div>
@@ -927,6 +929,16 @@
                     <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name" />
                   </datalist>
                 </div>
+                <div class="form-row-inline">
+                  <label class="form-label">Room Type</label>
+                  <div class="form-select-wrap">
+                    <select v-model="addForm.roomType" class="form-select">
+                      <option value="Lecture">Lecture</option>
+                      <option value="Comlab/Laboratory">Comlab/Laboratory</option>
+                    </select>
+                    <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+                </div>
               </template>
               <template v-else>
                 <div class="form-row-inline">
@@ -963,6 +975,16 @@
                       <select v-model="ps.room" class="form-select">
                         <option value="" disabled>Select Room</option>
                         <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
+                      </select>
+                      <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                  </div>
+                  <div class="form-row-inline">
+                    <label class="form-label">Room Type {{ i + 1 }}</label>
+                    <div class="form-select-wrap">
+                      <select v-model="ps.roomType" class="form-select">
+                        <option value="Lecture">Lecture</option>
+                        <option value="Comlab/Laboratory">Comlab/Laboratory</option>
                       </select>
                       <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                     </div>
@@ -1154,7 +1176,7 @@ function getTermLabel(term) {
   return `${term.schoolYear || ''} · ${term.semester || ''}`.trim()
 }
 function getSelectedTermId() {
-  return getTermId(selectedTerm.value || activeTerm.value || publishedTerm.value)
+  return getTermId(selectedTerm.value || publishedTerm.value)
 }
 function hasTermSwitcher() {
   const inUseId = getTermId(activeTerm.value)
@@ -1165,35 +1187,30 @@ function isSelectedTerm(term) {
   return getTermId(term) === getTermId(selectedTerm.value)
 }
 function selectTerm(term) {
-  selectedTerm.value = term || activeTerm.value || publishedTerm.value || null
+  selectedTerm.value = term || publishedTerm.value || null
 }
 const effectiveYears = computed(() => {
-  const sectionCounts = activeTerm.value?.sectionCounts || {}
+  const sectionCounts = (selectedTerm.value || publishedTerm.value)?.sectionCounts || {}
   const mapped = Object.keys(sectionCounts)
     .filter(year => Number(sectionCounts[year]) > 0)
     .sort((a, b) => years.indexOf(a) - years.indexOf(b))
   return mapped.length ? mapped : years
 })
 const effectiveRoomOptions = computed(() => {
-  const rooms = Array.isArray(activeTerm.value?.rooms) ? activeTerm.value.rooms : []
-  if (rooms.length) {
-    return rooms.map((room) => {
-      if (typeof room === 'string') {
-        const type = /comlab/i.test(room) ? 'Comlab' : 'Lecture'
-        return { name: room, label: `${room} (${type})`, type }
-      }
-      return { name: room.name || '', label: `${room.name}${room.type === 'Comlab' ? ' (Comlab)' : ''}`, type: room.type || 'Lecture' }
-    }).filter((item) => item.name)
-  }
-  return roomOptions.map((room) => {
-    const type = /comlab/i.test(room) ? 'Comlab' : 'Lecture'
-    return { name: room, label: `${room}${type === 'Comlab' ? ' (Comlab)' : ''}`, type }
+  const term = selectedTerm.value || publishedTerm.value
+  const configuredRooms = (Array.isArray(term?.rooms) ? term.rooms : [])
+    .map(room => typeof room === 'string' ? room : room.name)
+    .filter(Boolean)
+  const availableRooms = configuredRooms.length ? configuredRooms : roomOptions
+  return availableRooms.map((room) => {
+    return { name: room, label: room }
   })
 })
 
 function getSectionsForYear(year) {
-  const count = Number(activeTerm.value?.sectionCounts?.[year])
-  const names = Array.isArray(activeTerm.value?.sectionNames?.[year]) ? activeTerm.value.sectionNames[year] : []
+  const term = selectedTerm.value || publishedTerm.value
+  const count = Number(term?.sectionCounts?.[year])
+  const names = Array.isArray(term?.sectionNames?.[year]) ? term.sectionNames[year] : []
   if (Number.isFinite(count) && count > 0) {
     if (names.length) {
       return names.slice(0, count)
@@ -1285,19 +1302,10 @@ function getTeacherAvatar(name = '', avatar = '') {
 
 async function loadTermContext() {
   try {
-    const [inUseResponse, publishedResponse] = await Promise.all([
-      apiRequest('/academic-terms/in-use').catch(() => ({ term: null })),
-      apiRequest('/academic-terms/published').catch(() => ({ term: null })),
-    ])
-    activeTerm.value = inUseResponse.term || null
+    const publishedResponse = await apiRequest('/academic-terms/published').catch(() => ({ term: null }))
+    activeTerm.value = null
     publishedTerm.value = publishedResponse.term || null
-    if (!selectedTerm.value) {
-      const inUseId = getTermId(activeTerm.value)
-      const publishedId = getTermId(publishedTerm.value)
-      if (inUseId && (!publishedId || inUseId === publishedId)) {
-        selectedTerm.value = activeTerm.value || publishedTerm.value || null
-      }
-    }
+    if (!selectedTerm.value) selectedTerm.value = publishedTerm.value || null
   } catch (_) {
     activeTerm.value = null
     publishedTerm.value = null
@@ -1305,21 +1313,8 @@ async function loadTermContext() {
 }
 
 async function ensureTermSelection() {
-  const inUseId = getTermId(activeTerm.value)
-  const publishedId = getTermId(publishedTerm.value)
-  if (!inUseId || !publishedId || inUseId === publishedId) {
-    selectedTerm.value = activeTerm.value || publishedTerm.value || null
-    return
-  }
-
-  if (selectedTerm.value) {
-    const selectedId = getTermId(selectedTerm.value)
-    if (selectedId === inUseId || selectedId === publishedId) {
-      return
-    }
-  }
-
-  selectedTerm.value = activeTerm.value || publishedTerm.value || null
+  if (selectedTerm.value) return
+  selectedTerm.value = publishedTerm.value || null
 }
 
 async function loadAddTeachers() {
@@ -1434,7 +1429,7 @@ const visibleScheduleEntries = computed(() => {
 
 const listAddForm = reactive({
   day: '', timeIn: '', timeOut: '', year: '', section: '', campus: 'South Campus',
-  teacher: '', major: '', subject: '', room: '', parallel: false, parallelCount: 1,
+  teacher: '', major: '', subject: '', room: '', roomType: 'Lecture', parallel: false, parallelCount: 1,
 })
 const listTimeError = ref('')
 const listAddFormValid = computed(() =>
@@ -1463,6 +1458,7 @@ async function addListEntry() {
     listAddForm.day = ''; listAddForm.timeIn = ''; listAddForm.timeOut = '';
     listAddForm.year = ''; listAddForm.section = ''; listAddForm.teacher = '';
     listAddForm.subject = ''; listAddForm.room = ''; listAddForm.major = '';
+    listAddForm.roomType = 'Lecture'
     listAddForm.campus = 'South Campus'
   } catch (error) {
     await showScheduleError(error)
@@ -1696,6 +1692,7 @@ function syncEntriesFromApi(apiEntries) {
       subject: entry.subject,
       campus: inferredCampus,
       room: entry.room,
+      roomType: entry.roomType || 'Lecture',
       year: isLunch ? '' : entry.year,
       tableLabel,
       section,
@@ -1714,7 +1711,7 @@ function syncEntriesFromApi(apiEntries) {
       subbedLabel: entry.subbedLabel || '',
       color: isLunch
         ? 'color-gray'
-        : (inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || 'color-yellow')),
+        : (inferredCampus === 'Main Campus' ? 'color-orange' : (entry.roomType === 'Comlab/Laboratory' ? 'color-green' : (entry.color || roomBasedColor || 'color-yellow'))),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -1781,8 +1778,7 @@ function checkScheduleConflict(payload, skipFilter = null) {
     : [payload.room].filter(Boolean)
 
   const selectedId = getSelectedTermId()
-  const inUseId = getTermId(activeTerm.value)
-  const restrictByTerm = Boolean(selectedId && inUseId && selectedId === inUseId)
+  const restrictByTerm = Boolean(selectedId)
 
   if (payload.parallel) {
     const slots = (payload.parallelSlots || []).filter(Boolean)
@@ -1993,7 +1989,7 @@ const form = reactive({
   slot: '', day: '', teacher: '', subject: '',
   year: '', major: '', section: '',
   campus: 'South Campus',
-  room: '', parallel: false,
+  room: '', roomType: 'Lecture', parallel: false,
   parallelCount: 2,
   parallelSlots: [],
   color: 'color-green',
@@ -2073,7 +2069,7 @@ const lunchBreakTimeError = computed(() => {
 })
 
 function buildSlots(count) {
-  return Array.from({ length: count }, () => ({ section: '', room: '' }))
+  return Array.from({ length: count }, () => ({ section: '', room: '', roomType: 'Lecture' }))
 }
 
 watch([() => form.timeIn, () => form.timeOut], () => {
@@ -2084,7 +2080,7 @@ watch([() => form.timeIn, () => form.timeOut], () => {
 })
 
 watch(() => form.parallelCount, (val) => {
-  while (form.parallelSlots.length < val)  form.parallelSlots.push({ section: '', room: '' })
+  while (form.parallelSlots.length < val)  form.parallelSlots.push({ section: '', room: '', roomType: 'Lecture' })
   while (form.parallelSlots.length > val)  form.parallelSlots.pop()
 })
 
@@ -2280,6 +2276,7 @@ function openAddModal(slot, day) {
   form.subject         = ''
   form.campus          = 'South Campus'
   form.room            = (addMode.value === 'room' && contextRoom.value) ? contextRoom.value : ''
+  form.roomType        = 'Lecture'
   form.parallel        = false
   form.parallelCount   = 2
   form._parallelGroupId = null
@@ -2314,6 +2311,7 @@ function openEditModal(slot, day, e) {
   form.subject         = e.subject
   form.campus          = inferCampus(e)
   form.room            = e.room ?? ''
+  form.roomType        = e.roomType || 'Lecture'
   form.parallel        = e.parallel ?? false
   form.parallelCount   = e.parallelCount ?? 2
   form.color           = e.color
@@ -2337,11 +2335,36 @@ function openEditModal(slot, day, e) {
 
 function buildOldDescriptor() {
   const oldTableLabel = form._oldTableLabel || form.teacher
+  const academicTermId = getSelectedTermId() || undefined
   if (form._parallelGroupId) {
-    return { tableLabel: oldTableLabel, parallelGroupId: form._parallelGroupId }
+    return { tableLabel: oldTableLabel, parallelGroupId: form._parallelGroupId, academicTermId }
   }
   const [oldTimeIn = '', oldTimeOut = ''] = (form._oldSlot || '').split(' - ')
-  return { tableLabel: oldTableLabel, section: form._oldSection, day: form._oldDay, timeIn: oldTimeIn, timeOut: oldTimeOut }
+  return { tableLabel: oldTableLabel, section: form._oldSection, day: form._oldDay, timeIn: oldTimeIn, timeOut: oldTimeOut, academicTermId }
+}
+
+async function applyRouteContext() {
+  const requestedTermId = String(route.query.academicTermId || '').trim()
+  if (requestedTermId) {
+    const response = await apiRequest('/academic-terms')
+    selectedTerm.value = (response.terms || []).find(term => getTermId(term) === requestedTermId) || selectedTerm.value
+  }
+
+  const requestedMode = String(route.query.mode || '')
+  if (requestedMode === 'teacher') {
+    scheduleViewMode.value = 'timetable'
+    addMode.value = 'teacher'
+    selectedTeacher.value = String(route.query.teacher || '')
+  } else if (requestedMode === 'room') {
+    scheduleViewMode.value = 'timetable'
+    addMode.value = 'room'
+    contextRoom.value = String(route.query.room || '') || null
+    contextFloor.value = addFloors.find(floor => floor.rooms.some(room =>
+      room === contextRoom.value
+      || room.startsWith(`${contextRoom.value} `)
+      || contextRoom.value.startsWith(`${room} `)
+    ))?.label || null
+  }
 }
 
 function isEntryBeingEdited(entry) {
@@ -2374,10 +2397,11 @@ function buildSchedulePayload(source) {
   const termId = getSelectedTermId()
   if (termId) payload.academicTermId = termId
   if (source.parallel) {
-    payload.parallelSlots = source.parallelSlots.map(s => ({ section: s.section, room: s.room }))
+    payload.parallelSlots = source.parallelSlots.map(s => ({ section: s.section, room: s.room, roomType: s.roomType || 'Lecture' }))
   } else {
     payload.section = source.section
     payload.room    = source.room
+    payload.roomType = source.roomType || 'Lecture'
   }
   return payload
 }
@@ -2452,12 +2476,13 @@ const addForm = reactive({
   year: '', section: '',
   campus: 'South Campus',
   teacher: '', major: '', subject: '', room: '',
+  roomType: 'Lecture',
   parallel: false, parallelCount: 2,
-  parallelSlots: [{ section: '', room: '' }, { section: '', room: '' }],
+  parallelSlots: [{ section: '', room: '', roomType: 'Lecture' }, { section: '', room: '', roomType: 'Lecture' }],
 })
 
 watch(() => addForm.parallelCount, (val) => {
-  while (addForm.parallelSlots.length < val) addForm.parallelSlots.push({ section: '', room: '' })
+  while (addForm.parallelSlots.length < val) addForm.parallelSlots.push({ section: '', room: '', roomType: 'Lecture' })
   while (addForm.parallelSlots.length > val) addForm.parallelSlots.pop()
 })
 
@@ -2474,9 +2499,10 @@ function openAddPanel() {
   addForm.teacher = selectedTeacher.value || ''
   addForm.subject = ''
   addForm.room = addMode.value === 'room' ? contextRoom.value || '' : ''
+  addForm.roomType = 'Lecture'
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
-    { section: '', room: '' }, { section: '', room: '' })
+    { section: '', room: '', roomType: 'Lecture' }, { section: '', room: '', roomType: 'Lecture' })
   addTimeError.value = ''; addSavedCount.value = 0
   showAddPanel.value = true
 }
@@ -2485,9 +2511,10 @@ function resetAddForm() {
   addForm.day = ''; addForm.timeIn = ''; addForm.timeOut = ''
   addForm.year = ''; addForm.section = ''; addForm.campus = 'South Campus'
   addForm.teacher = selectedTeacher.value || ''; addForm.subject = ''; addForm.room = ''; addForm.major = ''
+  addForm.roomType = 'Lecture'
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
-    { section: '', room: '' }, { section: '', room: '' })
+    { section: '', room: '', roomType: 'Lecture' }, { section: '', room: '', roomType: 'Lecture' })
   addTimeError.value = ''
 }
 
@@ -2532,7 +2559,8 @@ watch([() => consultForm.startTime, () => consultForm.endTime], () => {
 
 async function openConsultModal() {
   try {
-    const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
+    const termId = getSelectedTermId()
+    const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}&academicTermId=${encodeURIComponent(termId)}`)
     consultWeeklyMins.value = res.weeklyUsedMinutes || 0
   } catch (_) { consultWeeklyMins.value = 0 }
   await fetchConsultationsForTeacher()
@@ -2566,7 +2594,7 @@ async function saveConsultSlot() {
     Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
     consultTimeError.value = ''
     await fetchConsultationsForTeacher()
-    const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
+    const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}&academicTermId=${encodeURIComponent(termId)}`)
     consultWeeklyMins.value = res.weeklyUsedMinutes || 0
   } catch (error) {
     await Swal.fire({
@@ -2593,7 +2621,8 @@ async function deleteConsultSlot(id) {
       Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
     }
     await fetchConsultationsForTeacher()
-    const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
+    const termId = getSelectedTermId()
+    const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}&academicTermId=${encodeURIComponent(termId)}`)
     consultWeeklyMins.value = res.weeklyUsedMinutes || 0
   } catch (error) {
     await Swal.fire({ icon: 'error', title: 'Error', text: error?.message || 'Failed to delete.', confirmButtonColor: '#4b5563', background: '#fff' })
@@ -2696,6 +2725,7 @@ function confirmLogout() { showLogoutModal.value = false; logout(); router.push(
 onMounted(async () => {
   try {
     await loadTermContext()
+    await applyRouteContext()
     await ensureTermSelection()
     const response = await apiRequest('/users?role=teacher')
     if (response.users && Array.isArray(response.users)) {
@@ -3375,6 +3405,7 @@ onMounted(async () => {
 .logout-cancel-btn:hover  { background: #ffeaea; }
 .logout-confirm-btn { background: #4b5563; color: #fff; border: none; font-family: inherit; font-size: 1rem; font-weight: 600; padding: 10px 32px; border-radius: 10px; cursor: pointer; }
 .logout-confirm-btn:hover { background: #6b7280; }
+.room-type-stack{display:flex;flex-direction:column;gap:6px}
 </style>
 
 <style>

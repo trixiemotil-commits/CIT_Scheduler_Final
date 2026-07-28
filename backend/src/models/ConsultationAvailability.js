@@ -41,7 +41,10 @@ const consultationAvailabilitySchema = new mongoose.Schema(
   }
 );
 
-// One slot per teacher per day (no double-booking same day)
-consultationAvailabilitySchema.index({ employeeId: 1, dayOfWeek: 1 }, { unique: true });
+// One slot per teacher per day within the same academic term.
+consultationAvailabilitySchema.index(
+  { employeeId: 1, dayOfWeek: 1, academicTermId: 1 },
+  { unique: true }
+);
 
 module.exports = mongoose.model("ConsultationAvailability", consultationAvailabilitySchema);

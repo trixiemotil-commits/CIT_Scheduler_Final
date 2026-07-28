@@ -14,6 +14,7 @@ const notificationRoutes = require("../routes/notificationRoutes");
 const eventRoutes = require("../routes/eventRoutes");
 const activityLogRoutes = require("../routes/activityLogRoutes");
 const activityLogger = require("../middleware/activityLogger");
+const ConsultationAvailability = require("../models/ConsultationAvailability");
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -69,6 +70,15 @@ app.use((_req, res) => {
 async function startServer() {
   try {
     await connectDB();
+    // Replace the legacy cross-term uniqueness rule with a term-scoped rule.
+    const consultationIndexes = await ConsultationAvailability.collection.indexes();
+    if (consultationIndexes.some((index) => index.name === "employeeId_1_dayOfWeek_1")) {
+      await ConsultationAvailability.collection.dropIndex("employeeId_1_dayOfWeek_1");
+    }
+    await ConsultationAvailability.collection.createIndex(
+      { employeeId: 1, dayOfWeek: 1, academicTermId: 1 },
+      { unique: true, name: "employeeId_1_dayOfWeek_1_academicTermId_1" }
+    );
     const server = app.listen(PORT, () => {
       console.log(`Backend server listening on port ${PORT}`);
     });

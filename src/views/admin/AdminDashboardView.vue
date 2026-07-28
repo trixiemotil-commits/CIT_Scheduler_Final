@@ -24,6 +24,7 @@
           <span class="nav-icon" v-html="item.icon"></span>
           <span>{{ item.name }}</span>
         </RouterLink>
+        <PublishedTermScheduleLink />
       </nav>
 
       <RoleSwitchButton />
