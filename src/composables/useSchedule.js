@@ -70,6 +70,12 @@ export function colorForRoom(room) {
     : 'color-yellow'
 }
 
+export function colorForRoomType(roomType, room = '') {
+  if (roomType === 'Comlab/Laboratory') return 'color-green'
+  if (roomType === 'Lecture') return 'color-yellow'
+  return colorForRoom(room)
+}
+
 /** Convert "7:00 AM" or "1:30 PM" → total minutes since midnight */
 export function parseTime(t) {
   if (!t) return 0

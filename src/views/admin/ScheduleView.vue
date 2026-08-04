@@ -2,6 +2,7 @@
   <div class="layout">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
     <aside class="sidebar admin-sidebar">
+      <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
           <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
@@ -27,7 +28,7 @@
           <span>Activity Logs</span>
         </RouterLink>
         <RouterLink to="/admin/settings" class="nav-item admin-secondary-nav" :class="{ active: currentRoute === '/admin/settings' }">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33"/></svg></span>
+          <AdminSettingsIcon />
           <span>Settings</span>
         </RouterLink>
         <PublishedTermScheduleLink />
@@ -576,6 +577,16 @@
                     <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                   </div>
                 </div>
+                <div class="form-row-inline">
+                  <label class="form-label">Room Type</label>
+                  <div class="form-select-wrap">
+                    <select v-model="addForm.roomType" class="form-select">
+                      <option value="Lecture">Lecture</option>
+                      <option value="Comlab/Laboratory">Comlab/Laboratory</option>
+                    </select>
+                    <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+                </div>
               </template>
               <!-- Parallel section+room pairs -->
               <template v-else>
@@ -622,6 +633,16 @@
                       <select v-model="ps.room" class="form-select">
                         <option value="" disabled>Select Room</option>
                         <option v-for="r in roomOptions" :key="r" :value="r">{{ r }}</option>
+                      </select>
+                      <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                  </div>
+                  <div class="form-row-inline">
+                    <label class="form-label">Room Type {{ i + 1 }}</label>
+                    <div class="form-select-wrap">
+                      <select v-model="ps.roomType" class="form-select">
+                        <option value="Lecture">Lecture</option>
+                        <option value="Comlab/Laboratory">Comlab/Laboratory</option>
                       </select>
                       <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                     </div>
@@ -799,6 +820,7 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import {
   colorForRoom,
+  colorForRoomType,
   days,
   entries,
   parseTime,
@@ -1127,7 +1149,7 @@ function syncEntriesFromApi(apiEntries) {
     const key = `${tableLabel}|${rawSection || `__lunch_${entry.id || slot}`}|${slot}|${day}`
 
     const inferredCampus = inferCampus(entry)
-    const roomBasedColor = colorForRoom(entry.room)
+    const roomBasedColor = colorForRoomType(entry.roomType, entry.room)
     entries[key] = {
       entryType: isLunch ? 'lunch' : (entryType || 'class'),
       teacher: entry.teacher,
@@ -1149,7 +1171,7 @@ function syncEntriesFromApi(apiEntries) {
       subbedLabel: entry.subbedLabel || '',
       color: isLunch
         ? 'color-gray'
-        : (inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || 'color-yellow')),
+        : (roomBasedColor || entry.color || 'color-yellow'),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -1177,10 +1199,12 @@ function buildSchedulePayload(source) {
     payload.parallelSlots = source.parallelSlots.map((slot) => ({
       section: slot.section,
       room: slot.room,
+      roomType: slot.roomType || 'Lecture',
     }))
   } else {
     payload.section = source.section
     payload.room = source.room
+    payload.roomType = source.roomType || 'Lecture'
   }
 
   return payload
@@ -1753,13 +1777,13 @@ const addForm = reactive({
   day: '', timeIn: '', timeOut: '',
   year: '', section: '',
   campus: 'South Campus',
-  teacher: '', subject: '', room: '',
+  teacher: '', subject: '', room: '', roomType: 'Lecture',
   parallel: false, parallelCount: 2,
-  parallelSlots: [{ section: '', room: '' }, { section: '', room: '' }],
+  parallelSlots: [{ section: '', room: '', roomType: 'Lecture' }, { section: '', room: '', roomType: 'Lecture' }],
 })
 
 watch(() => addForm.parallelCount, (val) => {
-  while (addForm.parallelSlots.length < val) addForm.parallelSlots.push({ section: '', room: '' })
+  while (addForm.parallelSlots.length < val) addForm.parallelSlots.push({ section: '', room: '', roomType: 'Lecture' })
   while (addForm.parallelSlots.length > val) addForm.parallelSlots.pop()
 })
 
@@ -1779,9 +1803,10 @@ function openAddPanel() {
   addForm.section = ''
   addForm.campus = 'South Campus'
   addForm.teacher = selectedTeacher.value || ''
+  addForm.roomType = 'Lecture'
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
-    { section: '', room: '' }, { section: '', room: '' })
+    { section: '', room: '', roomType: 'Lecture' }, { section: '', room: '', roomType: 'Lecture' })
   addTimeError.value = ''
   addSavedCount.value = 0
   showAddPanel.value = true
@@ -1792,9 +1817,10 @@ function resetAddForm() {
   addForm.year = ''; addForm.section = ''
   addForm.campus = 'South Campus'
   addForm.teacher = selectedTeacher.value || ''; addForm.subject = ''; addForm.room = ''
+  addForm.roomType = 'Lecture'
   addForm.parallel = false; addForm.parallelCount = 2
   addForm.parallelSlots.splice(0, addForm.parallelSlots.length,
-    { section: '', room: '' }, { section: '', room: '' })
+    { section: '', room: '', roomType: 'Lecture' }, { section: '', room: '', roomType: 'Lecture' })
   addTimeError.value = ''
 }
 

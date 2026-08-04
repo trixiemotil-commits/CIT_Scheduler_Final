@@ -398,8 +398,10 @@ function isGreenComlabRoom(room) {
   return /(\b406\b|\b407\b|\b408\b|\b409\b|comlab|\bcl\b)/i.test(String(room || ''))
 }
 
-function scheduleColor(colorToken, _campus, room, subject) {
+function scheduleColor(colorToken, _campus, room, subject, roomType) {
   if (/^(?:color-)?gray$/i.test(String(colorToken || '')) || /\blunch\b/i.test(String(subject || ''))) return 'gray'
+  if (roomType === 'Comlab/Laboratory') return 'green'
+  if (roomType === 'Lecture') return 'yellow'
   if (isGreenComlabRoom(room)) return 'green'
   return 'yellow'
 }
@@ -559,11 +561,12 @@ function mapEntriesToSchedule(entries) {
       entryType: isLunch ? 'lunch' : 'class',
       year: isLunch ? '' : (entry.year || ''),
       room: entry.room || '',
+      roomType: entry.roomType || '',
       subject: entry.subject || 'Untitled Subject',
       code: entry.subject || 'Untitled Subject',
       section: isLunch ? '' : (entry.section || ''),
       parallel: isLunch ? false : Boolean(entry.parallel),
-      color: scheduleColor(entry.color, entry.campus, entry.room, entry.subject),
+      color: scheduleColor(entry.color, entry.campus, entry.room, entry.subject, entry.roomType),
       teacher: entry.teacher || userName.value || 'Teacher',
       isSubstitute: Boolean(entry.isSubstitute),
       subbedLabel: entry.subbedLabel || '',

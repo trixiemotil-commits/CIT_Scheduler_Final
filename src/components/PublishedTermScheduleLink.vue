@@ -2,6 +2,7 @@
   <RouterLink
     to="/admin/academic-terms"
     class="nav-item unified-academic-link"
+    :class="{ active: isAcademicTerms }"
   >
     <span class="nav-icon">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -14,6 +15,7 @@
       v-if="publishedTermId"
       :to="{ path: '/admin/academic-terms', query: { term: publishedTermId, action: 'view' } }"
       class="nav-item current-term-schedule-link"
+      :class="{ active: isCurrentTerm }"
     >
       <span class="nav-icon">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -29,11 +31,18 @@
 
 <script setup>
 import { getToken } from '@/auth.js'
-import { onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const route = useRoute()
 const publishedTermId = ref('')
+const isAcademicTerms = computed(() => route.path === '/admin/academic-terms' && !route.query.term)
+const isCurrentTerm = computed(() =>
+  route.path === '/admin/academic-terms'
+  && Boolean(publishedTermId.value)
+  && String(route.query.term || '') === publishedTermId.value
+)
 onMounted(async () => {
   const token = getToken()
   if (!token) return

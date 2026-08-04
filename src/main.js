@@ -4,6 +4,8 @@ import { IonicVue } from '@ionic/vue'
 import App from './App.vue'
 import RoleSwitchButton from './components/RoleSwitchButton.vue'
 import PublishedTermScheduleLink from './components/PublishedTermScheduleLink.vue'
+import AdminSidebarToggle from './components/AdminSidebarToggle.vue'
+import AdminSettingsIcon from './components/AdminSettingsIcon.vue'
 
 /* Ionic's required base styles. Custom project styles load afterwards so the
    existing admin, teacher, and student branding remains in control. */
@@ -24,6 +26,8 @@ app.use(IonicVue)
 app.use(router)
 app.component('RoleSwitchButton', RoleSwitchButton)
 app.component('PublishedTermScheduleLink', PublishedTermScheduleLink)
+app.component('AdminSidebarToggle', AdminSidebarToggle)
+app.component('AdminSettingsIcon', AdminSettingsIcon)
 
 // Global error handlers to surface runtime errors to the page for debugging
 window.addEventListener('error', (ev) => {

@@ -878,3 +878,193 @@ body,
 .admin-sidebar a[href="/admin/academic-terms"]:not(.unified-academic-link) {
   display: none !important;
 }
+
+/* One stable admin navigation layout across every admin route. */
+.layout > .admin-sidebar {
+  position: sticky !important;
+  width: 288px !important;
+  min-width: 288px !important;
+  padding: 24px 17px !important;
+  transition: width .22s ease, min-width .22s ease, padding .22s ease !important;
+}
+
+.admin-sidebar .nav-item {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.admin-sidebar .nav-item > span:last-child {
+  min-width: 0;
+  white-space: nowrap !important;
+}
+
+.admin-sidebar .nav-icon {
+  width: 22px !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  justify-content: center !important;
+}
+
+.admin-sidebar .nav-icon svg {
+  display: block !important;
+  width: 22px !important;
+  height: 22px !important;
+}
+
+.admin-sidebar .unified-academic-link,
+.admin-sidebar .current-term-schedule-link,
+.admin-sidebar .current-term-link {
+  order: 20;
+}
+
+.admin-sidebar .current-term-schedule-link,
+.admin-sidebar .current-term-link {
+  order: 21;
+}
+
+.admin-sidebar-toggle {
+  position: fixed;
+  top: 20px;
+  left: 248px;
+  z-index: 20;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  color: #687078;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+  cursor: pointer;
+  transition: left .22s ease, color .18s ease, background-color .18s ease;
+}
+
+.admin-sidebar-toggle:hover {
+  color: #252a2f;
+  background-color: rgba(37, 42, 47, .08);
+}
+
+.admin-sidebar-toggle:focus-visible {
+  outline: 2px solid #397b5a;
+  outline-offset: 2px;
+}
+
+.admin-sidebar-toggle.is-collapsed {
+  color: #252a2f;
+  background: linear-gradient(145deg, #f4f5f5, #c7cbce);
+  border: 1px solid rgba(255, 255, 255, .8);
+  box-shadow: 0 4px 12px rgba(32, 37, 41, .22);
+}
+
+.admin-sidebar-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-sidebar-collapsed .layout > .admin-sidebar {
+  width: 82px !important;
+  min-width: 82px !important;
+  padding-inline: 12px !important;
+  overflow: visible !important;
+}
+
+.admin-sidebar-collapsed .admin-sidebar-toggle {
+  left: 29px;
+}
+
+.admin-sidebar .sidebar-profile {
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+.admin-sidebar .sidebar-nav > a:nth-of-type(3) {
+  margin-bottom: 0 !important;
+}
+
+.admin-sidebar .sidebar-nav > a:nth-of-type(3)::after {
+  content: none !important;
+  display: none !important;
+}
+
+.admin-sidebar-collapsed .admin-sidebar .sidebar-profile {
+  display: flex !important;
+  justify-content: center !important;
+  padding: 38px 0 14px !important;
+}
+
+.admin-sidebar-collapsed .admin-sidebar .avatar-wrap {
+  width: 48px !important;
+  height: 48px !important;
+}
+
+.admin-sidebar-collapsed .admin-sidebar .sidebar-profile :is(.brand, .role, .email),
+.admin-sidebar-collapsed .admin-sidebar .nav-item > span:last-child {
+  display: none !important;
+}
+
+.admin-sidebar-collapsed .admin-sidebar .nav-item {
+  min-height: 48px !important;
+  justify-content: center !important;
+  padding-inline: 0 !important;
+}
+
+.admin-sidebar-collapsed .admin-sidebar .sidebar-nav > a:nth-of-type(3) {
+  margin-bottom: 20px !important;
+}
+
+.admin-sidebar-collapsed .admin-sidebar :is(.logout-btn, .role-switch-btn, .switch-role-btn) {
+  min-width: 48px !important;
+  padding-inline: 0 !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  font-size: 0 !important;
+}
+
+.admin-sidebar-collapsed .admin-sidebar :is(.logout-btn, .role-switch-btn, .switch-role-btn) svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+@media (max-width: 900px) {
+  .layout > .admin-sidebar {
+    display: flex !important;
+    width: 252px !important;
+    min-width: 252px !important;
+  }
+
+  .admin-sidebar-collapsed .layout > .admin-sidebar {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding-inline: 0 !important;
+    border: 0 !important;
+    overflow: visible !important;
+  }
+
+  .admin-sidebar-collapsed .admin-sidebar > :not(.admin-sidebar-toggle) {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  .admin-sidebar-collapsed .admin-sidebar-toggle {
+    top: 16px;
+    left: 16px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .admin-sidebar .admin-sidebar-toggle {
+    left: 212px;
+  }
+
+  .admin-sidebar-collapsed .admin-sidebar .admin-sidebar-toggle {
+    left: 16px;
+  }
+}

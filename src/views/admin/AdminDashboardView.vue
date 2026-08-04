@@ -2,6 +2,7 @@
   <div class="layout admin-dashboard">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
     <aside class="sidebar admin-sidebar">
+      <AdminSidebarToggle />
       <!-- Profile -->
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
