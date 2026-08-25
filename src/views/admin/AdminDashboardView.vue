@@ -116,6 +116,79 @@
         </div>
       </section>
 
+      <section class="today-teachers-section">
+        <div class="today-teachers-header">
+          <div>
+            <span class="today-section-eyebrow"><i></i> Live schedule</span>
+            <h2>Teachers with classes today</h2>
+            <p>{{ todayDateLabel }} <span>Updated {{ currentTimeLabel }}</span></p>
+          </div>
+          <div class="today-carousel-controls" v-if="todayTeachers.length > teachersPerSlide">
+            <span>Showing {{ todayTeacherIndex + 1 }}–{{ Math.min(todayTeacherIndex + teachersPerSlide, todayTeachers.length) }} of {{ todayTeachers.length }}</span>
+          </div>
+        </div>
+
+        <div v-if="todayScheduleLoading" class="today-teachers-loading">Loading today’s teaching schedule…</div>
+        <div v-else-if="todayTeachers.length" class="today-carousel-stage">
+          <button
+            type="button"
+            class="today-stage-arrow previous"
+            :disabled="todayTeacherIndex === 0"
+            aria-label="Show previous teachers"
+            @click="previousTodayTeachers"
+          >&lsaquo;</button>
+          <div
+            :key="todayTeacherIndex"
+            :class="['today-teachers-grid', `teacher-count-${Math.min(visibleTodayTeachers.length, teachersPerSlide)}`]"
+          >
+            <article v-for="teacher in visibleTodayTeachers" :key="teacher.name" class="today-teacher-card">
+            <header>
+              <img :src="teacher.avatar" :alt="teacher.name" />
+              <div>
+                <h3>{{ teacher.name }}</h3>
+                <p><strong>{{ teacher.schedule.length }}</strong> class{{ teacher.schedule.length === 1 ? '' : 'es' }} · {{ teacher.schedule[0]?.timeIn }}–{{ teacher.schedule[teacher.schedule.length - 1]?.timeOut }}</p>
+              </div>
+              <span :class="['teacher-day-status', teacher.currentStatus.className]">{{ teacher.currentStatus.label }}</span>
+            </header>
+            <ol class="today-schedule-list">
+              <li v-for="entry in teacher.schedule" :key="entry.id || `${entry.timeIn}-${entry.subject}-${entry.section}`" :class="getTodayEntryState(entry)">
+                <time>{{ entry.timeIn }}<small>{{ entry.timeOut }}</small></time>
+                <span class="schedule-timeline-dot"></span>
+                <div>
+                  <strong>{{ entry.subject }}</strong>
+                  <span>{{ [entry.section, entry.room].filter(Boolean).join(' · ') || 'Class details unavailable' }}</span>
+                </div>
+                <em>{{ getTodayEntryLabel(entry) }}</em>
+              </li>
+            </ol>
+            </article>
+          </div>
+          <button
+            type="button"
+            class="today-stage-arrow next"
+            :disabled="todayTeacherIndex >= todayTeacherMaxIndex"
+            aria-label="Show next teachers"
+            @click="nextTodayTeachers"
+          >&rsaquo;</button>
+          <div v-if="todayCarouselPages.length > 1" class="today-carousel-footer">
+            <div class="today-carousel-dots" aria-label="Teacher carousel pages">
+              <button
+                v-for="page in todayCarouselPages"
+                :key="page.index"
+                type="button"
+                :class="{ active: todayTeacherIndex === page.start }"
+                :aria-label="`Show teacher slide ${page.index + 1}`"
+                @click="todayTeacherIndex = page.start"
+              ><span></span></button>
+            </div>
+          </div>
+        </div>
+        <div v-else class="today-teachers-empty">
+          <span>No classes scheduled today</span>
+          <p>Teachers with scheduled classes will appear here automatically.</p>
+        </div>
+      </section>
+
       <!-- Charts -->
       <section class="charts-row">
         <!-- Consultation Trends -->
@@ -243,7 +316,7 @@
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
 import Chart from 'chart.js/auto'
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 // v-click-outside directive
@@ -282,6 +355,121 @@ async function apiRequest(path, options = {}) {
 }
 
 const user = getUser() || {}
+
+const todayScheduleEntries = ref([])
+const teacherDirectory = ref([])
+const todayScheduleLoading = ref(true)
+const currentDateTime = ref(new Date())
+const todayTeacherIndex = ref(0)
+const teachersPerSlide = 2
+let dashboardRealtimeTimer = null
+
+const todayName = computed(() => currentDateTime.value.toLocaleDateString('en-US', { weekday: 'long' }))
+const todayDateLabel = computed(() => currentDateTime.value.toLocaleDateString('en-US', {
+  weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+}))
+const currentTimeLabel = computed(() => currentDateTime.value.toLocaleTimeString('en-US', {
+  hour: 'numeric', minute: '2-digit',
+}))
+
+function normalizeName(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function timeToMinutes(value) {
+  if (!value) return Number.MAX_SAFE_INTEGER
+  const match = String(value).trim().toUpperCase().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/)
+  if (!match) return Number.MAX_SAFE_INTEGER
+  let hour = Number(match[1])
+  const minute = Number(match[2])
+  if (match[3] === 'PM' && hour !== 12) hour += 12
+  if (match[3] === 'AM' && hour === 12) hour = 0
+  return hour * 60 + minute
+}
+
+function teacherAvatar(name) {
+  const match = teacherDirectory.value.find((teacher) => {
+    const fullName = teacher.name || `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim()
+    return normalizeName(fullName) === normalizeName(name)
+  })
+  return match?.avatar || `https://i.pravatar.cc/120?u=${encodeURIComponent(name)}`
+}
+
+function getTodayEntryState(entry) {
+  const now = currentDateTime.value.getHours() * 60 + currentDateTime.value.getMinutes()
+  const start = timeToMinutes(entry.timeIn)
+  const end = timeToMinutes(entry.timeOut)
+  if (now >= start && now < end) return 'is-current'
+  if (now >= end) return 'is-complete'
+  return 'is-upcoming'
+}
+
+function getTodayEntryLabel(entry) {
+  const state = getTodayEntryState(entry)
+  if (state === 'is-current') return 'Now'
+  if (state === 'is-complete') return 'Finished'
+  return 'Upcoming'
+}
+
+const todayTeachers = computed(() => {
+  const grouped = new Map()
+  todayScheduleEntries.value
+    .filter((entry) => normalizeName(entry.day) === normalizeName(todayName.value))
+    .filter((entry) => normalizeName(entry.entryType) !== 'lunch' && !normalizeName(entry.subject).includes('lunch break'))
+    .filter((entry) => entry.teacher)
+    .forEach((entry) => {
+      const key = normalizeName(entry.teacher)
+      if (!grouped.has(key)) grouped.set(key, { name: entry.teacher, avatar: teacherAvatar(entry.teacher), schedule: [] })
+      grouped.get(key).schedule.push(entry)
+    })
+
+  const now = currentDateTime.value.getHours() * 60 + currentDateTime.value.getMinutes()
+  return [...grouped.values()].map((teacher) => {
+    teacher.schedule.sort((a, b) => timeToMinutes(a.timeIn) - timeToMinutes(b.timeIn))
+    const current = teacher.schedule.find((entry) => now >= timeToMinutes(entry.timeIn) && now < timeToMinutes(entry.timeOut))
+    const next = teacher.schedule.find((entry) => timeToMinutes(entry.timeIn) > now)
+    teacher.currentStatus = current
+      ? { label: 'Teaching now', className: 'is-live' }
+      : next
+        ? { label: `Next ${next.timeIn}`, className: 'is-next' }
+        : { label: 'Classes complete', className: 'is-done' }
+    return teacher
+  }).sort((a, b) => timeToMinutes(a.schedule[0]?.timeIn) - timeToMinutes(b.schedule[0]?.timeIn) || a.name.localeCompare(b.name))
+})
+
+const todayTeacherMaxIndex = computed(() => todayTeachers.value.length
+  ? Math.floor((todayTeachers.value.length - 1) / teachersPerSlide) * teachersPerSlide
+  : 0)
+const visibleTodayTeachers = computed(() => todayTeachers.value.slice(todayTeacherIndex.value, todayTeacherIndex.value + teachersPerSlide))
+const todayCarouselPages = computed(() => Array.from(
+  { length: Math.ceil(todayTeachers.value.length / teachersPerSlide) },
+  (_, index) => ({ index, start: index * teachersPerSlide })
+))
+
+function previousTodayTeachers() {
+  todayTeacherIndex.value = Math.max(0, todayTeacherIndex.value - teachersPerSlide)
+}
+
+function nextTodayTeachers() {
+  todayTeacherIndex.value = Math.min(todayTeacherMaxIndex.value, todayTeacherIndex.value + teachersPerSlide)
+}
+
+async function loadTodayTeacherSchedules({ quiet = false } = {}) {
+  if (!quiet) todayScheduleLoading.value = true
+  try {
+    const [schedulePayload, usersPayload] = await Promise.all([
+      apiRequest('/schedules'),
+      apiRequest('/users?role=teacher'),
+    ])
+    todayScheduleEntries.value = Array.isArray(schedulePayload.entries) ? schedulePayload.entries : []
+    teacherDirectory.value = Array.isArray(usersPayload.users) ? usersPayload.users : []
+    todayTeacherIndex.value = Math.min(todayTeacherIndex.value, todayTeacherMaxIndex.value)
+  } catch (error) {
+    console.error('Failed to load today’s teacher schedules:', error)
+  } finally {
+    todayScheduleLoading.value = false
+  }
+}
 /* ── Nav ── */
 const navItems = [
   {
@@ -575,8 +763,19 @@ function createBarChart() {
 
 onMounted(() => {
   loadDashboardSummary()
+  loadTodayTeacherSchedules()
   createLineChart()
   createBarChart()
+  dashboardRealtimeTimer = window.setInterval(() => {
+    currentDateTime.value = new Date()
+    loadTodayTeacherSchedules({ quiet: true })
+  }, 60000)
+})
+
+onUnmounted(() => {
+  if (dashboardRealtimeTimer) window.clearInterval(dashboardRealtimeTimer)
+  if (lineChartInstance) lineChartInstance.destroy()
+  if (barChartInstance) barChartInstance.destroy()
 })
 
 function handleLogout() {
@@ -901,6 +1100,78 @@ function confirmLogout() {
   margin-top: 4px;
 }
 
+/* Today's teacher schedule carousel */
+.today-teachers-section { position: relative; margin-bottom: 28px; padding: 26px 28px 18px; overflow: visible; border: 1px solid #bcc4c9; border-radius: 20px; background: linear-gradient(145deg, #f7f8f9 0%, #dfe3e6 52%, #f2f4f5 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 12px 32px rgba(36,47,55,.13); }
+.today-teachers-header { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+.today-section-eyebrow { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; color: #52655d; font-size: .68rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.today-section-eyebrow i { width: 8px; height: 8px; border: 2px solid #c9e1d2; border-radius: 50%; background: #4b8b65; box-shadow: 0 0 0 3px #e8f3ec; }
+.today-teachers-header h2 { margin: 0; color: #202a31; font-size: 1.35rem; letter-spacing: -.025em; line-height: 1.35; }
+.today-teachers-header p { margin: 5px 0 0; color: #63717a; font-size: .8rem; }
+.today-teachers-header p span { margin-left: 7px; padding-left: 9px; border-left: 1px solid #ccd4d8; color: #89939a; }
+.today-carousel-controls { display: flex; align-items: center; gap: 7px; }
+.today-carousel-controls > span { padding: 8px 13px; color: #4f5b63; border: 1px solid #bfc7cc; border-radius: 99px; background: linear-gradient(180deg, #fbfcfc, #e5e8ea); font-size: .72rem; font-weight: 700; box-shadow: inset 0 1px 0 #fff, 0 3px 9px rgba(44,55,63,.08); }
+.today-carousel-controls button { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid #d3dade; border-radius: 10px; background: #fff; color: #3f4e57; box-shadow: 0 3px 9px rgba(42,53,61,.07); cursor: pointer; }
+.today-carousel-controls button:hover:not(:disabled) { border-color: #9eabb2; background: #eef2f4; transform: translateY(-1px); }
+.today-carousel-controls button:disabled { cursor: default; opacity: .4; }
+.today-carousel-controls svg { width: 17px; height: 17px; }
+.today-carousel-stage { position: relative; overflow: visible; padding: 3px 48px; }
+.today-stage-arrow { position: absolute; z-index: 3; top: 50%; display: grid; width: 42px; height: 42px; padding: 0 0 4px; place-items: center; border: 1px solid #aeb8be; border-radius: 50%; background: linear-gradient(145deg, #f9fafb, #d9dde0); color: #344047; box-shadow: inset 0 1px 0 #fff, 0 7px 18px rgba(36,48,56,.16); font: 500 2rem/1 Arial, sans-serif; cursor: pointer; transform: translateY(-50%); transition: color .18s ease, background .18s ease, border-color .18s ease, transform .18s ease; }
+.today-stage-arrow.previous { left: 1px; }
+.today-stage-arrow.next { right: 1px; }
+.today-stage-arrow:hover:not(:disabled) { color: #fff; border-color: #4e5960; background: linear-gradient(145deg, #747e84, #3f494f); transform: translateY(-50%) scale(1.06); }
+.today-stage-arrow:disabled { color: #9ba4a9; background: linear-gradient(145deg, #edf0f1, #d8dcde); box-shadow: inset 0 1px 0 rgba(255,255,255,.8); cursor: default; opacity: .64; }
+.today-teachers-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+.today-carousel-stage > .today-teachers-grid { animation: today-slide-in .3s cubic-bezier(.22,.72,.25,1); }
+@keyframes today-slide-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
+.today-teachers-grid.teacher-count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.today-teachers-grid.teacher-count-1 { width: min(100%, 720px); grid-template-columns: minmax(0, 1fr); margin-inline: auto; }
+.today-teachers-grid.teacher-count-1 .today-teacher-card > header { padding-left: 18px; padding-right: 18px; }
+.today-teachers-grid.teacher-count-1 .today-schedule-list { padding-left: 18px; padding-right: 18px; }
+.today-teacher-card { display: flex; min-width: 0; flex-direction: column; overflow: hidden; border: 1px solid #bfc7cc; border-radius: 15px; background: linear-gradient(145deg, #f8f9fa, #e7eaec); box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 6px 17px rgba(44,55,63,.11); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.today-teacher-card:hover { border-color: #9faab0; box-shadow: inset 0 1px 0 #fff, 0 10px 24px rgba(44,55,63,.15); transform: translateY(-2px); }
+.today-teacher-card > header { display: flex; min-height: 82px; align-items: center; gap: 13px; padding: 16px 18px; border-bottom: 1px solid #cbd2d6; background: linear-gradient(135deg, #fbfcfc, #e1e5e7); }
+.today-teacher-card > header img { width: 48px; height: 48px; flex: 0 0 48px; border: 2px solid #fff; border-radius: 13px; object-fit: cover; box-shadow: 0 0 0 1px #d4dce0, 0 4px 10px rgba(36,48,56,.1); }
+.today-teacher-card > header > div { min-width: 0; flex: 1; }
+.today-teacher-card h3 { overflow: hidden; margin: 0; color: #263138; font-size: .94rem; text-overflow: ellipsis; white-space: nowrap; }
+.today-teacher-card header p { margin: 4px 0 0; color: #69767e; font-size: .7rem; }
+.today-teacher-card header p strong { color: #4b5961; }
+.teacher-day-status { flex: 0 0 auto; padding: 6px 9px; border-radius: 99px; font-size: .61rem; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+.teacher-day-status.is-live { color: #276842; border: 1px solid #bedbc8; background: #e9f5ed; }
+.teacher-day-status.is-next { color: #65562d; border: 1px solid #dfd3b3; background: #f8f3e5; }
+.teacher-day-status.is-done { color: #68747c; border: 1px solid #d9dfe2; background: #f0f3f4; }
+.today-schedule-list { max-height: 230px; min-height: 0; margin: 0; padding: 11px 18px 15px; overflow-y: auto; scrollbar-color: #aeb8bd transparent; scrollbar-width: thin; list-style: none; }
+.today-schedule-list::-webkit-scrollbar { width: 6px; }
+.today-schedule-list::-webkit-scrollbar-track { background: transparent; }
+.today-schedule-list::-webkit-scrollbar-thumb { border-radius: 99px; background: #aeb8bd; }
+.today-schedule-list li { position: relative; display: grid; grid-template-columns: 72px 12px minmax(0,1fr) auto; gap: 10px; align-items: start; min-height: 62px; padding: 11px 0; }
+.today-schedule-list li:not(:last-child)::after { content: ''; position: absolute; left: 87px; top: 27px; bottom: -15px; width: 1px; background: #bfc8cd; }
+.today-schedule-list time { color: #3d4b54; font-size: .73rem; font-weight: 700; white-space: nowrap; }
+.today-schedule-list time small { display: block; margin-top: 3px; color: #7e8a91; font-size: .62rem; font-weight: 500; }
+.schedule-timeline-dot { position: relative; z-index: 1; width: 9px; height: 9px; margin-top: 3px; border: 2px solid #aab5bb; border-radius: 50%; background: #fff; }
+.today-schedule-list li > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.today-schedule-list strong { overflow: hidden; color: #2e3a42; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+.today-schedule-list li > div > span { overflow: hidden; color: #6d7a82; font-size: .67rem; text-overflow: ellipsis; white-space: nowrap; }
+.today-schedule-list li > em { align-self: center; padding: 5px 7px; border-radius: 7px; background: #f0f3f4; color: #6d7981; font-size: .55rem; font-style: normal; font-weight: 800; text-transform: uppercase; }
+.today-schedule-list li.is-upcoming > em { color: #6b5b2d; background: #f8f2df; }
+.today-schedule-list li.is-current > em { color: #286c45; background: #dcefe3; }
+.today-schedule-list li.is-current { margin: 2px -7px; padding: 9px 7px; border-radius: 8px; background: #edf6f0; }
+.today-schedule-list li.is-current::after { left: 94px; }
+.today-schedule-list li.is-current .schedule-timeline-dot { border-color: #3f805a; background: #4f9468; box-shadow: 0 0 0 3px #dceee3; }
+.today-schedule-list li.is-complete { opacity: .57; }
+.today-schedule-list li.is-complete .schedule-timeline-dot { border-color: #8d999f; background: #8d999f; }
+.today-teachers-loading,.today-teachers-empty { display: flex; min-height: 150px; align-items: center; justify-content: center; flex-direction: column; color: #748088; font-size: .76rem; text-align: center; }
+.today-teachers-empty span { color: #38454d; font-size: .86rem; font-weight: 700; }
+.today-teachers-empty p { margin: 5px 0 0; color: #818c93; font-size: .7rem; }
+.today-carousel-footer { position: relative; z-index: 4; display: flex; min-height: 32px; align-items: center; justify-content: center; gap: 13px; margin: 14px 0 0; padding: 0; }
+.today-footer-arrow { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid #d2dade; border-radius: 50%; background: #fff; color: #415059; box-shadow: 0 3px 9px rgba(42,53,61,.08); cursor: pointer; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
+.today-footer-arrow:hover:not(:disabled) { border-color: #9eabb2; background: #edf1f3; transform: scale(1.05); }
+.today-footer-arrow:disabled { cursor: default; opacity: .35; }
+.today-footer-arrow svg { width: 16px; height: 16px; }
+.today-carousel-dots { display: flex; align-items: center; gap: 4px; padding: 5px 7px; border: 1px solid #bfc8cd; border-radius: 99px; background: linear-gradient(180deg, #f8f9fa, #dfe3e5); box-shadow: inset 0 1px 0 rgba(255,255,255,.9); }
+.today-carousel-dots button { display: grid; width: 18px; height: 18px; padding: 0; place-items: center; border: 0; background: transparent; cursor: pointer; }
+.today-carousel-dots button span { display: block; width: 6px; height: 6px; border-radius: 99px; background: #aab3b8; transition: width .2s ease, background .2s ease; }
+.today-carousel-dots button.active span { width: 16px; background: #505c63; }
+
 /* Charts */
 .charts-row {
   display: grid;
@@ -1176,11 +1447,19 @@ function confirmLogout() {
 /* Responsive */
 @media (max-width: 900px) {
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
+  .today-teachers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .charts-row { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
   .main { padding: 20px 16px 32px; }
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
+  .today-teachers-section { padding: 18px 16px 18px; }
+  .today-teachers-header { align-items: flex-start; flex-direction: column; }
+  .today-teachers-grid { grid-template-columns: 1fr; }
+  .today-carousel-stage { padding-inline: 23px; }
+  .today-stage-arrow { width: 36px; height: 36px; font-size: 1.7rem; }
+  .today-stage-arrow.previous { left: 0; }
+  .today-stage-arrow.next { right: 0; }
   .sidebar { width: 200px; min-width: 200px; }
 }
 

@@ -4,8 +4,16 @@
     <!-- Hidden Admin Button -->
     <button class="hidden-admin-btn" @click="showAdminModal = true" title="Create Admin Account"></button>
     <div class="card" :class="{ 'card--wide': activeTab === 'signup' }">
-      <!-- Title -->
-      <h1 class="title">CIT Scheduler</h1>
+      <!-- Brand -->
+      <div class="login-brand">
+        <div class="login-brand__seal-wrap">
+          <img src="/branding/cit-college-seal.png" alt="PHINMA Araullo University College of Information Technology" class="login-brand__seal" />
+        </div>
+        <div class="login-brand__copy">
+          <span>College of Information Technology</span>
+          <h1 class="title">CIT Scheduler</h1>
+        </div>
+      </div>
 
       <!-- Tab Toggle -->
       <div class="tab-toggle">
@@ -33,8 +41,6 @@
           <RouterLink to="/forgot-password" class="action-link">Forgot Password?</RouterLink>
         </div>
 
-        <div v-if="loginError" class="error-msg">{{ loginError }}</div>
-
         <!-- reCAPTCHA widget -->
         <div v-if="siteKey" class="captcha-wrap">
           <div ref="signinCaptchaRef" class="captcha-box"></div>
@@ -42,23 +48,6 @@
 
         <button type="submit" class="submit-btn">Login</button>
       </form>
-
-      <div v-else-if="activeTab === 'role-select'" class="form role-selection">
-        <p class="role-selection__intro">This account has more than one role. Choose how you would like to continue.</p>
-        <button
-          v-for="role in availableRoles"
-          :key="role"
-          type="button"
-          class="role-selection__button"
-          :disabled="isSelectingRole"
-          @click="chooseRole(role)"
-        >
-          <span class="role-selection__name">Continue as {{ roleLabel(role) }}</span>
-          <span class="role-selection__description">{{ role === 'admin' ? 'Manage users, schedules, and system settings.' : 'View your teaching schedule and consultations.' }}</span>
-        </button>
-        <div v-if="loginError" class="error-msg">{{ loginError }}</div>
-        <button type="button" class="action-link plain-btn" @click="cancelRoleSelection">Use another account</button>
-      </div>
 
       <!-- ── Sign Up Form ── -->
       <form v-else class="form" @submit.prevent="handleSignUp">
@@ -120,6 +109,72 @@
       </form>
     </div>
 
+    <!-- Login and reCAPTCHA alerts -->
+    <div v-if="loginAlert" class="login-alert-overlay" role="presentation" @click.self="closeLoginAlert">
+      <section class="login-alert" role="alertdialog" aria-modal="true" aria-labelledby="login-alert-title" aria-describedby="login-alert-message">
+        <div class="login-alert__icon" :class="`login-alert__icon--${loginAlert.type}`" aria-hidden="true">
+          <svg v-if="loginAlert.type === 'captcha'" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 8.5 6M12 7v6M12 17h.01"/><path d="m17 3 3.5.5L20 7"/></svg>
+          <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/></svg>
+        </div>
+        <h2 id="login-alert-title">{{ loginAlert.title }}</h2>
+        <p id="login-alert-message" :class="{ 'login-alert__message--error': loginAlert.type === 'credentials' }">{{ loginAlert.message }}</p>
+        <button type="button" @click="closeLoginAlert">Try again</button>
+      </section>
+    </div>
+
+    <!-- Role choice for accounts that are both administrators and teachers -->
+    <div
+      v-if="showRoleSelection"
+      class="role-modal-overlay"
+      role="presentation"
+      @click.self="cancelRoleSelection"
+    >
+      <section
+        class="role-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="role-modal-title"
+        aria-describedby="role-modal-description"
+      >
+        <img src="/branding/cit-college-seal.png" alt="" class="role-modal__seal" aria-hidden="true" />
+        <h2 id="role-modal-title" class="role-modal__title">Choose your role</h2>
+        <p id="role-modal-description" class="role-selection__intro">
+          This account has more than one role. Select how you want to continue.
+        </p>
+
+        <div class="role-selection">
+          <button
+            v-for="role in availableRoles"
+            :key="role"
+            type="button"
+            class="role-selection__button"
+            :disabled="isSelectingRole"
+            @click="chooseRole(role)"
+          >
+            <span class="role-selection__icon" :class="`role-selection__icon--${role}`" aria-hidden="true">
+              <svg v-if="role === 'admin'" viewBox="0 0 24 24">
+                <path d="M12 3 4.5 6v5.2c0 4.6 3.1 8.3 7.5 9.8 4.4-1.5 7.5-5.2 7.5-9.8V6L12 3Z" />
+                <path d="m8.8 12 2 2 4.4-4.5" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24">
+                <circle cx="9" cy="7" r="3.2" />
+                <path d="M3.5 19c.4-3.7 2.2-5.5 5.5-5.5s5.1 1.8 5.5 5.5M15 5h5.5v9H15M17 9h1.5" />
+              </svg>
+            </span>
+            <span class="role-selection__copy">
+              <span class="role-selection__name">{{ roleLabel(role) }}</span>
+            </span>
+            <span class="role-selection__arrow" aria-hidden="true">&#8594;</span>
+          </button>
+        </div>
+
+        <div v-if="loginError" class="error-msg role-modal__error">{{ loginError }}</div>
+        <button type="button" class="role-modal__cancel" :disabled="isSelectingRole" @click="cancelRoleSelection">
+          Use another account
+        </button>
+      </section>
+    </div>
+
     <!-- Admin Modal -->
     <div v-if="showAdminModal" class="admin-modal-overlay" @click.self="showAdminModal = false">
       <div class="admin-modal">
@@ -150,7 +205,7 @@
 </template>
 
 <script setup>
-import { login, register, selectRole } from '@/auth.js'
+import { login, logout, register, selectRole } from '@/auth.js'
 import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
@@ -241,6 +296,8 @@ const activeTab = ref('signin')
 const loginError = ref('')
 const availableRoles = ref([])
 const isSelectingRole = ref(false)
+const showRoleSelection = ref(false)
+const loginAlert = ref(null)
 const signUpError = ref('')
 const signUpSuccess = ref('')
 const router = useRouter()
@@ -538,6 +595,14 @@ function routeByRole(role) {
   return '/student/dashboard'
 }
 
+function showLoginAlert(type, title, message) {
+  loginAlert.value = { type, title, message }
+}
+
+function closeLoginAlert() {
+  loginAlert.value = null
+}
+
 async function handleLogin() {
   loginError.value = ''
   try {
@@ -554,21 +619,28 @@ async function handleLogin() {
     }
 
     if (!recaptchaToken) {
-      loginError.value = 'Please complete the reCAPTCHA verification.'
+      showLoginAlert('captcha', 'Verification required', 'Please complete the “I’m not a robot” check before signing in.')
       return
     }
 
     const payload = await login(signIn.email, signIn.password, recaptchaToken)
     const user = payload?.user
     const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
-    if (roles.length > 1) {
-      availableRoles.value = roles
-      activeTab.value = 'role-select'
+    const normalizedRoles = roles.map(role => String(role).toLowerCase())
+    if (normalizedRoles.includes('admin') && normalizedRoles.includes('teacher')) {
+      availableRoles.value = ['admin', 'teacher']
+      showRoleSelection.value = true
       return
     }
     router.push(routeByRole(user.role))
   } catch (error) {
     loginError.value = error.message || 'Invalid email or password.'
+    const isCaptchaError = /recaptcha|captcha|verification/i.test(loginError.value)
+    showLoginAlert(
+      isCaptchaError ? 'captcha' : 'credentials',
+      isCaptchaError ? 'Verification unsuccessful' : 'Unable to sign in',
+      isCaptchaError ? 'The reCAPTCHA check expired or could not be verified. Please complete it again.' : loginError.value
+    )
     try { resetRecaptcha(signinWidgetId) } catch (_) {}
   }
 }
@@ -593,7 +665,10 @@ async function chooseRole(role) {
 function cancelRoleSelection() {
   logout()
   availableRoles.value = []
+  showRoleSelection.value = false
   activeTab.value = 'signin'
+  signIn.password = ''
+  resetRecaptcha(signinWidgetId)
 }
 
 async function handleSignUp() {
@@ -744,12 +819,70 @@ watch(activeTab, (val) => {
 }
 
 .title {
+  margin: 0;
   text-align: center;
   font-size: 2rem;
   font-weight: 700;
   color: #39424b;
   letter-spacing: -0.5px;
 }
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin: -8px 0 3px;
+}
+
+.login-brand__seal-wrap {
+  position: relative;
+  display: grid;
+  width: 82px;
+  height: 82px;
+  flex: 0 0 82px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .92);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #fff 0%, #e6e9eb 48%, #aeb5ba 100%);
+  box-shadow: 0 9px 22px rgba(31, 38, 44, .2), inset 0 1px rgba(255, 255, 255, .95);
+}
+
+.login-brand__seal-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(58, 66, 73, .16);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.login-brand__seal {
+  position: relative;
+  z-index: 1;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .22));
+}
+
+.login-brand__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.login-brand__copy > span {
+  margin-bottom: 3px;
+  color: #6d7680;
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.login-brand__copy .title { text-align: left; }
 
 /* Tab */
 .tab-toggle {
@@ -938,22 +1071,154 @@ watch(activeTab, (val) => {
 }
 .submit-btn:active { transform: scale(0.98); }
 
-.role-selection { gap: 14px; }
-.role-selection__intro { margin: 0 0 4px; color: #667085; line-height: 1.5; text-align: center; }
-.role-selection__button {
-  width: 100%; text-align: left; border: 1px solid #d7e3dc; border-radius: 12px;
-  background: #f8fbf9; padding: 15px 16px; cursor: pointer; font-family: inherit;
-  display: flex; flex-direction: column; gap: 4px; transition: border-color .15s, background .15s;
+.login-alert-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(7, 12, 16, .66);
+  backdrop-filter: blur(5px);
+  animation: role-overlay-in 160ms ease-out;
 }
-.role-selection__button:hover:not(:disabled) { background: #edf6f0; border-color: #2d6a4f; }
+.login-alert {
+  width: min(100%, 350px);
+  padding: 25px 24px 22px;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #fafbfc, #e6eaed);
+  box-shadow: 0 24px 65px rgba(0,0,0,.38);
+  animation: role-modal-in 190ms ease-out;
+}
+.login-alert__icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 13px;
+  place-items: center;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.45);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #65727e, #36414b);
+  box-shadow: 0 7px 17px rgba(42, 54, 64, .22), inset 0 1px rgba(255,255,255,.2);
+}
+.login-alert__icon--captcha { background: linear-gradient(145deg, #657887, #3b4e5b); box-shadow: 0 7px 17px rgba(48, 67, 79, .22), inset 0 1px rgba(255,255,255,.2); }
+.login-alert__icon svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.login-alert h2 { margin: 0; color: #252d35; font-size: 1.3rem; font-weight: 750; letter-spacing: -.02em; }
+.login-alert p { margin: 8px auto 19px; color: #687580; font-size: .82rem; line-height: 1.5; }
+.login-alert .login-alert__message--error { color: #a52d2d; font-size: .9rem; font-weight: 700; }
+.login-alert > button {
+  width: 100%;
+  min-height: 42px;
+  color: #fff;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #596570, #303944);
+  box-shadow: 0 7px 15px rgba(43, 52, 61, .18);
+  font-family: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.login-alert > button:hover { background: linear-gradient(135deg, #687581, #394550); }
+.login-alert > button:focus-visible { outline: 3px solid rgba(76, 91, 103, .3); outline-offset: 2px; }
+
+.role-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(7, 12, 16, 0.7);
+  backdrop-filter: blur(5px);
+  animation: role-overlay-in 180ms ease-out;
+}
+.role-modal {
+  width: min(100%, 400px);
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  background: linear-gradient(145deg, #f8fafc 0%, #e5e9ec 100%);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.38);
+  animation: role-modal-in 220ms ease-out;
+}
+.role-modal__seal {
+  display: block;
+  width: 58px;
+  height: 58px;
+  margin: -2px auto 10px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 7px rgba(28, 34, 39, .24));
+}
+.role-modal__title {
+  margin: 0 0 5px;
+  text-align: center;
+  color: #252c34;
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+.role-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 17px;
+}
+.role-selection__intro { margin: 0; color: #667085; line-height: 1.5; text-align: center; }
+.role-selection__button {
+  width: 100%; text-align: left; border: 1px solid #d5dbe0; border-radius: 16px;
+  min-height: 64px; background: rgba(255, 255, 255, 0.82); padding: 11px 13px; cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; gap: 14px; transition: border-color .15s, background .15s, transform .15s, box-shadow .15s;
+}
+.role-selection__button:hover:not(:disabled) { background: #fff; border-color: #7b8794; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(47, 55, 66, 0.1); }
+.role-selection__button:focus-visible { outline: 3px solid rgba(75, 85, 99, 0.28); outline-offset: 2px; }
 .role-selection__button:disabled { opacity: .65; cursor: wait; }
-.role-selection__name { color: #1b4332; font-weight: 700; font-size: 1rem; }
-.role-selection__description { color: #667085; font-size: .84rem; }
+.role-selection__icon { flex: 0 0 40px; display: grid; place-items: center; height: 40px; border: 1px solid rgba(255,255,255,.52); border-radius: 11px; color: #fff; background: linear-gradient(145deg, #66717c, #343d47); box-shadow: 0 5px 12px rgba(39, 47, 54, .18), inset 0 1px rgba(255,255,255,.22); }
+.role-selection__icon--admin { background: linear-gradient(145deg, #435867, #263844); }
+.role-selection__icon--teacher { background: linear-gradient(145deg, #66717c, #3f4953); }
+.role-selection__icon svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.role-selection__copy { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 4px; }
+.role-selection__name { color: #252c34; font-weight: 700; font-size: .95rem; }
+.role-selection__arrow { color: #7b8794; font-size: 1.25rem; transition: transform .15s; }
+.role-selection__button:hover:not(:disabled) .role-selection__arrow { transform: translateX(3px); }
+.role-modal__error { margin-top: 14px; }
+.role-modal__cancel {
+  display: block;
+  margin: 16px auto 0;
+  padding: 6px 10px;
+  border: 0;
+  color: #5b6470;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.role-modal__cancel:hover:not(:disabled) { color: #252c34; text-decoration: underline; }
+.role-modal__cancel:disabled { opacity: .6; cursor: wait; }
+@keyframes role-overlay-in { from { opacity: 0; } }
+@keyframes role-modal-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 
 @media (max-width: 520px) {
   .card { padding: 28px 20px 24px; }
   .title { font-size: 1.65rem; }
   .name-row { flex-direction: column; gap: 12px; }
+  .login-brand { gap: 11px; }
+  .login-brand__seal-wrap { width: 68px; height: 68px; flex-basis: 68px; }
+  .login-brand__seal { width: 60px; height: 60px; }
+  .login-brand__copy > span { max-width: 190px; font-size: .54rem; line-height: 1.3; }
+  .role-modal-overlay { padding: 16px; }
+  .role-modal { padding: 24px 18px; border-radius: 20px; }
+  .role-modal__title { font-size: 1.5rem; }
+  .role-selection__button { padding: 14px 12px; gap: 11px; }
+  .role-selection__description { line-height: 1.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .role-modal-overlay,
+  .role-modal { animation: none; }
 }
 /* Hidden Admin Button Styles */
 .hidden-admin-btn {

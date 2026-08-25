@@ -1,5 +1,6 @@
 <template>
   <div class="page-bg">
+    <canvas ref="tronCanvas" class="tron-canvas" aria-hidden="true"></canvas>
     <div class="card">
 
       <!-- ══════════════════════════════
@@ -152,7 +153,7 @@
 
 <script setup>
 import { requestPasswordReset, resetPassword } from '@/auth.js'
-import { computed, defineComponent, h, nextTick, reactive, ref } from 'vue'
+import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 /* ── Eye icon ── */
@@ -221,6 +222,77 @@ const passwordsMatch = computed(() => newPassword.value === confirmPassword.valu
 const allRequirementsMet = computed(() => requirements.every(r => r.test()))
 const canReset = computed(() => allRequirementsMet.value && passwordsMatch.value && otp.value.length === 6)
 const router = useRouter()
+const tronCanvas = ref(null)
+let tronFrame = null
+
+function initialiseTronBackground() {
+  const canvas = tronCanvas.value
+  const context = canvas?.getContext('2d')
+  if (!canvas || !context) return
+  let width = 0
+  let height = 0
+  let movement = 0
+  let circuits = []
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+  function makeCircuits() {
+    circuits = Array.from({ length: Math.max(7, Math.min(10, Math.round(width / 190))) }, (_, index) => {
+      let x = -120
+      let y = 40 + ((index * 91) % Math.max(80, height - 80))
+      const points = [{ x, y }]
+      while (x < width + 150) {
+        x += 80 + ((index * 37 + points.length * 29) % 110)
+        points.push({ x, y })
+        if (points.length % 2 === 0) {
+          y = Math.max(35, Math.min(height - 35, y + (points.length % 4 ? 58 : -72)))
+          points.push({ x, y })
+        }
+      }
+      return { points, offset: index * 137, speed: .45 + index * .025 }
+    })
+  }
+
+  function draw() {
+    const gradient = context.createLinearGradient(0, 0, 0, height)
+    gradient.addColorStop(0, '#242b31'); gradient.addColorStop(.42, '#1a2025'); gradient.addColorStop(1, '#0d1216')
+    context.fillStyle = gradient; context.fillRect(0, 0, width, height)
+    const horizon = height * .34
+    context.strokeStyle = 'rgba(229,236,238,.12)'; context.lineWidth = 1
+    for (let x = -width; x < width * 2; x += 52) {
+      context.beginPath(); context.moveTo(width / 2 + (x - width / 2) * .1, horizon); context.lineTo(x, height); context.stroke()
+    }
+    for (let i = 0; i < 20; i++) {
+      const depth = (i + ((movement * .72) % 52) / 52) / 20
+      const y = horizon + Math.min(depth * depth, 1) * (height - horizon)
+      context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke()
+    }
+    circuits.forEach(circuit => {
+      context.beginPath(); context.moveTo(circuit.points[0].x, circuit.points[0].y)
+      circuit.points.slice(1).forEach(point => context.lineTo(point.x, point.y))
+      context.strokeStyle = 'rgba(213,221,225,.18)'; context.lineWidth = 1.15; context.stroke()
+      const point = circuit.points[Math.floor((circuit.offset + movement * circuit.speed) / 65) % circuit.points.length]
+      context.fillStyle = '#fff'; context.shadowColor = '#d9e2e6'; context.shadowBlur = 12
+      context.beginPath(); context.arc(point.x, point.y, 2.4, 0, Math.PI * 2); context.fill(); context.shadowBlur = 0
+    })
+    const vignette = context.createRadialGradient(width / 2, height * .46, 80, width / 2, height * .46, Math.max(width, height) * .75)
+    vignette.addColorStop(0, 'transparent'); vignette.addColorStop(1, 'rgba(0,0,0,.34)')
+    context.fillStyle = vignette; context.fillRect(0, 0, width, height)
+    if (!reducedMotion.matches) { movement += 1; tronFrame = requestAnimationFrame(draw) }
+  }
+
+  function resize() {
+    if (tronFrame) cancelAnimationFrame(tronFrame)
+    const bounds = canvas.getBoundingClientRect(); width = bounds.width; height = bounds.height
+    const ratio = Math.min(devicePixelRatio || 1, 2); canvas.width = width * ratio; canvas.height = height * ratio
+    context.setTransform(ratio, 0, 0, ratio, 0, 0); makeCircuits(); draw()
+  }
+  window.addEventListener('resize', resize); resize()
+  return () => { if (tronFrame) cancelAnimationFrame(tronFrame); window.removeEventListener('resize', resize) }
+}
+
+let disposeTron
+onMounted(() => { disposeTron = initialiseTronBackground() })
+onUnmounted(() => disposeTron?.())
 
 async function goToStep2() {
   error.value = ''
@@ -284,11 +356,25 @@ async function handleReset() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at 50% 110%, #e5e7eb 0%, #cbd5e1 30%, #9ca3af 55%, #6b7280 72%, #4b5563 100%);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(180deg, #20272d 0%, #171d22 42%, #0b1014 100%);
   padding: 24px;
 }
 
+.tron-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .card {
+  position: relative;
+  z-index: 1;
   background: #fff;
   border-radius: 24px;
   padding: 44px 48px 40px;
@@ -493,4 +579,5 @@ async function handleReset() {
   .card { padding: 36px 22px 32px; }
   .pin-box { width: 40px; height: 48px; font-size: 1.2rem; }
 }
+
 </style>

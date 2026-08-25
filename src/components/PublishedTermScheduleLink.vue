@@ -1,4 +1,7 @@
 <template>
+  <div class="schedule-management-label" aria-hidden="true">
+    <span>Schedule management</span>
+  </div>
   <RouterLink
     to="/admin/academic-terms"
     class="nav-item unified-academic-link"
@@ -12,8 +15,7 @@
     <span>Academic Terms</span>
   </RouterLink>
   <RouterLink
-      v-if="publishedTermId"
-      :to="{ path: '/admin/academic-terms', query: { term: publishedTermId, action: 'view' } }"
+      :to="currentTermTarget"
       class="nav-item current-term-schedule-link"
       :class="{ active: isCurrentTerm }"
     >
@@ -35,13 +37,24 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const TERM_CACHE_KEY = 'cit-published-term-id'
 const route = useRoute()
-const publishedTermId = ref('')
-const isAcademicTerms = computed(() => route.path === '/admin/academic-terms' && !route.query.term)
+const publishedTermId = ref(sessionStorage.getItem(TERM_CACHE_KEY) || '')
+const currentTermTarget = computed(() => publishedTermId.value
+  ? { path: '/admin/academic-terms', query: { term: publishedTermId.value, action: 'view', source: 'current' } }
+  : { path: '/admin/academic-terms' }
+)
+const isScheduleDetail = computed(() => route.path === '/admin/schedule/view' || route.path === '/admin/schedule/add')
+const isAcademicTerms = computed(() =>
+  (route.path === '/admin/academic-terms' && route.query.source !== 'current')
+  || (isScheduleDetail.value && route.query.source === 'academic')
+)
 const isCurrentTerm = computed(() =>
-  route.path === '/admin/academic-terms'
-  && Boolean(publishedTermId.value)
-  && String(route.query.term || '') === publishedTermId.value
+  (route.path === '/admin/academic-terms'
+    && Boolean(publishedTermId.value)
+    && String(route.query.term || '') === publishedTermId.value
+    && route.query.source === 'current')
+  || (isScheduleDetail.value && route.query.source === 'current')
 )
 onMounted(async () => {
   const token = getToken()
@@ -53,8 +66,10 @@ onMounted(async () => {
     if (!response.ok) return
     const payload = await response.json()
     publishedTermId.value = String(payload.term?._id || payload.term?.id || '')
+    if (publishedTermId.value) sessionStorage.setItem(TERM_CACHE_KEY, publishedTermId.value)
+    else sessionStorage.removeItem(TERM_CACHE_KEY)
   } catch (_) {
-    publishedTermId.value = ''
+    // Keep the cached target during a temporary network failure.
   }
 })
 </script>

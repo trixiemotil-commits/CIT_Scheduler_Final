@@ -72,6 +72,10 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    designatedAreas: {
+      type: [String],
+      default: [],
+    },
     yearLevel: {
       type: String,
       enum: YEAR_LEVEL_VALUES,

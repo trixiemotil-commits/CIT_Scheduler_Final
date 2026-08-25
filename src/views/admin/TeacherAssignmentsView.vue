@@ -53,25 +53,28 @@
       <!-- Header -->
       <header class="main-header">
         <div>
+          <span class="page-eyebrow">Faculty management</span>
           <h1 class="page-title">Teacher Assignments</h1>
-          <p class="page-sub">Manage teacher profiles and designated areas</p>
+          <p class="page-sub">Manage teacher availability, designated areas, and substitute coverage.</p>
         </div>
+        <button class="add-teacher-btn header-add-btn" @click="showAddModal = true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Add teacher
+        </button>
       </header>
 
       <!-- Teachers Card Section -->
       <section class="teachers-section">
         <div class="section-header">
           <div>
-            <h2 class="section-title">Teacher Assignments</h2>
-            <p class="section-sub">Manage teacher information and designated areas</p>
+            <h2 class="section-title">Faculty overview</h2>
+            <p class="section-sub">{{ filteredTeachers.length }} teacher{{ filteredTeachers.length === 1 ? '' : 's' }} shown</p>
           </div>
-          <button class="add-teacher-btn" @click="showAddModal = true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Add Teacher
-          </button>
+          <div class="summary-counts">
+            <span><b>{{ teachers.length }}</b>Total</span>
+            <span class="available"><b>{{ teachers.filter(item => item.status === 'In School').length }}</b>In school</span>
+            <span><b>{{ teachers.filter(item => item.status === 'On Leave').length }}</b>On leave</span>
+          </div>
         </div>
 
         <!-- Status Tabs -->
@@ -80,9 +83,10 @@
             v-for="tab in statusTabs"
             :key="tab"
             :class="['status-tab', { active: activeTab === tab }]"
-            @click="activeTab = tab"
+            @click="selectStatusTab(tab)"
           >
             {{ tab }}
+            <span>{{ tab === 'All' ? teachers.length : teachers.filter(item => item.status === tab).length }}</span>
           </button>
         </div>
 
@@ -95,6 +99,18 @@
           </button>
 
           <div class="teachers-grid">
+            <div v-if="!filteredTeachers.length" class="teachers-empty-state">
+              <span class="teachers-empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M17 8h5M19.5 5.5v5" />
+                </svg>
+              </span>
+              <h3>No teachers are {{ emptyStatusDescription }}</h3>
+              <p>There are currently no teacher records under the “{{ activeTab }}” status.</p>
+              <button type="button" @click="selectStatusTab('All')">View all teachers</button>
+            </div>
             <div
               v-for="teacher in visibleTeachers"
               :key="teacher.id"
@@ -127,6 +143,7 @@
 
               <!-- Status Dropdown -->
               <div class="teacher-status-wrap">
+                <label>Availability status</label>
                 <select
                   v-model="teacher.status"
                   :class="['status-dropdown', `status-${teacher.status.toLowerCase().replace(/\s+/g, '-')}`]"
@@ -139,62 +156,35 @@
               </div>
 
               <!-- Substitute Teacher -->
-              <div v-if="teacher.status === 'On Leave'" class="substitute-teacher-wrap">
-                <label class="substitute-label">Substitute Teacher:</label>
-                <div v-if="getTeacherWeeklySchedule(teacher).length" class="substitute-info">
-                  <span class="substitute-class-label">Today's schedule:</span>
-                  <ul class="substitute-schedule-list">
-                    <li v-for="entry in getTeacherWeeklySchedule(teacher)" :key="`${entry.day}-${entry.timeIn}-${entry.timeOut}-${entry.subject}`" class="substitute-schedule-item">
-                      <div class="substitute-entry-header">
-                        <div>
-                          <strong>{{ entry.subject }}</strong>
-                          <div class="substitute-entry-meta">{{ entry.day }} — {{ entry.timeIn }} - {{ entry.timeOut }}</div>
-                        </div>
-                        <div class="substitute-entry-assign">
-                          <label class="substitute-entry-label">Substitute</label>
-                          <div class="substitute-select-row">
-                            <select
-                              class="substitute-dropdown"
-                              v-model="teacher.substituteAssignments[getEntryKey(entry)]"
-                              @change="() => markUnsaved(teacher)"
-                            >
-                              <option value="">Select substitute teacher</option>
-                              <option
-                                v-for="sub in getAvailableSubstitutesForEntry(teacher, entry)"
-                                :key="sub.id"
-                                :value="sub.id"
-                              >
-                                {{ sub.name }}
-                              </option>
-                            </select>
-                            <div class="substitute-selected-name" v-if="teacher.substituteAssignments && teacher.substituteAssignments[getEntryKey(entry)]">
-                              {{ getTeacherNameById(teacher.substituteAssignments[getEntryKey(entry)]) }}
-                            </div>
-                            <button
-                              v-if="teacher.substituteAssignments && teacher.substituteAssignments[getEntryKey(entry)]"
-                              type="button"
-                              class="substitute-remove-btn"
-                              title="Remove this substitute"
-                              @click="removeEntrySubstitute(teacher, entry)"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  </ul>
+              <div v-if="teacher.status === 'On Leave'" class="leave-coverage-block">
+                <div class="leave-coverage-notice">
+                  <span class="leave-coverage-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M8 2v4M16 2v4M3 10h18" />
+                      <rect x="3" y="4" width="18" height="17" rx="2" />
+                      <path d="m9 15 2 2 4-4" />
+                    </svg>
+                  </span>
+                  <span>
+                    <strong>Substitute coverage</strong>
+                    <small v-if="getTeacherWeeklySchedule(teacher).length">
+                      {{ getAssignedCoverageCount(teacher) }} of {{ getTeacherWeeklySchedule(teacher).length }} classes assigned
+                    </small>
+                    <small v-else>No scheduled classes to cover</small>
+                  </span>
+                  <button
+                    v-if="getTeacherWeeklySchedule(teacher).length"
+                    type="button"
+                    class="manage-coverage-btn"
+                    title="Manage substitute assignments"
+                    @click="openCoverageModal(teacher)"
+                  >
+                    Manage
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
                 </div>
-                <div v-else class="substitute-info">
-                  <span>Loading weekly schedule...</span>
-                </div>
-                <button
-                  class="substitute-save-btn"
-                  :disabled="savingSubstitute[teacher.id]"
-                  @click="saveSubstituteAssignment(teacher)"
-                >
-                  {{ savingSubstitute[teacher.id] ? 'Updating...' : 'Update Substitutes' }}
-                </button>
               </div>
               <!-- Designated Areas -->
               <div v-if="teacher.designatedAreas.length" class="designated-areas">
@@ -230,74 +220,103 @@
     <!-- ═══ Add Teacher Modal ═══ -->
     <Teleport to="body">
       <div v-if="showAddModal" class="modal-overlay" @click.self="showAddModal = false">
-        <div class="modal-box">
+        <div class="modal-box add-teacher-modal" role="dialog" aria-modal="true" aria-labelledby="add-teacher-title">
           <!-- Header -->
           <div class="modal-header">
-            <h2 class="modal-title">Add New Teacher</h2>
-            <p class="modal-sub">Enter teacher information and assign designated areas</p>
-          </div>
-
-          <!-- Avatar placeholder -->
-          <div class="modal-avatar-section">
-            <div class="modal-avatar-placeholder" @click="$refs.fileInput.click()">
-              <img v-if="previewImage" :src="previewImage" alt="Preview" class="modal-avatar-preview" />
-              <template v-else>
-                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              </template>
-              <div class="modal-avatar-checkmark">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="#64748b">
-                  <path d="M20 6L9 17l-5-5" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </div>
+            <div>
+              <span class="modal-eyebrow">Faculty record</span>
+              <h2 id="add-teacher-title" class="modal-title">Add New Teacher</h2>
+              <p class="modal-sub">Create a teacher profile and assign their designated teaching areas.</p>
             </div>
-            <input
-              ref="fileInput"
-              type="file"
-              accept="image/*"
-              class="modal-file-input"
-              @change="handleImageUpload"
-            />
+            <button type="button" class="modal-close-btn" aria-label="Close add teacher modal" @click="showAddModal = false">
+              ×
+            </button>
           </div>
 
-          <!-- Form Fields -->
-          <div class="modal-form">
-            <input v-model="newTeacherName" type="text" placeholder="Enter Teacher Name" class="modal-input" />
-            <input v-model="newTeacherEmail" type="email" placeholder="Enter Email" class="modal-input" />
-            
-            <!-- Multiple Designated Areas Custom Dropdown -->
-            <div class="modal-areas-group">
-              <label class="modal-areas-label">Designated Areas:</label>
-              <div class="modal-custom-dropdown" v-click-outside="() => showAreasDropdown = false">
-                <button class="modal-dropdown-btn" @click="showAreasDropdown = !showAreasDropdown">
-                  <span v-if="newTeacherAreas.length === 0" class="modal-dropdown-placeholder">Select designated areas</span>
-                  <span v-else class="modal-dropdown-selected">
-                    {{ newTeacherAreas.length }} selected
-                  </span>
-                  <svg class="modal-dropdown-icon" :class="{ open: showAreasDropdown }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"></polyline>
+          <div class="add-teacher-modal-body">
+            <!-- Avatar placeholder -->
+            <div class="modal-avatar-section">
+              <div class="modal-avatar-placeholder" @click="$refs.fileInput.click()">
+                <img v-if="previewImage" :src="previewImage" alt="Preview" class="modal-avatar-preview" />
+                <template v-else>
+                  <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.6">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
                   </svg>
-                </button>
-                
-                <div v-if="showAreasDropdown" class="modal-dropdown-menu">
-                  <label v-for="area in ['Data Structure', 'Database', 'OOP', 'Web Development', 'Mobile Dev', 'UI/UX', 'Algorithms', 'Software Engineering']" :key="area" class="modal-dropdown-option">
-                    <input
-                      type="checkbox"
-                      :value="area"
-                      :checked="newTeacherAreas.includes(area)"
-                      @change="(e) => {
-                        if (e.target.checked) {
-                          newTeacherAreas.push(area)
-                        } else {
-                          newTeacherAreas.splice(newTeacherAreas.indexOf(area), 1)
-                        }
-                      }"
-                      class="modal-dropdown-checkbox"
-                    />
-                    <span class="modal-dropdown-label">{{ area }}</span>
-                  </label>
+                </template>
+                <div class="modal-avatar-checkmark">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.2" stroke-linecap="round" />
+                  </svg>
+                </div>
+              </div>
+              <div class="modal-avatar-copy">
+                <strong>Profile photo</strong>
+                <span>Click the circle to upload an image.</span>
+              </div>
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/*"
+                class="modal-file-input"
+                @change="handleImageUpload"
+              />
+            </div>
+
+            <!-- Form Fields -->
+            <div class="modal-form">
+              <label class="modal-field">
+                <span>Teacher name</span>
+                <input v-model="newTeacherName" type="text" placeholder="Enter teacher's name" class="modal-input" />
+              </label>
+              <label class="modal-field">
+                <span>Email address</span>
+                <div class="modal-email-input-wrap">
+                  <input
+                    v-model="newTeacherEmail"
+                    type="text"
+                    placeholder="Enter teacher's email"
+                    class="modal-input modal-email-input"
+                  />
+                  <span class="modal-email-suffix">.au@phinmaed.com</span>
+                </div>
+              </label>
+              
+              <!-- Multiple Designated Areas Custom Dropdown -->
+              <div class="modal-areas-group">
+                <label class="modal-areas-label">Designated areas</label>
+                <div class="modal-custom-dropdown" v-click-outside="() => showAreasDropdown = false">
+                  <button type="button" class="modal-dropdown-btn" @click="showAreasDropdown = !showAreasDropdown">
+                    <span v-if="newTeacherAreas.length === 0" class="modal-dropdown-placeholder">Select designated areas</span>
+                    <span v-else class="modal-dropdown-selected">
+                      {{ newTeacherAreas.length }} area{{ newTeacherAreas.length === 1 ? '' : 's' }} selected
+                    </span>
+                    <svg class="modal-dropdown-icon" :class="{ open: showAreasDropdown }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+                  
+                  <div v-if="showAreasDropdown" class="modal-dropdown-menu">
+                    <label v-for="area in ['Data Structure', 'Database', 'OOP', 'Web Development', 'Mobile Dev', 'UI/UX', 'Algorithms', 'Software Engineering']" :key="area" class="modal-dropdown-option">
+                      <input
+                        type="checkbox"
+                        :value="area"
+                        :checked="newTeacherAreas.includes(area)"
+                        @change="(e) => {
+                          if (e.target.checked) {
+                            newTeacherAreas.push(area)
+                          } else {
+                            newTeacherAreas.splice(newTeacherAreas.indexOf(area), 1)
+                          }
+                        }"
+                        class="modal-dropdown-checkbox"
+                      />
+                      <span class="modal-dropdown-label">{{ area }}</span>
+                    </label>
+                  </div>
+                </div>
+                <div v-if="newTeacherAreas.length" class="modal-selected-areas">
+                  <span v-for="area in newTeacherAreas" :key="area">{{ area }}</span>
                 </div>
               </div>
             </div>
@@ -306,9 +325,73 @@
           <!-- Actions -->
           <div class="modal-actions">
             <button class="modal-cancel-btn" @click="showAddModal = false">Cancel</button>
-            <button class="modal-add-btn" @click="addNewTeacher">Add</button>
+            <button class="modal-add-btn" :disabled="isSavingNewTeacher" @click="addNewTeacher">
+              {{ isSavingNewTeacher ? 'Saving…' : 'Add' }}
+            </button>
           </div>
         </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="coverageTeacher" class="modal-overlay coverage-modal-overlay" @click.self="closeCoverageModal">
+        <section class="coverage-modal" role="dialog" aria-modal="true" aria-labelledby="coverage-modal-title">
+          <header class="coverage-modal-header">
+            <div class="coverage-modal-heading">
+              <span class="coverage-modal-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 2v4M16 2v4M3 10h18" /><rect x="3" y="4" width="18" height="17" rx="2" /><path d="m9 15 2 2 4-4" />
+                </svg>
+              </span>
+              <div>
+                <span class="coverage-modal-eyebrow">Substitute management</span>
+                <h2 id="coverage-modal-title">Coverage for {{ coverageTeacher.name }}</h2>
+                <p>Assign an available teacher to each scheduled class.</p>
+              </div>
+            </div>
+            <button class="coverage-modal-close" type="button" aria-label="Close substitute management" @click="closeCoverageModal">&times;</button>
+          </header>
+
+          <div class="coverage-modal-progress">
+            <span>{{ getAssignedCoverageCount(coverageTeacher) }} of {{ getTeacherWeeklySchedule(coverageTeacher).length }} classes covered</span>
+            <div class="coverage-progress-track"><span :style="{ width: `${getCoverageProgress(coverageTeacher)}%` }"></span></div>
+          </div>
+
+          <div class="coverage-modal-list">
+            <article v-for="entry in getTeacherWeeklySchedule(coverageTeacher)" :key="getEntryKey(entry)" class="coverage-modal-row">
+              <div class="coverage-class-details">
+                <strong>{{ entry.subject }}</strong>
+                <span>{{ entry.day }} · {{ entry.timeIn }}–{{ entry.timeOut }}</span>
+                <small v-if="entry.section || entry.room">{{ [entry.section, entry.room].filter(Boolean).join(' · ') }}</small>
+              </div>
+              <div class="coverage-assignment-field">
+                <label :for="`substitute-${getEntryKey(entry)}`">Covering teacher</label>
+                <div class="substitute-select-row">
+                  <select
+                    :id="`substitute-${getEntryKey(entry)}`"
+                    :value="getAssignedSubstitute(coverageTeacher, entry)"
+                    :class="['substitute-dropdown', { 'is-placeholder': !getAssignedSubstitute(coverageTeacher, entry) }]"
+                    @change="updateCoverageSubstitute(entry, $event.target.value)"
+                  >
+                    <option value="" disabled>Choose a substitute teacher</option>
+                    <option v-for="sub in getAvailableSubstitutesForEntry(coverageTeacher, entry)" :key="sub.id" :value="sub.id">{{ sub.name }}</option>
+                  </select>
+                  <button v-if="coverageTeacher.substituteAssignments[getEntryKey(entry)]" type="button" class="substitute-remove-btn" @click="removeEntrySubstitute(coverageTeacher, entry)">Clear</button>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <footer class="coverage-modal-footer">
+            <span>Assignments are saved only when you confirm.</span>
+            <div>
+              <button type="button" class="coverage-cancel-btn" @click="closeCoverageModal">Cancel</button>
+              <button type="button" class="substitute-save-btn" :disabled="savingSubstitute[coverageTeacher.id]" @click="saveCoverageAndClose">
+                {{ savingSubstitute[coverageTeacher.id] ? 'Saving…' : 'Save assignments' }}
+              </button>
+            </div>
+          </footer>
+        </section>
       </div>
     </Teleport>
 
@@ -348,12 +431,16 @@ const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const showLogoutModal = ref(false)
 const showAddModal = ref(false)
+const coverageTeacher = ref(null)
+const coverageSnapshot = ref({})
 const showAreasDropdown = ref(false)
 const newTeacherName = ref('')
 const newTeacherEmail = ref('')
 const newTeacherAreas = ref([])
 const previewImage = ref('')
+const TEACHER_EMAIL_SUFFIX = '.au@phinmaed.com'
 const fileInput = ref(null)
+const isSavingNewTeacher = ref(false)
 
 const activeTab = ref('All')
 const currentIndex = ref(0)
@@ -363,6 +450,37 @@ function confirmLogout() {
   showLogoutModal.value = false
   logout()
   router.push('/')
+}
+
+function openCoverageModal(teacher) {
+  coverageTeacher.value = teacher
+  coverageSnapshot.value = { ...(teacher.substituteAssignments || {}) }
+}
+
+function closeCoverageModal({ preserve = false } = {}) {
+  if (!preserve && coverageTeacher.value) {
+    coverageTeacher.value.substituteAssignments = { ...coverageSnapshot.value }
+    if (unsavedChanges.value?.[coverageTeacher.value.id]) delete unsavedChanges.value[coverageTeacher.value.id]
+  }
+  coverageTeacher.value = null
+  coverageSnapshot.value = {}
+}
+
+function getCoverageProgress(teacher) {
+  const total = getTeacherWeeklySchedule(teacher).length
+  return total ? Math.round((getAssignedCoverageCount(teacher) / total) * 100) : 0
+}
+
+function updateCoverageSubstitute(entry, substituteId) {
+  if (!coverageTeacher.value) return
+  updateEntrySubstitute(coverageTeacher.value, entry, substituteId)
+  markUnsaved(coverageTeacher.value)
+}
+
+async function saveCoverageAndClose() {
+  if (!coverageTeacher.value) return
+  const saved = await saveSubstituteAssignment(coverageTeacher.value)
+  if (saved) closeCoverageModal({ preserve: true })
 }
 
 function markUnsaved(teacher) {
@@ -375,6 +493,20 @@ function canAutoRefresh() {
 }
 
 const statusTabs = ['All', 'In School', 'On Meeting', 'On Leave']
+
+function selectStatusTab(tab) {
+  activeTab.value = tab
+  currentIndex.value = 0
+}
+
+const emptyStatusDescription = computed(() => {
+  const descriptions = {
+    'In School': 'currently in school',
+    'On Meeting': 'currently in a meeting',
+    'On Leave': 'currently on leave',
+  }
+  return descriptions[activeTab.value] || 'available'
+})
 
 const teachers = ref([])
 const scheduleCache = ref({})
@@ -410,7 +542,7 @@ async function apiRequest(path, options = {}) {
       logout()
       router.push('/')
     }
-    throw new Error(body.message || 'Request failed.')
+    throw new Error(body.error || body.message || 'Request failed.')
   }
 
   return body
@@ -537,6 +669,9 @@ function mapTeacherFromApi(user) {
   const firstName = (user.firstName || '').trim()
   const lastName = (user.lastName || '').trim()
   const fullName = `${firstName} ${lastName}`.trim()
+  const designatedAreas = Array.isArray(user.designatedAreas) && user.designatedAreas.length
+    ? user.designatedAreas
+    : (user.department ? [user.department] : [])
 
   return {
     id: user.id,
@@ -554,7 +689,7 @@ function mapTeacherFromApi(user) {
     studentId: user.studentId || '',
     phone: user.phone || '',
     department: user.department || '',
-    designatedAreas: user.department ? [user.department] : [],
+    designatedAreas,
     substituteTeacher: user.substituteTeacher || null,
     substituteAssignments: user.substituteAssignments || {},
     _lastStatus: mapTeacherStatus(user.teacher_status),
@@ -563,6 +698,11 @@ function mapTeacherFromApi(user) {
 
 function getEntryKey(entry) {
   return `${entry.day || ''}|${entry.timeIn || ''}-${entry.timeOut || ''}|${entry.subject || ''}`.trim()
+}
+
+function getAssignedCoverageCount(teacher) {
+  const assignments = teacher.substituteAssignments || {}
+  return getTeacherWeeklySchedule(teacher).filter((entry) => assignments[getEntryKey(entry)]).length
 }
 
 function getAssignedSubstitute(teacher, entry) {
@@ -838,6 +978,7 @@ const saveSubstituteAssignment = async (teacher) => {
       confirmButtonColor: '#4b5563',
       customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
     })
+    return true
   } catch (error) {
     console.error('Failed to save substitute assignment:', error)
     await Swal.fire({
@@ -847,6 +988,7 @@ const saveSubstituteAssignment = async (teacher) => {
       confirmButtonColor: '#4b5563',
       customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
     })
+    return false
   } finally {
     savingSubstitute.value[teacher.id] = false
   }
@@ -863,30 +1005,87 @@ const handleImageUpload = (event) => {
   }
 }
 
-const addNewTeacher = () => {
-  if (!newTeacherName.value || !newTeacherEmail.value || newTeacherAreas.value.length === 0) {
-    alert('Please fill in all fields and select at least one designated area')
-    return
-  }
+const getTeacherEmailLocalPart = () => {
+  return newTeacherEmail.value
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(new RegExp(`${TEACHER_EMAIL_SUFFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'), '')
+    .replace(/@.*$/, '')
+}
 
-  const newTeacher = {
-    id: teachers.value.length + 1,
-    name: newTeacherName.value,
-    college: 'College of Information Technology',
-    email: newTeacherEmail.value,
-    avatar: previewImage.value || `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 100)}`,
-    status: 'In School',
-    designatedAreas: [...newTeacherAreas.value],
-    substituteTeacher: null
+const splitTeacherName = (name) => {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return { firstName: '', lastName: '' }
+  if (parts.length === 1) return { firstName: parts[0], lastName: 'Teacher' }
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(' '),
   }
+}
 
-  teachers.value.push(newTeacher)
+const buildDefaultTeacherPassword = (emailLocalPart) => {
+  const safeLocal = String(emailLocalPart || 'teacher').replace(/[^a-z0-9]/gi, '')
+  return `${safeLocal || 'Teacher'}Teacher@2026`
+}
+
+const resetAddTeacherForm = () => {
   newTeacherName.value = ''
   newTeacherEmail.value = ''
   newTeacherAreas.value = []
   previewImage.value = ''
-  showAddModal.value = false
-  console.log('New teacher added:', newTeacher)
+  showAreasDropdown.value = false
+}
+
+const addNewTeacher = async () => {
+  const emailLocalPart = getTeacherEmailLocalPart()
+  const { firstName, lastName } = splitTeacherName(newTeacherName.value)
+
+  if (!firstName || !lastName || !emailLocalPart || newTeacherAreas.value.length === 0) {
+    alert('Please fill in all fields and select at least one designated area')
+    return
+  }
+
+  const payload = {
+    firstName,
+    lastName,
+    email: `${emailLocalPart}${TEACHER_EMAIL_SUFFIX}`.toLowerCase(),
+    role: 'teacher',
+    roles: ['teacher'],
+    password: buildDefaultTeacherPassword(emailLocalPart),
+    account_status: 'Active',
+    teacher_status: 'On School',
+    avatar: previewImage.value || null,
+    designatedAreas: [...newTeacherAreas.value],
+  }
+
+  isSavingNewTeacher.value = true
+  try {
+    await apiRequest('/users', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    await loadTeachers()
+    resetAddTeacherForm()
+    showAddModal.value = false
+    await Swal.fire({
+      icon: 'success',
+      title: 'Teacher saved',
+      text: 'The teacher profile has been saved to the database.',
+      confirmButtonColor: '#4b5563',
+      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
+    })
+  } catch (error) {
+    console.error('Failed to add teacher:', error)
+    await Swal.fire({
+      icon: 'error',
+      title: 'Unable to save teacher',
+      text: error.message || 'Failed to save teacher to the database.',
+      confirmButtonColor: '#4b5563',
+      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
+    })
+  } finally {
+    isSavingNewTeacher.value = false
+  }
 }
 
 let teacherRefreshInterval
@@ -1513,21 +1712,52 @@ onUnmounted(() => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(15, 23, 42, 0.46);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 20px;
 }
 
 .modal-box {
   background: #fff;
-  border-radius: 20px;
-  padding: 36px 40px 28px;
-  width: 420px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0;
+  width: min(560px, 95vw);
   max-width: 95vw;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  max-height: min(720px, 92vh);
+  overflow: visible;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
   position: relative;
+}
+
+.add-teacher-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 94vw);
+  overflow: visible;
+}
+
+.add-teacher-modal .modal-header,
+.add-teacher-modal .add-teacher-modal-body,
+.add-teacher-modal .modal-actions {
+  background: #ffffff;
+}
+
+.add-teacher-modal .modal-form,
+.add-teacher-modal .modal-field,
+.add-teacher-modal .modal-areas-group {
+  min-width: 0;
+}
+
+.add-teacher-modal :is(input, select, textarea),
+.add-teacher-modal .modal-dropdown-btn {
+  background: #ffffff !important;
+  box-shadow: none !important;
 }
 
 .logout-modal-box {
@@ -1560,54 +1790,117 @@ onUnmounted(() => {
 .logout-confirm-btn:hover { background: #6b7280; }
 
 .modal-header {
-  margin-bottom: 24px;
-  text-align: center;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 0;
+  padding: 22px 28px 18px;
+  border-bottom: 1px solid #e5eaf0;
+  background: #ffffff;
+  text-align: left;
+  border-radius: 10px 10px 0 0;
+}
+
+.modal-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .modal-title {
-  font-size: 1.5rem;
+  font-size: clamp(1.35rem, 2.4vw, 1.65rem);
   font-weight: 700;
-  color: #4b5563;
-  margin: 0 0 4px;
+  color: #202a34;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  margin: 0 0 6px;
 }
 
 .modal-sub {
-  font-size: 0.9rem;
-  color: #777;
+  max-width: 420px;
+  font-size: 0.82rem;
+  line-height: 1.48;
+  color: #66727e;
   margin: 0;
+}
+
+.modal-close-btn {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 1.55rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.modal-close-btn:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #111827;
+}
+
+.add-teacher-modal-body {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+  padding: 0;
+  background: #ffffff;
 }
 
 .modal-avatar-section {
   display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 10px;
   justify-content: center;
-  margin-bottom: 28px;
+  margin-bottom: 0;
+  min-height: 0;
+  padding: 26px 24px;
+  border: 0;
+  border-right: 1px solid #e5eaf0;
+  border-radius: 0;
+  background: #f8fafc;
 }
 
 .modal-avatar-placeholder {
   position: relative;
-  width: 100px;
-  height: 100px;
+  width: 118px;
+  height: 118px;
   border-radius: 50%;
-  background: #f3f4f6;
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed #4b5563;
+  border: 1px dashed #94a3b8;
   cursor: pointer;
   transition: all 0.2s;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .modal-avatar-placeholder:hover {
-  background: #d4e8d9;
-  border-color: #6b7280;
+  background: #f8fafc;
+  border-color: #475569;
 }
 
 .modal-avatar-preview {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 50%;
+  border-radius: inherit;
+  overflow: hidden;
 }
 
 .modal-file-input {
@@ -1616,56 +1909,133 @@ onUnmounted(() => {
 
 .modal-avatar-checkmark {
   position: absolute;
-  bottom: -2px;
+  bottom: 4px;
   right: -2px;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: #64748b;
+  background: #475569;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #fff;
+  border: 3px solid #fff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
+}
+
+.modal-avatar-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #64748b;
+  text-align: center;
+  padding: 0 4px;
+}
+
+.modal-avatar-copy strong {
+  color: #334155;
+  font-size: 0.8rem;
+}
+
+.modal-avatar-copy span {
+  max-width: 170px;
+  font-size: 0.68rem;
+  line-height: 1.35;
 }
 
 .modal-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 13px;
+  margin-bottom: 0;
+  padding: 26px 28px 28px;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.modal-field > span,
+.modal-areas-label {
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
 }
 
 .modal-input,
 .modal-select {
-  padding: 12px 14px;
-  border: 1px solid #d0d0d0;
-  border-radius: 8px;
-  font-size: 0.95rem;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #d4dce4;
+  border-radius: 6px;
+  background: #fff !important;
+  color: #1f2937;
+  font-size: 0.86rem;
   font-family: inherit;
-  transition: border-color 0.2s;
+  box-shadow: none !important;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
 .modal-input::placeholder {
-  color: #aaa;
+  color: #9aa4af;
 }
 
 .modal-input:focus,
 .modal-select:focus {
   outline: none;
-  border-color: #4b5563;
-  box-shadow: 0 0 0 2px rgba(48, 53, 58, 0.1);
+  border-color: #64748b;
+  background: #fff !important;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.14) !important;
+}
+
+.modal-email-input-wrap {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid #d4dce4;
+  border-radius: 6px;
+  background: #ffffff;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.modal-email-input-wrap:focus-within {
+  border-color: #64748b;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.14);
+}
+
+.modal-email-input {
+  min-width: 0;
+  flex: 1;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+}
+
+.modal-email-input:focus {
+  box-shadow: none !important;
+}
+
+.modal-email-suffix {
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-left: 1px solid #e5eaf0;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .modal-areas-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.modal-areas-label {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #333;
+  gap: 7px;
 }
 
 .modal-areas-select {
@@ -1708,19 +2078,22 @@ onUnmounted(() => {
 .modal-custom-dropdown {
   position: relative;
   width: 100%;
+  z-index: 20;
 }
 
 .modal-dropdown-btn {
   width: 100%;
-  padding: 12px 14px;
-  border: 1px solid #d0d0d0;
-  border-radius: 8px;
-  background: #fff;
-  font-size: 0.95rem;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #d4dce4;
+  border-radius: 6px;
+  background: #fff !important;
+  font-size: 0.86rem;
   font-family: inherit;
-  color: #333;
+  color: #1f2937;
   cursor: pointer;
-  transition: border-color 0.2s;
+  box-shadow: none !important;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1728,22 +2101,22 @@ onUnmounted(() => {
 }
 
 .modal-dropdown-btn:hover {
-  border-color: #4b5563;
+  border-color: #94a3b8;
 }
 
 .modal-dropdown-btn:focus {
   outline: none;
-  border-color: #4b5563;
-  box-shadow: 0 0 0 2px rgba(48, 53, 58, 0.1);
+  border-color: #64748b;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.14) !important;
 }
 
 .modal-dropdown-placeholder {
-  color: #aaa;
+  color: #9aa4af;
 }
 
 .modal-dropdown-selected {
-  font-weight: 500;
-  color: #4b5563;
+  font-weight: 750;
+  color: #334155;
 }
 
 .modal-dropdown-icon {
@@ -1758,30 +2131,32 @@ onUnmounted(() => {
 
 .modal-dropdown-menu {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 8px);
   left: 0;
   right: 0;
   background: #fff;
-  border: 1px solid #d0d0d0;
-  border-radius: 8px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-  z-index: 10;
-  max-height: 280px;
+  border: 1px solid #d4dce4;
+  border-radius: 6px;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.10);
+  z-index: 1200;
+  max-height: 230px;
   overflow-y: auto;
+  padding: 6px;
 }
 
 .modal-dropdown-option {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 10px 11px;
+  border-radius: 4px;
   cursor: pointer;
   transition: background 0.15s;
   user-select: none;
 }
 
 .modal-dropdown-option:hover {
-  background: #f5f5f5;
+  background: #f1f5f9;
 }
 
 .modal-dropdown-checkbox {
@@ -1799,18 +2174,45 @@ onUnmounted(() => {
   flex: 1;
 }
 
+.modal-selected-areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 27px;
+}
+
+.modal-selected-areas span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 5px 8px;
+  border: 1px solid #dbe3ea;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
 .modal-actions {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+  padding: 16px 28px 20px;
+  border-top: 1px solid #e5eaf0;
+  background: #ffffff;
+  border-radius: 0 0 10px 10px;
+  position: relative;
+  z-index: 1;
 }
 
 .modal-cancel-btn,
 .modal-add-btn {
-  padding: 12px 28px;
+  min-height: 42px;
+  padding: 9px 20px;
   border: none;
-  border-radius: 8px;
-  font-size: 0.95rem;
+  border-radius: 6px;
+  font-size: 0.84rem;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -1818,9 +2220,9 @@ onUnmounted(() => {
 }
 
 .modal-cancel-btn {
-  background: #f5f5f5;
-  color: #d32f2f;
-  border: 1px solid #e0e0e0;
+  background: #ffffff;
+  color: #dc2626;
+  border: 1px solid #e5e7eb;
 }
 
 .modal-cancel-btn:hover {
@@ -1829,7 +2231,9 @@ onUnmounted(() => {
 }
 
 .modal-add-btn {
-  background: #4b5563;
+  min-width: 118px;
+  justify-content: center;
+  background: #334155;
   color: #fff;
   display: flex;
   align-items: center;
@@ -1841,10 +2245,138 @@ onUnmounted(() => {
 }
 
 .modal-add-btn:hover {
-  background: #6b7280;
+  background: #1f2937;
 }
 
 /* ════════════════════════ RESPONSIVE ════════════════════════ */
+/* Teacher assignments readability refresh */
+.layout { background: linear-gradient(135deg, #f2f4f5, #dfe3e6); }
+.main { padding: 32px 38px 44px; }
+.main-header { align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 25px; }
+.page-eyebrow { display: block; margin-bottom: 5px; color: #68747d; font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.page-title { margin: 0; color: #202830; font-size: clamp(2rem, 3vw, 2.55rem); font-weight: 700; letter-spacing: -.04em; }
+.page-sub { max-width: 650px; margin-top: 8px; color: #66727c; font-size: .9rem; line-height: 1.5; }
+.header-add-btn { min-height: 46px; padding: 0 18px; border: 1px solid #3e4d58; border-radius: 12px; background: linear-gradient(145deg, #5c6771, #343e47); box-shadow: 0 8px 20px rgba(45,55,63,.2); font-size: .78rem; }
+.header-add-btn:hover { background: linear-gradient(145deg, #687580, #3d4852); transform: translateY(-1px); }
+.teachers-section { padding: 25px 27px 24px; border: 1px solid rgba(255,255,255,.9); border-radius: 20px; background: rgba(255,255,255,.78); box-shadow: 0 14px 38px rgba(41,51,59,.1); }
+.section-header { align-items: center; margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid #e1e6e9; }
+.section-title { color: #252e35; font-size: 1.18rem; letter-spacing: -.02em; }
+.section-sub { margin-top: 5px; color: #78838b; font-size: .75rem; }
+.summary-counts { display: flex; align-items: center; gap: 7px; }
+.summary-counts span { display: inline-flex; align-items: baseline; gap: 5px; padding: 7px 10px; color: #6b7680; border: 1px solid #dce2e5; border-radius: 9px; background: #f7f9fa; font-size: .65rem; }
+.summary-counts b { color: #2c3740; font-size: .82rem; }
+.summary-counts .available { color: #34704e; border-color: #c8dfd1; background: #eef8f2; }
+.status-tabs { gap: 7px; margin-bottom: 20px; }
+.status-tab { display: inline-flex; min-height: 38px; padding: 7px 12px; align-items: center; gap: 7px; color: #59656e; border-color: #d8dee2; border-radius: 10px; background: #f7f8f9; font-size: .72rem; font-weight: 600; }
+.status-tab span { display: grid; min-width: 20px; height: 20px; place-items: center; padding: 0 5px; color: #6c7780; border-radius: 99px; background: #e5e9ec; font-size: .61rem; }
+.status-tab.active { color: #fff; border-color: #3f4d57; background: #3f4d57; box-shadow: 0 5px 12px rgba(45,56,64,.16); }
+.status-tab.active span { color: #27333b; background: #fff; }
+.teachers-carousel-wrap { position: relative; align-items: stretch; gap: 12px; }
+.teachers-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; align-items: stretch; }
+.teachers-empty-state { display: flex; min-height: 360px; grid-column: 1 / -1; align-items: center; justify-content: center; flex-direction: column; padding: 48px 24px; color: #4d5a62; text-align: center; }
+.teachers-empty-icon { display: grid; width: 66px; height: 66px; margin-bottom: 17px; place-items: center; border: 1px solid #d9e0e4; border-radius: 18px; background: #f5f7f8; color: #69777f; }
+.teachers-empty-icon svg { width: 31px; height: 31px; }
+.teachers-empty-state h3 { margin: 0; color: #29333a; font-size: 1.05rem; font-weight: 700; }
+.teachers-empty-state p { max-width: 430px; margin: 7px 0 18px; color: #738089; font-size: .78rem; line-height: 1.55; }
+.teachers-empty-state button { min-height: 40px; padding: 9px 16px; border: 1px solid #cad3d8; border-radius: 9px; background: #fff; color: #43515a; font: inherit; font-size: .72rem; font-weight: 700; cursor: pointer; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
+.teachers-empty-state button:hover { border-color: #9eabb2; background: #f5f7f8; transform: translateY(-1px); }
+.carousel-arrow { align-self: center; width: 38px; height: 38px; border-color: #d9dfe2; background: rgba(255,255,255,.9); box-shadow: 0 5px 14px rgba(42,52,59,.1); }
+.teacher-card { min-height: 0; padding: 20px 19px; border: 1px solid #dce2e6 !important; border-radius: 16px; background: #fff !important; box-shadow: 0 7px 20px rgba(42,52,59,.07); }
+.teacher-card:hover { transform: translateY(-2px); border-color: #b9c4ca !important; box-shadow: 0 12px 27px rgba(42,52,59,.11); }
+.teacher-card::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: #8c979f; }
+.teacher-card.card-in-school::before { background: #499067; }
+.teacher-card.card-on-leave::before { background: #9b7272; }
+.teacher-card.card-on-meeting::before { background: #a78c53; }
+.status-badge { top: 14px; right: 14px; display: flex; align-items: center; gap: 5px; padding: 5px 8px; color: #53616a !important; border: 1px solid #d8dee2; border-radius: 999px; background: #f1f3f4 !important; font-size: .58rem; letter-spacing: .04em; }
+.badge-in-school { color: #276842 !important; border-color: #bddbc8; background: #e8f5ed !important; }
+.badge-on-leave { color: #7d4545 !important; border-color: #dec5c5; background: #f7eded !important; }
+.badge-on-meeting { color: #765f2e !important; border-color: #e1d5b8; background: #f8f3e7 !important; }
+.teacher-avatar-wrap { margin: 10px 0 14px; }
+.teacher-avatar { width: 82px; height: 82px; border: 3px solid #fff; box-shadow: 0 0 0 1px #d7dde1, 0 6px 15px rgba(35,44,51,.13); }
+.teacher-name { margin-bottom: 4px; color: #222a31; font-size: 1rem; }
+.teacher-college { min-height: 36px; margin-bottom: 10px; color: #77828a; font-size: .73rem; }
+.teacher-email { justify-content: center; min-width: 0; margin-bottom: 15px; color: #64717a; font-size: .7rem; }
+.teacher-email span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.teacher-status-wrap { display: flex; flex-direction: column; gap: 6px; margin-bottom: 13px; }
+.teacher-status-wrap > label { color: #707b83; font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.status-dropdown { min-height: 40px; padding: 8px 11px; border-color: #d6dde1 !important; border-radius: 9px; background: #f8fafb !important; color: #34414a !important; font-size: .72rem; }
+.designated-areas { margin-top: auto; padding-top: 13px; border-color: #e5e9eb; }
+.designated-label,.substitute-label { color: #727d85; font-size: .62rem; letter-spacing: .06em; }
+.area-tag { padding: 6px 9px; color: #50606b; border: 1px solid #dfe5e8; border-radius: 8px; background: #f4f7f8; font-size: .67rem; }
+.leave-coverage-block { margin: 3px 0 13px; }
+.leave-coverage-notice { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid #e0d4d1; border-radius: 11px; background: #faf6f4; color: #4a3d3a; text-align: left; }
+.leave-coverage-notice > span:nth-child(2) { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.leave-coverage-notice strong { font-size: .72rem; font-weight: 700; }
+.leave-coverage-notice small { color: #7f706b; font-size: .64rem; line-height: 1.35; }
+.leave-coverage-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 9px; background: #eee2de; color: #75564d; }
+.leave-coverage-icon svg { width: 17px; height: 17px; }
+.manage-coverage-btn { display: flex; min-height: 32px; align-items: center; justify-content: center; gap: 4px; padding: 6px 9px; flex: 0 0 auto; border: 1px solid #cdbdb7; border-radius: 8px; background: #fff; color: #624b44; font: inherit; font-size: .63rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 5px rgba(70,50,43,.06); transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.manage-coverage-btn svg { width: 15px; height: 15px; }
+.manage-coverage-btn:hover { border-color: #aeb9bf; background: #f6f8f9; transform: translateY(-1px); }
+.coverage-modal-overlay { padding: 24px; background: rgba(20, 28, 33, .58); backdrop-filter: blur(5px); }
+.coverage-modal { display: flex; width: min(760px, 96vw); max-height: min(760px, 90vh); flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,.72); border-radius: 20px; background: #f7f9fa; box-shadow: 0 28px 80px rgba(15, 23, 29, .3); text-align: left; }
+.coverage-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 26px 20px; border-bottom: 1px solid #e1e6e9; background: #fff; }
+.coverage-modal-heading { display: flex; align-items: center; gap: 14px; }
+.coverage-modal-icon { display: grid; width: 46px; height: 46px; flex: 0 0 46px; place-items: center; border-radius: 13px; background: #eee5e1; color: #71584f; }
+.coverage-modal-icon svg { width: 22px; height: 22px; }
+.coverage-modal-eyebrow { display: block; margin-bottom: 4px; color: #70574f; font-size: .72rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.coverage-modal-heading h2 { margin: 0; color: #20282e; font-size: 1.38rem; font-weight: 700; line-height: 1.25; }
+.coverage-modal-heading p { margin: 5px 0 0; color: #64717a; font-size: .84rem; line-height: 1.45; }
+.coverage-modal-close { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 0; border-radius: 9px; background: #f1f3f4; color: #5b6870; font-size: 1.45rem; line-height: 1; cursor: pointer; }
+.coverage-modal-close:hover { background: #e6eaec; }
+.coverage-modal-progress { display: flex; align-items: center; gap: 15px; padding: 13px 26px; border-bottom: 1px solid #e2e7e9; background: #f7f9fa; }
+.coverage-modal-progress > span { flex: 0 0 auto; color: #49575f; font-size: .76rem; font-weight: 700; }
+.coverage-progress-track { height: 6px; flex: 1; overflow: hidden; border-radius: 999px; background: #e1e5e7; }
+.coverage-progress-track span { display: block; height: 100%; border-radius: inherit; background: #527663; transition: width .25s ease; }
+.coverage-modal-list { display: grid; gap: 10px; padding: 18px 26px; overflow-y: auto; }
+.coverage-modal-row { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(280px, 1.2fr); align-items: center; gap: 22px; padding: 15px 16px; border: 1px solid #dfe5e8; border-radius: 12px; background: #fff; }
+.coverage-class-details { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.coverage-class-details strong { overflow: hidden; color: #252e34; font-size: .9rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.coverage-class-details span { color: #596770; font-size: .76rem; font-weight: 500; }
+.coverage-class-details small { color: #76828a; font-size: .69rem; }
+.coverage-assignment-field label { display: block; margin-bottom: 7px; color: #56636b; font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.coverage-modal .substitute-dropdown { min-height: 44px; padding: 9px 38px 9px 12px; color: #2f3a41; border-color: #cbd3d8; background-color: #fff; font-size: .78rem; font-weight: 500; }
+.coverage-modal .substitute-dropdown.is-placeholder { color: #7c878e; }
+.coverage-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 26px; border-top: 1px solid #dfe5e8; background: #fff; }
+.coverage-modal-footer > span { color: #66737b; font-size: .7rem; }
+.coverage-modal-footer > div { display: flex; gap: 11px; }
+.coverage-cancel-btn { min-width: 105px; min-height: 46px; padding: 11px 20px; border: 1px solid #cbd4d9; border-radius: 10px; background: #fff; color: #3f4d55; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.coverage-cancel-btn:hover { background: #f2f5f6; }
+.coverage-modal .substitute-save-btn { min-width: 175px; min-height: 46px; padding: 11px 21px; border-radius: 10px; font-size: .78rem; }
+.substitute-teacher-wrap { display: block; margin: 7px 0 0; padding: 0; overflow: hidden; border: 1px solid #e1e6e9; border-radius: 11px; background: #f8fafb; }
+.coverage-summary { display: flex; min-height: 40px; align-items: center; justify-content: space-between; padding: 0 12px; color: #46545d; font-size: .68rem; font-weight: 700; cursor: pointer; list-style: none; }
+.coverage-summary::-webkit-details-marker { display: none; }
+.coverage-summary:hover { background: #f1f4f5; }
+.coverage-chevron { width: 16px; height: 16px; transition: transform .2s ease; }
+.substitute-teacher-wrap[open] .coverage-chevron { transform: rotate(180deg); }
+.coverage-body { max-height: 350px; padding: 0 10px 10px; overflow-y: auto; border-top: 1px solid #e3e7e9; }
+.substitute-info { display: block; margin-top: 2px; padding-top: 0; border: 0; }
+.substitute-class-label { display: block; padding: 10px 2px 7px; color: #76828a; font-size: .62rem; font-weight: 600; }
+.substitute-schedule-list { gap: 7px; }
+.substitute-schedule-item { padding: 10px; border: 1px solid #e1e6e9; border-radius: 9px; background: #fff; }
+.substitute-entry-header { gap: 9px; }
+.substitute-entry-header strong { color: #2f3940; font-size: .7rem; }
+.substitute-entry-meta { margin-top: 2px; color: #7a858d; font-size: .61rem; }
+.substitute-entry-label { color: #737f87; font-size: .59rem; letter-spacing: .04em; text-transform: uppercase; }
+.substitute-dropdown { min-height: 38px; border-radius: 8px; font-size: .7rem; }
+.substitute-remove-btn { min-height: 42px; padding: 9px 13px; border-color: #d2dade; border-radius: 8px; background: #fff; color: #59676f; font-size: .71rem; font-weight: 700; }
+.substitute-remove-btn:hover { border-color: #adb7bd; background: #f2f5f6; color: #39464e; }
+.coverage-actions { position: sticky; bottom: -10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; padding: 10px 2px 1px; border-top: 1px solid #e3e7e9; background: #f8fafb; }
+.coverage-actions > span { color: #818b92; font-size: .58rem; line-height: 1.3; text-align: left; }
+.substitute-save-btn { width: auto; min-height: 36px; margin: 0; padding: 8px 12px; flex: 0 0 auto; border-radius: 8px; background: #465762; font-size: .66rem; }
+@media (max-width: 650px) {
+  .coverage-modal-overlay { padding: 10px; }
+  .coverage-modal { width: 100%; max-height: 94vh; border-radius: 16px; }
+  .coverage-modal-header,.coverage-modal-progress,.coverage-modal-list,.coverage-modal-footer { padding-left: 16px; padding-right: 16px; }
+  .coverage-modal-row { grid-template-columns: 1fr; gap: 13px; }
+  .coverage-modal-footer { align-items: stretch; flex-direction: column; }
+  .coverage-modal-footer > div { justify-content: flex-end; }
+  .coverage-cancel-btn,.coverage-modal .substitute-save-btn { flex: 1; min-width: 0; }
+}
+.carousel-indicators { margin-top: 16px; }
+.indicator { width: 7px; height: 7px; background: #cbd2d6; }
+.indicator.active { width: 22px; border-radius: 99px; background: #4b5a64; }
+
 /* Large Desktop (1200px+) - 3 columns */
 @media (min-width: 1200px) {
   .teachers-grid {
@@ -1898,6 +2430,29 @@ onUnmounted(() => {
   .modal-box {
     width: 95vw;
     max-height: 90vh;
+  }
+  .add-teacher-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+  }
+  .modal-header {
+    padding: 20px;
+  }
+  .modal-avatar-section {
+    flex-direction: column;
+    justify-content: center;
+    min-height: 0;
+    padding: 16px 20px;
+    border-right: 0;
+    border-bottom: 1px solid #e5eaf0;
+  }
+  .modal-form {
+    padding: 18px 20px;
+  }
+  .modal-actions {
+    padding: 16px 20px 20px;
   }
   .modal-form-group { margin-bottom: 12px; }
   .modal-form-label { font-size: 0.85rem; }

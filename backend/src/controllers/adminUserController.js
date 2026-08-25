@@ -59,6 +59,7 @@ function toClientUser(user) {
     employeeId: user.employeeId || "",
     studentId: user.studentId || "",
     avatar: user.avatar,
+    designatedAreas: Array.isArray(user.designatedAreas) ? user.designatedAreas : [],
     yearLevel: user.yearLevel || "",
     section: user.section || "",
     dateAdded: user.createdAt,
@@ -124,6 +125,7 @@ async function createUser(req, res) {
       yearLevel = "",
       section = "",
       avatar = null,
+      designatedAreas = [],
     } = req.body;
 
     if (!firstName || !lastName || !email || !role || !password) {
@@ -181,13 +183,16 @@ async function createUser(req, res) {
       roles: normalizedRoles,
       passwordHash,
       department: DEFAULT_DEPARTMENT,
+      designatedAreas: Array.isArray(designatedAreas)
+        ? designatedAreas.map(normalizeString).filter(Boolean)
+        : [],
       phone: normalizeString(phone),
       account_status: "Active",
       teacher_status: normalizedRoles.includes("teacher") ? sanitizeTeacherStatus(teacher_status) : undefined,
       employeeId: normalizedEmployeeId || undefined,
       studentId: normalizedStudentId || undefined,
-      yearLevel: normalizedRoles.includes("student") ? normalizeString(yearLevel) : "",
-      section: normalizedRoles.includes("student") ? normalizeString(section) : "",
+      yearLevel: normalizedRoles.includes("student") ? normalizeString(yearLevel) : undefined,
+      section: normalizedRoles.includes("student") ? normalizeString(section) : undefined,
       avatar: avatar || null,
     });
 
@@ -216,6 +221,7 @@ async function updateUser(req, res) {
       studentId = "",
       yearLevel = "",
       section = "",
+      designatedAreas = [],
     } = req.body;
 
     if (!firstName || !lastName || !email || !role) {
@@ -268,6 +274,11 @@ async function updateUser(req, res) {
     user.role = normalizedRoles[0];
     user.roles = normalizedRoles;
     user.department = DEFAULT_DEPARTMENT;
+    if (Object.prototype.hasOwnProperty.call(req.body, "designatedAreas")) {
+      user.designatedAreas = Array.isArray(req.body.designatedAreas)
+        ? req.body.designatedAreas.map(normalizeString).filter(Boolean)
+        : [];
+    }
     user.phone = normalizeString(phone);
     const requestedStatus = normalizeString(account_status) || normalizeString(status);
     if (requestedStatus) {
@@ -286,6 +297,8 @@ async function updateUser(req, res) {
       user.section = normalizeString(section);
     } else {
       user.studentId = undefined;
+      user.yearLevel = undefined;
+      user.section = "";
     }
 
     await user.save();

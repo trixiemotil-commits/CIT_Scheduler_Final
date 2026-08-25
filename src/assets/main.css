@@ -892,6 +892,34 @@ body,
   display: flex !important;
   align-items: center !important;
   width: 100% !important;
+  order: 10;
+}
+
+.admin-sidebar .sidebar-nav > a[href="/admin/dashboard"] {
+  order: 0;
+}
+
+.admin-sidebar .schedule-management-label {
+  order: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 6px 1px;
+  color: #6e7880;
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-sidebar .schedule-management-label::before {
+  content: '';
+  width: 16px;
+  height: 1px;
+  flex: 0 0 16px;
+  background: #8f989f;
 }
 
 .admin-sidebar .nav-item > span:last-child {
@@ -900,27 +928,62 @@ body,
 }
 
 .admin-sidebar .nav-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  align-self: center !important;
   width: 22px !important;
   min-width: 22px !important;
   height: 22px !important;
+  min-height: 22px !important;
   justify-content: center !important;
+  line-height: 0 !important;
+  flex: 0 0 22px !important;
 }
 
 .admin-sidebar .nav-icon svg {
   display: block !important;
   width: 22px !important;
   height: 22px !important;
+  min-width: 22px !important;
+  min-height: 22px !important;
+  stroke-width: 1.9 !important;
+  vector-effect: non-scaling-stroke;
+  overflow: visible;
+}
+
+/* Keep the real gear SVG visible, but visually match the neighboring nav glyphs. */
+.sidebar a[href$="/settings"] .nav-icon svg {
+  transform: scale(.76) !important;
+  transform-origin: center !important;
 }
 
 .admin-sidebar .unified-academic-link,
 .admin-sidebar .current-term-schedule-link,
 .admin-sidebar .current-term-link {
-  order: 20;
+  order: 2;
 }
 
 .admin-sidebar .current-term-schedule-link,
 .admin-sidebar .current-term-link {
-  order: 21;
+  order: 3;
+  margin-bottom: 18px;
+}
+
+.admin-sidebar .current-term-schedule-link::after,
+.admin-sidebar .current-term-link::after {
+  content: '';
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 8px;
+  left: 8px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(87, 97, 105, .28) 14%, rgba(87, 97, 105, .28) 86%, transparent);
+  pointer-events: none;
+}
+
+.admin-sidebar-collapsed .admin-sidebar .current-term-schedule-link::after,
+.admin-sidebar-collapsed .admin-sidebar .current-term-link::after {
+  display: none;
 }
 
 .admin-sidebar-toggle {
@@ -980,6 +1043,86 @@ body,
   left: 29px;
 }
 
+.admin-sidebar-quick-menu {
+  position: absolute;
+  z-index: 1000;
+  top: 37px;
+  left: 72px;
+  display: flex;
+  width: max-content;
+  padding: 0;
+  flex-direction: row;
+  gap: 6px;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateX(-5px);
+  pointer-events: none;
+  transition: opacity .16s ease, transform .16s ease, visibility .16s;
+}
+
+.admin-sidebar-quick-menu::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 100%;
+  width: 20px;
+  height: 100%;
+}
+
+.admin-sidebar-quick-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: auto;
+  min-height: 38px;
+  padding: 8px 13px;
+  color: #f7f8f9;
+  background: rgba(37, 40, 43, .96);
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 999px;
+  box-shadow: 0 7px 18px rgba(20, 24, 27, .24);
+  font-family: inherit;
+  font-size: .78rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .15s ease, transform .15s ease;
+}
+
+.admin-sidebar-quick-menu button:hover,
+.admin-sidebar-quick-menu button:focus-visible {
+  color: #fff;
+  background: #111315;
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.admin-sidebar-quick-menu svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .admin-sidebar-collapsed .admin-sidebar-toggle {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .admin-sidebar-collapsed .admin-sidebar:has(.sidebar-profile:hover, .sidebar-profile:focus-within, .admin-sidebar-quick-menu:hover, .admin-sidebar-quick-menu:focus-within) .admin-sidebar-quick-menu {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+}
+
 .admin-sidebar .sidebar-profile {
   border-bottom: 0 !important;
   box-shadow: none !important;
@@ -997,7 +1140,7 @@ body,
 .admin-sidebar-collapsed .admin-sidebar .sidebar-profile {
   display: flex !important;
   justify-content: center !important;
-  padding: 38px 0 14px !important;
+  padding: 8px 0 14px !important;
 }
 
 .admin-sidebar-collapsed .admin-sidebar .avatar-wrap {
@@ -1006,7 +1149,8 @@ body,
 }
 
 .admin-sidebar-collapsed .admin-sidebar .sidebar-profile :is(.brand, .role, .email),
-.admin-sidebar-collapsed .admin-sidebar .nav-item > span:last-child {
+.admin-sidebar-collapsed .admin-sidebar .nav-item > span:last-child,
+.admin-sidebar-collapsed .admin-sidebar .schedule-management-label {
   display: none !important;
 }
 
@@ -1066,5 +1210,9 @@ body,
 
   .admin-sidebar-collapsed .admin-sidebar .admin-sidebar-toggle {
     left: 16px;
+  }
+
+  .admin-sidebar-quick-menu {
+    display: none !important;
   }
 }

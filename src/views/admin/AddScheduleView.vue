@@ -46,35 +46,40 @@
     </aside>
 
     <!-- ═══════════════════ MAIN ═══════════════════ -->
-    <main class="main">
+    <main class="main" :class="{ 'main-list-view': scheduleViewMode === 'list' }">
       <!-- Page Header -->
       <header class="main-header">
         <div class="header-left">
-          <div class="breadcrumb"><button class="bc-btn back-only" @click="router.back()">&larr; Back</button></div>
-          <h1 class="page-title">
-            <template v-if="scheduleViewMode === ''">Choose View Mode</template>
-            <template v-else-if="scheduleViewMode === 'list'">All Schedules</template>
-            <template v-else-if="!addMode">Add Schedule</template>
-            <template v-else-if="addMode === 'teacher'">{{ selectedTeacher ? `Prof. ${selectedTeacher}` : 'By Teacher' }}</template>
-            <template v-else-if="addMode === 'room'">{{ contextRoom ? `Room ${contextRoom}` : contextFloor ? contextFloor : 'By Room' }}</template>
-          </h1>
-          <p class="page-sub">
-            <template v-if="scheduleViewMode === ''">Start by choosing the view mode you want to use.</template>
-            <template v-else-if="scheduleViewMode === 'list'">Browse all schedules and add new entries below.</template>
-            <template v-else-if="!addMode">Choose a context before adding schedule entries</template>
-            <template v-else-if="addMode === 'teacher'">{{ selectedTeacher ? 'Click cells to add or edit entries' : 'Select a teacher to assign schedules' }}</template>
-            <template v-else-if="addMode === 'room'">{{ contextRoom ? 'Click empty slots to add entries for this room' : contextFloor ? 'Select a room' : 'Choose a floor first' }}</template>
-          </p>
+          <div class="page-heading-row">
+            <div class="page-heading-copy">
+              <span class="page-eyebrow">Schedule management</span>
+              <h1 class="page-title">
+                <template v-if="scheduleViewMode === ''">Choose View Mode</template>
+                <template v-else-if="scheduleViewMode === 'list'">All Schedules</template>
+                <template v-else-if="!addMode">Add Schedule</template>
+                <template v-else-if="addMode === 'teacher'">{{ selectedTeacher ? 'Add Schedule' : 'By Teacher' }}</template>
+                <template v-else-if="addMode === 'room'">{{ contextRoom ? 'Add Schedule' : contextFloor ? contextFloor : 'By Room' }}</template>
+              </h1>
+              <p class="page-sub">
+                <template v-if="scheduleViewMode === ''">Start by choosing the view mode you want to use.</template>
+                <template v-else-if="scheduleViewMode === 'list'">Browse all schedules and add new entries below.</template>
+                <template v-else-if="!addMode">Choose a context before adding schedule entries</template>
+                <template v-else-if="addMode === 'teacher'">{{ selectedTeacher ? 'Create and manage timetable entries for this teacher.' : 'Select a teacher to assign schedules' }}</template>
+                <template v-else-if="addMode === 'room'">{{ contextRoom ? 'Create and manage timetable entries for this room.' : contextFloor ? 'Select a room' : 'Choose a floor first' }}</template>
+              </p>
+            </div>
+          </div>
         </div>
         <div class="header-right">
           <div v-if="selectedTermLabel" class="term-banner">
-            <span>Viewing: {{ selectedTermLabel }}</span>
+            <span class="term-banner-label">Academic term</span>
+            <strong>{{ selectedTermLabel }}</strong>
           </div>
-        </div>
-        <div v-if="scheduleViewMode === 'list' || ((addMode === 'teacher' && selectedTeacher) || (addMode === 'room' && contextRoom))" class="header-actions">
-          <div class="view-toggle">
-            <button type="button" class="view-btn" :class="{ active: scheduleViewMode === 'timetable' }" @click="scheduleViewMode = 'timetable'">Time table View</button>
-            <button type="button" class="view-btn" :class="{ active: scheduleViewMode === 'list' }" @click="scheduleViewMode = 'list'">Listed View</button>
+          <div v-if="scheduleViewMode === 'list' || ((addMode === 'teacher' && selectedTeacher) || (addMode === 'room' && contextRoom))" class="header-actions">
+            <div class="view-toggle" aria-label="Schedule view">
+              <button type="button" class="view-btn" :class="{ active: scheduleViewMode === 'timetable' }" @click="scheduleViewMode = 'timetable'">Timetable</button>
+              <button type="button" class="view-btn" :class="{ active: scheduleViewMode === 'list' }" @click="scheduleViewMode = 'list'">List view</button>
+            </div>
           </div>
         </div>
       </header>
@@ -205,25 +210,23 @@
       </div>
 
 
-      <div v-else-if="scheduleViewMode === 'list'" class="schedule-card">
-        <!-- Card Top Bar -->
-        <div class="sched-topbar">
-          <div class="sched-topbar-left">
-            <h2 class="sched-grid-title">All Schedules</h2>
-            <p class="sched-grid-sub teacher-selected">Browse all schedules currently in the system.</p>
+      <div v-else-if="scheduleViewMode === 'list'" class="schedule-card list-schedule-card">
+        <div class="sched-topbar list-schedule-toolbar">
+          <div class="list-summary">
+            <span class="list-summary-count">{{ visibleScheduleEntries.length }}</span>
+            <div>
+              <h2 class="list-summary-title">Schedule entries</h2>
+              <p class="list-summary-copy">Select any row to review or edit its details.</p>
+            </div>
           </div>
-          <div class="sched-topbar-right">
-            <button class="new-sched-btn" @click="openAddPanel">
+          <div class="list-toolbar-actions">
+            <button class="new-sched-btn" @click="scrollToListAddForm">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               New Schedule
             </button>
           </div>
         </div>
         <div class="schedule-list-wrap">
-          <div class="schedule-list-meta">
-            <span>{{ visibleScheduleEntries.length }} entries found</span>
-            <span class="schedule-list-note">Click a row to edit the selected schedule.</span>
-          </div>
           <div class="schedule-list-table-wrap">
             <table class="schedule-list-table">
               <thead>
@@ -243,95 +246,101 @@
                   <td colspan="8" class="empty-state small-empty-state">No schedules are currently available.</td>
                 </tr>
                 <tr v-for="entry in visibleScheduleEntries" :key="entry._key" class="schedule-list-row" @click="openEditModal(entry.slot, entry.day, entry)">
-                  <td>{{ entry.day }}</td>
-                  <td>{{ entry.timeIn }} – {{ entry.timeOut }}</td>
-                  <td>{{ entry.year }}</td>
-                  <td>{{ entry.subject }}</td>
-                  <td>{{ entry.teacher }}</td>
-                  <td>{{ entry.room }}</td>
-                  <td>{{ entry.section }}</td>
-                  <td>{{ entry.campus }}</td>
-                </tr>
-                <tr class="schedule-input-row">
-                  <td>
-                    <select v-model="listAddForm.day" class="form-select">
-                      <option value="" disabled>Select Day</option>
-                      <option v-for="d in days" :key="d" :value="d">{{ d }}</option>
-                    </select>
-                  </td>
-                  <td>
-                    <div class="time-inputs">
-                      <select v-model="listAddForm.timeIn" class="form-select small">
-                        <option value="" disabled>Start</option>
-                        <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
-                      </select>
-                      <span class="time-separator">–</span>
-                      <select v-model="listAddForm.timeOut" class="form-select small">
-                        <option value="" disabled>End</option>
-                        <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
-                      </select>
-                    </div>
-                  </td>
-                  <td>
-                        <select v-model="listAddForm.year" class="form-select small">
-                      <option value="" disabled>Year</option>
-                      <option v-for="y in effectiveYears" :key="y" :value="y">{{ y }}</option>
-                    </select>
-                  </td>
-                      <td>
-                        <div style="display:flex;gap:8px;align-items:center;">
-                          <select v-if="listAddForm.year === '3rd Year' || listAddForm.year === '4th Year'" v-model="listAddForm.major" class="form-select small">
-                            <option value="" disabled>Major</option>
-                            <option v-for="m in majorOptions" :key="m" :value="m">{{ m || 'None' }}</option>
-                          </select>
-                          <select v-model="listAddForm.subject" class="form-select">
-                            <option value="" disabled>Select Subject</option>
-                            <option v-for="s in listSubjectOptions" :key="s" :value="s">{{ s }}</option>
-                          </select>
-                        </div>
-                      </td>
-                  <td>
-                    <select v-model="listAddForm.teacher" class="form-select">
-                      <option value="" disabled>Select Teacher</option>
-                      <option v-for="t in teacherOptions" :key="t" :value="t">{{ t }}</option>
-                    </select>
-                  </td>
-                  <td>
-                    <div class="room-type-stack">
-                      <select v-model="listAddForm.room" class="form-select">
-                        <option value="" disabled>Select Room</option>
-                        <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
-                      </select>
-                      <select v-model="listAddForm.roomType" class="form-select">
-                        <option value="Lecture">Lecture</option>
-                        <option value="Comlab/Laboratory">Comlab/Laboratory</option>
-                      </select>
-                    </div>
-                  </td>
-                  <td>
-                    <select v-model="listAddForm.section" class="form-select">
-                      <option value="" disabled>Select Section</option>
-                      <option v-for="s in getSectionsForYear(listAddForm.year)" :key="s" :value="s">{{ s }}</option>
-                    </select>
-                  </td>
-                  <td>
-                    <div class="inline-campus-row">
-                      <button type="button" class="campus-btn small" :class="{ active: listAddForm.campus === 'South Campus' }" @click="listAddForm.campus = 'South Campus'">South</button>
-                      <button type="button" class="campus-btn small" :class="{ active: listAddForm.campus === 'Main Campus' }" @click="listAddForm.campus = 'Main Campus'">Main</button>
-                      <button type="button" class="save-btn save-inline-btn" @click="addListEntry" :disabled="!listAddFormValid">Add</button>
-                    </div>
-                    <div v-if="listTimeError" class="time-error table-time-error">{{ listTimeError }}</div>
-                  </td>
+                  <td><span class="list-day">{{ entry.day }}</span></td>
+                  <td><span class="list-time">{{ entry.timeIn }} – {{ entry.timeOut }}</span></td>
+                  <td><span class="list-year">{{ entry.year }}</span></td>
+                  <td><span class="list-subject">{{ entry.subject }}</span></td>
+                  <td><span class="list-teacher">{{ entry.teacher }}</span></td>
+                  <td><span class="list-room">{{ entry.room }}</span></td>
+                  <td><span class="list-section">{{ entry.section }}</span></td>
+                  <td><span class="list-campus">{{ entry.campus }}</span></td>
                 </tr>
               </tbody>
             </table>
+          </div>
+          <section ref="listAddSection" class="list-add-section" aria-labelledby="list-add-title">
+            <div class="list-add-heading">
+              <div>
+                <span class="list-add-eyebrow">New entry</span>
+                <h3 id="list-add-title">Add schedule</h3>
+                <p>Complete the details below, then save the new timetable entry.</p>
+              </div>
+              <span class="list-add-required">All fields are required</span>
+            </div>
+
+            <div class="list-add-grid">
+              <label class="list-field">
+                <span>Day</span>
+                <select v-model="listAddForm.day" class="form-select">
+                  <option value="" disabled>Day</option>
+                  <option v-for="d in days" :key="d" :value="d">{{ d }}</option>
+                </select>
+              </label>
+              <label class="list-field list-field-time">
+                <span>Class time</span>
+                <div class="time-inputs">
+                  <select v-model="listAddForm.timeIn" class="form-select"><option value="" disabled>From</option><option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option></select>
+                  <span class="time-separator">to</span>
+                  <select v-model="listAddForm.timeOut" class="form-select"><option value="" disabled>To</option><option v-for="t in endTimeOptionsAfter(listAddForm.timeIn)" :key="t" :value="t">{{ t }}</option></select>
+                </div>
+                <small v-if="listTimeError" class="list-field-error">{{ listTimeError }}</small>
+              </label>
+              <label class="list-field">
+                <span>Year level</span>
+                <select v-model="listAddForm.year" class="form-select"><option value="" disabled>Year</option><option v-for="y in effectiveYears" :key="y" :value="y">{{ y }}</option></select>
+              </label>
+              <label v-if="listAddForm.year === '3rd Year' || listAddForm.year === '4th Year'" class="list-field">
+                <span>Major</span>
+                <select v-model="listAddForm.major" class="form-select"><option value="" disabled>Major</option><option v-for="m in majorOptions" :key="m" :value="m">{{ m || 'None' }}</option></select>
+              </label>
+              <label class="list-field list-field-wide">
+                <span>Subject</span>
+                <select v-model="listAddForm.subject" class="form-select"><option value="" disabled>Subject</option><option v-for="s in listSubjectOptions" :key="s" :value="s">{{ s }}</option></select>
+              </label>
+              <label class="list-field list-field-wide">
+                <span>Teacher</span>
+                <select v-model="listAddForm.teacher" class="form-select"><option value="" disabled>Teacher</option><option v-for="t in teacherOptions" :key="t" :value="t">{{ t }}</option></select>
+              </label>
+              <label class="list-field">
+                <span>Room</span>
+                <select v-model="listAddForm.room" class="form-select"><option value="" disabled>Room</option><option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option></select>
+              </label>
+              <label class="list-field">
+                <span>Room type</span>
+                <select v-model="listAddForm.roomType" class="form-select"><option value="Lecture">Lec</option><option value="Comlab/Laboratory">Lab</option></select>
+              </label>
+              <label class="list-field">
+                <span>Section</span>
+                <select v-model="listAddForm.section" class="form-select"><option value="" disabled>Section</option><option v-for="s in getSectionsForYear(listAddForm.year)" :key="s" :value="s">{{ s }}</option></select>
+              </label>
+              <div class="list-field list-campus-field">
+                <span>Campus</span>
+                <div class="list-campus-options">
+                  <button type="button" :class="{ active: listAddForm.campus === 'South Campus' }" @click="listAddForm.campus = 'South Campus'">South</button>
+                  <button type="button" :class="{ active: listAddForm.campus === 'Main Campus' }" @click="listAddForm.campus = 'Main Campus'">Main</button>
+                </div>
+              </div>
+            </div>
+            <div class="list-add-actions">
+              <span>{{ listAddFormValid ? 'Ready to add this schedule.' : 'Complete the required schedule details.' }}</span>
+              <button type="button" class="list-add-submit" :disabled="!listAddFormValid" @click="addListEntry">Add schedule</button>
+            </div>
+          </section>
+          <div v-if="visibleScheduleEntries.length" class="schedule-list-footer">
+            <span>Showing all {{ visibleScheduleEntries.length }} schedule entries</span>
+            <button type="button" class="list-footer-action" @click="scrollToListAddForm">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add another schedule
+            </button>
           </div>
         </div>
       </div>
       <!-- Schedule Card (teacher mode: teacher selected / room mode: room selected) -->
       <div v-else-if="scheduleViewMode === 'timetable' && ((addMode === 'teacher' && selectedTeacher) || (addMode === 'room' && contextRoom))" class="schedule-card">
         <div class="sched-topbar">
+          <button class="schedule-back-btn" aria-label="Back to teacher selection" title="Back to teacher selection" @click="returnToTermWorkspace">&larr;</button>
           <div class="sched-topbar-left">
+            <span class="sched-context-label">Schedule for</span>
             <h2 class="sched-grid-title">
               <template v-if="addMode === 'teacher'">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
@@ -342,9 +351,6 @@
                 Room {{ contextRoom }}
               </template>
             </h2>
-            <p class="sched-grid-sub teacher-selected">
-              {{ addMode === 'teacher' ? `Schedule for Prof. ${selectedTeacher}` : `Schedules assigned to Room ${contextRoom}` }}
-            </p>
           </div>
           <div class="sched-topbar-right">
             <!-- Section filter (teacher mode only) -->
@@ -416,7 +422,7 @@
             </thead>
             <tbody>
               <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
-                <td class="td-time">{{ slot }}</td>
+                <td class="td-time"><span class="time-boundary-label">{{ slot }}</span></td>
                 <template v-for="day in days" :key="day">
                   <td
                     v-if="!isSpannedCell30(slot, day) && !isConsultSpannedCell30(slot, day)"
@@ -462,9 +468,16 @@
                       <div
                         class="sched-entry color-blue consult-entry"
                         :style="consultEntryStyle30(slot, getConsultationForCell30(slot, day))"
+                        role="button"
+                        tabindex="0"
+                        :aria-label="`Edit consultation on ${day}, ${getConsultationForCell30(slot, day).startTime} to ${getConsultationForCell30(slot, day).endTime}`"
+                        @click.stop="openConsultSlotModal(getConsultationForCell30(slot, day))"
+                        @keydown.enter.stop.prevent="openConsultSlotModal(getConsultationForCell30(slot, day))"
+                        @keydown.space.stop.prevent="openConsultSlotModal(getConsultationForCell30(slot, day))"
                       >
                         <div class="entry-teacher">Consultation</div>
                         <div class="entry-subject" style="font-size:0.72rem;opacity:0.9">{{ getConsultationForCell30(slot, day).startTime }} – {{ getConsultationForCell30(slot, day).endTime }}</div>
+                        <div class="consult-edit-hint">Click to manage</div>
                       </div>
                     </template>
                     <!-- Empty cell -->
@@ -484,7 +497,7 @@
             <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day">{{ day }}</th></tr></thead>
             <tbody>
               <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
-                <td class="td-time">{{ slot }}</td>
+                <td class="td-time"><span class="time-boundary-label">{{ slot }}</span></td>
                 <template v-for="day in days" :key="day">
                   <td
                     v-if="!isSpannedRoomCell30(slot, day)"
@@ -523,7 +536,7 @@
     <!-- ═══ Add / Edit Schedule Modal ═══ -->
     <Teleport to="body">
       <div v-if="showSchedModal" class="modal-overlay" @click.self="showSchedModal = false">
-        <div class="sched-modal-box">
+        <div class="sched-modal-box schedule-entry-modal">
           <div class="sched-modal-header">
             <div>
               <div class="sched-modal-mode-badge" :class="editMode ? 'badge-edit' : 'badge-add'">
@@ -538,10 +551,13 @@
                 {{ form.year }} &ndash; {{ form.section || 'Parallel' }}
               </p>
             </div>
+            <button class="panel-close schedule-modal-close" aria-label="Close schedule form" @click="showSchedModal = false">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
 
           <div class="sched-form">
-            <div class="form-row-inline" :class="{ 'schedule-for-row': selectedTeacher && !editMode }">
+            <div class="form-row-inline schedule-teacher-field" :class="{ 'schedule-for-row': selectedTeacher && !editMode }">
               <label v-if="!(selectedTeacher && !editMode)" class="form-label">Teacher</label>
               <div v-if="selectedTeacher && !editMode" class="schedule-for-text">Schedule for Prof. {{ selectedTeacher }}</div>
               <div v-else-if="selectedTeacher" class="form-value-locked">Prof. {{ selectedTeacher }}</div>
@@ -565,7 +581,7 @@
                 </div>
               </div>
             </template>
-            <div class="form-row-inline">
+            <div class="form-row-inline schedule-start-field">
               <label class="form-label">Start of Class</label>
               <div class="form-select-wrap">
                 <select v-model="form.timeIn" class="form-select">
@@ -575,17 +591,17 @@
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
             </div>
-            <div class="form-row-inline">
+            <div class="form-row-inline schedule-end-field">
               <label class="form-label">End of Class</label>
               <div class="form-select-wrap">
                 <select v-model="form.timeOut" class="form-select">
                   <option value="" disabled>Select End of Class</option>
-                  <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
+                  <option v-for="t in endTimeOptionsAfter(form.timeIn)" :key="t" :value="t">{{ t }}</option>
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
             </div>
-            <div class="form-row-inline">
+            <div class="form-row-inline schedule-year-field">
               <label class="form-label">Year</label>
               <div class="form-select-wrap">
                 <select v-model="form.year" class="form-select">
@@ -605,7 +621,7 @@
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
             </div>
-            <div class="form-row-inline" v-if="!form.parallel">
+            <div class="form-row-inline schedule-section-field" v-if="!form.parallel">
               <label class="form-label">Section</label>
               <input v-if="form.campus === 'Main Campus'" v-model.trim="form.section" type="text" class="form-input" placeholder="Enter Section"/>
               <div v-else class="form-select-wrap">
@@ -616,7 +632,7 @@
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
             </div>
-            <div class="form-row-inline">
+            <div class="form-row-inline schedule-subject-field">
               <label class="form-label">Subject</label>
               <div v-if="form.subject === 'Lunch Break'" class="lunch-subject-selected">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
@@ -631,7 +647,7 @@
               </div>
             </div>
             <template v-if="!form.parallel">
-              <div class="form-row-inline">
+              <div class="form-row-inline schedule-room-field">
                 <label class="form-label">Room</label>
                 <input v-if="form.campus === 'Main Campus'" v-model.trim="form.room" type="text" class="form-input" placeholder="Enter Room"/>
                 <div v-else class="form-select-wrap">
@@ -642,7 +658,7 @@
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
               </div>
-              <div class="form-row-inline">
+              <div class="form-row-inline schedule-room-type-field">
                 <label class="form-label">Room Type</label>
                 <div class="form-select-wrap">
                   <select v-model="form.roomType" class="form-select">
@@ -701,7 +717,7 @@
                 </div>
               </template>
             </template>
-            <div class="form-row-inline">
+            <div class="form-row-inline schedule-campus-field">
               <label class="form-label">Campus</label>
               <div class="campus-toggle">
                 <button type="button" class="campus-btn" :class="{ active: form.campus === 'South Campus' }" @click="form.campus = 'South Campus'">South Campus</button>
@@ -732,7 +748,7 @@
           <div v-if="!editMode && addMode === 'teacher' && lunchBreakContext.teacher && lunchBreakContext.day" class="lunch-break-footer">
             <button type="button" class="lunch-break-modal-btn" @click="openLunchBreakPicker">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
-              Add Lunch Break
+              Set Lunch Break
             </button>
           </div>
 
@@ -759,11 +775,17 @@
             <div class="lunch-break-picker-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
             </div>
-            <div>
+            <div class="lunch-break-picker-copy">
+              <span class="lunch-break-picker-eyebrow">Break settings</span>
               <h2 id="lunch-break-picker-title">{{ lunchBreakContext.editing ? 'Edit Lunch Break' : 'Set Lunch Break' }}</h2>
-              <p>{{ lunchBreakContext.day }} &bull; Select the lunch time.</p>
+              <p>{{ lunchBreakContext.day }}<template v-if="lunchBreakContext.teacher"> · Prof. {{ lunchBreakContext.teacher }}</template></p>
             </div>
+            <button type="button" class="lunch-break-picker-close" aria-label="Close lunch break dialog" @click="showLunchBreakPicker = false">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
+
+          <p class="lunch-break-picker-help">Choose when this teacher’s lunch break begins and ends. The selected time will be reserved on the timetable.</p>
 
           <div class="lunch-break-picker-fields">
             <label class="lunch-break-picker-field">
@@ -777,7 +799,7 @@
               <span>End Time</span>
               <select v-model="lunchBreakForm.timeOut">
                 <option value="" disabled>Select End Time</option>
-                <option v-for="time in timeOptions" :key="time" :value="time">{{ time }}</option>
+                <option v-for="time in endTimeOptionsAfter(lunchBreakForm.timeIn)" :key="time" :value="time">{{ time }}</option>
               </select>
             </label>
           </div>
@@ -852,7 +874,7 @@
                 <div class="form-select-wrap">
                   <select v-model="addForm.timeOut" class="form-select">
                     <option value="" disabled>Select End of Class</option>
-                    <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
+                    <option v-for="t in endTimeOptionsAfter(addForm.timeIn)" :key="t" :value="t">{{ t }}</option>
                   </select>
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
@@ -1028,36 +1050,67 @@
       <div v-if="showConsultModal" class="modal-overlay" @click.self="showConsultModal = false">
         <div class="sched-modal-box consult-modal-box">
           <div class="sched-modal-header">
-            <div>
+            <div class="consult-header-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </div>
+            <div class="consult-heading-copy">
               <div class="sched-modal-mode-badge badge-add">Consultation Hours</div>
               <h2 class="sched-modal-title">Prof. {{ selectedTeacher }}</h2>
-              <p class="sched-modal-sub">
-                <span :class="consultWeeklyMins >= 240 ? 'limit-warning' : 'limit-ok'">
-                  {{ consultWeeklyMins }} / 240 min used this week
-                </span>
-              </p>
+              <p class="consult-modal-subtitle">Set the weekly times when students can request a consultation.</p>
             </div>
-            <button class="panel-close" @click="showConsultModal = false">
+            <button class="panel-close consult-close" aria-label="Close consultation hours" @click="showConsultModal = false">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
+          <div class="consult-modal-content">
+            <section class="consult-left-pane" aria-label="Consultation availability and current schedule">
+              <div class="consult-usage">
+                <div class="consult-usage-copy">
+                  <span>Weekly availability</span>
+                  <strong :class="consultWeeklyMins >= 240 ? 'limit-warning' : 'limit-ok'">{{ consultWeeklyMins }} of 240 minutes</strong>
+                </div>
+                <div class="consult-progress" aria-hidden="true"><span :style="{ width: `${Math.min((consultWeeklyMins / 240) * 100, 100)}%` }"></span></div>
+              </div>
+          <div v-if="consultationSlots.length" class="consult-section-heading">
+            <div><span>Current schedule</span><strong>{{ consultationSlots.length }} {{ consultationSlots.length === 1 ? 'slot' : 'slots' }}</strong></div>
+            <p>Manage the teacher’s saved consultation availability.</p>
+          </div>
           <div v-if="consultationSlots.length" class="consult-slots-list">
             <div v-for="cslot in consultationSlots" :key="cslot.id" class="consult-slot-item">
-              <div class="consult-slot-day">{{ cslot.dayOfWeek }}</div>
-              <div class="consult-slot-time">{{ cslot.startTime }} – {{ cslot.endTime }}</div>
+              <div class="consult-slot-calendar" aria-hidden="true">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+              </div>
+              <div class="consult-slot-details">
+                <div class="consult-slot-day">{{ cslot.dayOfWeek }}</div>
+                <div class="consult-slot-time">{{ cslot.startTime }} – {{ cslot.endTime }}</div>
+              </div>
               <div class="consult-slot-dur">{{ cslot.durationMinutes }} min</div>
               <div class="consult-slot-actions">
-                <button class="consult-edit-btn" @click="editConsultSlot(cslot)">Edit</button>
+                <button class="consult-edit-btn" type="button" title="Edit consultation slot" aria-label="Edit consultation slot" @click="editConsultSlot(cslot)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                </button>
                 <button class="consult-del-btn" @click="deleteConsultSlot(cslot.id)">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                 </button>
               </div>
             </div>
           </div>
-          <div v-else class="consult-empty">No consultation slots set for this teacher.</div>
-          <div class="sched-form" style="border-top:1px solid #eee;padding-top:12px;margin-top:4px;">
-            <div class="consult-form-title">{{ consultEditId ? 'Edit Slot' : 'Add New Slot' }}</div>
-            <div class="form-row-inline">
+          <div v-else class="consult-empty">
+            <span class="consult-empty-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+            </span>
+            <div><strong>No consultation hours yet</strong><span>Add the teacher’s first available time below.</span></div>
+          </div>
+            </section>
+            <section class="consult-right-pane" aria-label="Consultation slot form">
+          <div class="sched-form consult-form-shell">
+            <div class="consult-form-heading">
+              <div class="consult-form-icon" aria-hidden="true">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+              </div>
+              <div><div class="consult-form-title">{{ consultEditId ? 'Edit consultation slot' : 'Add consultation slot' }}</div><p>{{ consultEditId ? 'Update the selected availability below.' : 'Choose a day and available time range.' }}</p></div>
+            </div>
+            <div class="form-row-inline consult-day-field">
               <label class="form-label">Day</label>
               <div class="form-select-wrap">
                 <select v-model="consultForm.dayOfWeek" class="form-select">
@@ -1087,7 +1140,7 @@
               <div class="form-select-wrap">
                 <select v-model="consultForm.endTime" class="form-select">
                   <option value="" disabled>Select Time</option>
-                  <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
+                  <option v-for="t in endTimeOptionsAfter(consultForm.startTime)" :key="t" :value="t">{{ t }}</option>
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
@@ -1104,6 +1157,8 @@
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               {{ consultEditId ? 'Update' : 'Save Slot' }}
             </button>
+          </div>
+            </section>
           </div>
         </div>
       </div>
@@ -1148,12 +1203,31 @@ import {
   years,
 } from '@/composables/useSchedule.js'
 import Swal from 'sweetalert2'
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
+
+function endTimeOptionsAfter(startTime) {
+  if (!startTime) return timeOptions
+  const startMinutes = parseTime(startTime)
+  return timeOptions.filter((time) => parseTime(time) > startMinutes)
+}
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+
+function returnToTermWorkspace() {
+  const term = String(route.query.academicTermId || '').trim()
+  router.push({
+    path: '/admin/academic-terms',
+    query: {
+      ...(term ? { term } : {}),
+      action: 'add',
+      mode: route.query.mode === 'room' ? 'room' : 'teacher',
+      source: route.query.source === 'current' ? 'current' : 'academic',
+    },
+  })
+}
 
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -1256,15 +1330,25 @@ const navItems = [
 const timeSlots30 = timeOptions  // ['7:00 AM', '7:30 AM', '8:00 AM', ...]
 
 /* ── Add mode state ── */
-const addMode    = ref(null)    // null | 'teacher' | 'room'
+const initialAddRouteMode = ['room', 'teacher'].includes(String(route.query.mode || ''))
+  ? String(route.query.mode)
+  : null
+const addMode    = ref(initialAddRouteMode)    // null | 'teacher' | 'room'
 const contextFloor = ref(null)
-const contextRoom  = ref(null)
+const contextRoom  = ref(initialAddRouteMode === 'room' ? (String(route.query.room || '') || null) : null)
 
 const addFloors = [
   { label: '2nd Floor', number: '2', rooms: ['201', '202', '204', '205', '208', '209'] },
   { label: '3rd Floor', number: '3', rooms: ['301', '302', '303', '304', '305', '306', '307', '308', '309'] },
   { label: '4th Floor', number: '4', rooms: ['401', '402', '403', '404', '405', '406 (Comlab 1)', '407 (Comlab 2)', '408 (Comlab 3)', '409 (Comlab 4)'] },
 ]
+if (contextRoom.value) {
+  contextFloor.value = addFloors.find(floor => floor.rooms.some(room =>
+    room === contextRoom.value
+    || room.startsWith(`${contextRoom.value} `)
+    || contextRoom.value.startsWith(`${room} `)
+  ))?.label || null
+}
 const contextFloorRooms = computed(
   () => addFloors.find(f => f.label === contextFloor.value)?.rooms ?? []
 )
@@ -1396,9 +1480,9 @@ async function handleRoomCellClick30(slot, day) {
 
 /* ── Filters ── */
 const filterSection    = ref('All')
-const selectedTeacher  = ref('')
+const selectedTeacher  = ref(initialAddRouteMode === 'teacher' ? String(route.query.teacher || '') : '')
 const yearDropdown      = ref('All')
-const scheduleViewMode  = ref('')
+const scheduleViewMode  = ref(initialAddRouteMode ? 'timetable' : '')
 
 function selectViewMode(mode) {
   scheduleViewMode.value = mode
@@ -1434,6 +1518,7 @@ const listAddForm = reactive({
   teacher: '', major: '', subject: '', room: '', roomType: 'Lecture', parallel: false, parallelCount: 1,
 })
 const listTimeError = ref('')
+const listAddSection = ref(null)
 const listAddFormValid = computed(() =>
   listAddForm.day && listAddForm.timeIn && listAddForm.timeOut &&
   listAddForm.year && listAddForm.teacher && listAddForm.subject && listAddForm.room &&
@@ -1442,8 +1527,12 @@ const listAddFormValid = computed(() =>
 
 watch([() => listAddForm.timeIn, () => listAddForm.timeOut], () => {
   if (listAddForm.timeIn && listAddForm.timeOut) {
-    listTimeError.value = parseTime(listAddForm.timeOut) <= parseTime(listAddForm.timeIn)
-      ? 'End of Class must be after Start of Class' : ''
+    if (parseTime(listAddForm.timeOut) <= parseTime(listAddForm.timeIn)) {
+      listAddForm.timeOut = ''
+      listTimeError.value = ''
+      return
+    }
+    listTimeError.value = ''
   } else { listTimeError.value = '' }
 })
 
@@ -1465,6 +1554,12 @@ async function addListEntry() {
   } catch (error) {
     await showScheduleError(error)
   }
+}
+
+async function scrollToListAddForm() {
+  await nextTick()
+  listAddSection.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  window.setTimeout(() => listAddSection.value?.querySelector('select')?.focus(), 450)
 }
 
 watch(selectedTeacher, async (teacher) => {
@@ -1557,16 +1652,27 @@ function isSpannedCell30(slot, day) {
   return false
 }
 
-const ROW_HEIGHT_30 = 40
 function entryStyle30(rowSlot, entry) {
   if (!entry?.timeIn || !entry?.timeOut) return {}
   const rowStart   = parseTime(rowSlot)
   const entryStart = parseTime(entry.timeIn)
   const mins       = Math.max(1, parseTime(entry.timeOut) - entryStart)
-  const offsetMins = entryStart - rowStart
+  const offsetMins = Math.max(0, entryStart - rowStart)
+  const spannedMins = getRowspan30(entry) * 30
+  const trailingMins = Math.max(0, spannedMins - offsetMins - mins)
+  const hasFollowingEntry = Object.values(entries).some(candidate =>
+    candidate.day === entry.day &&
+    parseTime(candidate.timeIn) === parseTime(entry.timeOut) &&
+    (addMode.value === 'room'
+      ? candidate.room === entry.room
+      : candidate.teacher === entry.teacher)
+  )
+  const bottomGap = hasFollowingEntry ? 4 : -40
   return {
-    top:    (offsetMins / 30) * ROW_HEIGHT_30 + 3 + 'px',
-    height: Math.max(24, (mins / 30) * ROW_HEIGHT_30 - 6) + 'px',
+    top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
+    bottom: `calc(${(trailingMins / spannedMins) * 100}% + ${bottomGap}px)`,
+    height: 'auto',
+    zIndex: 3,
   }
 }
 
@@ -1601,10 +1707,13 @@ function consultEntryStyle30(rowSlot, consult) {
   const rowStart     = parseTime(rowSlot)
   const consultStart = parseTime(consult.startTime)
   const mins         = Math.max(1, parseTime(consult.endTime) - consultStart)
-  const offsetMins   = consultStart - rowStart
+  const offsetMins   = Math.max(0, consultStart - rowStart)
+  const spannedMins  = getConsultRowspan30(consult) * 30
+  const trailingMins = Math.max(0, spannedMins - offsetMins - mins)
   return {
-    top:    (offsetMins / 30) * ROW_HEIGHT_30 + 3 + 'px',
-    height: Math.max(24, (mins / 30) * ROW_HEIGHT_30 - 6) + 'px',
+    top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
+    bottom: `calc(${(trailingMins / spannedMins) * 100}% + 4px)`,
+    height: 'auto',
   }
 }
 
@@ -2070,14 +2179,24 @@ const lunchBreakTimeError = computed(() => {
     : ''
 })
 
+watch(() => lunchBreakForm.timeIn, (startTime) => {
+  if (startTime && lunchBreakForm.timeOut && parseTime(lunchBreakForm.timeOut) <= parseTime(startTime)) {
+    lunchBreakForm.timeOut = ''
+  }
+})
+
 function buildSlots(count) {
   return Array.from({ length: count }, () => ({ section: '', room: '', roomType: 'Lecture' }))
 }
 
 watch([() => form.timeIn, () => form.timeOut], () => {
   if (form.timeIn && form.timeOut) {
-    modalTimeError.value = parseTime(form.timeOut) <= parseTime(form.timeIn)
-      ? 'End of Class must be after Start of Class' : ''
+    if (parseTime(form.timeOut) <= parseTime(form.timeIn)) {
+      form.timeOut = ''
+      modalTimeError.value = ''
+      return
+    }
+    modalTimeError.value = ''
   } else { modalTimeError.value = '' }
 })
 
@@ -2490,8 +2609,12 @@ watch(() => addForm.parallelCount, (val) => {
 
 watch([() => addForm.timeIn, () => addForm.timeOut], () => {
   if (addForm.timeIn && addForm.timeOut) {
-    addTimeError.value = parseTime(addForm.timeOut) <= parseTime(addForm.timeIn)
-      ? 'End of Class must be after Start of Class' : ''
+    if (parseTime(addForm.timeOut) <= parseTime(addForm.timeIn)) {
+      addForm.timeOut = ''
+      addTimeError.value = ''
+      return
+    }
+    addTimeError.value = ''
   } else { addTimeError.value = '' }
 })
 
@@ -2554,8 +2677,12 @@ const consultTimeError  = ref('')
 
 watch([() => consultForm.startTime, () => consultForm.endTime], () => {
   if (consultForm.startTime && consultForm.endTime) {
-    consultTimeError.value = parseTime(consultForm.endTime) <= parseTime(consultForm.startTime)
-      ? 'End time must be after start time' : ''
+    if (parseTime(consultForm.endTime) <= parseTime(consultForm.startTime)) {
+      consultForm.endTime = ''
+      consultTimeError.value = ''
+      return
+    }
+    consultTimeError.value = ''
   } else { consultTimeError.value = '' }
 })
 
@@ -2578,6 +2705,13 @@ function editConsultSlot(slot) {
   consultForm.startTime  = slot.startTime
   consultForm.endTime    = slot.endTime
   consultTimeError.value = ''
+}
+
+async function openConsultSlotModal(slot) {
+  if (!slot) return
+  await openConsultModal()
+  const refreshedSlot = consultationSlots.value.find(item => item.id === slot.id) || slot
+  editConsultSlot(refreshedSlot)
 }
 
 async function saveConsultSlot() {
@@ -2641,10 +2775,10 @@ function printSchedule() {
     '4:00 PM','4:30 PM','5:00 PM','5:30 PM','6:00 PM','6:30 PM','7:00 PM',
   ]
   const colorMap = {
-    'color-green': { bg: '#b7ddc3', fg: '#214d30' }, 'color-yellow': { bg: '#efd77c', fg: '#5d4700' },
-    'color-orange': { bg: '#efd77c', fg: '#5d4700' }, 'color-blue': { bg: '#b6d8f5', fg: '#1d527d' },
-    'color-gray': { bg: '#cdd3d6', fg: '#4e575d' },
-    'color-purple': { bg: '#d8c3ef', fg: '#5b417c' }, 'color-red': { bg: '#e63946', fg: '#ffffff' },
+    'color-green': { bg: '#1f6b45', fg: '#ffffff' }, 'color-yellow': { bg: '#e9c46a', fg: '#5a3e00' },
+    'color-orange': { bg: '#f4a261', fg: '#5a2d00' }, 'color-blue': { bg: '#4a90d9', fg: '#ffffff' },
+    'color-gray': { bg: '#626c76', fg: '#ffffff' },
+    'color-purple': { bg: '#7b5ea7', fg: '#ffffff' }, 'color-red': { bg: '#e63946', fg: '#ffffff' },
   }
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   function toMins(t) {
@@ -2677,6 +2811,13 @@ function printSchedule() {
   function consultRowspanFor(consult) {
     return rowspanFor({ timeIn: consult.startTime, timeOut: consult.endTime })
   }
+  function entryBlock(e) {
+    if (e.entryType === 'lunch') {
+      return `<div class="entry-block"><span class="e-subject e-main">Lunch Break</span><span class="e-time">${esc(e.timeIn)} – ${esc(e.timeOut)}</span></div>`
+    }
+    const meta = [e.section, e.room, e.year].filter(Boolean).join(' · ')
+    return `<div class="entry-block"><span class="e-subject e-main">${esc(e.subject || 'Schedule')}</span><span class="e-time">${esc(e.timeIn)} – ${esc(e.timeOut)}</span>${selectedTeacher.value ? '' : `<span class="e-teacher">${esc(e.teacher || '—')}</span>`}${meta ? `<span class="e-section">${esc(meta)}</span>` : ''}</div>`
+  }
   const occupied = Array.from({length: SLOTS.length}, () => Array(DAYS.length).fill(false))
   let bodyHTML = ''
   for (let si = 0; si < SLOTS.length; si++) {
@@ -2688,9 +2829,9 @@ function printSchedule() {
       if (matched.length > 0) {
         const rs = rowspanFor(matched[0])
         for (let r = 1; r < rs; r++) { if (si + r < SLOTS.length) occupied[si + r][di] = true }
-        const inner = matched.map(e => `<div class="entry-block"><span class="e-time">${esc(e.timeIn)} – ${esc(e.timeOut)}</span><span class="e-section">${esc(e.section)}</span><span class="e-teacher">${esc(e.teacher)}</span><span class="e-subject">${esc(e.subject)}</span><span class="e-room">${esc(e.room)}</span></div>`).join('<hr class="entry-sep">')
+        const inner = matched.map(entryBlock).join('<hr class="entry-sep">')
         const clr = colorMap[matched[0].color] || { bg: '#eef1fb', fg: '#1a1a2e' }
-        bodyHTML += `<td class="entry-cell" rowspan="${rs}" style="background:${clr.bg};color:${clr.fg}">${inner}</td>`
+        bodyHTML += `<td class="entry-cell" rowspan="${rs}" style="--entry-bg:${clr.bg};--entry-fg:${clr.fg};">${inner}</td>`
       } else {
         const consult = filteredConsultations.find(c => c.dayOfWeek === DAYS[di] && toMins(c.startTime) >= slotMins[si] && toMins(c.startTime) < (si + 1 < slotMins.length ? slotMins[si + 1] : slotMins[si] + 30))
         if (consult) {
@@ -2705,11 +2846,11 @@ function printSchedule() {
     bodyHTML += '</tr>'
   }
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Schedule</title>
-<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Segoe UI',Arial,sans-serif;padding:20px;font-size:11px;color:#1a1a2e;}h2{font-size:15px;font-weight:700;margin-bottom:3px;}.sub{font-size:10px;color:#666;margin-bottom:12px;}table{width:100%;border-collapse:collapse;table-layout:fixed;}th{background:#1a1a2e;color:#fff;padding:7px 6px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.04em;border:1px solid #0d0d1e;}th.time-hdr{width:72px;}td{border:1px solid #dde;vertical-align:top;padding:0;}td.time-col{background:#f0f2fa;font-size:10px;font-weight:600;color:#444;text-align:center;padding:5px 3px;width:72px;}td.empty-cell{background:#fafbff;}td.entry-cell{background:#eef1fb;padding:4px 5px;vertical-align:top;}.entry-block{padding:2px 0;}.entry-sep{border:none;border-top:1px dashed #c5cadf;margin:3px 0;}td.entry-cell span{display:block;line-height:1.45;}.e-time{font-size:9px;color:#888;margin-bottom:2px;}.e-section{font-weight:700;font-size:10px;color:#1a1a2e;}.e-teacher{font-size:10px;color:#333;}.e-subject{font-size:9.5px;color:#555;font-style:italic;}.e-room{font-size:9.5px;color:#777;}</style>
-<style>body,td,th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.entry-cell span{color:#fff!important;opacity:1!important;}.consultation-cell{background:#4a90d9!important;color:#fff!important;}</style>
+<style>@page{size:landscape;margin:10mm;}*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Segoe UI',Arial,sans-serif;padding:14px 18px;font-size:11px;color:#1a1a2e;background:#fff;}h2{font-size:15px;font-weight:700;margin-bottom:3px;color:#4b5563;}.sub{font-size:10px;color:#666;margin-bottom:12px;}table{width:100%;border-collapse:collapse;table-layout:fixed;border:1px solid #cfd6df;}th{background:#4b5563;color:#fff;padding:7px 6px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.04em;border:1px solid #0d2a20;}th.time-hdr{width:72px;}tbody tr{height:44px;min-height:44px;max-height:44px;}td{border:1px solid #dde;vertical-align:top;padding:0;}td.time-col{background:#f0f2fa;font-size:10px;font-weight:600;color:#444;text-align:center;padding:5px 3px;width:72px;vertical-align:middle;}td.empty-cell{background:#fafbff;}td.entry-cell{position:relative;background:var(--entry-bg);color:var(--entry-fg);padding:9px 10px;vertical-align:top;border:4px solid #fff;border-radius:9px;box-shadow:inset 0 -1px rgba(0,0,0,.08);overflow:hidden;}.entry-block{padding:1px 0;}.entry-sep{border:none;border-top:1px solid rgba(255,255,255,.28);margin:5px 0;}td.entry-cell span{display:block;line-height:1.45;color:inherit;}.e-main{font-size:10px;font-weight:800;line-height:1.25;}.e-time{font-size:8.7px;opacity:.92;margin-top:2px;}.e-section{font-weight:700;font-size:9.5px;margin-top:2px;}.e-teacher{font-size:9px;font-weight:700;margin-top:2px;}.e-subject{font-size:9.5px;font-weight:700;}.consultation-cell{background:#4a90d9!important;color:#fff!important;}</style>
+<style>body,td,th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.entry-cell span{color:inherit!important;}</style>
 </head><body>
 <h2>Teacher Schedule${selectedTeacher.value ? ' — Prof. ' + esc(selectedTeacher.value) : ''}</h2>
-<p class="sub">Printed on ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</p>
+<p class="sub">${esc([selectedTermLabel.value ? `Term: ${selectedTermLabel.value}` : '', `Printed on ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`].filter(Boolean).join(' • '))}</p>
 <table><thead><tr><th class="time-hdr">Time</th>${DAYS.map(d=>`<th>${esc(d)}</th>`).join('')}</tr></thead>
 <tbody>${bodyHTML}</tbody></table>
 <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<\/script>
@@ -3302,10 +3443,10 @@ onMounted(async () => {
 .color-yellow { background: #e9c46a; color: #5a3e00; }
 .color-orange { background: #f4a261; color: #5a2d00; }
 .color-blue   { background: #4a90d9; color: #fff; }
-.color-gray   { background: #9ca3af; color: #1f2937; }
+.color-gray   { background: #626c76; color: #ffffff; }
 .color-purple { background: #7b5ea7; color: #fff; }
 .color-red    { background: #e63946; color: #fff; }
-.consult-entry { cursor: default; pointer-events: none; }
+.consult-entry { cursor: pointer; pointer-events: auto; }
 .consult-cell  { cursor: default !important; }
 .consult-cell:hover { background: inherit !important; }
 
@@ -3373,6 +3514,288 @@ onMounted(async () => {
 .limit-ok { color: #4b5563; }
 .time-error { display: flex; align-items: center; gap: 6px; color: #e63946; font-size: 0.8rem; font-weight: 500; background: #ffeaea; border-radius: 8px; padding: 8px 12px; margin: 0 28px; }
 
+/* Consultation modal refresh */
+.consult-modal-box {
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  max-height: min(760px,calc(100vh - 40px));
+  padding: 0;
+  overflow: hidden auto;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 18px;
+  background: #f7f8f9;
+  box-shadow: 0 26px 70px rgba(20,27,31,.28), inset 0 1px #fff;
+}
+.consult-modal-box .sched-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid #dde2e5;
+  background: linear-gradient(135deg,#fff,#edf0f1);
+}
+.consult-heading-copy { min-width: 0; flex: 1; }
+.consult-modal-box .sched-modal-mode-badge { margin-bottom: 8px; padding: 5px 9px; color: #64717a; border: 1px solid #d8dee2; background: #f2f4f5; font-size: .61rem; letter-spacing: .1em; }
+.consult-modal-box .sched-modal-title { overflow: hidden; color: #273139; font-size: 1.18rem; font-weight: 680; letter-spacing: -.025em; white-space: nowrap; text-overflow: ellipsis; }
+.consult-close { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; padding: 0; border-color: #cbd2d6; border-radius: 9px; background: linear-gradient(145deg,#fff,#e5e9eb); box-shadow: 0 3px 8px rgba(38,46,52,.07); }
+.consult-close:hover { color: #232d34; border-color: #929ea6; background: #fff; }
+.consult-usage { display: flex; align-items: center; gap: 10px; margin-top: 8px; color: #68747c; font-size: .69rem; font-weight: 600; }
+.consult-progress { width: 110px; height: 5px; overflow: hidden; border-radius: 999px; background: #d9dfe2; }
+.consult-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#71808a,#3d4952); transition: width .2s ease; }
+.consult-slots-list { gap: 8px; padding: 16px 24px 4px; }
+.consult-slot-item { padding: 10px 11px; border-color: #d7dee2; border-radius: 9px; background: #fff; box-shadow: 0 3px 8px rgba(38,46,52,.04); }
+.consult-slot-day { color: #35424b; }
+.consult-slot-time { color: #536069; }
+.consult-slot-dur { padding: 3px 7px; border-radius: 999px; background: #edf1f3; color: #64717a; font-size: .64rem; font-weight: 650; }
+.consult-edit-btn { color: #4b5a64; border-color: #bcc6cc; background: #f7f9fa; }
+.consult-edit-btn:hover { background: #e9edef; }
+.consult-del-btn { color: #8b4b4b; border-color: #dbc4c4; }
+.consult-empty { display: flex; align-items: center; gap: 11px; margin: 16px 24px 2px; padding: 13px 14px; color: #68747c; border: 1px dashed #cbd3d8; border-radius: 10px; background: #f0f3f4; font-style: normal; }
+.consult-empty-icon { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; color: #5a6872; border-radius: 9px; background: #e2e7e9; }
+.consult-empty strong,.consult-empty span { display: block; }
+.consult-empty strong { color: #354149; font-size: .74rem; font-weight: 680; }
+.consult-empty div span { margin-top: 2px; font-size: .65rem; }
+.consult-form-shell { gap: 12px; margin: 16px 24px 0; padding: 17px 0 0; border-top: 1px solid #dce2e5; }
+.consult-form-title { padding: 0 0 2px; color: #34414a; font-size: .82rem; font-weight: 680; }
+.consult-modal-box .form-row-inline { grid-template-columns: 1fr; gap: 6px; }
+.consult-modal-box .form-label { color: #5a6770; font-size: .67rem; font-weight: 680; }
+.consult-modal-box .form-select { min-height: 42px; padding: 9px 34px 9px 11px; color: #344149; border-color: #cbd3d8; border-radius: 9px; background: #fff; font-size: .72rem; }
+.consult-modal-box .form-select:focus { border-color: #7f8d96; box-shadow: 0 0 0 3px rgba(70,84,94,.09); }
+.consult-modal-box .time-error { margin: 0; }
+.consult-modal-box .sched-modal-actions { margin: 18px 0 0; padding: 15px 24px 20px; border-top: 1px solid #dce2e5; background: #f0f3f4; }
+.consult-modal-box .cancel-btn-text { min-height: 38px; padding: 8px 13px; color: #5d6a73; border: 1px solid transparent; border-radius: 8px; font-size: .72rem; font-weight: 650; }
+.consult-modal-box .cancel-btn-text:hover { border-color: #d0d7db; background: #fff; opacity: 1; }
+.consult-modal-box .save-btn { min-height: 40px; padding: 9px 17px; border: 1px solid #414d56; border-radius: 9px; background: linear-gradient(145deg,#64717b,#37434c); box-shadow: 0 4px 10px rgba(38,46,52,.16); font-size: .72rem; }
+.consult-modal-box .save-btn:disabled { color: #929aa0; border-color: #d1d7db; background: #dfe3e5; box-shadow: none; opacity: 1; }
+
+/* Add/edit schedule modal refresh */
+.schedule-entry-modal {
+  width: 720px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 36px);
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,.92);
+  border-radius: 18px;
+  background: #f7f8f9;
+  box-shadow: 0 26px 70px rgba(20,27,31,.3), inset 0 1px #fff;
+}
+.schedule-entry-modal .sched-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0;
+  padding: 21px 24px 17px;
+  border-bottom: 1px solid #dce2e5;
+  background: linear-gradient(135deg,#fff,#edf0f1);
+}
+.schedule-entry-modal .sched-modal-mode-badge { margin-bottom: 7px; padding: 5px 9px; color: #65717a; border: 1px solid #d8dee2; background: #f2f4f5; font-size: .61rem; letter-spacing: .1em; }
+.schedule-entry-modal .sched-modal-title { color: #273139; font-size: 1.22rem; font-weight: 680; letter-spacing: -.025em; }
+.schedule-entry-modal .sched-modal-sub { margin-top: 5px; color: #758088; font-size: .7rem; }
+.schedule-modal-close { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; padding: 0; border-color: #cbd3d8; border-radius: 9px; background: linear-gradient(145deg,#fff,#e5e9eb); box-shadow: 0 3px 8px rgba(38,46,52,.07); }
+.schedule-entry-modal .sched-form {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 14px 16px;
+  margin: 0;
+  padding: 20px 24px;
+}
+.schedule-entry-modal .form-row-inline { display: grid; grid-template-columns: 1fr; align-content: start; gap: 6px; }
+.schedule-entry-modal .form-row-inline.schedule-for-row,
+.schedule-entry-modal .parallel-row,
+.schedule-entry-modal .parallel-slot-divider { grid-column: 1 / -1; }
+.schedule-entry-modal .schedule-for-text { justify-content: flex-start; min-height: 48px; padding: 11px 14px; text-align: left; border-left: 4px solid #59666f; border-radius: 10px; background: linear-gradient(135deg,#f1f3f4,#e2ebe7); box-shadow: none; color: #354149; font-size: .78rem; font-weight: 650; }
+.schedule-entry-modal .form-label { color: #59666f; font-size: .69rem; font-weight: 680; }
+.schedule-entry-modal .form-select,
+.schedule-entry-modal .form-input { min-height: 43px; padding: 9px 34px 9px 11px; color: #344149; border-color: #cbd3d8; border-radius: 9px; background: #fff; font-size: .74rem; }
+.schedule-entry-modal .form-select:focus,
+.schedule-entry-modal .form-input:focus { border-color: #7f8d96; box-shadow: 0 0 0 3px rgba(70,84,94,.09); }
+.schedule-entry-modal .campus-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 4px; border: 1px solid #cbd3d8; border-radius: 9px; background: #e9edef; }
+.schedule-entry-modal .campus-btn { min-height: 34px; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: #5d6972; font-size: .68rem; }
+.schedule-entry-modal .campus-btn.active { color: #fff; background: linear-gradient(145deg,#66737c,#3d4952); box-shadow: 0 3px 7px rgba(38,46,52,.16); }
+.schedule-entry-modal .parallel-row { justify-content: flex-start; gap: 12px; padding: 3px 0; }
+.schedule-entry-modal .parallel-btn { min-height: 38px; padding: 7px 12px; border: 1px solid #d1d8dc; border-radius: 9px; background: #fff; color: #58656e; font-size: .72rem; }
+.schedule-entry-modal .parallel-btn.active { border-color: #87949c; background: #edf1f3; color: #344149; }
+.schedule-entry-modal .par-radio { width: 18px; height: 18px; }
+.schedule-entry-modal .parallel-slot-divider { margin-top: 3px; color: #69757e; border-color: #dce2e5; font-size: .64rem; }
+.schedule-entry-modal .time-error { margin: 0 24px 12px !important; padding: 9px 11px !important; }
+.schedule-entry-modal .lunch-break-footer { margin: 0; padding: 0 24px 18px; }
+.schedule-entry-modal .lunch-break-modal-btn { min-height: 42px; border-color: #bdc7cd; border-radius: 9px; background: #e9edef; color: #4d5a63; font-size: .73rem; }
+.schedule-entry-modal .sched-modal-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: 0;
+  padding: 14px 24px 18px;
+  border-top: 1px solid #dce2e5;
+  background: rgba(244,246,247,.97);
+  backdrop-filter: blur(8px);
+}
+.schedule-entry-modal .cancel-btn-text { min-height: 39px; padding: 8px 14px; color: #5c6972; border: 1px solid transparent; border-radius: 8px; font-size: .73rem; }
+.schedule-entry-modal .cancel-btn-text:hover { border-color: #d0d7db; background: #fff; opacity: 1; }
+.schedule-entry-modal .save-btn { min-height: 41px; padding: 9px 19px; border: 1px solid #414d56; border-radius: 9px; background: linear-gradient(145deg,#64717b,#37434c); box-shadow: 0 4px 10px rgba(38,46,52,.16); font-size: .73rem; }
+.schedule-entry-modal .save-btn:disabled { color: #929aa0; border-color: #d1d7db; background: #dfe3e5; box-shadow: none; opacity: 1; }
+
+/* Consultation readability */
+.consult-modal-box { width: 560px; }
+.consult-modal-box .sched-modal-title { font-size: 1.3rem; }
+.consult-usage { font-size: .76rem; }
+.consult-empty strong { font-size: .8rem; }
+.consult-empty div span { font-size: .72rem; line-height: 1.45; }
+.consult-form-title { font-size: .9rem; }
+.consult-modal-box .form-label { font-size: .74rem; }
+.consult-modal-box .form-select { min-height: 46px; font-size: .8rem; }
+.consult-slot-day,.consult-slot-time { font-size: .76rem; }
+.consult-modal-box .cancel-btn-text,.consult-modal-box .save-btn { font-size: .76rem; }
+@media (max-width: 640px) {
+  .schedule-entry-modal .sched-form { grid-template-columns: 1fr; padding: 18px; }
+  .schedule-entry-modal .form-row-inline.schedule-for-row,
+  .schedule-entry-modal .parallel-row,
+  .schedule-entry-modal .parallel-slot-divider { grid-column: auto; }
+  .schedule-entry-modal .sched-modal-header,
+  .schedule-entry-modal .sched-modal-actions { padding-right: 18px; padding-left: 18px; }
+}
+
+/* Modal legibility and metallic lunch-break dialog */
+.modal-overlay { background: rgba(28,34,38,.5); backdrop-filter: blur(4px); }
+.schedule-entry-modal .form-label { font-size: .76rem; line-height: 1.35; }
+.schedule-entry-modal .form-select,
+.schedule-entry-modal .form-input { font-size: .81rem; line-height: 1.35; }
+.schedule-entry-modal .sched-modal-sub { font-size: .77rem; line-height: 1.45; }
+.schedule-entry-modal .schedule-for-text { font-size: .84rem; line-height: 1.4; }
+
+.lunch-break-picker {
+  width: 500px;
+  max-width: calc(100vw - 32px);
+  padding: 0;
+  overflow: hidden;
+  color: #303b43;
+  border: 1px solid rgba(255,255,255,.92);
+  border-radius: 18px;
+  background: #f6f8f9;
+  box-shadow: 0 26px 70px rgba(20,27,31,.3), inset 0 1px #fff;
+}
+.lunch-break-picker-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  padding: 21px 22px 17px;
+  border-bottom: 1px solid #dbe1e4;
+  background: linear-gradient(135deg,#fff,#e9edef);
+}
+.lunch-break-picker-icon {
+  width: 40px;
+  height: 40px;
+  color: #44515a;
+  border-color: #c4cdd2;
+  border-radius: 10px;
+  background: linear-gradient(145deg,#fff,#dce2e5);
+  box-shadow: 0 3px 8px rgba(38,46,52,.07), inset 0 1px #fff;
+}
+.lunch-break-picker-copy { min-width: 0; flex: 1; }
+.lunch-break-picker-eyebrow { display: block; margin-bottom: 4px; color: #77838b; font-size: .62rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.lunch-break-picker h2 { color: #273139; font-size: 1.15rem; font-weight: 680; letter-spacing: -.02em; }
+.lunch-break-picker-header p { margin-top: 4px; overflow: hidden; color: #69757d; font-size: .73rem; font-weight: 550; white-space: nowrap; text-overflow: ellipsis; }
+.lunch-break-picker-close {
+  display: grid;
+  width: 35px;
+  height: 35px;
+  flex: 0 0 35px;
+  place-items: center;
+  padding: 0;
+  color: #5b6871;
+  border: 1px solid #c8d0d5;
+  border-radius: 9px;
+  background: linear-gradient(145deg,#fff,#e1e6e8);
+  box-shadow: 0 3px 8px rgba(38,46,52,.07);
+  cursor: pointer;
+}
+.lunch-break-picker-close:hover { color: #222c33; border-color: #929ea6; background: #fff; }
+.lunch-break-picker-help { margin: 18px 22px 0; padding: 11px 12px; color: #5f6c74; border-left: 3px solid #64727c; border-radius: 0 8px 8px 0; background: #e9edef; font-size: .75rem; line-height: 1.55; }
+.lunch-break-picker-fields { gap: 14px; padding: 18px 22px 2px; }
+.lunch-break-picker-field { grid-template-columns: 1fr; gap: 7px; color: #55626b; font-size: .76rem; font-weight: 680; }
+.lunch-break-picker-field select { min-height: 46px; padding: 10px 36px 10px 12px; color: #303b43; border-color: #c5ced3; border-radius: 9px; background: #fff; font-size: .82rem; outline: none; }
+.lunch-break-picker-field select:focus { border-color: #7d8a93; box-shadow: 0 0 0 3px rgba(70,84,94,.1); }
+.lunch-break-picker-error { margin: 14px 22px 0; padding: 10px 11px; color: #884848; border: 1px solid #e2caca; background: #f8eaea; font-size: .74rem; line-height: 1.45; }
+.lunch-break-picker-actions { margin: 18px 0 0; padding: 14px 22px 19px; border-top: 1px solid #dbe1e4; background: #edf1f2; }
+.lunch-break-picker-actions .cancel-btn-text { min-height: 40px; padding: 8px 14px; color: #5a6770; border: 1px solid transparent; border-radius: 8px; font-size: .76rem; font-weight: 650; }
+.lunch-break-picker-actions .cancel-btn-text:hover { border-color: #ced6da; background: #fff; opacity: 1; }
+.lunch-break-picker-actions .save-btn { min-height: 42px; padding: 9px 18px; border: 1px solid #414d56; border-radius: 9px; background: linear-gradient(145deg,#64717b,#37434c); box-shadow: 0 4px 10px rgba(38,46,52,.16); font-size: .76rem; }
+.lunch-break-picker-actions .save-btn:disabled { color: #929aa0; border-color: #d1d7db; background: #dfe3e5; box-shadow: none; opacity: 1; }
+
+/* Edit schedule hierarchy */
+.schedule-entry-modal .schedule-teacher-field,
+.schedule-entry-modal .schedule-subject-field,
+.schedule-entry-modal .schedule-campus-field { grid-column: 1 / -1; }
+.schedule-entry-modal .schedule-teacher-field .form-value-locked {
+  min-height: 46px;
+  padding: 10px 13px;
+  color: #354149;
+  border: 1px solid #d2d9dd;
+  border-left: 4px solid #64727c;
+  border-radius: 9px;
+  background: linear-gradient(135deg,#f4f6f7,#e9edef);
+  font-size: .82rem;
+  font-weight: 650;
+}
+.schedule-entry-modal .schedule-subject-field .form-select { font-weight: 560; }
+.schedule-entry-modal .schedule-campus-field .campus-toggle { max-width: 100%; }
+.schedule-entry-modal .clear-slot-btn {
+  min-height: 40px;
+  padding: 8px 14px;
+  color: #7d4747;
+  border-color: #d7bcbc;
+  border-radius: 9px;
+  background: #faf4f4;
+  font-size: .72rem;
+  box-shadow: none;
+}
+.schedule-entry-modal .clear-slot-btn:hover { color: #713b3b; border-color: #c99f9f; background: #f5e7e7; }
+.schedule-entry-modal.badge-edit,
+.schedule-entry-modal .badge-edit { color: #59666f; border-color: #ccd4d9; background: #edf1f3; }
+@media (max-width: 640px) {
+  .schedule-entry-modal .schedule-teacher-field,
+  .schedule-entry-modal .schedule-subject-field,
+  .schedule-entry-modal .schedule-campus-field { grid-column: auto; }
+}
+
+/* Exact timetable boundary alignment */
+.sched-grid td.td-time { position: sticky; overflow: visible; }
+.time-boundary-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  padding: 2px 4px;
+  background: #f7f8f9;
+  line-height: 1.2;
+  text-align: center;
+  transform: translateY(-50%);
+}
+.sched-grid tbody tr:first-child .time-boundary-label { top: 6px; transform: none; }
+.free-time-cell { position: relative; vertical-align: middle !important; }
+.free-time-cell .click-to-add {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: 0;
+  line-height: 1.2;
+  text-align: center;
+}
+.sched-entry { top: 0; bottom: 0; border-radius: 6px; }
+
 /* ═══ Add Schedule Panel ═══ */
 .panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.30); z-index: 900; display: flex; justify-content: flex-end; }
 .add-panel { width: 420px; max-width: 96vw; background: #fff; height: 100vh; display: flex; flex-direction: column; box-shadow: -4px 0 32px rgba(0,0,0,0.14); overflow: hidden; }
@@ -3408,6 +3831,828 @@ onMounted(async () => {
 .logout-confirm-btn { background: #4b5563; color: #fff; border: none; font-family: inherit; font-size: 1rem; font-weight: 600; padding: 10px 32px; border-radius: 10px; cursor: pointer; }
 .logout-confirm-btn:hover { background: #6b7280; }
 .room-type-stack{display:flex;flex-direction:column;gap:6px}
+
+/* Timetable workspace refresh */
+.main { padding: 26px 32px 44px; }
+.main-header {
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 8px 2px 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.header-left { min-width: 0; gap: 4px; }
+.page-heading-row { display: flex; min-width: 0; align-items: center; gap: 14px; }
+.page-heading-copy { min-width: 0; }
+.page-eyebrow {
+  display: block;
+  color: #707c85;
+  font-size: .63rem;
+  font-weight: 750;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.bc-btn {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  min-height: 36px;
+  padding: 7px 11px;
+  color: #4e5a63;
+  border: 1px solid #cbd2d6;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #fff, #e7eaec);
+  box-shadow: 0 3px 8px rgba(40,48,54,.07), inset 0 1px 0 #fff;
+  text-decoration: none;
+}
+.page-heading-row .bc-btn {
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  flex: 0 0 42px;
+  justify-content: center;
+  padding: 0;
+  font-size: 1rem;
+  text-decoration: none;
+}
+.page-title {
+  margin-top: 4px;
+  color: #1f2933;
+  font-size: clamp(2rem, 3vw, 2.65rem);
+  font-weight: 500;
+  letter-spacing: -.04em;
+  line-height: 1.08;
+}
+.page-sub { max-width: 680px; margin-top: 9px; color: #66727c; font-size: .94rem; line-height: 1.55; }
+.header-right { align-items: flex-end; gap: 10px; }
+.term-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #343f47;
+  white-space: nowrap;
+}
+.term-banner-label { color: #7a858d; font-size: .62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.term-banner strong { font-size: .77rem; font-weight: 650; }
+.header-actions { padding: 0; }
+.term-current-label { color: #4c5861; font-size: .78rem; }
+.view-toggle {
+  gap: 3px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid #d1d7db;
+  border-radius: 11px;
+  background: rgba(238,240,241,.86);
+}
+.view-btn { min-height: 38px; padding: 8px 14px; border: 0; border-radius: 8px; background: transparent; font-size: .74rem; font-weight: 650; }
+.view-btn:hover { background: rgba(255,255,255,.76); }
+.view-btn.active { background: linear-gradient(145deg, #626c75, #343c43); box-shadow: 0 4px 9px rgba(38,45,50,.2), inset 0 1px rgba(255,255,255,.18); }
+.schedule-card {
+  padding: 0;
+  overflow: visible;
+  border: 1px solid rgba(255,255,255,.88);
+  border-radius: 18px;
+  background: #eef1f2;
+  box-shadow: 0 14px 34px rgba(38,46,52,.11), inset 0 1px 0 #fff;
+}
+.main .schedule-card {
+  border: 1px solid rgba(255,255,255,.88) !important;
+  border-radius: 18px !important;
+  background: #eef1f2 !important;
+  box-shadow: 0 14px 34px rgba(38,46,52,.11), inset 0 1px 0 #fff !important;
+}
+.sched-topbar {
+  align-items: center;
+  margin: 0;
+  padding: 18px 20px;
+  border: 0;
+  border-bottom: 1px solid #d7dde1;
+  border-radius: 17px 17px 0 0;
+  background: linear-gradient(135deg,#fff,#eceff0);
+  box-shadow: inset 0 1px 0 #fff;
+}
+.schedule-back-btn {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  padding: 0;
+  color: #46535c;
+  border: 1px solid #c8d0d5;
+  border-radius: 10px;
+  background: linear-gradient(145deg,#fff,#e2e6e8);
+  box-shadow: 0 3px 8px rgba(39,47,53,.08), inset 0 1px 0 #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+.schedule-back-btn:hover { color: #202a31; border-color: #939fa7; background: #fff; transform: translateX(-2px); }
+.schedule-back-btn:focus-visible { outline: 3px solid rgba(49,70,83,.18); outline-offset: 2px; }
+.sched-topbar-left { min-width: 0; flex: 1; }
+.sched-context-label {
+  display: block;
+  margin: 0 0 7px;
+  color: #76818a;
+  font-size: .64rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.sched-grid-title { display: flex; align-items: center; color: #252d33; font-size: 1.3rem; line-height: 1.25; letter-spacing: -.025em; }
+.sched-grid-title svg { width: 19px; height: 19px; flex: 0 0 19px; margin-right: 9px !important; }
+.sched-grid-sub.teacher-selected {
+  margin-top: 5px;
+  padding: 0;
+  color: #707b83;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: .72rem;
+  font-weight: 500;
+}
+.sched-topbar-right { padding: 4px; border: 1px solid #d3dade; border-radius: 11px; background: #eef1f2; }
+.sched-select { min-height: 38px; border-color: transparent; border-radius: 8px; background: transparent; color: #48545d; font-size: .72rem; font-weight: 600; }
+.sched-select:hover,.sched-select:focus { border-color: #bec7cc; background: #fff; }
+.icon-btn.consult-btn { width: 38px; height: 38px; border-radius: 8px; color: #fff; border-color: #3e4b55; background: linear-gradient(145deg,#62717b,#35434c); box-shadow: 0 3px 8px rgba(38,48,55,.17); }
+.main .sched-grid-wrap {
+  width: 100%;
+  margin: 0;
+  padding: 18px;
+  overflow-x: auto;
+  border: 0 !important;
+  border-radius: 0 0 17px 17px !important;
+  background: #eef1f2 !important;
+  box-shadow: none !important;
+}
+.sched-grid { overflow: hidden; border: 1px solid #ccd4d9; border-radius: 12px; border-collapse: separate; border-spacing: 0; background: #fff; box-shadow: 0 5px 16px rgba(39,47,53,.06); }
+.sched-grid th { height: 48px; padding: 11px 9px; background: #424c55; font-size: .75rem; letter-spacing: .01em; }
+.sched-grid th:first-child { border-radius: 12px 0 0; }
+.sched-grid th:last-child { border-radius: 0 12px 0 0; }
+.sched-grid tbody tr { height: 44px; }
+.sched-grid td { border-width: 0 1px 1px 0; border-color: #e0e4e7; }
+.sched-grid tbody tr.half-hour td { border-top: 1px dashed #dfe4e7; }
+.sched-grid td.td-time {
+  overflow: visible;
+  color: #536069;
+  border-right: 1px solid #cfd6da;
+  background: #f7f8f9;
+  font-size: .66rem;
+  vertical-align: middle;
+}
+.sched-grid tbody tr.half-hour .td-time { background: #f7f8f9; }
+.time-boundary-label {
+  position: static;
+  display: block;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  line-height: 1.2;
+  text-align: center;
+  transform: none;
+}
+.free-time-cell { background: #f8f9fa; }
+.free-time-cell:hover { background: #edf1f3; }
+.free-time-cell .click-to-add { color: #8a949b; font-size: .63rem; opacity: 0; transition: opacity .15s ease; }
+.free-time-cell:hover .click-to-add { opacity: 1; }
+.sched-entry { left: 4px; right: 4px; padding: 7px 8px; border-radius: 7px; box-shadow: 0 3px 8px rgba(30,39,44,.14); }
+.entry-teacher {
+  display: -webkit-box;
+  padding-right: 0;
+  overflow: hidden;
+  font-size: .72rem;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.entry-subject {
+  display: -webkit-box;
+  padding-right: 0;
+  overflow: hidden;
+  font-size: .67rem;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.entry-time-range { font-size: .62rem; font-style: normal; font-weight: 550; }
+.entry-timestamp { opacity: .7; }
+
+/* Refined list workspace */
+.main-list-view { padding-right: 24px; padding-left: 24px; }
+.main-list-view .main-header,
+.main-list-view .list-schedule-card { width: 100%; max-width: none; }
+.main .list-schedule-card {
+  width: 100%;
+  max-width: none;
+  overflow: visible;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.list-schedule-toolbar {
+  min-height: 92px;
+  padding: 18px 22px;
+  border: 1px solid rgba(255,255,255,.94);
+  border-radius: 16px;
+  background: linear-gradient(135deg,#fff,#eceff0);
+  box-shadow: 0 10px 24px rgba(38,46,52,.09), inset 0 1px 0 #fff;
+}
+.list-summary { display: flex; min-width: 0; align-items: center; gap: 13px; }
+.list-summary-count {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  place-items: center;
+  color: #fff;
+  border: 1px solid #69747d;
+  border-radius: 12px;
+  background: linear-gradient(145deg,#69747d,#354049);
+  box-shadow: 0 5px 12px rgba(38,47,54,.18), inset 0 1px rgba(255,255,255,.2);
+  font-size: 1rem;
+  font-weight: 700;
+}
+.list-summary-title { margin: 0; color: #283139; font-size: 1rem; font-weight: 680; letter-spacing: -.015em; }
+.list-summary-copy { margin: 4px 0 0; color: #748089; font-size: .72rem; line-height: 1.45; }
+.list-toolbar-actions { display: flex; align-items: center; }
+.list-toolbar-actions .new-sched-btn {
+  min-height: 42px;
+  padding: 10px 17px;
+  border: 1px solid #434f58;
+  border-radius: 10px;
+  background: linear-gradient(145deg,#626e78,#354049);
+  box-shadow: 0 5px 12px rgba(38,47,54,.18), inset 0 1px rgba(255,255,255,.18);
+  font-size: .76rem;
+  font-weight: 650;
+  letter-spacing: .005em;
+}
+.list-toolbar-actions .new-sched-btn:hover { background: linear-gradient(145deg,#707c85,#424d56); transform: translateY(-1px); }
+.schedule-list-wrap { width: 100%; margin: 18px 0 0; background: transparent; }
+.schedule-list-table-wrap {
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: visible;
+  border: 1px solid #d6dde1;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(38,46,52,.09);
+  scrollbar-color: #aab3b9 transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.schedule-list-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  background: #fff;
+}
+.schedule-list-table thead th:first-child { border-radius: 13px 0 0; }
+.schedule-list-table thead th:last-child { border-radius: 0 13px 0 0; }
+.schedule-list-table th,
+.schedule-list-table td { border: 0; border-bottom: 1px solid #e3e7e9; text-align: left; vertical-align: middle; }
+.schedule-list-table th {
+  height: 46px;
+  padding: 11px 14px;
+  color: #65717a;
+  background: #f1f3f4;
+  font-size: .62rem;
+  font-weight: 750;
+  letter-spacing: .075em;
+  text-transform: uppercase;
+}
+.schedule-list-table td { height: 66px; padding: 12px 14px; color: #343e46; font-size: .76rem; line-height: 1.4; }
+.schedule-list-table th + th,
+.schedule-list-table td + td { border-left: 1px solid #edf0f1; }
+.schedule-list-table th:nth-child(1) { width: 9%; }
+.schedule-list-table th:nth-child(2) { width: 13%; }
+.schedule-list-table th:nth-child(3) { width: 8%; }
+.schedule-list-table th:nth-child(4) { width: 24%; }
+.schedule-list-table th:nth-child(5) { width: 16%; }
+.schedule-list-table th:nth-child(6) { width: 7%; }
+.schedule-list-table th:nth-child(7) { width: 10%; }
+.schedule-list-table th:nth-child(8) { width: 13%; }
+.schedule-list-row { cursor: pointer; transition: background .14s ease, box-shadow .14s ease; }
+.schedule-list-row:nth-child(even) { background: #fbfcfc; }
+.schedule-list-row:hover { background: #eef2f4; box-shadow: inset 3px 0 #53616b; }
+.schedule-list-row:focus-within { outline: 2px solid #687782; outline-offset: -2px; }
+.list-day { color: #2f3a42; font-weight: 680; }
+.list-time { display: inline-block; color: #33424c; font-size: .72rem; font-weight: 650; white-space: nowrap; }
+.list-year,
+.list-room,
+.list-section {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid #d9dfe2;
+  border-radius: 7px;
+  background: #f1f4f5;
+  color: #53616a;
+  font-size: .68rem;
+  font-weight: 620;
+}
+.list-subject { display: -webkit-box; overflow: hidden; color: #263139; font-weight: 570; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.list-teacher { display: -webkit-box; overflow: hidden; color: #39464f; font-weight: 620; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.list-campus { display: block; overflow: hidden; color: #66727b; white-space: nowrap; text-overflow: ellipsis; }
+.empty-state-row td { height: 150px; border-left: 0; color: #748089; text-align: center; }
+.schedule-list-table tbody tr:last-child td:first-child { border-radius: 0 0 0 13px; }
+.schedule-list-table tbody tr:last-child td:last-child { border-radius: 0 0 13px; }
+.list-add-section {
+  scroll-margin: 28px;
+  margin-top: 20px;
+  padding: 22px;
+  border: 1px solid #d4dce0;
+  border-radius: 15px;
+  background: linear-gradient(145deg,#fff,#eef1f2);
+  box-shadow: 0 10px 24px rgba(38,46,52,.08), inset 0 1px #fff;
+}
+.list-add-section:focus-within { border-color: #9ca8b0; box-shadow: 0 12px 28px rgba(38,46,52,.11), 0 0 0 3px rgba(82,98,109,.08); }
+.list-add-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 17px; border-bottom: 1px solid #dce2e5; }
+.list-add-eyebrow { display: block; margin-bottom: 5px; color: #77838b; font-size: .61rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.list-add-heading h3 { margin: 0; color: #273139; font-size: 1.05rem; font-weight: 680; letter-spacing: -.02em; }
+.list-add-heading p { margin: 4px 0 0; color: #717d85; font-size: .71rem; }
+.list-add-required { flex: 0 0 auto; padding: 5px 9px; color: #66727b; border: 1px solid #d7dde1; border-radius: 999px; background: #f4f6f7; font-size: .6rem; font-weight: 650; }
+.list-add-grid {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 19px 2px 16px;
+  overflow-x: visible;
+  scrollbar-color: #aab3b9 transparent;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.list-field { display: flex; min-width: 0; flex-direction: column; gap: 7px; color: #56636c; font-size: .65rem; font-weight: 680; }
+.list-field { width: 118px; min-width: 0; flex: 1 1 118px; }
+.list-field-time { width: 230px; min-width: 0; flex: 1.5 1 230px; }
+.list-field-wide { width: 220px; min-width: 0; flex: 1.6 1 220px; }
+.list-campus-field { width: 156px; min-width: 0; flex: 1.1 1 156px; }
+.list-field .form-select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 9px 22px 9px 9px;
+  color: #354149;
+  border: 1px solid #cbd3d8;
+  border-radius: 9px;
+  background-color: #fbfcfc;
+  font-size: .66rem;
+  font-weight: 520;
+  text-overflow: ellipsis;
+}
+.list-field .form-select:focus { border-color: #7e8c95; background-color: #fff; box-shadow: 0 0 0 3px rgba(76,91,102,.09); }
+.list-field-time .time-inputs { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
+.list-field-time .time-separator { color: #7b878f; font-size: .62rem; font-weight: 650; }
+.list-field-error { color: #a54545; font-size: .6rem; font-weight: 600; }
+.list-campus-options { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 4px; border: 1px solid #cbd3d8; border-radius: 9px; background: #e9edef; }
+.list-campus-options button { min-height: 32px; color: #5e6a72; border: 0; border-radius: 6px; background: transparent; font: inherit; cursor: pointer; }
+.list-campus-options button.active { color: #fff; background: linear-gradient(145deg,#66727c,#3c4750); box-shadow: 0 3px 7px rgba(38,46,52,.17); }
+.list-add-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; border-top: 1px solid #dce2e5; color: #758189; font-size: .66rem; }
+.list-add-submit { min-height: 40px; padding: 9px 18px; color: #fff; border: 1px solid #3f4b54; border-radius: 9px; background: linear-gradient(145deg,#626f78,#354149); box-shadow: 0 4px 10px rgba(38,46,52,.16); font: inherit; font-size: .72rem; font-weight: 680; cursor: pointer; }
+.list-add-submit:hover:not(:disabled) { background: linear-gradient(145deg,#707d86,#424e57); transform: translateY(-1px); }
+.list-add-submit:disabled { color: #8d969c; border-color: #d2d8dc; background: #e1e5e7; box-shadow: none; cursor: not-allowed; }
+.schedule-list-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 4px 2px;
+  color: #748089;
+  font-size: .7rem;
+}
+.list-footer-action {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  color: #46545e;
+  border: 1px solid #cbd3d8;
+  border-radius: 9px;
+  background: linear-gradient(145deg,#fff,#e9edef);
+  box-shadow: 0 3px 8px rgba(38,46,52,.07), inset 0 1px #fff;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.list-footer-action:hover { color: #202a31; border-color: #9eabb3; background: #fff; }
+@media (max-width: 900px) {
+  .main { padding: 24px 20px 40px; }
+  .main-header { align-items: flex-start; flex-direction: column; }
+  .header-right { width: 100%; align-items: flex-start; }
+  .sched-topbar { align-items: flex-start; flex-direction: column; }
+  .list-schedule-toolbar { gap: 14px; }
+  .list-toolbar-actions { width: 100%; }
+  .list-toolbar-actions .new-sched-btn { width: 100%; justify-content: center; }
+  .schedule-list-footer { align-items: flex-start; flex-direction: column; }
+  .sched-grid-wrap { padding: 14px; }
+}
+@media (max-width: 560px) {
+  .list-add-section { padding: 18px 15px; }
+  .list-add-heading,.list-add-actions { align-items: flex-start; flex-direction: column; }
+  .list-add-submit { width: 100%; }
+}
+
+/* Timetable interaction and event-spacing refinements */
+.sched-grid td.td-time {
+  position: sticky;
+  overflow: visible;
+  padding: 0 8px;
+  vertical-align: middle;
+}
+.time-boundary-label {
+  position: static;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  line-height: 1.2;
+  text-align: center;
+  transform: none;
+}
+.sched-grid tbody tr:first-child .time-boundary-label {
+  top: auto;
+  transform: none;
+}
+.free-time-cell {
+  position: relative;
+  vertical-align: middle !important;
+}
+.free-time-cell .click-to-add {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: 0;
+  line-height: 1.2;
+  text-align: center;
+}
+.sched-entry {
+  left: 4px;
+  right: 4px;
+  border-radius: 7px;
+}
+.consult-entry {
+  overflow: hidden;
+  left: 6px;
+  right: 6px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255,255,255,.28);
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+}
+.consult-entry:hover {
+  z-index: 6;
+  filter: brightness(1.04);
+  box-shadow: 0 8px 18px rgba(35,84,132,.28);
+  transform: translateY(-1px);
+}
+.consult-entry:focus-visible {
+  z-index: 7;
+  outline: 3px solid rgba(74,144,217,.32);
+  outline-offset: 2px;
+}
+.consult-edit-hint {
+  position: absolute;
+  right: 7px;
+  bottom: 6px;
+  padding: 3px 7px;
+  color: rgba(255,255,255,.94);
+  border-radius: 999px;
+  background: rgba(24,65,106,.34);
+  font-size: .58rem;
+  font-weight: 650;
+  letter-spacing: .01em;
+  opacity: .84;
+}
+.consult-entry:hover .consult-edit-hint,
+.consult-entry:focus-visible .consult-edit-hint { background: rgba(24,65,106,.52); opacity: 1; }
+
+/* Consultation dialog layout */
+.consult-modal-box {
+  width: 940px;
+  max-height: calc(100vh - 48px);
+  color: #2f3a42;
+  border-radius: 22px;
+  background: #f7f9fa;
+}
+.consult-modal-box .sched-modal-header {
+  align-items: flex-start;
+  padding: 24px 26px 22px;
+  background: linear-gradient(145deg,#fff 0%,#f1f4f5 68%,#e9eef0 100%);
+}
+.consult-header-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  place-items: center;
+  color: #fff;
+  border: 1px solid #45545e;
+  border-radius: 13px;
+  background: linear-gradient(145deg,#697983,#3d4b54);
+  box-shadow: 0 7px 16px rgba(43,56,64,.2), inset 0 1px rgba(255,255,255,.22);
+}
+.consult-modal-box .sched-modal-mode-badge { margin-bottom: 6px; }
+.consult-modal-box .sched-modal-title { font-size: 1.25rem; line-height: 1.25; }
+.consult-modal-subtitle { margin: 5px 0 0; color: #738089; font-size: .74rem; line-height: 1.5; }
+.consult-modal-content {
+  display: grid;
+  grid-template-columns: minmax(0,3fr) minmax(0,7fr);
+  min-height: 430px;
+}
+.consult-left-pane {
+  min-width: 0;
+  padding: 22px 18px 24px;
+  border-right: 1px solid #dce2e5;
+  background: #f2f5f6;
+}
+.consult-left-pane .consult-slot-dur { display: none; }
+.consult-left-pane .consult-slot-item { gap: 9px; padding: 11px 10px; }
+.consult-left-pane .consult-slot-actions { gap: 4px; }
+.consult-left-pane .consult-edit-btn { padding: 5px; }
+.consult-right-pane {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  background: #fafbfb;
+}
+.consult-usage {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid #d8dfe3;
+  border-radius: 10px;
+  background: rgba(255,255,255,.75);
+}
+.consult-usage-copy { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.consult-usage-copy span { color: #748089; font-size: .67rem; font-weight: 650; }
+.consult-usage-copy strong { color: #3f4c55; font-size: .71rem; font-weight: 750; }
+.consult-progress { width: 100%; height: 7px; align-self: center; background: #dce2e5; }
+.consult-progress span { background: linear-gradient(90deg,#71838e,#3f4e58); }
+.consult-section-heading { display: flex; align-items: flex-start; flex-direction: column; justify-content: space-between; gap: 5px; padding: 22px 0 10px; }
+.consult-section-heading div { display: flex; align-items: center; gap: 9px; }
+.consult-section-heading span { color: #344149; font-size: .83rem; font-weight: 750; }
+.consult-section-heading strong { padding: 3px 8px; color: #64727b; border-radius: 999px; background: #e7ecee; font-size: .62rem; }
+.consult-section-heading p { margin: 0; color: #849098; font-size: .65rem; }
+.consult-slots-list { max-height: 285px; padding: 0 2px 5px 0; overflow-y: auto; }
+.consult-slot-item { gap: 12px; padding: 12px 13px; border-radius: 12px; transition: border-color .15s ease, box-shadow .15s ease; }
+.consult-slot-item:hover { border-color: #bdc8ce; box-shadow: 0 6px 14px rgba(40,52,60,.08); }
+.consult-slot-calendar { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; color: #586872; border-radius: 9px; background: #edf1f3; }
+.consult-slot-details { min-width: 0; flex: 1; }
+.consult-slot-day { min-width: 0; color: #344149; font-size: .77rem; }
+.consult-slot-time { margin-top: 2px; color: #748089; font-size: .7rem; }
+.consult-slot-dur { flex: 0 0 auto; padding: 4px 8px; }
+.consult-slot-actions { margin-left: 2px; }
+.consult-edit-btn,.consult-del-btn { min-height: 32px; border-radius: 8px; }
+.consult-edit-btn { display: grid; width: 32px; padding: 5px; place-items: center; }
+.consult-del-btn { width: 32px; justify-content: center; padding: 5px; }
+.consult-form-shell {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 14px 16px;
+  margin: 22px 24px 0;
+  padding: 19px;
+  border: 1px solid #d9e0e4;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 5px 14px rgba(40,52,60,.05);
+}
+.consult-form-heading { grid-column: 1 / -1; display: flex; align-items: center; gap: 11px; padding-bottom: 2px; }
+.consult-form-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; color: #fff; border-radius: 9px; background: #4a5963; }
+.consult-form-heading .consult-form-title { padding: 0; font-size: .83rem; }
+.consult-form-heading p { margin: 2px 0 0; color: #7c8991; font-size: .65rem; }
+.consult-day-field { grid-column: 1 / -1; }
+.consult-modal-box .form-row-inline { gap: 7px; }
+.consult-modal-box .form-select { min-height: 44px; }
+.consult-modal-box .time-error { grid-column: 1 / -1; }
+.consult-modal-box .sched-modal-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  gap: 9px;
+  margin-top: auto;
+  padding: 15px 24px 19px;
+  background: rgba(240,244,245,.96);
+  backdrop-filter: blur(8px);
+}
+.consult-modal-box .save-btn { min-width: 126px; justify-content: center; }
+@media (max-width: 640px) {
+  .consult-modal-box { width: calc(100vw - 24px); max-height: calc(100vh - 24px); }
+  .consult-modal-box .sched-modal-header { padding: 20px 18px; }
+  .consult-header-icon { display: none; }
+  .consult-modal-content { display: block; min-height: 0; }
+  .consult-left-pane { padding: 18px; border-right: 0; border-bottom: 1px solid #dce2e5; }
+  .consult-usage { grid-template-columns: 1fr; }
+  .consult-section-heading { padding-right: 0; padding-left: 0; }
+  .consult-slots-list { max-height: none; padding-right: 0; padding-left: 0; }
+  .consult-slot-dur { display: none; }
+  .consult-form-shell { grid-template-columns: 1fr; margin-right: 18px; margin-left: 18px; padding: 16px; }
+  .consult-form-heading,.consult-day-field { grid-column: auto; }
+  .consult-modal-box .sched-modal-actions { padding-right: 18px; padding-left: 18px; }
+}
+@media (min-width: 641px) and (max-width: 900px) {
+  .consult-modal-box { width: calc(100vw - 32px); }
+  .consult-modal-content { grid-template-columns: minmax(0,3fr) minmax(0,7fr); }
+  .consult-left-pane { padding: 20px; }
+  .consult-form-shell { grid-template-columns: 1fr; margin: 20px; }
+  .consult-form-heading,.consult-day-field { grid-column: auto; }
+}
+
+/* Metallic gray neumorphic consultation theme */
+.consult-modal-box {
+  border: 1px solid rgba(255,255,255,.92);
+  background: linear-gradient(145deg,#e9edef,#cfd5d9);
+  box-shadow: 26px 26px 60px rgba(22,29,34,.38), -12px -12px 34px rgba(255,255,255,.38), inset 0 1px 1px #fff;
+}
+.consult-modal-box .sched-modal-header {
+  border-bottom-color: #bfc7cc;
+  background: linear-gradient(145deg,#f4f6f7,#d6dce0);
+  box-shadow: inset 0 1px #fff, 0 8px 20px rgba(48,59,66,.1);
+}
+.consult-header-icon {
+  color: #f9fbfc;
+  border-color: #39464f;
+  background: linear-gradient(145deg,#697984,#36434c);
+  box-shadow: 7px 7px 14px rgba(55,65,72,.28), -5px -5px 12px rgba(255,255,255,.9), inset 1px 1px rgba(255,255,255,.25);
+}
+.consult-modal-box .sched-modal-mode-badge {
+  color: #53616a;
+  border-color: #c3cbd0;
+  background: linear-gradient(145deg,#f5f7f8,#dce1e4);
+  box-shadow: 3px 3px 7px rgba(72,83,90,.13), -3px -3px 7px #fff;
+}
+.consult-close {
+  color: #4d5961;
+  border-color: #c1c9ce;
+  background: linear-gradient(145deg,#f2f4f5,#cfd5d9);
+  box-shadow: 6px 6px 12px rgba(68,78,85,.2), -5px -5px 11px rgba(255,255,255,.92), inset 0 1px #fff;
+}
+.consult-close:hover {
+  color: #242e34;
+  border-color: #aeb8be;
+  background: linear-gradient(145deg,#fff,#d7dde0);
+  transform: translateY(-1px);
+}
+.consult-left-pane {
+  border-right-color: #bcc5ca;
+  background: linear-gradient(145deg,#dce1e4,#cbd2d6);
+  box-shadow: inset -8px 0 18px rgba(74,84,91,.08), inset 1px 0 rgba(255,255,255,.72);
+}
+.consult-right-pane { background: linear-gradient(145deg,#e7ebed,#d5dbde); }
+.consult-usage {
+  border-color: rgba(255,255,255,.68);
+  background: linear-gradient(145deg,#e9edef,#cdd4d8);
+  box-shadow: 8px 8px 17px rgba(76,87,94,.19), -7px -7px 16px rgba(255,255,255,.76), inset 0 1px #fff;
+}
+.consult-usage-copy span { color: #68757d; }
+.consult-usage-copy strong { color: #354149; }
+.consult-progress {
+  padding: 2px;
+  height: 9px;
+  background: #c3cbd0;
+  box-shadow: inset 3px 3px 6px rgba(78,89,96,.25), inset -2px -2px 5px rgba(255,255,255,.72);
+}
+.consult-progress span { background: linear-gradient(90deg,#7b8b95,#34414a); box-shadow: 0 1px 3px rgba(31,40,46,.28); }
+.consult-section-heading strong,
+.consult-slot-dur {
+  color: #53616a;
+  background: linear-gradient(145deg,#e9edef,#cbd2d6);
+  box-shadow: 3px 3px 7px rgba(72,83,90,.14), -3px -3px 7px rgba(255,255,255,.8);
+}
+.consult-slot-item {
+  border-color: rgba(255,255,255,.72);
+  background: linear-gradient(145deg,#edf0f2,#d2d8dc);
+  box-shadow: 7px 7px 15px rgba(73,84,91,.17), -6px -6px 14px rgba(255,255,255,.74), inset 0 1px #fff;
+}
+.consult-slot-item:hover {
+  border-color: #f7f8f9;
+  background: linear-gradient(145deg,#f3f5f6,#d7dde0);
+  box-shadow: 9px 9px 19px rgba(65,76,83,.21), -7px -7px 16px rgba(255,255,255,.86), inset 0 1px #fff;
+  transform: translateY(-1px);
+}
+.consult-slot-calendar {
+  color: #4e5d66;
+  background: linear-gradient(145deg,#e8ecee,#c4ccd1);
+  box-shadow: 4px 4px 9px rgba(70,81,88,.18), -4px -4px 9px rgba(255,255,255,.8);
+}
+.consult-edit-btn {
+  color: #46545d;
+  border-color: #aeb9c0;
+  background: linear-gradient(145deg,#edf0f2,#cbd2d6);
+  box-shadow: 4px 4px 8px rgba(70,81,88,.16), -3px -3px 7px rgba(255,255,255,.78);
+}
+.consult-edit-btn:hover { color: #273139; background: linear-gradient(145deg,#f7f8f9,#d4dade); }
+.consult-del-btn {
+  color: #854a4a;
+  border-color: #c9aaaa;
+  background: linear-gradient(145deg,#eee9e9,#d7cdcd);
+  box-shadow: 4px 4px 8px rgba(78,67,67,.14), -3px -3px 7px rgba(255,255,255,.75);
+}
+.consult-form-shell {
+  border-color: rgba(255,255,255,.82);
+  background: linear-gradient(145deg,#e9edef,#cfd6da);
+  box-shadow: 10px 10px 22px rgba(67,78,85,.2), -8px -8px 19px rgba(255,255,255,.82), inset 0 1px #fff;
+}
+.consult-form-icon {
+  border: 1px solid #3d4a53;
+  background: linear-gradient(145deg,#687984,#38454e);
+  box-shadow: 5px 5px 11px rgba(58,69,76,.25), -4px -4px 10px rgba(255,255,255,.72), inset 0 1px rgba(255,255,255,.2);
+}
+.consult-modal-box .form-select {
+  color: #344149;
+  border-color: #b7c1c7;
+  background: linear-gradient(145deg,#f0f2f3,#d9dee1);
+  box-shadow: inset 3px 3px 7px rgba(77,88,95,.14), inset -3px -3px 7px rgba(255,255,255,.82);
+}
+.consult-modal-box .form-select:hover { border-color: #9facb3; }
+.consult-modal-box .form-select:focus {
+  border-color: #7d8b94;
+  background: #edf0f2;
+  box-shadow: inset 3px 3px 7px rgba(77,88,95,.16), inset -3px -3px 7px rgba(255,255,255,.78), 0 0 0 3px rgba(67,82,91,.13);
+}
+.consult-modal-box .sched-modal-actions {
+  border-top-color: #bec7cc;
+  background: linear-gradient(145deg,rgba(225,230,233,.97),rgba(202,210,214,.97));
+  box-shadow: 0 -7px 18px rgba(57,68,75,.09), inset 0 1px rgba(255,255,255,.72);
+}
+.consult-modal-box .cancel-btn-text {
+  color: #4d5a62;
+  border-color: transparent;
+}
+.consult-modal-box .cancel-btn-text:hover {
+  border-color: #bac4c9;
+  background: linear-gradient(145deg,#edf0f2,#d1d7db);
+  box-shadow: 4px 4px 9px rgba(69,80,87,.15), -4px -4px 9px rgba(255,255,255,.74);
+}
+.consult-modal-box .save-btn {
+  color: #fff;
+  border-color: #35424b;
+  background: linear-gradient(145deg,#687984,#34414a);
+  box-shadow: 6px 6px 13px rgba(54,65,72,.28), -5px -5px 12px rgba(255,255,255,.6), inset 0 1px rgba(255,255,255,.22);
+}
+.consult-modal-box .save-btn:not(:disabled):hover { background: linear-gradient(145deg,#778892,#3d4a53); transform: translateY(-1px); }
+.consult-modal-box .save-btn:disabled {
+  color: #8e989e;
+  border-color: #b8c1c6;
+  background: linear-gradient(145deg,#dbe0e3,#c4ccd0);
+  box-shadow: inset 3px 3px 7px rgba(76,87,94,.12), inset -3px -3px 7px rgba(255,255,255,.55);
+}
+.consult-empty {
+  margin-right: 0;
+  margin-left: 0;
+  border-color: #aeb9bf;
+  background: linear-gradient(145deg,#e4e8ea,#cad1d5);
+  box-shadow: inset 3px 3px 7px rgba(74,85,92,.12), inset -3px -3px 7px rgba(255,255,255,.65);
+}
+.consult-empty-icon { background: linear-gradient(145deg,#e8ecee,#c5cdd1); box-shadow: 3px 3px 7px rgba(70,81,88,.14), -3px -3px 7px rgba(255,255,255,.7); }
+
+/* Use the right modal pane itself as the input surface */
+.consult-right-pane {
+  background: linear-gradient(145deg,#e8ecee,#d5dbde);
+  box-shadow: inset 1px 0 rgba(255,255,255,.66);
+}
+.consult-right-pane .consult-form-shell {
+  align-content: start;
+  margin: 0;
+  padding: 34px 38px 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.consult-right-pane .consult-form-heading {
+  margin-bottom: 9px;
+  padding-bottom: 19px;
+  border-bottom: 1px solid rgba(166,177,184,.72);
+}
+.consult-right-pane .consult-form-icon {
+  width: 42px;
+  height: 42px;
+  flex-basis: 42px;
+}
+.consult-right-pane .consult-form-heading .consult-form-title { font-size: .91rem; }
+.consult-right-pane .consult-form-heading p { margin-top: 4px; font-size: .7rem; }
+.consult-right-pane .form-row-inline { gap: 8px; }
+.consult-right-pane .form-label { color: #4e5b64; font-size: .76rem; }
+.consult-right-pane .form-select { min-height: 50px; font-size: .82rem; }
+.consult-right-pane .sched-modal-actions {
+  border-top: 1px solid #bbc4c9;
+  background: linear-gradient(145deg,rgba(224,229,232,.98),rgba(202,209,213,.98));
+}
+@media (max-width: 900px) {
+  .consult-right-pane .consult-form-shell { margin: 0; padding: 26px 24px; }
+}
+@media (max-width: 640px) {
+  .consult-right-pane .consult-form-shell { padding: 22px 18px; }
+}
 </style>
 
 <style>

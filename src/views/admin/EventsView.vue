@@ -53,30 +53,50 @@
       <!-- Header -->
       <header class="main-header">
         <div>
-          <h1 class="page-title">Events</h1>
+          <span class="page-eyebrow">Events management</span>
+          <h1 class="page-title">Events Management</h1>
           <p class="page-sub">Manage and track school events</p>
         </div>
-      </header>
-
-      <!-- ── Events Section ── -->
-
-      <!-- Top bar -->
-      <div class="events-topbar">
-        <div class="events-tabs">
-          <button :class="['ev-tab', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active Events</button>
-          <button :class="['ev-tab', { active: eventsTab === 'archived' }]" @click="eventsTab = 'archived'">
-            Archived
-            <span v-if="archivedEvents.length" class="ev-tab-count">{{ archivedEvents.length }}</span>
-          </button>
-        </div>
-        <button class="add-event-btn" @click="openAddEvent">
+        <button class="add-event-btn header-add-event-btn" @click="openAddEvent">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Add Event
         </button>
-      </div>
+      </header>
 
-      <!-- Events Grid -->
-      <div class="events-grid">
+      <!-- ── Events Section ── -->
+      <section class="events-section">
+        <div class="events-section-header">
+          <div>
+            <h2 class="events-section-title">Events overview</h2>
+            <p class="events-section-sub">
+              {{ eventsTab === 'active' ? activeEvents.length : archivedEvents.length }}
+              {{ eventsTab === 'active' ? 'active' : 'archived' }}
+              event{{ (eventsTab === 'active' ? activeEvents.length : archivedEvents.length) === 1 ? '' : 's' }} shown
+            </p>
+          </div>
+          <div class="event-summary-counts">
+            <span><b>{{ events.length }}</b>Total</span>
+            <span class="active"><b>{{ activeEvents.length }}</b>Active</span>
+            <span><b>{{ archivedEvents.length }}</b>Archived</span>
+          </div>
+        </div>
+
+        <!-- Top bar -->
+        <div class="events-topbar">
+          <div class="events-tabs">
+            <button :class="['ev-tab', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">
+              Active Events
+              <span class="ev-tab-count">{{ activeEvents.length }}</span>
+            </button>
+            <button :class="['ev-tab', { active: eventsTab === 'archived' }]" @click="eventsTab = 'archived'">
+              Archived
+              <span class="ev-tab-count">{{ archivedEvents.length }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Events Grid -->
+        <div class="events-grid">
         <template v-if="eventsTab === 'active'">
           <div v-for="ev in activeEvents" :key="ev.id" class="event-card event-card--clickable" @click="openViewEvent(ev)">
             <div v-if="ev.image" class="event-card-img-wrap">
@@ -166,7 +186,8 @@
             <span>No archived events.</span>
           </div>
         </template>
-      </div>
+        </div>
+      </section>
     </main>
 
     <!-- ═══ View Event Modal ═══ -->
@@ -1548,5 +1569,634 @@ onMounted(loadEvents)
 .ev-submit-btn:hover { opacity: 0.9; box-shadow: 0 6px 18px rgba(48, 53, 58,0.32); }
 @media (max-width: 720px) {
   .form-row { grid-template-columns: 1fr; }
+}
+
+/* ── Minimal Events Refresh ───────────────────────────────────────── */
+.layout {
+  background:
+    radial-gradient(circle at 78% 4%, rgba(255,255,255,.75), transparent 30%),
+    linear-gradient(135deg, #f4f6f7 0%, #dde2e5 100%);
+}
+
+.main {
+  padding: 40px 44px 44px;
+}
+
+.main-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.page-eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: #6d7881;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.page-title {
+  margin: 0;
+  color: #202830;
+  font-size: clamp(2rem, 3vw, 2.6rem);
+  font-weight: 750;
+  letter-spacing: -.045em;
+}
+
+.page-sub {
+  margin-top: 9px;
+  color: #6f7b84;
+  font-size: .93rem;
+}
+
+.events-topbar {
+  margin-bottom: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.events-tabs {
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 999px;
+  background: rgba(231,235,238,.72);
+  box-shadow:
+    inset 3px 3px 7px rgba(141,151,158,.18),
+    inset -3px -3px 7px rgba(255,255,255,.75);
+}
+
+.ev-tab {
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: 999px;
+  color: #6b7580;
+  font-size: .78rem;
+  font-weight: 750;
+}
+
+.ev-tab:hover {
+  background: #eef2f5;
+  color: #303a43;
+}
+
+.ev-tab.active {
+  background: #3f4a55;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(39, 49, 58, .14);
+}
+
+.ev-tab-count {
+  background: rgba(255,255,255,.22);
+  color: inherit;
+  font-size: .66rem;
+}
+
+.add-event-btn {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid #3e4d58;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #5c6771, #343e47);
+  box-shadow: 0 8px 20px rgba(45,55,63,.2);
+  font-size: .78rem;
+  font-weight: 750;
+}
+
+.add-event-btn:hover {
+  background: linear-gradient(145deg, #687580, #3d4852);
+  transform: translateY(-1px);
+}
+
+.header-add-event-btn {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(45,55,63,.2);
+  white-space: nowrap;
+}
+
+.events-section {
+  padding: 26px 28px 28px;
+  border: 1px solid rgba(255,255,255,.95);
+  border-radius: 24px;
+  background: linear-gradient(145deg, rgba(247,249,250,.74), rgba(218,224,228,.62));
+  box-shadow:
+    14px 16px 34px rgba(88, 99, 107, .16),
+    -10px -10px 24px rgba(255,255,255,.58),
+    inset 1px 1px 0 rgba(255,255,255,.82);
+  backdrop-filter: blur(8px);
+}
+
+.events-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e2e8ec;
+}
+
+.events-section-title {
+  margin: 0;
+  color: #252e35;
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -.025em;
+}
+
+.events-section-sub {
+  margin: 7px 0 0;
+  color: #75818a;
+  font-size: .82rem;
+}
+
+.event-summary-counts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.event-summary-counts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 12px;
+  background: rgba(238,242,244,.65);
+  box-shadow:
+    inset 2px 2px 5px rgba(141,151,158,.12),
+    inset -2px -2px 5px rgba(255,255,255,.72);
+  color: #74808a;
+  font-size: .75rem;
+  font-weight: 650;
+}
+
+.event-summary-counts b {
+  color: #34404a;
+  font-size: .9rem;
+}
+
+.event-summary-counts .active {
+  border-color: #cfe7da;
+  background: #eefaf3;
+  color: #35704f;
+}
+
+.events-grid {
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.event-card {
+  position: relative;
+  gap: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.96);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(255,255,255,.82), rgba(229,234,237,.72));
+  box-shadow:
+    10px 12px 25px rgba(88,99,107,.13),
+    -7px -7px 18px rgba(255,255,255,.62),
+    inset 1px 1px 0 rgba(255,255,255,.78);
+  backdrop-filter: blur(8px);
+}
+
+.event-card:hover,
+.event-card--clickable:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255,255,255,.98);
+  box-shadow:
+    13px 16px 31px rgba(88,99,107,.18),
+    -8px -8px 19px rgba(255,255,255,.7),
+    inset 1px 1px 0 rgba(255,255,255,.82);
+}
+
+.event-card--archived {
+  opacity: .72;
+  filter: grayscale(.18);
+}
+
+.event-card-img-wrap,
+.event-card-default-cover {
+  height: 182px;
+  margin: 0;
+  border-radius: 0;
+  background-color: #d9dee2;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.5);
+}
+
+.event-card-img {
+  filter: saturate(.94) contrast(.98);
+}
+
+.event-card-head {
+  gap: 10px;
+  order: 2;
+  padding: 16px 18px 0;
+  margin-top: 0;
+}
+
+.event-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 0 11px;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 999px;
+  font-size: .64rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+
+.event-badge--active {
+  border-color: rgba(255,255,255,.9);
+  background: #eef2f4;
+  box-shadow:
+    inset 2px 2px 4px rgba(141,151,158,.10),
+    inset -2px -2px 4px rgba(255,255,255,.8);
+  color: #4e5963;
+}
+
+.event-badge--archived {
+  border-color: #e2e5e8;
+  background: #f5f6f7;
+  color: #7a828a;
+}
+
+.event-card-actions {
+  margin-left: auto;
+  gap: 5px;
+}
+
+.ec-btn {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #e2e7eb;
+  border-radius: 10px;
+  background: rgba(255,255,255,.82);
+  color: #46525c;
+  font-size: .72rem;
+  font-weight: 750;
+}
+
+.ec-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ec-btn--edit {
+  border-color: #d8e5ff;
+  background: #f4f8ff;
+  color: #2563eb;
+}
+
+.ec-btn--archive,
+.ec-btn--restore {
+  background: #f8fafb;
+  color: #505b64;
+}
+
+.ec-btn--delete {
+  border-color: #fee2e2;
+  background: #fff7f7;
+  color: #dc2626;
+}
+
+.event-card-title {
+  order: 3;
+  margin: 12px 18px 0;
+  color: #1f2933;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  overflow-wrap: anywhere;
+}
+
+.event-card-desc {
+  order: 4;
+  display: -webkit-box;
+  min-height: 40px;
+  margin: 7px 18px 0;
+  overflow: hidden;
+  color: #707b84;
+  font-size: .78rem;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.event-card-meta {
+  order: 5;
+  gap: 7px;
+  margin: 16px 18px 18px;
+  padding-top: 14px;
+  border-top: 1px solid #e8edf0;
+}
+
+.event-meta-item {
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid #e1e7eb;
+  border-radius: 999px;
+  background: rgba(255,255,255,.7);
+  color: #5c6872;
+  font-size: .72rem;
+  font-weight: 650;
+}
+
+.event-meta-item svg {
+  color: #6f7b84;
+}
+
+.events-empty {
+  min-height: 310px;
+  border: 1px dashed #cdd5da;
+  border-radius: 22px;
+  background: rgba(255,255,255,.46);
+  color: #73808a;
+}
+
+.event-modal-box,
+.ev-view-box {
+  border: 1px solid rgba(255,255,255,.95);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .26);
+}
+
+.ev-modal-banner {
+  border-radius: 18px 18px 0 0;
+  background: #ffffff;
+  border-bottom: 1px solid #e5ebef;
+}
+
+.ev-modal-banner-icon {
+  background: #eef2f4;
+  color: #45515b;
+}
+
+.ev-modal-banner-icon svg {
+  stroke: currentColor;
+}
+
+.ev-modal-banner-title {
+  color: #202830;
+}
+
+.ev-modal-banner-sub {
+  color: #6d7881;
+}
+
+.ev-modal-close {
+  border: 1px solid #dbe3e8;
+  background: #ffffff;
+  color: #475569;
+}
+
+.ev-modal-close:hover {
+  background: #f3f6f8;
+}
+
+.event-form {
+  gap: 16px;
+}
+
+.form-label {
+  color: #55616b;
+  font-size: .68rem;
+  letter-spacing: .08em;
+}
+
+.form-input,
+.teacher-picker-trigger,
+.time-display,
+.img-upload-area {
+  border: 1px solid #d8e0e5;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.form-input:focus,
+.teacher-picker-trigger:hover,
+.time-display:hover,
+.time-display--open {
+  border-color: #7c8994;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, .10);
+}
+
+.form-actions {
+  margin-top: 4px;
+  border-top: 1px solid #e7edf1;
+}
+
+.ev-cancel-btn,
+.ev-submit-btn {
+  border-radius: 11px;
+  font-size: .8rem;
+}
+
+.ev-submit-btn {
+  background: #3f4a55;
+  box-shadow: 0 10px 22px rgba(45,55,63,.18);
+}
+
+/* ── Add/Edit Event Modal polish: match teacher modal buttons ─────── */
+.event-modal-box {
+  display: flex;
+  flex-direction: column;
+  width: min(600px, 94vw);
+  max-height: min(780px, 90vh);
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.ev-modal-banner {
+  flex: 0 0 auto;
+  padding: 22px 28px 20px;
+  border-bottom: 1px solid #e5eaf0;
+  border-radius: 14px 14px 0 0;
+  background: #ffffff;
+}
+
+.ev-modal-banner-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  background: #eef2f4;
+  color: #475569;
+}
+
+.ev-modal-banner-title {
+  color: #202a34;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -.035em;
+}
+
+.ev-modal-banner-sub {
+  color: #66727e;
+  font-size: .84rem;
+}
+
+.ev-modal-close {
+  top: 18px;
+  right: 20px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+}
+
+.ev-modal-close:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #111827;
+}
+
+.event-form {
+  flex: 1 1 auto;
+  gap: 14px;
+  padding: 22px 28px 0;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+.form-row {
+  gap: 14px;
+}
+
+.teacher-picker-trigger {
+  color: #475569;
+}
+
+.teacher-picker-trigger:hover {
+  border-color: #94a3b8;
+}
+
+.teacher-picker-option input,
+.teacher-picker-all input {
+  accent-color: #4b5563;
+}
+
+.teacher-picker-avatar {
+  background: #eef2f4;
+  color: #475569;
+}
+
+.teacher-picker-option:hover {
+  background: #f6f8fa;
+}
+
+.img-upload-area {
+  min-height: 150px;
+  border: 1px dashed #cbd5e1;
+  background: #fbfcfd;
+}
+
+.img-upload-area:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: 8px -28px 0;
+  padding: 18px 28px 22px;
+  border-top: 1px solid #e5eaf0;
+  background: #ffffff;
+  box-shadow: 0 -10px 20px rgba(255,255,255,.92);
+}
+
+.ev-cancel-btn,
+.ev-submit-btn {
+  min-height: 42px;
+  padding: 9px 20px;
+  border-radius: 6px;
+  font-size: .84rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.ev-cancel-btn {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #dc2626;
+}
+
+.ev-cancel-btn:hover {
+  border-color: #d32f2f;
+  background: #f8fafc;
+}
+
+.ev-submit-btn {
+  min-width: 132px;
+  justify-content: center;
+  border: 0;
+  background: #334155;
+  color: #ffffff;
+}
+
+.ev-submit-btn:hover {
+  background: #1f2937;
+  opacity: 1;
+  box-shadow: none;
+}
+
+@media (max-width: 720px) {
+  .event-modal-box {
+    max-height: 92vh;
+  }
+
+  .event-form {
+    padding: 20px 20px 0;
+  }
+
+  .form-actions {
+    margin-inline: -20px;
+    padding-inline: 20px;
+  }
+}
+
+@media (max-width: 700px) {
+  .main {
+    padding: 26px 20px 34px;
+  }
+
+  .events-topbar {
+    align-items: stretch;
+  }
+
+  .events-tabs,
+  .add-event-btn {
+    width: 100%;
+  }
+
+  .ev-tab {
+    flex: 1;
+    justify-content: center;
+  }
 }
 </style>
