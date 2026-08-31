@@ -47,27 +47,28 @@
 </template>
 
 <script setup>
+import { getToken, getUser, saveMergedUser } from '@/auth.js'
 import {
-  IonIcon,
-  IonLabel,
-  IonPage,
-  IonRouterOutlet,
-  IonTabBar,
-  IonTabButton,
-  IonTabs,
+    IonIcon,
+    IonLabel,
+    IonPage,
+    IonRouterOutlet,
+    IonTabBar,
+    IonTabButton,
+    IonTabs,
 } from '@ionic/vue'
 import {
-  calendarOutline,
-  homeOutline,
-  megaphoneOutline,
-  peopleOutline,
-  personOutline,
+    calendarOutline,
+    homeOutline,
+    megaphoneOutline,
+    peopleOutline,
+    personOutline,
 } from 'ionicons/icons'
-import { getToken, getUser, saveMergedUser } from '@/auth.js'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const showTermPrompt = ref(false)
+const promptAlreadyHandled = ref(false)
 const publishedTerm = ref(null)
 const savingAssignment = ref(false)
 const termPromptError = ref('')
@@ -85,6 +86,15 @@ const availableSections = computed(() =>
 const publishedTermLabel = computed(() =>
   publishedTerm.value ? `${publishedTerm.value.schoolYear} · ${publishedTerm.value.semester}` : 'A new semester'
 )
+
+function getStudentTermStorageKeys() {
+  const user = getUser() || {}
+  const userKey = user.id || user._id || user.email || 'student'
+  return {
+    assignment: `cit_student_term_assignment_${userKey}`,
+    prompt: `cit_student_term_prompt_${userKey}`,
+  }
+}
 
 watch(() => termForm.yearLevel, () => { termForm.section = '' })
 
@@ -104,12 +114,17 @@ async function checkPublishedTerm() {
     const term = payload.term
     if (!term) return
     publishedTerm.value = term
-    const user = getUser() || {}
     const termId = String(term.id || term._id || '')
-    const storageKey = `cit_student_term_assignment_${user.id || user._id || user.email || 'student'}`
-    if (termId && localStorage.getItem(storageKey) !== termId) {
-      showTermPrompt.value = true
-    }
+    if (!termId) return
+
+    const { assignment, prompt } = getStudentTermStorageKeys()
+    if (localStorage.getItem(assignment) === termId) return
+    if (localStorage.getItem(prompt) === termId || promptAlreadyHandled.value) return
+    if (showTermPrompt.value) return
+
+    localStorage.setItem(prompt, termId)
+    promptAlreadyHandled.value = true
+    showTermPrompt.value = true
   } catch (_) {
     // The app remains usable if the term service is temporarily unavailable.
   }
@@ -126,8 +141,10 @@ async function saveTermAssignment() {
     })
     const user = saveMergedUser(payload.user || {})
     const termId = String(publishedTerm.value?.id || publishedTerm.value?._id || '')
-    const storageKey = `cit_student_term_assignment_${user.id || user._id || user.email || 'student'}`
-    localStorage.setItem(storageKey, termId)
+    const { assignment, prompt } = getStudentTermStorageKeys()
+    localStorage.setItem(assignment, termId)
+    localStorage.setItem(prompt, termId)
+    promptAlreadyHandled.value = false
     showTermPrompt.value = false
   } catch (error) {
     termPromptError.value = error.message

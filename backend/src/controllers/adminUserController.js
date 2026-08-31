@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
+const { logActivity } = require("../utils/activityLogWriter");
 
 const ROLE_LABELS = {
   admin: "Admin",
@@ -196,6 +197,14 @@ async function createUser(req, res) {
       avatar: avatar || null,
     });
 
+    await logActivity({
+      actor: req.user,
+      action: `Created ${normalizedRoles.join(" & ")} account for ${user.firstName} ${user.lastName}`,
+      path: req.originalUrl || "/api/users",
+      method: req.method,
+      req,
+    });
+
     return res.status(201).json({ message: "User created.", user: toClientUser(user) });
   } catch (error) {
     console.error("Failed to create user:", error);
@@ -303,6 +312,14 @@ async function updateUser(req, res) {
 
     await user.save();
 
+    await logActivity({
+      actor: req.user,
+      action: `Updated ${normalizedRoles.join(" & ")} account for ${user.firstName} ${user.lastName}`,
+      path: req.originalUrl || `/api/users/${id}`,
+      method: req.method,
+      req,
+    });
+
     return res.json({ message: "User updated.", user: toClientUser(user) });
   } catch (error) {
     console.error("Failed to update user:", error);
@@ -330,6 +347,14 @@ async function updateUserStatus(req, res) {
     user.account_status = nextStatus;
     await user.save();
 
+    await logActivity({
+      actor: req.user,
+      action: `Changed ${user.firstName} ${user.lastName} account status to ${nextStatus}`,
+      path: req.originalUrl || `/api/users/${id}/status`,
+      method: req.method,
+      req,
+    });
+
     return res.json({ message: "User status updated.", user: toClientUser(user) });
   } catch (error) {
     console.error("Failed to update user status:", error);
@@ -343,6 +368,14 @@ async function approveAllPendingUsers(req, res) {
       { account_status: "Pending" },
       { $set: { account_status: "Active" } }
     );
+
+    await logActivity({
+      actor: req.user,
+      action: `Approved all pending user accounts (${result.modifiedCount || 0} updated)`,
+      path: req.originalUrl || "/api/users/approve-pending",
+      method: req.method,
+      req,
+    });
 
     return res.json({
       message: "Pending users approved.",

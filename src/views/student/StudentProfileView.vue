@@ -63,7 +63,7 @@
           </div>
           <div class="field-group">
             <label class="field-label">Email</label>
-            <input v-model="form.email" class="field-input" type="email" />
+            <input v-model="form.email" class="field-input" type="email" readonly disabled />
           </div>
           <div class="field-group">
             <label class="field-label">Year Level</label>
@@ -95,11 +95,11 @@
 </template>
 
 <script setup>
-import { IonContent, IonPage } from '@ionic/vue'
-import { ref, computed, onMounted } from 'vue'
-import { getUser, getToken, logout } from '@/auth.js'
+import { getToken, getUser, logout } from '@/auth.js'
 import StudentRefresher from '@/components/student/StudentRefresher.vue'
 import { notifyStudentDataChanged, useAutoRefresh } from '@/composables/useAutoRefresh.js'
+import { IonContent, IonPage } from '@ionic/vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -254,7 +254,6 @@ async function saveProfile() {
       body: JSON.stringify({
         firstName,
         lastName,
-        email: form.value.email,
         avatar: user.value.avatar || undefined,
       }),
     })

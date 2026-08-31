@@ -5,6 +5,7 @@ const User = require("../models/User");
 const { sendPasswordOtpEmail } = require("../config/mail");
 const ConsultationRequest = require('../models/ConsultationRequest')
 const Notification = require('../models/Notification')
+const { logActivity } = require("../utils/activityLogWriter");
 
 // Verify reCAPTCHA token with Google
 async function verifyRecaptcha(token, remoteIp = null) {
@@ -419,6 +420,14 @@ async function updateMe(req, res) {
 
     await user.save();
 
+    await logActivity({
+      actor: req.user,
+      action: `Updated profile details for ${user.firstName} ${user.lastName}`,
+      path: req.originalUrl || "/api/auth/me",
+      method: req.method,
+      req,
+    });
+
     // If teacher status changed, notify recent students with active requests for this teacher
     try {
       const newStatus = user.teacher_status
@@ -671,6 +680,14 @@ async function changePassword(req, res) {
     user.passwordHash = await bcrypt.hash(String(newPassword), 10);
     clearPasswordOtp(user);
     await user.save();
+
+    await logActivity({
+      actor: req.user,
+      action: "Changed account password",
+      path: req.originalUrl || "/api/auth/change-password",
+      method: req.method,
+      req,
+    });
 
     return res.status(200).json({ message: "Password changed successfully." });
   } catch (error) {

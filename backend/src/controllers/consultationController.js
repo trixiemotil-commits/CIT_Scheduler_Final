@@ -6,6 +6,7 @@ const ConsultationLog = require("../models/ConsultationLog");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const AcademicTerm = require("../models/AcademicTerm");
+const { logActivity } = require("../utils/activityLogWriter");
 
 const MAX_WEEKLY_MINUTES = 240; // 4 hours
 
@@ -627,6 +628,14 @@ async function createConsultationRequest(req, res) {
       console.warn('Failed to create notification for teacher:', err.message)
     }
 
+    await logActivity({
+      actor: req.user,
+      action: `Requested consultation with ${teacherName} for ${requestDoc.subject}`,
+      path: req.originalUrl || "/api/consultations/requests",
+      method: req.method,
+      req,
+    });
+
     return res.status(201).json({
       message: "Consultation request submitted.",
       request: toClientRequest(requestDoc),
@@ -836,6 +845,14 @@ async function updateConsultationRequestByStudent(req, res) {
     requestDoc.status = "PENDING";
     await requestDoc.save();
 
+    await logActivity({
+      actor: req.user,
+      action: `Edited consultation request for ${teacherName}`,
+      path: req.originalUrl || `/api/consultations/requests/${id}`,
+      method: req.method,
+      req,
+    });
+
     return res.json({ message: "Consultation request updated.", request: toClientRequest(requestDoc) });
   } catch (error) {
     console.error("updateConsultationRequestByStudent error:", error);
@@ -902,6 +919,14 @@ async function updateConsultationRequestStatus(req, res) {
       timeIn,
       timeOut: timeIn,
       notes: logNotes,
+    });
+
+    await logActivity({
+      actor: req.user,
+      action: `${actorRole === "student" ? "Student" : "Teacher"} updated consultation request to ${nextStatus} for ${requestDoc.subject}`,
+      path: req.originalUrl || `/api/consultations/requests/${req.params.id}/status`,
+      method: req.method,
+      req,
     });
 
     // Create notification for student when request status changes to APPROVED or RESCHED
@@ -1017,6 +1042,15 @@ async function createConsultation(req, res) {
     }
 
     const doc = await ConsultationAvailability.create({ employeeId, teacher, dayOfWeek, startTime, endTime, academicTermId });
+
+    await logActivity({
+      actor: req.user,
+      action: `Created consultation slot for ${teacher} on ${dayOfWeek} (${startTime}–${endTime})`,
+      path: req.originalUrl || "/api/consultations",
+      method: req.method,
+      req,
+    });
+
     return res.status(201).json({ message: "Consultation slot created.", consultation: toClient(doc) });
   } catch (error) {
     if (error?.code === 11000) {
@@ -1078,6 +1112,14 @@ async function updateConsultation(req, res) {
     target.academicTermId = academicTermId || null;
     await target.save();
 
+    await logActivity({
+      actor: req.user,
+      action: `Updated consultation slot for ${target.teacher} on ${newDay} (${newStart}–${newEnd})`,
+      path: req.originalUrl || `/api/consultations/${id}`,
+      method: req.method,
+      req,
+    });
+
     return res.json({ message: "Consultation slot updated.", consultation: toClient(target) });
   } catch (error) {
     if (error?.code === 11000) {
@@ -1093,6 +1135,15 @@ async function deleteConsultation(req, res) {
   try {
     const deleted = await ConsultationAvailability.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ message: "Consultation slot not found." });
+
+    await logActivity({
+      actor: req.user,
+      action: `Deleted consultation slot for ${deleted.teacher} on ${deleted.dayOfWeek}`,
+      path: req.originalUrl || `/api/consultations/${req.params.id}`,
+      method: req.method,
+      req,
+    });
+
     return res.json({ message: "Consultation slot deleted." });
   } catch (error) {
     console.error("deleteConsultation error:", error);

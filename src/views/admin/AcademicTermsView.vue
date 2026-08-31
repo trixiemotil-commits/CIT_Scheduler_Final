@@ -44,6 +44,11 @@
         </div>
 
           <div v-if="!workspaceMode" class="mode-grid">
+          <button class="mode-card" @click="chooseWorkspaceMode('student')">
+            <span class="mode-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M4 22v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg></span>
+            <span class="mode-copy"><strong>Student</strong><small>{{ workspaceAction === 'add' ? 'Choose a year and section to manage schedules' : 'Browse schedules by student group' }}</small></span>
+            <span class="mode-arrow" aria-hidden="true">&rarr;</span>
+          </button>
           <button class="mode-card" @click="chooseWorkspaceMode('room')">
             <span class="mode-icon" v-html="roomIcon"></span>
             <span class="mode-copy"><strong>Room</strong><small>{{ workspaceAction === 'add' ? 'Choose a room to manage its schedule' : 'See the classes assigned to each room' }}</small></span>
@@ -51,12 +56,7 @@
           </button>
           <button class="mode-card" @click="chooseWorkspaceMode('teacher')">
             <span class="mode-icon" v-html="teacherIcon"></span>
-            <span class="mode-copy"><strong>Teachers</strong><small>{{ workspaceAction === 'add' ? 'Choose a teacher to manage their schedule' : 'See each teacher’s complete schedule' }}</small></span>
-            <span class="mode-arrow" aria-hidden="true">&rarr;</span>
-          </button>
-          <button class="mode-card" @click="chooseWorkspaceMode('student')">
-            <span class="mode-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M4 22v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg></span>
-            <span class="mode-copy"><strong>Student</strong><small>{{ workspaceAction === 'add' ? 'Choose a year and section to manage schedules' : 'Browse schedules by student group' }}</small></span>
+            <span class="mode-copy"><strong>Faculty</strong><small>{{ workspaceAction === 'add' ? 'Choose a faculty member to manage their schedule' : 'See each faculty member’s complete schedule' }}</small></span>
             <span class="mode-arrow" aria-hidden="true">&rarr;</span>
           </button>
         </div>

@@ -5,6 +5,7 @@ const User = require("../models/User");
 const ConsultationAvailability = require("../models/ConsultationAvailability");
 const ConsultationRequest = require("../models/ConsultationRequest");
 const AcademicTerm = require("../models/AcademicTerm");
+const { logActivity } = require("../utils/activityLogWriter");
 
 const YEAR_VALUES = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 const DAY_VALUES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -579,6 +580,13 @@ async function createSchedule(req, res) {
     }
 
     const created = await ScheduleEntry.insertMany(docs);
+    await logActivity({
+      actor: req.user,
+      action: isLunchBreak ? "Added a lunch break" : `Added a schedule for ${docs[0]?.teacher || "a teacher"}`,
+      path: req.originalUrl || req.path,
+      method: req.method,
+      req,
+    });
     return res.status(201).json({
       message: isLunchBreak ? "Lunch break saved." : "Schedule saved.",
       entries: created.map(toClientEntry),
@@ -613,6 +621,13 @@ async function createLunchBreak(req, res) {
     }
 
     const created = await ScheduleEntry.create(doc);
+    await logActivity({
+      actor: req.user,
+      action: `Added a lunch break for ${doc.teacher || "a teacher"}`,
+      path: req.originalUrl || req.path,
+      method: req.method,
+      req,
+    });
     return res.status(201).json({ message: "Lunch break saved.", entry: toClientEntry(created) });
   } catch (error) {
     if (error.message && (
@@ -677,6 +692,13 @@ async function updateLunchBreak(req, res) {
       section: undefined,
     });
     await existing.save();
+    await logActivity({
+      actor: req.user,
+      action: `Updated a lunch break for ${existing.teacher || "a teacher"}`,
+      path: req.originalUrl || req.path,
+      method: req.method,
+      req,
+    });
 
     return res.json({ message: "Lunch break updated.", entry: toClientEntry(existing) });
   } catch (error) {
@@ -720,6 +742,13 @@ async function replaceSchedule(req, res) {
     await ScheduleEntry.deleteMany(deleteFilter);
 
     const created = await ScheduleEntry.insertMany(docs);
+    await logActivity({
+      actor: req.user,
+      action: `Updated a schedule for ${docs[0]?.teacher || "a teacher"}`,
+      path: req.originalUrl || req.path,
+      method: req.method,
+      req,
+    });
     return res.json({ message: "Schedule updated.", entries: created.map(toClientEntry) });
   } catch (error) {
     if (error.message && (
@@ -746,6 +775,13 @@ async function deleteSchedule(req, res) {
 
     const filter = getDescriptorFilter(oldDescriptor);
     const result = await ScheduleEntry.deleteMany(filter);
+    await logActivity({
+      actor: req.user,
+      action: `Deleted a schedule entry`,
+      path: req.originalUrl || req.path,
+      method: req.method,
+      req,
+    });
 
     return res.json({ message: "Schedule removed.", deletedCount: result.deletedCount || 0 });
   } catch (error) {

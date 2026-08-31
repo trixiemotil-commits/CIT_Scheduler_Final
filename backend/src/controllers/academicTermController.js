@@ -1,4 +1,5 @@
 const AcademicTerm = require("../models/AcademicTerm");
+const { logActivity } = require("../utils/activityLogWriter");
 
 function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -110,6 +111,14 @@ async function createTerm(req, res) {
       createdBy: normalizeString(req.body?.createdBy),
     });
 
+    await logActivity({
+      actor: req.user,
+      action: `Created academic term ${schoolYear} ${semester}`,
+      path: req.originalUrl || "/api/academic-terms",
+      method: req.method,
+      req,
+    });
+
     return res.status(201).json({ term });
   } catch (error) {
     console.error("Failed to create academic term:", error);
@@ -154,6 +163,15 @@ async function updateTerm(req, res) {
 
     Object.assign(term, payload);
     await term.save();
+
+    await logActivity({
+      actor: req.user,
+      action: `Updated academic term ${term.schoolYear || ""} ${term.semester || ""}`.trim(),
+      path: req.originalUrl || "/api/academic-terms",
+      method: req.method,
+      req,
+    });
+
     return res.json({ term });
   } catch (error) {
     console.error("Failed to update academic term:", error);
@@ -178,6 +196,14 @@ async function useTerm(req, res) {
     target.usedAt = new Date();
     await target.save();
 
+    await logActivity({
+      actor: req.user,
+      action: `Set academic term ${target.schoolYear} ${target.semester} as in use`,
+      path: req.originalUrl || "/api/academic-terms/use",
+      method: req.method,
+      req,
+    });
+
     return res.json({ term: target });
   } catch (error) {
     console.error("Failed to set academic term in use:", error);
@@ -201,6 +227,14 @@ async function publishTerm(req, res) {
     target.isPublished = true;
     target.publishedAt = new Date();
     await target.save();
+
+    await logActivity({
+      actor: req.user,
+      action: `Published academic term ${target.schoolYear} ${target.semester}`,
+      path: req.originalUrl || "/api/academic-terms/publish",
+      method: req.method,
+      req,
+    });
 
     return res.json({ term: target });
   } catch (error) {
