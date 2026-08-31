@@ -129,6 +129,7 @@
               <div class="form-select-wrap">
                 <select v-model="form.teacher" class="form-select">
                   <option value="" disabled>Select Teacher</option>
+                  <option value="CIT Faculty">CIT Faculty</option>
                   <option v-for="t in teacherOptions" :key="t" :value="t">{{ t }}</option>
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
@@ -359,7 +360,7 @@ const showFlash  = ref(false)
 const form = reactive({
   day: '', timeIn: '', timeOut: '',
   year: years[0], section: sections[0],
-  teacher: '', subject: '', room: '',
+  teacher: 'CIT Faculty', subject: '', room: '',
   parallel: false, parallelCount: 2,
   parallelSlots: [{ section: '', room: '' }, { section: '', room: '' }],
 })

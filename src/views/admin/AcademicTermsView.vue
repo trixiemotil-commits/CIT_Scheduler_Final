@@ -43,15 +43,20 @@
           <span :class="['action-chip', workspaceAction]">{{ workspaceAction === 'add' ? 'Add Schedule' : 'View Schedules' }}</span>
         </div>
 
-        <div v-if="!workspaceMode" class="mode-grid">
+          <div v-if="!workspaceMode" class="mode-grid">
           <button class="mode-card" @click="chooseWorkspaceMode('room')">
             <span class="mode-icon" v-html="roomIcon"></span>
-            <span class="mode-copy"><strong>Browse by room</strong><small>{{ workspaceAction === 'add' ? 'Choose a room to manage its schedule' : 'See the classes assigned to each room' }}</small></span>
+            <span class="mode-copy"><strong>Room</strong><small>{{ workspaceAction === 'add' ? 'Choose a room to manage its schedule' : 'See the classes assigned to each room' }}</small></span>
             <span class="mode-arrow" aria-hidden="true">&rarr;</span>
           </button>
           <button class="mode-card" @click="chooseWorkspaceMode('teacher')">
             <span class="mode-icon" v-html="teacherIcon"></span>
-            <span class="mode-copy"><strong>Browse by teacher</strong><small>{{ workspaceAction === 'add' ? 'Choose a teacher to manage their schedule' : 'See each teacher’s complete schedule' }}</small></span>
+            <span class="mode-copy"><strong>Teachers</strong><small>{{ workspaceAction === 'add' ? 'Choose a teacher to manage their schedule' : 'See each teacher’s complete schedule' }}</small></span>
+            <span class="mode-arrow" aria-hidden="true">&rarr;</span>
+          </button>
+          <button class="mode-card" @click="chooseWorkspaceMode('student')">
+            <span class="mode-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M4 22v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg></span>
+            <span class="mode-copy"><strong>Student</strong><small>{{ workspaceAction === 'add' ? 'Choose a year and section to manage schedules' : 'Browse schedules by student group' }}</small></span>
             <span class="mode-arrow" aria-hidden="true">&rarr;</span>
           </button>
         </div>
@@ -60,15 +65,46 @@
           <div class="preview-toolbar">
             <div class="preview-toolbar__intro">
               <button class="back-btn" @click="workspaceMode = ''; previewPage = 1"><span aria-hidden="true">&larr;</span> Choose another mode</button>
-              <span><b>{{ previewTargets.length }}</b> {{ workspaceMode === 'room' ? 'room' : 'teacher' }}{{ previewTargets.length === 1 ? '' : 's' }} found</span>
             </div>
             <label class="preview-search">
-              <span>Search {{ workspaceMode === 'room' ? 'room' : 'teacher' }}</span>
-              <input v-model.trim="previewSearch" type="search" :placeholder="workspaceMode === 'room' ? 'Search rooms...' : 'Search teachers...'" />
+              <span>Search {{ workspaceMode === 'room' ? 'room' : (workspaceMode === 'teacher' ? 'teacher' : 'student') }}</span>
+              <input v-model.trim="previewSearch" type="search" :placeholder="workspaceMode === 'room' ? 'Search rooms...' : (workspaceMode === 'teacher' ? 'Search teachers...' : 'Search student groups...')" />
             </label>
           </div>
+
           <div v-if="workspaceLoading" class="empty-state">Loading schedule previews...</div>
-          <div v-else-if="!pagedPreviewTargets.length" class="empty-state">No matching {{ workspaceMode === 'room' ? 'rooms' : 'teachers' }} found.</div>
+
+          <!-- Student: choose year first (uses same preview-card CSS as sections) -->
+          <div v-else-if="workspaceMode === 'student' && !studentYearSelection" class="preview-grid">
+            <button v-for="y in yearOptions" :key="y" class="preview-card" @click="studentYearSelection = y">
+              <div class="preview-card-head">
+                <span class="preview-avatar"><span>{{ y.slice(0,1) }}</span></span>
+                <div><strong>{{ y }}</strong><small>{{ workspaceTerm.sectionNames?.[y]?.length || 0 }} sections</small></div>
+                <span class="open-arrow" aria-hidden="true">&rarr;</span>
+              </div>
+            </button>
+          </div>
+
+          <!-- Student: choose section for selected year -->
+          <div v-else-if="workspaceMode === 'student' && studentYearSelection" class="preview-grid">
+            <div class="preview-toolbar__intro">
+              <button class="back-btn" @click="studentYearSelection = null"><span aria-hidden="true">&larr;</span> Choose another year</button>
+              <div style="margin-left:12px"><strong>{{ studentYearSelection }}</strong><small style="display:block;color:#6b7680">Select a section to manage schedules</small></div>
+            </div>
+            <div v-if="!workspaceEntries.length" class="empty-state">No schedules found for this term.</div>
+            <div v-else class="section-grid">
+              <button v-for="s in (workspaceTerm.sectionNames?.[studentYearSelection] || [])" :key="s" class="preview-card" @click="openSchedule({ value: { year: studentYearSelection, section: s } })">
+                <div class="preview-card-head">
+                  <span class="preview-avatar"><span>{{ studentYearSelection.slice(0,1) }}</span></span>
+                  <div><strong>{{ studentYearSelection }} · {{ s }}</strong><small>{{ workspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length }} scheduled class{{ workspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length === 1 ? '' : 'es' }}</small></div>
+                  <span class="open-arrow" aria-hidden="true">&rarr;</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div v-else-if="!pagedPreviewTargets.length" class="empty-state">No matching {{ workspaceMode === 'room' ? 'rooms' : (workspaceMode === 'teacher' ? 'teachers' : 'student groups') }} found.</div>
+
           <div v-else class="preview-grid">
             <button v-for="target in pagedPreviewTargets" :key="target.key" class="preview-card" @click="openSchedule(target)">
               <div class="preview-card-head">
@@ -91,6 +127,7 @@
               <span class="preview-action">{{ workspaceAction === 'add' ? 'Open schedule editor' : 'Open full schedule' }} <span aria-hidden="true">&rarr;</span></span>
             </button>
           </div>
+
           <footer v-if="previewTotalPages > 1" class="preview-pagination">
             <button :disabled="previewPage <= 1" @click="previewPage--">&lt;</button>
             <span>Page {{ previewPage }} of {{ previewTotalPages }}</span>
@@ -241,6 +278,7 @@ const workspaceTerm = ref(null)
 const workspaceAction = ref('')
 const workspaceMode = ref('')
 const workspaceEntries = ref([])
+const studentYearSelection = ref(null)
 const workspaceLoading = ref(false)
 const previewSearch = ref('')
 const previewPage = ref(1)
@@ -253,7 +291,7 @@ const form = reactive({ schoolYear: '', semester: '', sectionCounts: {}, section
 const isCurrentTermSource = computed(() => route.query.source === 'current')
 const pageTitle = computed(() => isCurrentTermSource.value ? 'Current Term Schedule' : 'Academic Terms')
 const pageDescription = computed(() => isCurrentTermSource.value
-  ? 'View the currently published schedule by room or teacher.'
+  ? 'View the currently published schedule by room, teacher, or student group.'
   : 'Create school terms, organize schedules, and choose what teachers and students can currently view.')
 const workspaceEyebrowBase = computed(() => isCurrentTermSource.value ? 'Current Term Schedule' : 'Academic Terms')
 const allRoomNames = computed(() => roomFloors.flatMap(floor => floor.rooms))
@@ -274,16 +312,31 @@ const filteredTerms = computed(() => terms.value
 const sectionCount = (term, year) => Number(term?.sectionCounts?.[year] ?? term?.sectionNames?.[year]?.length ?? 0)
 const previewTargets = computed(() => {
   const query = previewSearch.value.toLowerCase()
-  const source = workspaceMode.value === 'room'
-    ? [...new Set(termRooms(workspaceTerm.value))]
-      .map(room => ({ key: room, label: `Room ${room}`, initials: room, value: room }))
-    : teachers.value.map(teacher => ({ key: teacher.id || teacher.name, label: teacher.name, initials: initials(teacher.name), avatar: teacher.avatar, value: teacher.name }))
+  if (workspaceMode.value === 'room') {
+    const source = [...new Set(termRooms(workspaceTerm.value))].map(room => ({ key: room, label: `Room ${room}`, initials: room, value: room }))
+    return source
+      .filter(target => target.label.toLowerCase().includes(query))
+      .map(target => ({ ...target, entries: workspaceEntries.value.filter(entry => entry.room === target.value) }))
+  }
+  if (workspaceMode.value === 'teacher') {
+    const source = teachers.value.map(teacher => ({ key: teacher.id || teacher.name, label: teacher.name, initials: initials(teacher.name), avatar: teacher.avatar, value: teacher.name }))
+    return source
+      .filter(target => target.label.toLowerCase().includes(query))
+      .map(target => ({ ...target, entries: workspaceEntries.value.filter(entry => entry.teacher === target.value) }))
+  }
+  // student mode: group by year + section
+  const groups = {}
+  workspaceEntries.value.forEach(entry => {
+    const y = entry.year || 'Unknown'
+    const s = entry.section || '—'
+    const key = `${y}||${s}`
+    if (!groups[key]) groups[key] = { key, year: y, section: s, entries: [] }
+    groups[key].entries.push(entry)
+  })
+  const source = Object.values(groups).map(g => ({ key: g.key, label: `${g.year} · ${g.section}`, initials: g.year, value: g }))
   return source
     .filter(target => target.label.toLowerCase().includes(query))
-    .map(target => ({
-      ...target,
-      entries: workspaceEntries.value.filter(entry => workspaceMode.value === 'room' ? entry.room === target.value : entry.teacher === target.value),
-    }))
+    .map(target => ({ ...target, entries: target.value.entries }))
 })
 const previewTotalPages = computed(() => Math.max(1, Math.ceil(previewTargets.value.length / previewPageSize)))
 const pagedPreviewTargets = computed(() => previewTargets.value.slice((previewPage.value - 1) * previewPageSize, previewPage.value * previewPageSize))
@@ -297,9 +350,9 @@ watch(
     }
     const requestedTerm = terms.value.find(term => termId(term) === String(requestedId))
     if (requestedTerm && ['view', 'add'].includes(action)) {
-      openWorkspace(requestedTerm, action)
-      if (['teacher', 'room'].includes(String(route.query.mode || ''))) chooseWorkspaceMode(String(route.query.mode))
-    }
+        openWorkspace(requestedTerm, action)
+        if (['teacher', 'room', 'student'].includes(String(route.query.mode || ''))) chooseWorkspaceMode(String(route.query.mode))
+      }
   }
 )
 
@@ -356,6 +409,7 @@ function openWorkspace(term, action) {
   workspaceTerm.value = term
   workspaceAction.value = action
   workspaceMode.value = ''
+  studentYearSelection.value = null
   previewSearch.value = ''
   previewPage.value = 1
   workspaceEntries.value = []
@@ -364,6 +418,7 @@ function openWorkspace(term, action) {
 function closeWorkspace() { workspaceTerm.value = null; workspaceMode.value = ''; workspaceEntries.value = [] }
 async function chooseWorkspaceMode(mode) {
   workspaceMode.value = mode
+  if (mode === 'student') studentYearSelection.value = null
   previewPage.value = 1
   previewSearch.value = ''
   workspaceLoading.value = true
@@ -382,7 +437,13 @@ function openSchedule(target) {
     source: route.query.source === 'current' ? 'current' : 'academic',
   }
   if (workspaceMode.value === 'teacher') query.teacher = target.value
-  else query.room = target.value
+  else if (workspaceMode.value === 'room') query.room = target.value
+  else if (workspaceMode.value === 'student') {
+    // target.value is the object { year, section, entries }
+    const v = target.value || {}
+    query.year = v.year || ''
+    query.section = v.section || ''
+  }
   router.push({ path: workspaceAction.value === 'add' ? '/admin/schedule/add' : '/admin/schedule/view', query })
 }
 function resetForm() {

@@ -465,6 +465,7 @@
                 <div v-else class="form-select-wrap">
                   <select v-model="addForm.teacher" class="form-select">
                     <option value="" disabled>Select Teacher</option>
+                    <option value="CIT Faculty">CIT Faculty</option>
                     <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
                   </select>
                   <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1190,6 +1191,7 @@ function buildSchedulePayload(source) {
     timeIn: source.timeIn,
     timeOut: source.timeOut,
     teacher: source.teacher,
+    teacherIsGeneric: String(source.teacher || '').trim().toLowerCase() === 'cit faculty',
     subject: source.subject,
     parallel: Boolean(source.parallel),
     parallelCount: source.parallel ? source.parallelCount : 1,
@@ -1443,7 +1445,7 @@ const editMode = ref(false)
 const fromButton = ref(false)
 
 const form = reactive({
-  slot: '', day: '', teacher: '', subject: '',
+  slot: '', day: '', teacher: 'CIT Faculty', subject: '',
   year: '', section: '',
   campus: 'South Campus',
   room: '', parallel: false,
@@ -1607,7 +1609,10 @@ function checkScheduleConflict(payload, skipFilter = null) {
     if (!isSameDay || !isTimeOverlap) return
 
     // ── Teacher conflict: same teacher teaching at the same time on the same day ──
-    if (entry.teacher === payload.teacher) {
+    const teacherIsGeneric = String(payload.teacher || '').trim().toLowerCase() === 'cit faculty'
+    const payloadTeacherNorm = String(payload.teacher || '').trim().toLowerCase()
+    const entryTeacherNorm = String(entry.teacher || '').trim().toLowerCase()
+    if (!teacherIsGeneric && entryTeacherNorm === payloadTeacherNorm) {
       const dedupKey = `teacher|${payload.teacher}|${entry.timeIn}|${entry.timeOut}`
       if (!seen.has(dedupKey)) {
         seen.add(dedupKey)

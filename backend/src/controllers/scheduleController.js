@@ -184,6 +184,7 @@ function normalizeParallelSlots(parallelSlots) {
 
 function buildEntryDocs(payload, academicTermId = null) {
   const teacher  = normalizeString(payload.teacher);
+  const teacherIsGenericFlag = Boolean(payload.teacherIsGeneric) || normalizeString(payload.teacher).toLowerCase() === 'cit faculty'
   const tableLabel = teacher;  // schedules are stored per teacher
   const year = normalizeString(payload.baseYear || payload.year);
   const day = normalizeString(payload.day);
@@ -227,6 +228,7 @@ function buildEntryDocs(payload, academicTermId = null) {
     return slots.map((slot) => ({
       tableLabel,
       entryType: "class",
+      teacherIsGeneric: teacherIsGenericFlag,
       year,
       section: slot.section,
       day,
@@ -261,6 +263,7 @@ function buildEntryDocs(payload, academicTermId = null) {
     {
       tableLabel,
       entryType: "class",
+      teacherIsGeneric: teacherIsGenericFlag,
       year,
       section,
       day,
@@ -290,6 +293,7 @@ function buildLunchBreakDoc(payload, academicTermId = null) {
   const day = normalizeString(payload.day);
   const timeIn = normalizeString(payload.timeIn);
   const timeOut = normalizeString(payload.timeOut);
+  const teacherIsGenericFlag = Boolean(payload.teacherIsGeneric) || normalizeString(payload.teacher).toLowerCase() === 'cit faculty'
 
   if (!teacher || !day || !timeIn || !timeOut) {
     throw new Error("Missing required lunch break fields.");
@@ -308,6 +312,7 @@ function buildLunchBreakDoc(payload, academicTermId = null) {
   return {
     tableLabel,
     entryType: "lunch",
+    teacherIsGeneric: teacherIsGenericFlag,
     day,
     timeIn,
     timeOut,
@@ -374,6 +379,14 @@ async function getExcludedIds(oldDescriptor) {
 }
 
 async function findConflict(doc, excludedIds = []) {
+  console.debug('findConflict called', {
+    teacher: doc.teacher,
+    day: doc.day,
+    timeIn: doc.timeIn,
+    timeOut: doc.timeOut,
+    academicTermId: doc.academicTermId || null,
+    excludedCount: excludedIds?.length || 0,
+  });
   // Overlap: same day, time windows intersect
   const overlapFilter = {
     day: doc.day,
@@ -389,14 +402,24 @@ async function findConflict(doc, excludedIds = []) {
   const termFilter = { academicTermId: doc.academicTermId || null };
 
   // Rule 1: same teacher at the same time (any room)
-  const teacherConflict = await ScheduleEntry.findOne({
-    ...overlapFilter,
-    teacher: doc.teacher,
-    ...termFilter,
-  }).lean();
+  const teacherNameRaw = normalizeString(doc.teacher);
+  const teacherName = teacherNameRaw.toLowerCase();
+  const isGenericTeacher = !teacherName || teacherName === 'cit faculty';
+  console.debug('findConflict teacher normalization', { teacherRaw: teacherNameRaw, teacherName, isGenericTeacher });
+  if (!isGenericTeacher) {
+    const teacherConflict = await ScheduleEntry.findOne({
+      ...overlapFilter,
+      teacher: doc.teacher,
+      ...termFilter,
+    }).lean();
 
-  if (teacherConflict) {
-    return `Teacher ${doc.teacher} already has a class on ${doc.day} from ${teacherConflict.timeIn} to ${teacherConflict.timeOut}.`;
+    if (teacherConflict) {
+      console.debug('findConflict -> teacherConflict', { teacherConflictId: teacherConflict._id?.toString?.(), teacherConflict });
+      return {
+        rule: 'teacher',
+        message: `Teacher ${doc.teacher} already has a class on ${doc.day} from ${teacherConflict.timeIn} to ${teacherConflict.timeOut}.`,
+      };
+    }
   }
 
   // Rule 2: same room at the same time (any teacher)
@@ -408,26 +431,48 @@ async function findConflict(doc, excludedIds = []) {
     }).lean();
 
     if (roomConflict) {
-      return `Room ${doc.room} is already occupied on ${doc.day} from ${roomConflict.timeIn} to ${roomConflict.timeOut}.`;
+      console.debug('findConflict -> roomConflict', { roomConflictId: roomConflict._id?.toString?.(), roomConflict });
+      return {
+        rule: 'room',
+        message: `Room ${doc.room} is already occupied on ${doc.day} from ${roomConflict.timeIn} to ${roomConflict.timeOut}.`,
+      };
     }
   }
 
   // Rule 3: teacher has a consultation slot that overlaps this class time
-  const consultQuery = {
-    teacher: doc.teacher,
-    dayOfWeek: doc.day,
-    academicTermId: doc.academicTermId || null,
-  };
-  const consultSlots = await ConsultationAvailability.find(consultQuery).lean();
-  for (const slot of consultSlots) {
-    const slotStart = parseTimeToMinutes(slot.startTime);
-    const slotEnd   = parseTimeToMinutes(slot.endTime);
-    if (doc.timeInMinutes < slotEnd && doc.timeOutMinutes > slotStart) {
-      return `${doc.teacher} has a consultation slot on ${doc.day} from ${slot.startTime} to ${slot.endTime}. A class cannot be scheduled during consultation hours.`;
+  // Rule 3: teacher has a consultation slot that overlaps this class time
+  // Skip consultation checks for the generic 'CIT Faculty' placeholder
+  if (!isGenericTeacher) {
+    const consultQuery = {
+      teacher: doc.teacher,
+      dayOfWeek: doc.day,
+      academicTermId: doc.academicTermId || null,
+    };
+    const consultSlots = await ConsultationAvailability.find(consultQuery).lean();
+    for (const slot of consultSlots) {
+      const slotStart = parseTimeToMinutes(slot.startTime);
+      const slotEnd   = parseTimeToMinutes(slot.endTime);
+      if (doc.timeInMinutes < slotEnd && doc.timeOutMinutes > slotStart) {
+        console.debug('findConflict -> consultConflict', { slot });
+        console.debug('findConflict -> consultConflict', { slot });
+        return {
+          rule: 'consult',
+          message: `${doc.teacher} has a consultation slot on ${doc.day} from ${slot.startTime} to ${slot.endTime}. A class cannot be scheduled during consultation hours.`,
+        };
+      }
     }
   }
 
   return null;
+}
+
+function docForConflictCheck(doc) {
+  const tn = normalizeString(doc.teacher).toLowerCase()
+  const isGeneric = Boolean(doc.teacherIsGeneric) || !tn || tn === 'cit faculty'
+  if (isGeneric) {
+    return { ...doc, teacher: '' }
+  }
+  return doc
 }
 
 async function listScheduleTables(_req, res) {
@@ -509,15 +554,27 @@ async function listSchedules(req, res) {
 async function createSchedule(req, res) {
   try {
     const payload = req.body || {};
+    console.debug('createSchedule incoming payload', {
+      user: req.user ? { id: req.user.id, role: req.user.role } : null,
+      teacher: payload.teacher,
+      year: payload.year || payload.baseYear,
+      section: payload.section,
+      timeIn: payload.timeIn,
+      timeOut: payload.timeOut,
+      academicTermId: payload.academicTermId || null,
+      entryType: payload.entryType || 'class',
+    });
     const academicTermId = resolveAcademicTermReference(payload?.academicTermId) || await getActiveAcademicTermReference();
     const isLunchBreak = normalizeString(payload.entryType).toLowerCase() === "lunch";
     const docs = isLunchBreak ? [buildLunchBreakDoc(payload, academicTermId)] : buildEntryDocs(payload, academicTermId);
     await ensureTableExists(docs[0].tableLabel);
 
     for (const doc of docs) {
-      const conflictMessage = await findConflict(doc);
+      const conflictMessage = await findConflict(docForConflictCheck(doc));
       if (conflictMessage) {
-        return res.status(409).json({ message: conflictMessage, code: "SCHEDULE_CONFLICT" });
+        console.debug('createSchedule -> conflictMessage', { type: typeof conflictMessage, conflictMessage, doc });
+        const resp = typeof conflictMessage === 'string' ? { message: conflictMessage } : { message: conflictMessage.message, rule: conflictMessage.rule };
+        return res.status(409).json({ ...resp, code: "SCHEDULE_CONFLICT" });
       }
     }
 
@@ -548,9 +605,11 @@ async function createLunchBreak(req, res) {
     const doc = buildLunchBreakDoc(req.body || {}, academicTermId);
     await ensureTableExists(doc.tableLabel);
 
-    const conflictMessage = await findConflict(doc);
+    const conflictMessage = await findConflict(docForConflictCheck(doc));
     if (conflictMessage) {
-      return res.status(409).json({ message: conflictMessage, code: "SCHEDULE_CONFLICT" });
+      console.debug('createLunchBreak -> conflictMessage', { type: typeof conflictMessage, conflictMessage, doc });
+      const resp = typeof conflictMessage === 'string' ? { message: conflictMessage } : { message: conflictMessage.message, rule: conflictMessage.rule };
+      return res.status(409).json({ ...resp, code: "SCHEDULE_CONFLICT" });
     }
 
     const created = await ScheduleEntry.create(doc);
@@ -601,9 +660,11 @@ async function updateLunchBreak(req, res) {
       room: "",
     }, existing.academicTermId);
 
-    const conflictMessage = await findConflict(next, [existing._id]);
+    const conflictMessage = await findConflict(docForConflictCheck(next), [existing._id]);
     if (conflictMessage) {
-      return res.status(409).json({ message: conflictMessage, code: "SCHEDULE_CONFLICT" });
+      console.debug('updateLunchBreak -> conflictMessage', { type: typeof conflictMessage, conflictMessage, next });
+      const resp = typeof conflictMessage === 'string' ? { message: conflictMessage } : { message: conflictMessage.message, rule: conflictMessage.rule };
+      return res.status(409).json({ ...resp, code: "SCHEDULE_CONFLICT" });
     }
 
     existing.set({
@@ -647,9 +708,11 @@ async function replaceSchedule(req, res) {
 
     const excludedIds = await getExcludedIds(oldDescriptor);
     for (const doc of docs) {
-      const conflictMessage = await findConflict(doc, excludedIds);
+      const conflictMessage = await findConflict(docForConflictCheck(doc), excludedIds);
       if (conflictMessage) {
-        return res.status(409).json({ message: conflictMessage, code: "SCHEDULE_CONFLICT" });
+        console.debug('replaceSchedule -> conflictMessage', { type: typeof conflictMessage, conflictMessage, doc, excludedIds });
+        const resp = typeof conflictMessage === 'string' ? { message: conflictMessage } : { message: conflictMessage.message, rule: conflictMessage.rule };
+        return res.status(409).json({ ...resp, code: "SCHEDULE_CONFLICT" });
       }
     }
 
