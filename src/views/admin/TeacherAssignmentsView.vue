@@ -68,12 +68,15 @@
         <div class="section-header">
           <div>
             <h2 class="section-title">Faculty overview</h2>
-            <p class="section-sub">{{ filteredTeachers.length }} teacher{{ filteredTeachers.length === 1 ? '' : 's' }} shown</p>
+            <p class="section-sub">
+              <template v-if="loadingTeachers">Loading teachers...</template>
+              <template v-else>{{ filteredTeachers.length }} teacher{{ filteredTeachers.length === 1 ? '' : 's' }} shown</template>
+            </p>
           </div>
           <div class="summary-counts">
-            <span><b>{{ teachers.length }}</b>Total</span>
-            <span class="available"><b>{{ teachers.filter(item => item.status === 'In School').length }}</b>In school</span>
-            <span><b>{{ teachers.filter(item => item.status === 'On Leave').length }}</b>On leave</span>
+            <span class="summary-count summary-count--total"><b>{{ teachers.length }}</b><small>Total</small></span>
+            <span class="summary-count available"><b>{{ teachers.filter(item => item.status === 'In School').length }}</b><small>In school</small></span>
+            <span class="summary-count summary-count--leave"><b>{{ teachers.filter(item => item.status === 'On Leave').length }}</b><small>On leave</small></span>
           </div>
         </div>
 
@@ -99,7 +102,18 @@
           </button>
 
           <div class="teachers-grid">
-            <div v-if="!filteredTeachers.length" class="teachers-empty-state">
+            <div v-if="loadingTeachers" class="teachers-loading" aria-live="polite" aria-label="Loading teachers">
+              <div v-for="index in 3" :key="index" class="teacher-skeleton">
+                <div class="teacher-skeleton-badge"></div>
+                <div class="teacher-skeleton-avatar"></div>
+                <div class="teacher-skeleton-line teacher-skeleton-line--name"></div>
+                <div class="teacher-skeleton-line teacher-skeleton-line--college"></div>
+                <div class="teacher-skeleton-line teacher-skeleton-line--email"></div>
+                <div class="teacher-skeleton-field"></div>
+                <div class="teacher-skeleton-line teacher-skeleton-line--tag"></div>
+              </div>
+            </div>
+            <div v-else-if="!filteredTeachers.length" class="teachers-empty-state">
               <span class="teachers-empty-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -509,6 +523,7 @@ const emptyStatusDescription = computed(() => {
 })
 
 const teachers = ref([])
+const loadingTeachers = ref(false)
 const scheduleCache = ref({})
 const scheduleLoading = ref({})
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -759,6 +774,8 @@ function getAvailableSubstitutesForEntry(currentTeacher, entry) {
 }
 
 async function loadTeachers() {
+  const showLoadingState = teachers.value.length === 0
+  if (showLoadingState) loadingTeachers.value = true
   try {
     const payload = await apiRequest('/users?role=teacher')
     teachers.value = Array.isArray(payload.users)
@@ -771,6 +788,8 @@ async function loadTeachers() {
   } catch (error) {
     teachers.value = []
     console.error('Failed to load teachers:', error)
+  } finally {
+    if (showLoadingState) loadingTeachers.value = false
   }
 }
 
@@ -2258,14 +2277,19 @@ onUnmounted(() => {
 .page-sub { max-width: 650px; margin-top: 8px; color: #66727c; font-size: .9rem; line-height: 1.5; }
 .header-add-btn { min-height: 46px; padding: 0 18px; border: 1px solid #3e4d58; border-radius: 12px; background: linear-gradient(145deg, #5c6771, #343e47); box-shadow: 0 8px 20px rgba(45,55,63,.2); font-size: .78rem; }
 .header-add-btn:hover { background: linear-gradient(145deg, #687580, #3d4852); transform: translateY(-1px); }
-.teachers-section { padding: 25px 27px 24px; border: 1px solid rgba(255,255,255,.9); border-radius: 20px; background: rgba(255,255,255,.78); box-shadow: 0 14px 38px rgba(41,51,59,.1); }
-.section-header { align-items: center; margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid #e1e6e9; }
+.teachers-section { padding: 17px 27px 24px; border: 1px solid rgba(255,255,255,.9); border-radius: 20px; background: rgba(255,255,255,.78); box-shadow: 0 14px 38px rgba(41,51,59,.1); }
+.section-header { align-items: center; margin-bottom: 16px; padding-bottom: 15px; border-bottom: 1px solid #e1e6e9; }
 .section-title { color: #252e35; font-size: 1.18rem; letter-spacing: -.02em; }
 .section-sub { margin-top: 5px; color: #78838b; font-size: .75rem; }
-.summary-counts { display: flex; align-items: center; gap: 7px; }
-.summary-counts span { display: inline-flex; align-items: baseline; gap: 5px; padding: 7px 10px; color: #6b7680; border: 1px solid #dce2e5; border-radius: 9px; background: #f7f9fa; font-size: .65rem; }
-.summary-counts b { color: #2c3740; font-size: .82rem; }
-.summary-counts .available { color: #34704e; border-color: #c8dfd1; background: #eef8f2; }
+.summary-counts { display: flex; align-items: stretch; gap: 8px; }
+.summary-counts span { display: inline-flex; min-width: 78px; align-items: center; justify-content: center; gap: 7px; padding: 8px 11px; color: #66727b; border: 1px solid #dce2e5; border-radius: 11px; background: rgba(247,249,250,.9); font-size: .64rem; font-weight: 600; white-space: nowrap; }
+.summary-counts b { color: #2c3740; font-size: .95rem; line-height: 1; }
+.summary-counts small { font-size: .64rem; font-weight: 600; }
+.summary-counts .summary-count--total { border-color: #cfd7dc; background: #f4f6f7; }
+.summary-counts .available { color: #34704e; border-color: #b9d8c5; background: #eef8f2; }
+.summary-counts .available b { color: #276743; }
+.summary-counts .summary-count--leave { color: #95615d; border-color: #e2c9c7; background: #fbf2f1; }
+.summary-counts .summary-count--leave b { color: #874b47; }
 .status-tabs { gap: 7px; margin-bottom: 20px; }
 .status-tab { display: inline-flex; min-height: 38px; padding: 7px 12px; align-items: center; gap: 7px; color: #59656e; border-color: #d8dee2; border-radius: 10px; background: #f7f8f9; font-size: .72rem; font-weight: 600; }
 .status-tab span { display: grid; min-width: 20px; height: 20px; place-items: center; padding: 0 5px; color: #6c7780; border-radius: 99px; background: #e5e9ec; font-size: .61rem; }
@@ -2280,6 +2304,46 @@ onUnmounted(() => {
 .teachers-empty-state p { max-width: 430px; margin: 7px 0 18px; color: #738089; font-size: .78rem; line-height: 1.55; }
 .teachers-empty-state button { min-height: 40px; padding: 9px 16px; border: 1px solid #cad3d8; border-radius: 9px; background: #fff; color: #43515a; font: inherit; font-size: .72rem; font-weight: 700; cursor: pointer; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
 .teachers-empty-state button:hover { border-color: #9eabb2; background: #f5f7f8; transform: translateY(-1px); }
+.teachers-loading { display: contents; }
+.teacher-skeleton {
+  position: relative;
+  display: flex;
+  min-height: 360px;
+  align-items: center;
+  flex-direction: column;
+  padding: 20px 19px;
+  border: 1px solid #dce2e6;
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+.teacher-skeleton::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: #d8dee2;
+}
+.teacher-skeleton-badge,
+.teacher-skeleton-avatar,
+.teacher-skeleton-line,
+.teacher-skeleton-field {
+  background: linear-gradient(100deg, #edf1f3 25%, #f8fafb 45%, #edf1f3 65%);
+  background-size: 220% 100%;
+  animation: teacherSkeletonShimmer 1.35s ease-in-out infinite;
+}
+.teacher-skeleton-badge { width: 58px; height: 22px; align-self: flex-end; border-radius: 999px; }
+.teacher-skeleton-avatar { width: 82px; height: 82px; margin: 10px 0 18px; border: 3px solid #fff; border-radius: 50%; }
+.teacher-skeleton-line { height: 10px; border-radius: 6px; }
+.teacher-skeleton-line--name { width: 66%; height: 14px; }
+.teacher-skeleton-line--college { width: 78%; margin-top: 10px; }
+.teacher-skeleton-line--email { width: 72%; margin-top: 24px; }
+.teacher-skeleton-field { width: 100%; height: 38px; margin-top: 24px; border-radius: 9px; }
+.teacher-skeleton-line--tag { width: 48%; align-self: flex-start; margin-top: 24px; }
+@keyframes teacherSkeletonShimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
 .carousel-arrow { align-self: center; width: 38px; height: 38px; border-color: #d9dfe2; background: rgba(255,255,255,.9); box-shadow: 0 5px 14px rgba(42,52,59,.1); }
 .teacher-card { min-height: 0; padding: 20px 19px; border: 1px solid #dce2e6 !important; border-radius: 16px; background: #fff !important; box-shadow: 0 7px 20px rgba(42,52,59,.07); }
 .teacher-card:hover { transform: translateY(-2px); border-color: #b9c4ca !important; box-shadow: 0 12px 27px rgba(42,52,59,.11); }

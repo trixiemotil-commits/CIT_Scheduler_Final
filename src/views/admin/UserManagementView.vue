@@ -1,5 +1,13 @@
 <template>
   <div class="layout">
+    <Transition name="toast">
+      <div v-if="toastMessage" class="um-toast" role="status" aria-live="polite">
+        <span class="um-toast-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        <span>{{ toastMessage }}</span>
+      </div>
+    </Transition>
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
     <aside class="sidebar admin-sidebar">
       <AdminSidebarToggle />
@@ -50,7 +58,10 @@
       <!-- Header -->
       <header class="main-header">
         <div>
-          <h1 class="page-title">Manage Users</h1>
+          <h1 class="page-title">
+            <span class="page-title-kicker">Users Management</span>
+            <span class="page-title-main">Manage Users</span>
+          </h1>
           <p class="page-sub">Add, edit, and manage system user accounts</p>
         </div>
       </header>
@@ -98,6 +109,7 @@
             <option value="">All Roles</option>
             <option value="Admin">Admin</option>
             <option value="Teacher">Teacher</option>
+            <option value="Admin &amp; Teacher">Admin &amp; Teacher</option>
             <option value="Student">Student</option>
           </select>
           <button class="um-print-btn" title="Print Users" @click="printUsersTable">
@@ -117,7 +129,7 @@
 
       <!-- Stats row -->
       <div class="um-stats-row">
-        <div class="um-stat-card">
+        <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show all users" @click="selectUserStat('all')" @keydown.enter="selectUserStat('all')" @keydown.space.prevent="selectUserStat('all')">
           <div class="um-stat-icon um-stat-icon--total">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
@@ -126,16 +138,16 @@
             <div class="um-stat-label">Total Users</div>
           </div>
         </div>
-        <div class="um-stat-card">
+        <div :class="['um-stat-card', 'um-stat-card--clickable', { 'um-stat-card--selected': userStatFilter === 'admins' }]" role="button" tabindex="0" aria-label="Show administrators" @click="selectUserStat('admins')" @keydown.enter="selectUserStat('admins')" @keydown.space.prevent="selectUserStat('admins')">
           <div class="um-stat-icon um-stat-icon--admin">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
           <div class="um-stat-info">
-            <div class="um-stat-val">{{ users.filter(u => u.role === 'Admin').length }}</div>
+            <div class="um-stat-val">{{ users.filter(u => Array.isArray(u.roles) ? u.roles.includes('admin') : u.role === 'Admin').length }}</div>
             <div class="um-stat-label">Admins</div>
           </div>
         </div>
-        <div class="um-stat-card">
+        <div :class="['um-stat-card', 'um-stat-card--clickable', { 'um-stat-card--selected': userStatFilter === 'teachers' }]" role="button" tabindex="0" aria-label="Show teachers" @click="selectUserStat('teachers')" @keydown.enter="selectUserStat('teachers')" @keydown.space.prevent="selectUserStat('teachers')">
           <div class="um-stat-icon um-stat-icon--teacher">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
           </div>
@@ -144,7 +156,16 @@
             <div class="um-stat-label">Teachers</div>
           </div>
         </div>
-        <div class="um-stat-card">
+        <div :class="['um-stat-card', 'um-stat-card--clickable', { 'um-stat-card--selected': userStatFilter === 'admin-teacher' }]" role="button" tabindex="0" aria-label="Show admin and teacher accounts" @click="selectUserStat('admin-teacher')" @keydown.enter="selectUserStat('admin-teacher')" @keydown.space.prevent="selectUserStat('admin-teacher')">
+          <div class="um-stat-icon um-stat-icon--admin-teacher">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+          </div>
+          <div class="um-stat-info">
+            <div class="um-stat-val">{{ users.filter(u => Array.isArray(u.roles) &amp;&amp; u.roles.includes('admin') &amp;&amp; u.roles.includes('teacher')).length }}</div>
+            <div class="um-stat-label">Admin &amp; Teacher</div>
+          </div>
+        </div>
+        <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show active users" @click="selectUserStat('active')" @keydown.enter="selectUserStat('active')" @keydown.space.prevent="selectUserStat('active')">
           <div class="um-stat-icon um-stat-icon--active">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
@@ -153,7 +174,7 @@
             <div class="um-stat-label">Active</div>
           </div>
         </div>
-        <div class="um-stat-card um-stat-card--clickable" @click="activeView = 'archived'">
+        <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show archived users" @click="selectUserStat('archived')" @keydown.enter="selectUserStat('archived')" @keydown.space.prevent="selectUserStat('archived')">
           <div class="um-stat-icon um-stat-icon--archived">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
           </div>
@@ -335,7 +356,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">School ID Number <span class="form-required">*</span></label>
-              <input v-model="userForm.schoolId" class="form-input" type="text" placeholder="01-1234-123456" required />
+              <input v-model="userForm.schoolId" class="form-input" type="text" inputmode="numeric" maxlength="14" placeholder="01-1234-123456" required @input="formatSchoolId" />
             </div>
           </div>
 
@@ -407,7 +428,6 @@
 
           <div v-if="formError" class="um-pw-error">{{ formError }}</div>
           <div class="form-actions">
-            <button type="button" class="um-cancel-btn" @click="showUserModal = false">Cancel</button>
             <button type="submit" class="um-submit-btn" :disabled="isSavingUser">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               {{ isSavingUser ? 'Saving...' : (editingUser ? 'Save Changes' : 'Register User') }}
@@ -551,6 +571,9 @@
   <Teleport to="body">
     <div v-if="showRegisterConfirm" class="modal-overlay">
       <div class="swal-box">
+        <div class="swal-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
+        </div>
         <p class="swal-text">Are you sure you want to continue?</p>
         <div class="swal-actions">
           <button class="swal-cancel" @click="showRegisterConfirm = false">Cancel</button>
@@ -564,6 +587,9 @@
   <Teleport to="body">
     <div v-if="showApproveAllConfirm" class="modal-overlay">
       <div class="swal-box">
+        <div class="swal-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
+        </div>
         <p class="swal-text">{{ approvalMode === 'selected' ? `Approve ${selectedPendingUsers.length} selected user account(s)?` : `Approve all ${pendingCount} pending user account(s)?` }}</p>
         <div class="swal-actions">
           <button class="swal-cancel" @click="showApproveAllConfirm = false">Cancel</button>
@@ -654,11 +680,22 @@ const activeView  = ref('active')
 /* ── Search & Filter ── */
 const searchQuery = ref('')
 const roleFilter  = ref('')
+const userStatFilter = ref('')
 
 /* ── Users Data ── */
 const users = ref([])
 const isLoadingUsers = ref(false)
 const loadError = ref('')
+const toastMessage = ref('')
+let toastTimer
+
+function showToast(message) {
+  toastMessage.value = message
+  clearTimeout(toastTimer)
+  toastTimer = window.setTimeout(() => {
+    toastMessage.value = ''
+  }, 2800)
+}
 const autoRefreshNotice = ref('')
 const isBulkApproving = ref(false)
 const selectedPendingIds = ref([])
@@ -681,10 +718,25 @@ const filteredUsers = computed(() => {
       u.name.toLowerCase().includes(query) ||
       u.email.toLowerCase().includes(query) ||
       department.includes(query)
-    const matchRole = roleFilter.value === '' || u.role === roleFilter.value
-    return matchView && matchSearch && matchRole
+    const roles = Array.isArray(u.roles) ? u.roles : []
+    const matchRole = roleFilter.value === '' ||
+      (roleFilter.value === 'Admin & Teacher' && roles.includes('admin') && roles.includes('teacher')) ||
+      u.role === roleFilter.value
+    const matchStat = userStatFilter.value === '' ||
+      userStatFilter.value === 'archived' ||
+      (userStatFilter.value === 'admins' && roles.includes('admin')) ||
+      (userStatFilter.value === 'teachers' && roles.includes('teacher')) ||
+      (userStatFilter.value === 'admin-teacher' && roles.includes('admin') && roles.includes('teacher')) ||
+      (userStatFilter.value === 'active' && u.status === 'Active')
+    return matchView && matchSearch && matchRole && matchStat
   })
 })
+
+function selectUserStat(stat) {
+  userStatFilter.value = stat === 'all' ? '' : stat
+  roleFilter.value = stat === 'admin-teacher' ? 'Admin & Teacher' : ''
+  activeView.value = stat === 'archived' ? 'archived' : 'active'
+}
 
 const selectablePendingUsers = computed(() => filteredUsers.value.filter((user) => user.status === 'Pending'))
 const selectedPendingUsers = computed(() => {
@@ -727,6 +779,11 @@ function normalizeRoleLabel(role) {
   return role || ''
 }
 
+function formatSchoolIdValue(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 12)
+  return [digits.slice(0, 2), digits.slice(2, 6), digits.slice(6, 12)].filter(Boolean).join('-')
+}
+
 function mapUserForUi(user) {
   const firstName = user.firstName || ''
   const lastName  = user.lastName || ''
@@ -743,7 +800,7 @@ function mapUserForUi(user) {
     status: user.status || 'Active',
     dateAdded: formatDisplayDate(user.dateAdded || user.createdAt),
     avatar: user.avatar || fallbackAvatar(name),
-    schoolId: user.studentId || user.employeeId || '',
+    schoolId: formatSchoolIdValue(user.schoolId || user.studentId || user.employeeId),
     phone: user.phone || '',
     studentId: user.studentId || '',
     employeeId: user.employeeId || '',
@@ -862,6 +919,10 @@ function trimValue(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function formatSchoolId(event) {
+  userForm.value.schoolId = formatSchoolIdValue(event.target.value)
+}
+
 function buildUserPayload(includePassword) {
   const schoolId = trimValue(userForm.value.schoolId)
   const role = userForm.value.role
@@ -929,7 +990,7 @@ function openEditUser(user) {
     firstName: parts[0] || '',
     lastName:  parts.slice(1).join(' ') || '',
     email:      user.email,
-    schoolId:   user.schoolId || '',
+    schoolId:   formatSchoolIdValue(user.schoolId || user.studentId || user.employeeId),
     role:       user.role,
     status:     user.status,
     yearLevel:  user.yearLevel || '',
@@ -1123,6 +1184,7 @@ async function confirmSaveUser() {
   formError.value = ''
   showRegisterConfirm.value = false
   isSavingUser.value = true
+  const wasEditing = Boolean(editingUser.value)
 
   try {
     const payload = buildUserPayload(!editingUser.value)
@@ -1140,6 +1202,7 @@ async function confirmSaveUser() {
 
     await fetchUsers()
     showUserModal.value = false
+    showToast(wasEditing ? 'User updated successfully.' : 'User added successfully.')
   } catch (error) {
     formError.value = error.message || 'Failed to save user.'
   } finally {
@@ -1229,6 +1292,7 @@ function confirmArchiveUser() {
   const u = users.value.find(u => u.id === archiveTarget.value.id)
   if (u) u.status = 'Archived'
   showArchiveModal.value = false
+  showToast('User archived successfully.')
 }
 
 /* ── Restore User ── */
@@ -2039,6 +2103,99 @@ function confirmRestoreUser() {
 }
 .um-restore-confirm-btn:hover { background: #6b7280; }
 
+.swal-box {
+  width: min(430px, calc(100vw - 40px));
+  display: flex;
+  align-items: center;
+  padding: 28px 30px 24px;
+  gap: 14px;
+  border: 1px solid #d5dde1;
+  border-radius: 18px;
+  background: #f7f9fa;
+  box-shadow: 0 18px 42px rgba(34,45,54,.22);
+}
+.swal-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  flex: 0 0 48px;
+  border: 1px solid #e2d5b8;
+  border-radius: 14px;
+  background: #f8f3e7;
+  color: #765f2e;
+}
+.swal-text {
+  flex: 1;
+  color: #202830;
+  font-size: 1rem;
+  line-height: 1.45;
+  text-align: left;
+}
+.swal-actions { gap: 10px; flex: 0 0 auto; }
+.swal-cancel,
+.swal-continue {
+  min-height: 40px;
+  border-radius: 10px;
+  font-size: .82rem;
+  font-weight: 700;
+}
+.swal-cancel {
+  padding: 9px 18px;
+  border: 1px solid #d6dfe3;
+  background: #fff;
+  color: #59656e;
+}
+.swal-cancel:hover { background: #eef2f4; }
+.swal-continue {
+  min-width: 108px;
+  padding: 9px 18px;
+  border: 1px solid #3e4d58;
+  background: #44515d;
+  box-shadow: none;
+}
+.swal-continue:hover { background: #35424d; }
+
+.um-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 230px;
+  max-width: calc(100vw - 48px);
+  padding: 12px 15px;
+  border: 1px solid #cbd8d0;
+  border-radius: 12px;
+  background: #f7fbf8;
+  color: #3d5547;
+  box-shadow: 0 10px 24px rgba(42,52,59,.16);
+  font-size: .78rem;
+  font-weight: 650;
+}
+.um-toast-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  flex: 0 0 26px;
+  border-radius: 8px;
+  background: #dff1e5;
+  color: #2f8250;
+}
+.toast-enter-active,
+.toast-leave-active { transition: opacity .2s ease, transform .2s ease; }
+.toast-enter-from,
+.toast-leave-to { opacity: 0; transform: translateY(-8px); }
+
+@media (max-width: 520px) {
+  .swal-box { flex-wrap: wrap; }
+  .swal-text { flex-basis: calc(100% - 62px); }
+  .swal-actions { width: 100%; justify-content: flex-end; }
+}
+
 /* ── View Tabs ── */
 .um-view-tabs {
   display: flex;
@@ -2232,4 +2389,344 @@ function confirmRestoreUser() {
 .um-modal-box--wide{width:min(840px,calc(100vw - 44px));max-height:none;overflow:visible}.um-modal-box--wide .um-form{overflow:visible;padding:22px 30px 0;gap:13px}.um-modal-banner{min-height:96px;padding:20px 30px}.um-modal-banner-icon{width:50px;height:50px}.um-modal-banner-title{font-size:1.26rem}.um-modal-banner-sub{font-size:.84rem}.reg-avatar-row{padding:13px 16px;border-radius:15px;margin-bottom:0}.reg-avatar-wrap{width:54px;height:54px}.reg-avatar-wrap svg{width:28px;height:28px}.reg-avatar-name{font-size:.96rem}.reg-avatar-role{font-size:.76rem}.reg-section-title{margin:5px 0 -2px}.reg-section-label{font-size:.68rem}.form-row{gap:12px 18px}.form-group{gap:6px}.form-label{font-size:.7rem}.form-input{min-height:42px;padding:9px 13px;border-radius:11px}.form-actions{position:static;margin:0 -30px 0;padding:14px 30px 18px}.um-cancel-btn,.um-submit-btn{min-height:42px}.um-submit-btn{min-width:175px}.um-cancel-btn{min-width:112px}
 @media(max-height:760px){.um-modal-box--wide{width:min(900px,calc(100vw - 36px))}.um-modal-box--wide .um-form{gap:10px;padding-top:18px}.um-modal-banner{min-height:86px;padding:16px 28px}.reg-avatar-row{padding:10px 14px}.reg-avatar-wrap{width:48px;height:48px}.reg-section-title{margin:2px 0 -4px}.form-input{min-height:38px;padding:7px 12px}.form-actions{padding-top:11px;padding-bottom:14px}.um-cancel-btn,.um-submit-btn{min-height:38px}}
 @media(max-width:760px){.um-modal-box--wide{max-height:none;overflow:visible}.um-modal-box--wide .um-form{overflow:visible}.form-actions{position:static}.um-table-wrap{overflow-x:auto}}
+
+/* ── Shared admin content styling ───────────────────────────────────── */
+.main-header::before { display: none; }
+.main { padding: 32px 38px 44px; }
+.main-header { margin-bottom: 25px; }
+.um-management-panel {
+  padding: 17px 27px 24px !important;
+  border: 1px solid var(--metal-line) !important;
+  border-radius: 20px !important;
+  background: var(--metal-surface-soft) !important;
+  box-shadow: var(--metal-shadow) !important;
+  backdrop-filter: none !important;
+}
+.um-topbar {
+  margin-bottom: 16px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e1e6e9;
+}
+.um-view-tabs {
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.um-view-tab {
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid #d8dee2;
+  border-radius: 10px;
+  background: #f7f8f9;
+  color: #59656e;
+  font-size: .72rem;
+  font-weight: 600;
+}
+.um-view-tab:hover:not(.um-view-tab--on) { background: #eef2f4; }
+.um-view-tab--on {
+  border-color: #3f4d57;
+  background: #3f4d57;
+  box-shadow: 0 5px 12px rgba(45,56,64,.16);
+}
+.um-topbar-right { gap: 8px; }
+.um-search-input,
+.um-filter-select,
+.um-print-btn {
+  height: 42px;
+  border: 1px solid #d8e0e5;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #fff, #f0f3f4);
+  color: #3f4d57;
+  box-shadow: none;
+}
+.um-search-input:focus,
+.um-filter-select:focus { border-color: #7c8994; box-shadow: 0 0 0 3px rgba(100,116,139,.1); }
+.um-print-btn { padding: 0 14px; }
+.um-add-btn,
+.um-approve-all-btn,
+.um-approve-selected-btn {
+  min-height: 42px;
+  border: 1px solid #3e4d58;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #5c6771, #343e47);
+  box-shadow: 0 7px 14px rgba(45,55,63,.18);
+}
+.um-add-btn:hover,
+.um-approve-all-btn:hover,
+.um-approve-selected-btn:hover { background: linear-gradient(145deg, #687580, #3d4852); }
+.um-stats-row {
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.um-stat-card {
+  min-height: 86px;
+  padding: 15px 16px;
+  border: 1px solid #e0e6e9;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 7px 18px rgba(42,52,59,.07);
+}
+.um-stat-card:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(42,52,59,.1); }
+.um-stat-card--selected { border-color: #7c8994; box-shadow: 0 0 0 2px rgba(100,116,139,.12), 0 8px 18px rgba(42,52,59,.08); }
+.um-stat-icon { width: 42px; height: 42px; border-radius: 12px; }
+.um-stat-val { font-size: 1.35rem; font-weight: 800; }
+.um-stat-label { font-size: .7rem; font-weight: 650; }
+.um-table-wrap {
+  border: 1px solid #dce3e7;
+  border-radius: 17px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(42,52,59,.08);
+}
+.um-table thead tr,
+.um-table th { background: #f3f6f7; }
+.um-table th { padding: 14px 17px; color: #78848c; font-size: .66rem; }
+.um-table td { padding: 14px 17px; }
+.um-row { background: #fff; }
+.um-row:hover { background: #f7f9fa; }
+.um-btn { min-height: 34px; border-radius: 9px; }
+
+/* Compact table actions and clearer list proportions. */
+.um-view-tabs { display: flex; align-items: center; gap: 7px; }
+.um-view-tab { min-width: 112px; justify-content: center; }
+.um-view-tab--on { color: #fff; }
+.um-table { table-layout: fixed; }
+.um-table th:nth-child(1),
+.um-table td:nth-child(1) { width: 26px; }
+.um-table th:nth-child(2),
+.um-table td:nth-child(2) { width: 25%; }
+.um-table th:nth-child(3),
+.um-table td:nth-child(3) { width: 29%; }
+.um-table th:nth-child(4),
+.um-table td:nth-child(4) { width: 11%; }
+.um-table th:nth-child(5),
+.um-table td:nth-child(5) { width: 12%; }
+.um-table th:nth-child(6),
+.um-table td:nth-child(6) { width: 10%; }
+.um-table th:nth-child(7),
+.um-table td:nth-child(7) { width: 88px; }
+.um-user-info { min-width: 0; }
+.um-table th:nth-child(2),
+.um-table td:nth-child(2) { padding-left: 10px; }
+.um-user-cell { gap: 7px; }
+.um-table th,
+.um-table td { padding-top: 10px; padding-bottom: 10px; }
+.um-table th:nth-child(2),
+.um-table td:nth-child(2) { padding-right: 10px; }
+.um-table th:nth-child(3),
+.um-table td:nth-child(3) { padding-left: 10px; padding-right: 10px; }
+.um-user-avatar { width: 36px; height: 36px; }
+.um-user-name,
+.um-user-dept,
+.um-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; }
+.um-actions { width: 64px; }
+.um-actions-row { display: flex; justify-content: flex-end; gap: 4px; }
+.um-actions .um-btn {
+  width: 30px !important;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  font-size: 0;
+  flex: 0 0 34px;
+}
+.um-actions .um-btn svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.um-actions .um-btn:hover { transform: translateY(-1px); }
+
+@media (max-width: 900px) {
+  .main { padding: 24px 18px 32px; }
+  .um-management-panel { padding: 17px 20px 20px; }
+}
+
+/* ── Flat Users page finish ─────────────────────────────────────────── */
+.page-title {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  line-height: 1;
+}
+.page-title-kicker {
+  color: #68747d;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.page-title-main {
+  color: #202830;
+  font-size: clamp(2rem, 3vw, 2.55rem);
+  font-weight: 700;
+  letter-spacing: -.04em;
+}
+.um-management-panel {
+  background: #f3f5f6 !important;
+  border-color: #d5dde1 !important;
+  box-shadow: 0 10px 26px rgba(42,52,59,.08) !important;
+}
+.um-view-tabs { background: transparent; box-shadow: none; }
+.um-view-tab--on,
+.um-add-btn,
+.um-approve-all-btn,
+.um-approve-selected-btn {
+  background: #44515d;
+  box-shadow: none;
+}
+.um-view-tab--on:hover,
+.um-add-btn:hover,
+.um-approve-all-btn:hover,
+.um-approve-selected-btn:hover { background: #35424d; }
+.um-search-input,
+.um-filter-select,
+.um-print-btn { background: #fff; box-shadow: none; }
+.um-stats-row { gap: 12px; }
+.um-stats-row { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.um-stat-card {
+  background: #fff;
+  border-color: #dbe3e7;
+  box-shadow: 0 5px 14px rgba(42,52,59,.06);
+}
+.um-stat-card:hover { box-shadow: 0 8px 18px rgba(42,52,59,.08); }
+.um-table-wrap {
+  border-color: #d5dde1;
+  background: #fff;
+  box-shadow: 0 7px 18px rgba(42,52,59,.07);
+}
+.um-table thead tr,
+.um-table th { background: #edf1f2; }
+.um-row { background: #fff; }
+.um-user-avatar { box-shadow: none; }
+.um-stat-icon--admin-teacher { background: #e6eef2; color: #4a6875; }
+.um-stat-card .um-stat-label { line-height: 1.2; }
+.um-stat-card { gap: 9px; padding: 13px 10px; }
+.um-stat-icon { width: 36px; height: 36px; border-radius: 10px; }
+.um-stat-val { font-size: 1.2rem; }
+.um-stat-label { font-size: .6rem; white-space: nowrap; }
+
+@media (max-width: 1280px) {
+  .um-stats-row { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  .um-stats-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .um-stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.um-modal-box--wide {
+  border-color: #d5dde1;
+  border-radius: 18px;
+  background: #f7f9fa;
+  box-shadow: 0 18px 42px rgba(34,45,54,.22);
+}
+.um-modal-banner {
+  min-height: 88px;
+  padding: 18px 28px;
+  border-radius: 18px 18px 0 0;
+  border-bottom: 1px solid #d7dfe3;
+  background: linear-gradient(145deg, #f8fafb, #e4e8ea);
+}
+.um-modal-banner-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: #dfe5e8;
+}
+.um-modal-banner-icon svg { stroke: #3f4d57; }
+.um-modal-banner-title { color: #202830; font-size: 1.25rem; font-weight: 700; }
+.um-modal-banner-sub { color: #68747d; font-size: .82rem; }
+.um-modal-close {
+  border-color: #cbd5da;
+  border-radius: 9px;
+  background: #fff;
+  color: #3f4d57;
+}
+.um-modal-box--wide .um-form {
+  padding: 20px 30px 0;
+  gap: 13px;
+  background: #f7f9fa;
+}
+.reg-avatar-row {
+  padding: 12px 16px;
+  border-color: #d3dde2;
+  border-radius: 13px;
+  background: #fff;
+}
+.reg-section-line { background: #d6dfe3; }
+.form-input { background: #fff; box-shadow: none; }
+.form-input:focus { box-shadow: 0 0 0 3px rgba(100,116,139,.1); }
+.form-actions {
+  margin: 0 -30px;
+  padding: 14px 30px 18px;
+  border-top-color: #dce3e7;
+  background: #f7f9fa;
+  box-shadow: none;
+}
+.um-cancel-btn,
+.um-submit-btn { min-height: 40px; border-radius: 10px; }
+.um-submit-btn { background: #44515d; box-shadow: none; }
+.um-submit-btn:hover { background: #35424d; }
+
+@media (max-width: 640px) {
+  .page-title-main { font-size: 2.15rem; }
+}
+
+/* ── Confirmation popup final theme ─────────────────────────────────── */
+.swal-box {
+  width: min(420px, calc(100vw - 40px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 26px 28px 22px;
+  border: 1px solid #d5dde1;
+  border-radius: 18px;
+  background: #f7f9fa;
+  box-shadow: 0 18px 42px rgba(34,45,54,.22);
+}
+.swal-icon {
+  width: 60px;
+  height: 60px;
+  flex-basis: 60px;
+  border: 1px solid #dfcfaa;
+  border-radius: 16px;
+  background: #f8f3e7;
+  color: #765f2e;
+}
+.swal-icon svg { width: 28px; height: 28px; }
+.swal-text {
+  flex: none;
+  max-width: 290px;
+  margin: 0;
+  color: #202830;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+.swal-actions { gap: 8px; margin-top: 2px; }
+.swal-cancel,
+.swal-continue {
+  min-height: 38px;
+  border-radius: 10px;
+  font-size: .8rem;
+}
+.swal-cancel {
+  min-width: 82px;
+  padding: 8px 16px;
+  border: 1px solid #d6dfe3;
+  background: #fff;
+  color: #59656e;
+}
+.swal-continue {
+  min-width: 108px;
+  padding: 8px 16px;
+  border: 1px solid #3e4d58;
+  background: #44515d;
+  box-shadow: 0 5px 10px rgba(45,55,63,.14);
+}
+.swal-cancel:hover { background: #eef2f4; }
+.swal-continue:hover { background: #35424d; }
 </style>

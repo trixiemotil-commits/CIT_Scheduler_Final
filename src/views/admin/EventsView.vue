@@ -69,15 +69,18 @@
           <div>
             <h2 class="events-section-title">Events overview</h2>
             <p class="events-section-sub">
-              {{ eventsTab === 'active' ? activeEvents.length : archivedEvents.length }}
-              {{ eventsTab === 'active' ? 'active' : 'archived' }}
-              event{{ (eventsTab === 'active' ? activeEvents.length : archivedEvents.length) === 1 ? '' : 's' }} shown
+              <template v-if="loadingEvents">Loading events...</template>
+              <template v-else>
+                {{ eventsTab === 'active' ? activeEvents.length : archivedEvents.length }}
+                {{ eventsTab === 'active' ? 'active' : 'archived' }}
+                event{{ (eventsTab === 'active' ? activeEvents.length : archivedEvents.length) === 1 ? '' : 's' }} shown
+              </template>
             </p>
           </div>
           <div class="event-summary-counts">
-            <span><b>{{ events.length }}</b>Total</span>
-            <span class="active"><b>{{ activeEvents.length }}</b>Active</span>
-            <span><b>{{ archivedEvents.length }}</b>Archived</span>
+            <span class="event-summary-count event-summary-count--total"><b>{{ events.length }}</b><small>Total</small></span>
+            <span class="event-summary-count event-summary-count--active"><b>{{ activeEvents.length }}</b><small>Active</small></span>
+            <span class="event-summary-count event-summary-count--archived"><b>{{ archivedEvents.length }}</b><small>Archived</small></span>
           </div>
         </div>
 
@@ -96,7 +99,18 @@
         </div>
 
         <!-- Events Grid -->
-        <div class="events-grid">
+        <div v-if="loadingEvents" class="events-loading" aria-live="polite" aria-label="Loading events">
+          <div v-for="index in 2" :key="index" class="event-skeleton">
+            <div class="event-skeleton-cover"></div>
+            <div class="event-skeleton-content">
+              <div class="event-skeleton-line event-skeleton-line--short"></div>
+              <div class="event-skeleton-line event-skeleton-line--title"></div>
+              <div class="event-skeleton-line"></div>
+              <div class="event-skeleton-meta"></div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="events-grid">
         <template v-if="eventsTab === 'active'">
           <div v-for="ev in activeEvents" :key="ev.id" class="event-card event-card--clickable" @click="openViewEvent(ev)">
             <div v-if="ev.image" class="event-card-img-wrap">
@@ -390,7 +404,6 @@
 
             <!-- Actions -->
             <div class="form-actions">
-              <button type="button" class="ev-cancel-btn" @click="showEventModal = false">Cancel</button>
               <button type="submit" class="ev-submit-btn">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 {{ editingEvent ? 'Save Changes' : 'Add Event' }}
@@ -548,6 +561,7 @@ function confirmTime() {
 }
 
 const events = ref([])
+const loadingEvents = ref(false)
 
 const activeEvents   = computed(() => events.value.filter(e => e.status === 'active'))
 const archivedEvents = computed(() => events.value.filter(e => e.status === 'archived'))
@@ -624,11 +638,14 @@ async function eventRequest(path = '', options = {}) {
 }
 
 async function loadEvents() {
+  loadingEvents.value = true
   try {
     const payload = await eventRequest()
     events.value = Array.isArray(payload.events) ? payload.events : []
   } catch (error) {
     window.alert(error.message)
+  } finally {
+    loadingEvents.value = false
   }
 }
 
@@ -1579,7 +1596,7 @@ onMounted(loadEvents)
 }
 
 .main {
-  padding: 40px 44px 44px;
+  padding: 32px 38px 44px;
 }
 
 .main-header {
@@ -1587,7 +1604,7 @@ onMounted(loadEvents)
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 28px;
+  margin-bottom: 25px;
 }
 
 .page-eyebrow {
@@ -1604,7 +1621,7 @@ onMounted(loadEvents)
   margin: 0;
   color: #202830;
   font-size: clamp(2rem, 3vw, 2.6rem);
-  font-weight: 750;
+  font-weight: 700;
   letter-spacing: -.045em;
 }
 
@@ -1615,7 +1632,7 @@ onMounted(loadEvents)
 }
 
 .events-topbar {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -1624,23 +1641,23 @@ onMounted(loadEvents)
 }
 
 .events-tabs {
-  gap: 5px;
-  padding: 4px;
-  border: 1px solid rgba(255,255,255,.9);
-  border-radius: 999px;
-  background: rgba(231,235,238,.72);
-  box-shadow:
-    inset 3px 3px 7px rgba(141,151,158,.18),
-    inset -3px -3px 7px rgba(255,255,255,.75);
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .ev-tab {
   min-height: 38px;
-  padding: 0 18px;
-  border-radius: 999px;
-  color: #6b7580;
-  font-size: .78rem;
-  font-weight: 750;
+  padding: 7px 12px;
+  border: 1px solid #d8dee2;
+  border-radius: 10px;
+  background: #f7f8f9;
+  color: #59656e;
+  font-size: .72rem;
+  font-weight: 600;
 }
 
 .ev-tab:hover {
@@ -1649,16 +1666,25 @@ onMounted(loadEvents)
 }
 
 .ev-tab.active {
+  border-color: #3f4d57;
   background: #3f4a55;
   color: #fff;
-  box-shadow: 0 8px 18px rgba(39, 49, 58, .14);
+  box-shadow: 0 5px 12px rgba(45,56,64,.16);
 }
 
 .ev-tab-count {
-  background: rgba(255,255,255,.22);
-  color: inherit;
-  font-size: .66rem;
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: #e5e9ec;
+  color: #6c7780;
+  font-size: .61rem;
 }
+
+.ev-tab.active .ev-tab-count { background: #fff; color: #27333b; }
 
 .add-event-btn {
   min-height: 46px;
@@ -1710,8 +1736,8 @@ onMounted(loadEvents)
   margin: 0;
   color: #252e35;
   font-size: 1.18rem;
-  font-weight: 800;
-  letter-spacing: -.025em;
+  font-weight: 600;
+  letter-spacing: -.02em;
 }
 
 .events-section-sub {
@@ -2198,5 +2224,388 @@ onMounted(loadEvents)
     flex: 1;
     justify-content: center;
   }
+}
+
+/* ── Flat minimalist events page ─────────────────────────────────────── */
+.events-section {
+  padding: 17px 27px 24px !important;
+  border: 1px solid var(--metal-line) !important;
+  border-radius: 20px !important;
+  background: var(--metal-surface-soft) !important;
+  box-shadow: var(--metal-shadow) !important;
+  backdrop-filter: none !important;
+}
+.events-section-header {
+  margin-bottom: 16px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e1e7eb;
+}
+.events-section-title {
+  color: #202830;
+}
+.events-section-sub {
+  margin-top: 5px;
+  color: #74808a;
+  font-size: .75rem;
+}
+.event-summary-counts span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 78px;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 8px 11px;
+  white-space: nowrap;
+  border: 1px solid #dce2e5;
+  border-radius: 11px;
+  background: rgba(247,249,250,.9);
+  box-shadow: none;
+  color: #66727b;
+  font-size: .64rem;
+  font-weight: 600;
+}
+.event-summary-counts b {
+  color: #34404a;
+  font-size: .95rem;
+  line-height: 1;
+}
+.event-summary-counts small {
+  font-size: .64rem;
+  font-weight: 650;
+}
+.event-summary-counts .event-summary-count--active {
+  border-color: #b9d8c5;
+  background: #eef8f2;
+  color: #34704e;
+}
+.event-summary-counts .event-summary-count--active b { color: #276743; }
+.event-summary-counts .event-summary-count--archived {
+  border-color: #e2d5b8;
+  background: #f8f3e7;
+  color: #765f2e;
+}
+.event-summary-counts .event-summary-count--archived b { color: #765f2e; }
+.events-tabs {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.ev-tab {
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid #d8dee2;
+  border-radius: 10px;
+  background: #f7f8f9;
+  color: #59656e;
+  font-size: .72rem;
+  font-weight: 600;
+}
+.ev-tab:hover {
+  background: #f4f6f8;
+}
+.ev-tab.active {
+  border-color: #3f4d57;
+  background: #3f4d57;
+  box-shadow: 0 5px 12px rgba(45,56,64,.16);
+}
+.ev-tab-count {
+  background: #e5e9ec;
+  color: #6c7780;
+}
+.ev-tab.active .ev-tab-count {
+  background: #fff;
+  color: #27333b;
+}
+.event-card {
+  border: 1px solid #dbe3e8;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(42,52,61,.07);
+  backdrop-filter: none;
+}
+
+@media (min-width: 701px) {
+  .events-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .event-card {
+    display: grid;
+    grid-template-columns: 205px minmax(0, 1fr);
+    grid-template-rows: auto auto auto 1fr;
+    column-gap: 0;
+    align-items: start;
+  }
+
+  .event-card-img-wrap,
+  .event-card-default-cover {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    width: 205px;
+    height: 100%;
+    min-height: 174px;
+    border-radius: 0;
+  }
+
+  .event-card-head {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 15px 18px 0;
+  }
+
+  .event-card-title {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .event-card-desc {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .event-card-meta {
+    grid-column: 2;
+    grid-row: 4;
+    align-self: end;
+    margin-bottom: 16px;
+  }
+}
+.event-card:hover,
+.event-card--clickable:hover {
+  transform: translateY(-2px);
+  border-color: #c7d2da;
+  box-shadow: 0 14px 28px rgba(42,52,61,.1);
+}
+.event-card-img-wrap,
+.event-card-default-cover {
+  height: 180px;
+  background-color: #e4e9ed;
+  box-shadow: none;
+}
+.event-card-head {
+  padding: 15px 18px 0;
+}
+.event-badge,
+.event-meta-item {
+  border: 1px solid #dfe6eb;
+  background: #f8fafb;
+  box-shadow: none;
+}
+.event-badge--active {
+  border-color: #bfe8cf;
+  background: #e6f7ed;
+  color: #23834d;
+  box-shadow: none;
+}
+.event-badge--archived {
+  background: #eef2f4;
+  color: #65717b;
+}
+.ec-btn {
+  border: 1px solid #dbe3e8;
+  background: #fff;
+  box-shadow: none;
+}
+.ec-btn:hover {
+  border-color: #c7d2da;
+  background: #f6f8f9;
+}
+.ec-btn--edit {
+  border-color: #d8e5ff;
+  background: #f4f8ff;
+}
+.ec-btn--archive,
+.ec-btn--restore {
+  background: #fff;
+}
+.ec-btn--delete {
+  border-color: #fecaca;
+  background: #fff5f5;
+}
+.event-card-title {
+  color: #202830;
+}
+.event-card-desc {
+  color: #74808a;
+}
+.event-card-meta {
+  border-top: 1px solid #e8edf0;
+}
+.events-empty {
+  border: 1px dashed #cbd5dc;
+  background: #fff;
+}
+.add-event-btn,
+.header-add-event-btn {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid #3e4d58;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #5c6771, #343e47);
+  box-shadow: 0 8px 20px rgba(45,55,63,.2);
+}
+.add-event-btn:hover,
+.header-add-event-btn:hover {
+  background: linear-gradient(145deg, #687580, #3d4852);
+  transform: translateY(-1px);
+}
+
+/* Compact event form: keep the complete desktop form in view. */
+.event-modal-box {
+  width: min(680px, 94vw);
+  max-height: none;
+  border: 1px solid #dce3e8;
+  border-radius: 18px;
+  background: #f7f9fa;
+  box-shadow: 0 18px 42px rgba(34,45,54,.24);
+}
+
+.ev-modal-banner {
+  padding: 20px 26px 18px;
+  gap: 12px;
+  background: linear-gradient(145deg, #f8fafb, #e4e8ea);
+  border-bottom: 1px solid #d7dfe3;
+}
+
+.ev-modal-banner-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+}
+
+.ev-modal-banner-title { color: #202a34; font-size: 1.2rem; font-weight: 700; }
+.ev-modal-banner-sub { color: #66727e; font-size: .8rem; }
+.ev-modal-banner-icon { background: #e1e6e8; color: #3f4a55; }
+.ev-modal-banner-icon svg { stroke: currentColor; }
+.ev-modal-close { top: 12px; right: 14px; border: 1px solid #cbd5da; background: #fff; color: #3f4a55; }
+.ev-modal-close:hover { border-color: #9da8af; background: #fff; }
+
+.event-form {
+  gap: 14px;
+  padding: 20px 26px 18px;
+  overflow: visible;
+  background: #f7f9fa;
+}
+
+.form-group { gap: 7px; }
+.form-label { font-size: .68rem; }
+.form-row { gap: 14px; }
+
+.form-input,
+.time-display,
+.teacher-picker-trigger {
+  min-height: 42px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  font-size: .86rem;
+  background: linear-gradient(145deg, #fff, #f0f3f4);
+  box-shadow: none;
+}
+
+.fi-input { padding-left: 34px !important; }
+.form-textarea { min-height: 70px; line-height: 1.45; }
+.teacher-picker-value,
+.teacher-picker-placeholder,
+.td-val,
+.td-placeholder { font-size: .86rem; }
+.teacher-picker-help { font-size: .68rem; }
+
+.img-upload-area {
+  min-height: 84px;
+  padding: 14px 16px;
+  gap: 4px;
+}
+
+.img-upload-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+}
+
+.img-upload-hint { font-size: .78rem; }
+.img-upload-sub { font-size: .66rem; }
+.img-upload-area--has { min-height: 110px; }
+.img-upload-preview { height: 110px; }
+
+.form-actions {
+  gap: 9px;
+  padding-top: 12px;
+  margin-top: 1px;
+  justify-content: flex-end;
+  padding-bottom: 2px;
+}
+
+.ev-submit-btn {
+  min-height: 40px;
+  padding: 9px 18px;
+  font-size: .8rem;
+}
+
+.ev-submit-btn { min-width: 140px; justify-content: center; background: linear-gradient(145deg, #5c6771, #343e47); border: 1px solid #3e4d58; box-shadow: 0 6px 12px rgba(45,55,63,.18); }
+.ev-submit-btn:hover { opacity: 1; background: linear-gradient(145deg, #687580, #3d4852); }
+
+@media (max-width: 720px) {
+  .event-modal-box { max-height: 94vh; overflow-y: auto; }
+  .ev-modal-banner { padding-inline: 18px; }
+  .event-form { padding: 16px 18px 14px; }
+}
+
+.events-loading {
+  display: grid;
+  gap: 14px;
+}
+
+.event-skeleton {
+  display: grid;
+  grid-template-columns: 205px minmax(0, 1fr);
+  min-height: 174px;
+  overflow: hidden;
+  border: 1px solid #e1e7eb;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.event-skeleton-cover,
+.event-skeleton-line,
+.event-skeleton-meta {
+  background: linear-gradient(100deg, #edf1f3 25%, #f8fafb 45%, #edf1f3 65%);
+  background-size: 220% 100%;
+  animation: eventSkeletonShimmer 1.35s ease-in-out infinite;
+}
+
+.event-skeleton-cover { min-height: 174px; }
+
+.event-skeleton-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.event-skeleton-line {
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+}
+
+.event-skeleton-line--short { width: 26%; height: 22px; border-radius: 999px; }
+.event-skeleton-line--title { width: 62%; height: 18px; }
+.event-skeleton-meta { width: 72%; height: 28px; margin-top: auto; border-radius: 999px; }
+
+@keyframes eventSkeletonShimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (max-width: 700px) {
+  .event-skeleton {
+    grid-template-columns: 1fr;
+  }
+
+  .event-skeleton-cover { min-height: 120px; }
 }
 </style>

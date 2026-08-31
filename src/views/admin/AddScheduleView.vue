@@ -4653,6 +4653,182 @@ onMounted(async () => {
 @media (max-width: 640px) {
   .consult-right-pane .consult-form-shell { padding: 22px 18px; }
 }
+
+/* ── Flat minimalist consultation modal ───────────────────────────────── */
+.consult-modal-box {
+  border: 1px solid #d9e0e5;
+  background: #f8fafb;
+  box-shadow: 0 26px 70px rgba(18,24,30,.28);
+}
+.consult-modal-box .sched-modal-header {
+  min-height: 118px;
+  padding: 26px 32px;
+  border-bottom: 1px solid #e1e7eb;
+  background: #fff;
+  box-shadow: none;
+}
+.consult-header-icon {
+  color: #44515d;
+  border: 1px solid #d9e1e7;
+  background: #f2f5f7;
+  box-shadow: none;
+}
+.consult-modal-box .sched-modal-mode-badge {
+  color: #5d6873;
+  border: 1px solid #d9e1e7;
+  background: #f7f9fa;
+  box-shadow: none;
+}
+.consult-modal-box .sched-modal-title { color: #202830; }
+.consult-modal-subtitle { color: #7a858e; }
+.consult-close {
+  color: #5d6873;
+  border: 1px solid #d9e1e7;
+  background: #f8fafb;
+  box-shadow: none;
+}
+.consult-close:hover {
+  color: #202830;
+  border-color: #c8d2d9;
+  background: #eef2f4;
+  transform: none;
+}
+.consult-modal-content {
+  background: #f8fafb;
+}
+.consult-left-pane {
+  border-right: 1px solid #e1e7eb;
+  background: #f3f6f8;
+  box-shadow: none;
+}
+.consult-right-pane {
+  background: #fff;
+  box-shadow: none;
+}
+.consult-usage,
+.consult-slot-item,
+.consult-empty {
+  border: 1px solid #dfe6eb;
+  background: #fff;
+  box-shadow: none;
+}
+.consult-progress {
+  height: 8px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8ec;
+  box-shadow: none;
+}
+.consult-progress span {
+  background: #44515d;
+  box-shadow: none;
+}
+.consult-section-heading strong,
+.consult-slot-dur {
+  color: #5d6873;
+  background: #eef2f4;
+  box-shadow: none;
+}
+.consult-slot-item:hover {
+  border-color: #cfd9df;
+  background: #f9fbfc;
+  box-shadow: none;
+  transform: none;
+}
+.consult-slot-calendar,
+.consult-empty-icon {
+  color: #5d6873;
+  background: #eef2f4;
+  box-shadow: none;
+}
+.consult-edit-btn,
+.consult-del-btn {
+  box-shadow: none;
+}
+.consult-edit-btn {
+  color: #44515d;
+  border: 1px solid #cfd9df;
+  background: #fff;
+}
+.consult-edit-btn:hover {
+  color: #202830;
+  background: #eef2f4;
+}
+.consult-del-btn {
+  color: #b34040;
+  border: 1px solid #efcaca;
+  background: #fff5f5;
+}
+.consult-form-shell {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.consult-form-icon {
+  color: #fff;
+  border: 1px solid #3e4a55;
+  background: #44515d;
+  box-shadow: none;
+}
+.consult-right-pane .consult-form-shell {
+  padding: 32px 38px 26px;
+}
+.consult-right-pane .consult-form-heading {
+  border-bottom: 1px solid #e1e7eb;
+}
+.consult-modal-box .form-select {
+  color: #26313b;
+  border: 1px solid #d7e0e6;
+  background: #fbfcfd;
+  box-shadow: none;
+}
+.consult-modal-box .form-select:hover { border-color: #aeb9c0; }
+.consult-modal-box .form-select:focus {
+  border-color: #6b7884;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(100,113,126,.12);
+}
+.consult-modal-box .sched-modal-actions,
+.consult-right-pane .sched-modal-actions {
+  border-top: 1px solid #e1e7eb;
+  background: #fff;
+  box-shadow: none;
+}
+.consult-modal-box .cancel-btn-text {
+  color: #5d6873;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.consult-modal-box .cancel-btn-text:hover {
+  border-color: #d7e0e6;
+  background: #f6f8f9;
+  box-shadow: none;
+}
+.consult-modal-box .save-btn {
+  color: #fff;
+  border: 1px solid #3e4a55;
+  background: #44515d;
+  box-shadow: 0 8px 18px rgba(48,57,66,.16);
+}
+.consult-modal-box .save-btn:not(:disabled):hover {
+  background: #303b45;
+  transform: none;
+}
+.consult-modal-box .save-btn:disabled {
+  color: #8e989e;
+  border-color: #d7e0e6;
+  background: #edf1f3;
+  box-shadow: none;
+}
+@media (max-width: 900px) {
+  .consult-left-pane { border-right: 0; border-bottom: 1px solid #e1e7eb; }
+  .consult-right-pane .consult-form-shell { padding: 24px; }
+}
+@media (max-width: 640px) {
+  .consult-right-pane .consult-form-shell { padding: 20px 18px; }
+}
 </style>
 
 <style>
