@@ -23,77 +23,122 @@
       </button>
     </aside>
     <main class="main">
-      <header class="logs-header">
+      <header class="main-header">
         <div>
-          <span class="page-eyebrow">Activity monitoring</span>
-          <h1>Activity Logs</h1>
-          <p>Teacher and student actions recorded across the system</p>
+          <h1 class="page-title">
+            <span class="page-title-kicker">Activity monitoring</span>
+            <span class="page-title-main">Activity Logs</span>
+          </h1>
+          <p class="page-sub">Teacher and student actions recorded across the system</p>
         </div>
       </header>
 
-      <section class="activity-section">
-        <div class="activity-section-header">
-          <div>
-            <h2 class="activity-section-title">Activity overview</h2>
-            <p class="activity-section-sub">{{ totalLogs }} recorded {{ totalLogs === 1 ? 'activity' : 'activities' }}</p>
+      <section class="um-management-panel">
+        <div class="um-topbar">
+          <div class="um-view-tabs">
+            <button v-for="option in roleOptions" :key="option.value" :class="['um-view-tab', roleFilter === option.value ? 'um-view-tab--on' : '']" @click="changeRoleFilter(option.value)">
+              <svg v-if="option.value === ''" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M12 3v18"/></svg>
+              <svg v-else-if="option.value === 'teacher'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              {{ option.label }}
+            </button>
           </div>
-          <div class="activity-summary-counts">
-            <span><b>{{ totalLogs }}</b> Total</span>
-            <span><b>{{ logs.length }}</b> Shown</span>
-            <span><b>{{ currentPage }}</b> Page</span>
+          <div class="um-topbar-right">
+            <div class="um-search-wrap">
+              <span class="um-search-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </span>
+              <input v-model.trim="searchQuery" class="um-search-input" type="search" placeholder="Search activity..." @keyup.enter="applyFilters" />
+            </div>
+            <button class="um-print-btn" type="button" @click="applyFilters" :disabled="loading">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Search
+            </button>
           </div>
         </div>
 
-        <div class="toolbar">
-          <div class="filters">
-            <button v-for="option in roleOptions" :key="option.value" :class="{ active: roleFilter === option.value }" @click="changeRoleFilter(option.value)">{{ option.label }}</button>
-          </div>
+        <div class="um-logs-container">
+          <form class="um-search-panel" @submit.prevent="applyFilters">
+            <label class="um-search-field">
+              <span>Search activity</span>
+              <input v-model.trim="searchQuery" type="search" placeholder="Name, email, action, IP or device" />
+            </label>
+            <label>
+              <span>From date &amp; time</span>
+              <SystemDateTimePicker v-model="fromDateTime" placeholder="Select start date & time" />
+            </label>
+            <label>
+              <span>To date &amp; time</span>
+              <SystemDateTimePicker v-model="toDateTime" placeholder="Select end date & time" />
+            </label>
+            <div class="um-search-actions">
+              <button type="submit" class="um-apply-search" :disabled="loading">Search</button>
+              <button type="button" class="um-clear-search" :disabled="loading || !hasAdvancedFilters" @click="clearAdvancedFilters">Clear</button>
+            </div>
+          </form>
+
+          <p v-if="error" class="um-error-banner">{{ error }}</p>
+
+          <div class="um-table-wrap">
+          <table class="um-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Action</th>
+                <th>Role</th>
+                <th>Date &amp; Time</th>
+                <th>IP Address</th>
+                <th>Device</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="loading && !logs.length">
+                <td colspan="6">
+                  <div class="um-empty">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Loading activity logs...</span>
+                  </div>
+                </td>
+              </tr>
+              <tr v-else-if="!logs.length">
+                <td colspan="6">
+                  <div class="um-empty">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>No activity recorded yet.</span>
+                  </div>
+                </td>
+              </tr>
+              <tr v-for="log in logs" :key="log.id" class="um-row">
+                <td>
+                  <div class="um-user-cell">
+                    <div class="um-user-avatar um-user-avatar--log">{{ initials(log.actorName) }}</div>
+                    <div class="um-user-info">
+                      <span class="um-user-name">{{ log.actorName }}</span>
+                      <span class="um-user-dept">{{ log.email || 'No email recorded' }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="um-log-action">{{ log.action }}</td>
+                <td>
+                  <span :class="['um-role-badge', log.actorRole === 'teacher' ? 'um-role-badge--teacher' : 'um-role-badge--student']">{{ log.actorRole }}</span>
+                </td>
+                <td class="um-date">{{ formatTime(log.createdAt) }}</td>
+                <td class="um-email">{{ log.ipAddress || 'Not recorded' }}</td>
+                <td class="um-device">{{ log.device || 'Not recorded' }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <form class="search-panel" @submit.prevent="applyFilters">
-          <label class="search-field">
-            <span>Search activity</span>
-            <input v-model.trim="searchQuery" type="search" placeholder="Name, email, action, IP or device" />
-          </label>
-        <label>
-          <span>From date &amp; time</span>
-          <SystemDateTimePicker v-model="fromDateTime" placeholder="Select start date & time" />
-        </label>
-        <label>
-          <span>To date &amp; time</span>
-          <SystemDateTimePicker v-model="toDateTime" placeholder="Select end date & time" />
-        </label>
-          <div class="search-actions">
-            <button type="submit" class="apply-search" :disabled="loading">Search</button>
-            <button type="button" class="clear-search" :disabled="loading || !hasAdvancedFilters" @click="clearAdvancedFilters">Clear</button>
+        <footer v-if="logs.length" class="um-pagination">
+          <span class="um-page-summary">{{ firstVisibleLog }} to {{ lastVisibleLog }} of {{ totalLogs }} activities</span>
+          <div class="um-page-controls">
+            <button @click="changePage(currentPage - 1)" :disabled="currentPage <= 1 || loading" aria-label="Previous page">&lt;</button>
+            <span>Page {{ currentPage }} of {{ totalPages }}</span>
+            <button @click="changePage(currentPage + 1)" :disabled="currentPage >= totalPages || loading" aria-label="Next page">&gt;</button>
           </div>
-        </form>
-
-        <p v-if="error" class="error">{{ error }}</p>
-        <section class="log-card">
-          <div v-if="loading && !logs.length" class="empty">Loading activity logs...</div>
-          <div v-else-if="!logs.length" class="empty">No teacher or student activity recorded yet.</div>
-          <article v-for="log in logs" :key="log.id" class="log-row">
-            <div class="initials">{{ initials(log.actorName) }}</div>
-            <div class="log-main">
-              <strong>{{ log.actorName }}</strong><span :class="['role-tag', log.actorRole]">{{ log.actorRole }}</span>
-              <p>{{ log.action }}</p>
-              <div class="request-meta">
-                <span title="IP address">IP: {{ log.ipAddress || 'Not recorded' }}</span>
-                <span title="Device and browser">Device: {{ log.device || 'Not recorded' }}</span>
-              </div>
-            </div>
-            <time>{{ formatTime(log.createdAt) }}</time>
-          </article>
-          <footer v-if="logs.length" class="pagination">
-            <span class="page-summary">{{ firstVisibleLog }} to {{ lastVisibleLog }} of {{ totalLogs }} activities</span>
-            <div class="page-controls">
-              <button @click="changePage(currentPage - 1)" :disabled="currentPage <= 1 || loading" aria-label="Previous page">&lt;</button>
-              <span>Page {{ currentPage }} of {{ totalPages }}</span>
-              <button @click="changePage(currentPage + 1)" :disabled="currentPage >= totalPages || loading" aria-label="Next page">&gt;</button>
-            </div>
-          </footer>
-        </section>
+        </footer>
+        </div>
       </section>
     </main>
   </div>
@@ -174,16 +219,680 @@ onMounted(loadLogs)
 </script>
 
 <style scoped>
-.layout{display:flex;height:100vh;background:#f5f6f8;font-family:Poppins,Arial,sans-serif}.sidebar{width:280px;min-width:280px;background:#fff;border-right:1px solid #ececec;display:flex;flex-direction:column;align-items:center;padding:28px 18px 24px;box-sizing:border-box;position:sticky;top:0;height:100vh;overflow-y:auto}.sidebar-profile{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:28px;text-align:center}.avatar-wrap{width:96px;height:96px;border-radius:50%;overflow:hidden;margin-bottom:10px;border:3px solid #c8ddd4;cursor:pointer}.avatar{width:100%;height:100%;object-fit:cover}.brand{font-size:1.05rem;font-weight:600;color:#1b4332}.role{font-size:.88rem;color:#444;font-weight:500}.email{font-size:.82rem;color:#888;word-break:break-all}.sidebar-nav{display:flex;flex-direction:column;gap:4px;width:100%;flex:1}.nav-item{display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:10px;font-size:.88rem;font-weight:400;color:#444;text-decoration:none;transition:background .18s,color .18s;cursor:pointer}.nav-item:hover{background:#f0faf3;color:#1b4332}.nav-item.active{background:#1b4332;color:#fff}.logout-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 12px;background:#e63946;color:#fff;border:0;border-radius:10px;font-size:.85rem;font-weight:500;font-family:inherit;cursor:pointer;margin-top:16px}.logout-btn:hover{background:#c1121f}.main{flex:1;padding:38px 44px;overflow:auto}.main h1{margin:0;color:#1b4332;font-size:2rem}.main header p{margin:5px 0 26px;color:#777}.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.filters{display:flex;gap:7px}.filters button,.refresh{border:1px solid #dce3df;background:#fff;border-radius:8px;padding:8px 13px;color:#456;font:inherit;font-size:.82rem;cursor:pointer}.filters button.active{background:#1b4332;color:#fff;border-color:#1b4332}.refresh{color:#1b4332}.log-card{background:#fff;border:1px solid #e1e5e3;border-radius:14px;overflow:hidden}.log-row{display:flex;align-items:center;gap:13px;padding:15px 20px;border-bottom:1px solid #edf0ee}.initials{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#dcefe4;color:#1b4332;font-size:.76rem;font-weight:700}.log-main{flex:1}.log-main strong{font-size:.9rem;color:#222}.log-main p{margin:3px 0 0;font-size:.82rem;color:#667}.role-tag{margin-left:8px;padding:2px 7px;border-radius:99px;font-size:.67rem;text-transform:capitalize}.role-tag.teacher{background:#e7f5ec;color:#1b7a4a}.role-tag.student{background:#e8f0ff;color:#2761a8}time{font-size:.75rem;color:#84908a;white-space:nowrap}.empty{padding:55px;text-align:center;color:#87908b}.error{padding:10px 12px;background:#fff0f0;color:#b42318;border-radius:8px}.pagination{display:flex;justify-content:space-between;align-items:center;padding:13px 20px;background:#f8faf9;border-top:1px solid #e7ebe9}.page-summary,.page-controls span{font-size:.78rem;color:#66736c}.page-controls{display:flex;align-items:center;gap:10px}.page-controls button{width:34px;height:32px;border:1px solid #d5ded9;border-radius:8px;background:#fff;color:#1b4332;font-size:1.3rem;line-height:1;cursor:pointer}.page-controls button:hover:not(:disabled){background:#1b4332;color:#fff}.page-controls button:disabled{opacity:.4;cursor:not-allowed}@media(max-width:800px){.sidebar{display:none}.main{padding:24px 18px}.log-row{align-items:flex-start}time{white-space:normal;text-align:right}.toolbar{align-items:flex-start;gap:10px;flex-direction:column}.pagination{gap:10px;align-items:flex-start;flex-direction:column}}
-.search-panel{display:grid;grid-template-columns:minmax(240px,1.5fr) minmax(190px,1fr) minmax(190px,1fr) auto;gap:12px;align-items:end;margin-bottom:16px;padding:15px;background:#fff;border:1px solid #e1e5e3;border-radius:12px}.search-panel label{display:flex;flex-direction:column;gap:6px}.search-panel label span{font-size:.73rem;font-weight:600;color:#526159}.search-panel input{width:100%;box-sizing:border-box;border:1px solid #d5ded9;border-radius:8px;padding:9px 11px;background:#fff;color:#26332c;font:inherit;font-size:.8rem;outline:none}.search-panel input:focus{border-color:#1b4332;box-shadow:0 0 0 3px rgba(27,67,50,.1)}.search-actions{display:flex;gap:7px}.search-actions button{height:39px;border-radius:8px;padding:0 14px;font:inherit;font-size:.78rem;font-weight:600;cursor:pointer}.apply-search{border:1px solid #1b4332;background:#1b4332;color:#fff}.clear-search{border:1px solid #d5ded9;background:#fff;color:#526159}.search-actions button:disabled{opacity:.45;cursor:not-allowed}.request-meta{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:6px;color:#7b8780;font-size:.7rem}.request-meta span{word-break:break-word}@media(max-width:1100px){.search-panel{grid-template-columns:1fr 1fr}.search-field{grid-column:1/-1}}@media(max-width:800px){.search-panel{grid-template-columns:1fr}.search-field{grid-column:auto}.search-actions{width:100%}.search-actions button{flex:1}.request-meta{flex-direction:column;gap:3px}}
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
-.layout{background:linear-gradient(135deg,#eef1f2 0%,#d7dcdf 48%,#c5ccd0 100%);color:#222a33}.main{padding:42px 44px 48px}.logs-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:28px}.page-eyebrow{display:block;margin-bottom:8px;color:#65717b;font-size:.76rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase}.main h1{color:#202830;font-size:clamp(2.1rem,4vw,3.15rem);line-height:1;letter-spacing:-.055em;font-weight:850}.main header p{max-width:780px;margin:12px 0 0;color:#737d86;font-size:1.02rem;line-height:1.55}.logs-refresh-btn{min-height:46px;padding:0 20px;border:1px solid #3e4a55;border-radius:13px;background:linear-gradient(145deg,#5d6873,#343e48);color:#fff;font-weight:800;letter-spacing:-.01em;box-shadow:0 12px 24px rgba(48,57,66,.24),inset 0 1px 0 rgba(255,255,255,.18)}.logs-refresh-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 15px 28px rgba(48,57,66,.27),inset 0 1px 0 rgba(255,255,255,.2)}.logs-refresh-btn:disabled{opacity:.62;cursor:not-allowed}.activity-section{padding:26px 28px 28px;border:1px solid rgba(255,255,255,.9);border-radius:25px;background:linear-gradient(145deg,rgba(247,249,250,.82),rgba(221,227,231,.68));box-shadow:16px 18px 36px rgba(88,99,108,.16),-10px -10px 24px rgba(255,255,255,.58),inset 1px 1px 0 rgba(255,255,255,.72)}.activity-section-header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:-4px -4px 22px;padding:0 0 22px;border-bottom:1px solid rgba(151,163,173,.18)}.activity-section-title{margin:0;color:#242c35;font-size:1.25rem;font-weight:850;letter-spacing:-.03em}.activity-section-sub{margin:6px 0 0;color:#7a858d;font-size:.86rem}.activity-summary-counts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.activity-summary-counts span{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border:1px solid #dce4e9;border-radius:10px;background:rgba(255,255,255,.68);color:#74808a;font-size:.76rem;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}.activity-summary-counts b{color:#303a44;font-size:.93rem}.toolbar{margin:0 0 18px;justify-content:flex-start}.filters{display:inline-flex;gap:6px;padding:6px;border:1px solid rgba(205,214,220,.9);border-radius:14px;background:rgba(255,255,255,.58);box-shadow:inset 1px 1px 3px rgba(116,128,139,.12),inset -1px -1px 4px rgba(255,255,255,.9)}.filters button{min-height:42px;padding:0 18px;border:1px solid transparent;border-radius:11px;background:transparent;color:#596572;font-size:.82rem;font-weight:800;box-shadow:none}.filters button:hover:not(.active){background:rgba(255,255,255,.72);border-color:#e2e8ec}.filters button.active{border-color:#3d4853;background:linear-gradient(145deg,#5c6873,#36414b);color:#fff;box-shadow:0 8px 18px rgba(58,68,78,.18),inset 0 1px 0 rgba(255,255,255,.16)}.search-panel{grid-template-columns:minmax(260px,1.4fr) minmax(190px,.85fr) minmax(190px,.85fr) auto;gap:14px;margin-bottom:20px;padding:18px;border:1px solid rgba(255,255,255,.88);border-radius:19px;background:rgba(255,255,255,.66);box-shadow:inset 0 1px 0 rgba(255,255,255,.72),0 12px 24px rgba(86,96,105,.08)}.search-panel label span{color:#5a6570;font-size:.72rem;font-weight:850;letter-spacing:.02em}.search-panel input{min-height:44px;border:1px solid #d7e0e6;border-radius:12px;background:#fbfcfd;color:#24303a;font-size:.82rem;box-shadow:inset 0 1px 2px rgba(68,80,91,.06)}.search-panel input:focus{border-color:#6b7884;box-shadow:0 0 0 3px rgba(100,113,126,.12);background:#fff}.search-actions{gap:10px}.search-actions button{height:44px;border-radius:12px;padding:0 18px;font-weight:850}.apply-search{border:1px solid #3e4a55;background:linear-gradient(145deg,#5d6873,#343e48);color:#fff;box-shadow:0 10px 18px rgba(48,57,66,.18),inset 0 1px 0 rgba(255,255,255,.18)}.clear-search{border:1px solid #dbe2e7;background:#fff;color:#68737d}.log-card{border:1px solid rgba(255,255,255,.86);border-radius:20px;background:rgba(255,255,255,.76);box-shadow:0 16px 30px rgba(82,93,102,.1),inset 0 1px 0 rgba(255,255,255,.78);overflow:hidden}.log-row{gap:16px;padding:18px 22px;border-bottom:1px solid #e9eef1;background:rgba(255,255,255,.38);transition:background .18s ease,transform .18s ease}.log-row:hover{background:rgba(248,250,251,.95)}.initials{width:44px;height:44px;background:linear-gradient(145deg,#eef2f4,#dfe6ea);color:#44515d;font-size:.78rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 5px 12px rgba(85,96,106,.08)}.log-main strong{color:#242c35;font-size:.94rem;font-weight:850}.log-main p{margin-top:4px;color:#596572;font-size:.86rem}.role-tag{display:inline-flex;align-items:center;margin-left:10px;padding:3px 9px;border-radius:999px;font-size:.68rem;font-weight:800;text-transform:capitalize}.role-tag.teacher{background:#eaf7f0;color:#2a8752}.role-tag.student{background:#eaf2ff;color:#356db5}time{color:#7c8790;font-size:.78rem}.request-meta{color:#8a949b;font-size:.72rem}.pagination{background:rgba(248,250,251,.78);border-top:1px solid #e7edf1}.page-summary,.page-controls span{color:#66727c;font-weight:700}.page-controls button{border-color:#d8e0e6;color:#4b5965;background:#fff}.page-controls button:hover:not(:disabled){background:#3d4853;color:#fff}.empty{color:#7b858d;font-weight:700}.error{border:1px solid #ffd5d5;background:#fff5f5;color:#b42318;font-weight:700}
+.layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: #f5f6f8;
+  font-family: 'Poppins', sans-serif;
+}
 
-@media(max-width:1100px){.logs-header,.activity-section-header{align-items:flex-start;flex-direction:column}.activity-summary-counts{width:100%}.search-panel{grid-template-columns:1fr 1fr}.search-field{grid-column:1/-1}.search-actions{grid-column:1/-1}}
-@media(max-width:800px){.main{padding:24px 18px}.logs-refresh-btn{width:100%}.activity-section{padding:18px;border-radius:20px}.filters{width:100%;overflow:auto}.filters button{white-space:nowrap}.search-panel{grid-template-columns:1fr}.search-actions{grid-column:auto;width:100%}.search-actions button{flex:1}.log-row{align-items:flex-start}.log-row time{margin-left:auto;text-align:right}.pagination{gap:10px;align-items:flex-start;flex-direction:column}}
+.sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: #fff;
+  border-right: 1px solid #ececec;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 18px 24px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
 
-.main{padding:40px 44px 46px}.logs-header{margin-bottom:24px}.page-eyebrow{margin-bottom:10px;color:#6f7a83;font-size:.72rem;letter-spacing:.18em}.main h1{font-size:clamp(2.35rem,3.4vw,2.95rem);letter-spacing:-.06em}.main header p{font-size:1rem;color:#74808a}.logs-refresh-btn{min-width:126px;min-height:50px;border-radius:14px}.activity-section{padding:30px 34px 32px;border-radius:24px;background:linear-gradient(145deg,rgba(248,250,251,.9),rgba(223,229,233,.7));box-shadow:14px 16px 34px rgba(84,94,103,.14),-8px -8px 22px rgba(255,255,255,.58),inset 1px 1px 0 rgba(255,255,255,.76)}.activity-section-header{margin:0 0 24px;padding:0 0 22px}.activity-section-title{font-size:1.32rem}.activity-summary-counts span{min-width:82px;justify-content:center}.toolbar{margin-bottom:16px}.filters{padding:5px;border-radius:15px;background:rgba(255,255,255,.72)}.filters button{min-width:126px;min-height:43px}.search-panel{grid-template-columns:minmax(330px,1.25fr) minmax(210px,.72fr) minmax(210px,.72fr) auto;padding:18px 20px;border-radius:20px;background:linear-gradient(145deg,rgba(255,255,255,.82),rgba(241,244,246,.72));align-items:end}.search-panel input{height:46px;border-radius:12px}.search-actions button{height:46px;min-width:92px}.log-card{margin-top:22px;border-radius:22px;background:rgba(255,255,255,.88)}.log-row{display:grid;grid-template-columns:50px minmax(0,1fr) max-content;align-items:center;min-height:92px;padding:18px 22px}.initials{width:46px;height:46px}.log-main strong{font-size:.96rem}.log-main p{font-size:.85rem}.request-meta{gap:8px 18px}.log-row time{align-self:center;padding-left:24px;color:#7f8992;font-weight:600}.pagination{padding:16px 22px}.page-controls button{font-size:1rem;font-weight:800}
+.sidebar-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 28px;
+  text-align: center;
+}
 
-@media(max-width:1200px){.search-panel{grid-template-columns:1fr 1fr}.search-field{grid-column:1/-1}.search-actions{grid-column:1/-1;justify-content:flex-end}}
-@media(max-width:800px){.main h1{font-size:2.15rem}.activity-summary-counts span{min-width:auto}.filters button{min-width:max-content}.log-row{grid-template-columns:46px 1fr;gap:12px}.log-row time{grid-column:2;padding-left:0;text-align:left}.search-actions{justify-content:stretch}}
+.avatar-wrap {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 10px;
+  border: 3px solid #c4c9cd;
+  cursor: pointer;
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.brand {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.role {
+  font-size: 0.88rem;
+  color: #444;
+  font-weight: 500;
+}
+
+.email {
+  font-size: 0.82rem;
+  color: #888;
+  word-break: break-all;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  flex: 1;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 400;
+  color: #444;
+  text-decoration: none;
+  transition: background 0.18s, color 0.18s;
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  background: #f8fafc;
+  color: #4b5563;
+}
+
+.nav-item.active {
+  background: #4b5563;
+  color: #fff;
+}
+
+.nav-item.active .nav-icon {
+  color: #fff;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 12px;
+  background: #e63946;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 16px;
+}
+
+.logout-btn:hover {
+  background: #c1121f;
+}
+
+.main {
+  flex: 1;
+  padding: 40px 44px 32px;
+  overflow-y: auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.main-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.page-title {
+  font-size: clamp(1.8rem, 3vw, 2.2rem);
+  font-weight: 700;
+  color: #1a202c;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.page-title-kicker {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-bottom: 10px;
+}
+
+.page-title-main {
+  display: block;
+}
+
+.page-sub {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-top: 6px;
+  font-weight: 400;
+}
+
+.um-management-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.um-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.um-view-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.um-view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #4b5563;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.um-view-tab:hover:not(.um-view-tab--on) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.um-view-tab--on {
+  background: #3d4653;
+  border-color: #3d4653;
+  color: #fff;
+}
+
+.um-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.um-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.um-search-icon {
+  position: absolute;
+  left: 13px;
+  color: #d1d5db;
+  pointer-events: none;
+  display: flex;
+}
+
+.um-search-input {
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: #1a1a1a;
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 14px 10px 38px;
+  outline: none;
+  width: 280px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.um-search-input::placeholder {
+  color: #bbb;
+}
+
+.um-search-input:focus {
+  border-color: #4b5563;
+  box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.08);
+}
+
+.um-print-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #4b5563;
+  color: #fff;
+  border: 1px solid #4b5563;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.um-print-btn:hover:not(:disabled) {
+  background: #3d4653;
+  border-color: #3d4653;
+}
+
+.um-print-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.um-stats-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.um-stat-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.um-stat-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.um-stat-icon--total { background: #f3f4f6; color: #4f575f; }
+.um-stat-icon--admin { background: #e8eefe; color: #2563eb; }
+.um-stat-icon--teacher { background: #fef3c7; color: #b45309; }
+.um-stat-icon--active { background: #d8dcdf; color: #4f575f; }
+.um-stat-icon--archived { background: #f3f4f6; color: #6b7280; }
+
+.um-stat-val {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #111;
+  line-height: 1;
+}
+
+.um-stat-label {
+  font-size: 0.78rem;
+  color: #888;
+  font-weight: 500;
+  margin-top: 3px;
+}
+
+.um-logs-container {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #eaedf0;
+}
+
+.um-search-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.5fr) minmax(190px, 1fr) minmax(190px, 1fr) auto;
+  gap: 14px;
+  align-items: end;
+  padding: 20px;
+  background: #fff;
+  border: none;
+  border-bottom: 1px solid #eaedf0;
+  border-radius: 14px 14px 0 0;
+  box-shadow: none;
+}
+
+.um-search-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.um-search-panel label span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #4b5563;
+  letter-spacing: 0.3px;
+}
+
+.um-search-panel input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 13px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.um-search-panel input::placeholder {
+  color: #bbb;
+}
+
+.um-search-panel input:focus {
+  border-color: #4b5563;
+  box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.08);
+}
+
+.um-search-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.um-search-actions button {
+  height: 40px;
+  border-radius: 10px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.um-apply-search {
+  border: 1px solid #4b5563;
+  background: #4b5563;
+  color: #fff;
+}
+
+.um-apply-search:hover:not(:disabled) {
+  background: #3d4653;
+  border-color: #3d4653;
+}
+
+.um-clear-search {
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  color: #4b5563;
+}
+
+.um-clear-search:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #d1d5db;
+}
+
+.um-search-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.um-error-banner {
+  background: #fef2f2;
+  border: none;
+  border-bottom: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 14px 20px;
+  border-radius: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0;
+}
+
+.um-table-wrap {
+  background: #fff;
+  border-radius: 0;
+  box-shadow: none;
+  max-height: 65vh;
+  overflow-x: auto;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.um-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.um-table thead tr {
+  background: #f9fafb;
+  border-bottom: 1px solid #eaedf0;
+}
+
+.um-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f9fafb;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 20px;
+}
+
+.um-table td {
+  padding: 14px 20px;
+  vertical-align: middle;
+}
+
+.um-row {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.12s;
+}
+
+.um-row:last-child {
+  border-bottom: none;
+}
+
+.um-row:hover {
+  background: #fafbfc;
+}
+
+.um-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.um-user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #dfe8e2, #c4d7cf);
+  color: #1f4a38;
+  font-weight: 700;
+  font-size: 0.75rem;
+  border: 1px solid #c4d7cf;
+}
+
+.um-user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.um-user-name {
+  display: block;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 0.875rem;
+}
+
+.um-user-dept {
+  display: block;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin-top: 3px;
+}
+
+.um-log-action {
+  color: #374151;
+  line-height: 1.5;
+  max-width: 260px;
+  font-size: 0.875rem;
+}
+
+.um-role-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.um-role-badge--teacher {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.um-role-badge--student {
+  background: #f0e8fe;
+  color: #7c3aed;
+}
+
+.um-email,
+.um-device,
+.um-date {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.um-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: #d1d5db;
+  font-size: 0.875rem;
+}
+
+.um-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #eaedf0;
+  background: #f9fafb;
+  border-radius: 0 0 14px 14px;
+}
+
+.um-page-summary {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.um-page-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.um-page-controls button {
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  border-radius: 8px;
+  color: #4b5563;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-size: 0.85rem;
+}
+
+.um-page-controls button:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.um-page-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1200px) {
+  .um-stats-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .um-search-panel {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .um-search-field {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 800px) {
+  .main {
+    padding: 24px 18px;
+  }
+
+  .um-stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .um-search-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .um-topbar-right {
+    width: 100%;
+  }
+
+  .um-search-wrap,
+  .um-search-input,
+  .um-topbar-right > .um-print-btn {
+    width: 100%;
+  }
+
+  .um-pagination {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
 </style>
