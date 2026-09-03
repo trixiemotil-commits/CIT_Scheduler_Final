@@ -314,6 +314,14 @@ async function createAssignment(req, res) {
       console.warn('Failed to notify students about substitute assignment:', err.message)
     }
 
+    await logActivity({
+      actor: req.user,
+      action: `Assigned substitute teacher ${substituteTeacher} for ${originalTeacher} on ${date}`,
+      path: req.originalUrl || "/api/substitutions",
+      method: req.method,
+      req,
+    })
+
     return res.status(200).json({ message: 'Substitute assignment saved.', assignment: populated })
   } catch (error) {
     console.error('Failed to create substitute assignment:', error)
@@ -406,6 +414,14 @@ async function syncAssignments(req, res) {
       console.warn('Substitutes updated, but student notifications failed:', notificationError.message)
     }
 
+    await logActivity({
+      actor: req.user,
+      action: `Updated substitute assignments for ${originalTeacher} on ${date}`,
+      path: req.originalUrl || "/api/substitutions/sync",
+      method: req.method,
+      req,
+    })
+
     return res.json({
       message: grouped.size ? 'Substitute assignments updated.' : 'Substitute assignments removed.',
       assignmentCount: grouped.size,
@@ -482,6 +498,14 @@ async function deleteAssignment(req, res) {
     const { id } = req.params
     const doc = await SubstituteAssignment.findByIdAndDelete(id)
     if (!doc) return res.status(404).json({ message: 'Assignment not found.' })
+    await logActivity({
+      actor: req.user,
+      action: `Deleted substitute assignment ${id}`,
+      path: req.originalUrl || `/api/substitutions/${id}`,
+      method: req.method,
+      req,
+    })
+
     return res.json({ message: 'Assignment deleted.' })
   } catch (error) {
     console.error('Failed to delete substitute assignment:', error)
@@ -504,6 +528,14 @@ async function deleteAssignmentsForTeacher(req, res) {
     const result = await SubstituteAssignment.deleteMany({
       originalTeacher,
       date: { $gte: startOfDayUTC(target), $lte: endOfDayUTC(target) },
+    })
+
+    await logActivity({
+      actor: req.user,
+      action: `Removed substitute assignments for ${originalTeacher} on ${date}`,
+      path: req.originalUrl || "/api/substitutions/delete-for-teacher",
+      method: req.method,
+      req,
     })
 
     return res.json({

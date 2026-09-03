@@ -114,13 +114,17 @@
                     <div class="um-user-avatar um-user-avatar--log">{{ initials(log.actorName) }}</div>
                     <div class="um-user-info">
                       <span class="um-user-name">{{ log.actorName }}</span>
-                      <span class="um-user-dept">{{ log.email || 'No email recorded' }}</span>
+                      <span class="um-user-dept">{{ log.actorEmail || 'No email recorded' }}</span>
                     </div>
                   </div>
                 </td>
                 <td class="um-log-action">{{ log.action }}</td>
                 <td>
-                  <span :class="['um-role-badge', log.actorRole === 'teacher' ? 'um-role-badge--teacher' : 'um-role-badge--student']">{{ log.actorRole }}</span>
+                  <span :class="[
+                    'um-role-badge',
+                    log.actorRole === 'admin' ? 'um-role-badge--admin' :
+                    log.actorRole === 'teacher' ? 'um-role-badge--teacher' : 'um-role-badge--student'
+                  ]">{{ log.actorRole }}</span>
                 </td>
                 <td class="um-date">{{ formatTime(log.createdAt) }}</td>
                 <td class="um-email">{{ log.ipAddress || 'Not recorded' }}</td>
@@ -145,10 +149,10 @@
 </template>
 
 <script setup>
-import { getToken, getUser, logout } from '@/auth.js'
-import SystemDateTimePicker from '@/components/SystemDateTimePicker.vue'
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { getToken, getUser, logout } from '@/auth.js';
+import SystemDateTimePicker from '@/components/SystemDateTimePicker.vue';
+import { computed, onMounted, ref } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 const route = useRoute(); const router = useRouter(); const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -158,7 +162,7 @@ const currentPage = ref(1); const pageSize = 10; const totalLogs = ref(0); const
 const firstVisibleLog = computed(() => totalLogs.value ? ((currentPage.value - 1) * pageSize) + 1 : 0)
 const lastVisibleLog = computed(() => Math.min(currentPage.value * pageSize, totalLogs.value))
 const hasAdvancedFilters = computed(() => Boolean(searchQuery.value || fromDateTime.value || toDateTime.value))
-const roleOptions = [{ value: '', label: 'All activity' }, { value: 'teacher', label: 'Teachers' }, { value: 'student', label: 'Students' }]
+const roleOptions = [{ value: '', label: 'All activity' }, { value: 'admin', label: 'Admins' }, { value: 'teacher', label: 'Teachers' }, { value: 'student', label: 'Students' }]
 const icon = (path) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`
 const navItems = [
   { name: 'Dashboard', to: '/admin/dashboard', icon: icon('<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>') },
@@ -776,6 +780,11 @@ onMounted(loadLogs)
   border-radius: 20px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
+}
+
+.um-role-badge--admin {
+  background: rgba(74, 111, 255, 0.12);
+  color: #2543d8;
 }
 
 .um-role-badge--teacher {

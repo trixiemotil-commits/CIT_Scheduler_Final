@@ -46,6 +46,7 @@
       <!-- Header -->
       <header class="main-header">
         <div>
+          <span class="page-eyebrow">Dashboard</span>
           <h1 class="page-title">Admin Dashboard</h1>
           <p class="page-sub">Manage schedules, rooms, and teacher assignments</p>
         </div>
@@ -124,64 +125,52 @@
             <p>{{ todayDateLabel }} <span>Updated {{ currentTimeLabel }}</span></p>
           </div>
           <div class="today-carousel-controls" v-if="todayTeachers.length > teachersPerSlide">
-            <span>Showing {{ todayTeacherIndex + 1 }}–{{ Math.min(todayTeacherIndex + teachersPerSlide, todayTeachers.length) }} of {{ todayTeachers.length }}</span>
+            <span>Showing {{ teachersPerSlide }} of {{ todayTeachers.length }} teachers • Continuous carousel</span>
           </div>
         </div>
 
-        <div v-if="todayScheduleLoading" class="today-teachers-loading">Loading today’s teaching schedule…</div>
-        <div v-else-if="todayTeachers.length" class="today-carousel-stage">
-          <button
-            type="button"
-            class="today-stage-arrow previous"
-            :disabled="todayTeacherIndex === 0"
-            aria-label="Show previous teachers"
-            @click="previousTodayTeachers"
-          >&lsaquo;</button>
-          <div
-            :key="todayTeacherIndex"
-            :class="['today-teachers-grid', `teacher-count-${Math.min(visibleTodayTeachers.length, teachersPerSlide)}`]"
-          >
-            <article v-for="teacher in visibleTodayTeachers" :key="teacher.name" class="today-teacher-card">
-            <header>
-              <img :src="teacher.avatar" :alt="teacher.name" />
-              <div>
-                <h3>{{ teacher.name }}</h3>
-                <p><strong>{{ teacher.schedule.length }}</strong> class{{ teacher.schedule.length === 1 ? '' : 'es' }} · {{ teacher.schedule[0]?.timeIn }}–{{ teacher.schedule[teacher.schedule.length - 1]?.timeOut }}</p>
-              </div>
-              <span :class="['teacher-day-status', teacher.currentStatus.className]">{{ teacher.currentStatus.label }}</span>
-            </header>
-            <ol class="today-schedule-list">
-              <li v-for="entry in teacher.schedule" :key="entry.id || `${entry.timeIn}-${entry.subject}-${entry.section}`" :class="getTodayEntryState(entry)">
-                <time>{{ entry.timeIn }}<small>{{ entry.timeOut }}</small></time>
-                <span class="schedule-timeline-dot"></span>
-                <div>
-                  <strong>{{ entry.subject }}</strong>
-                  <span>{{ [entry.section, entry.room].filter(Boolean).join(' · ') || 'Class details unavailable' }}</span>
-                </div>
-                <em>{{ getTodayEntryLabel(entry) }}</em>
-              </li>
-            </ol>
-            </article>
-          </div>
-          <button
-            type="button"
-            class="today-stage-arrow next"
-            :disabled="todayTeacherIndex >= todayTeacherMaxIndex"
-            aria-label="Show next teachers"
-            @click="nextTodayTeachers"
-          >&rsaquo;</button>
-          <div v-if="todayCarouselPages.length > 1" class="today-carousel-footer">
-            <div class="today-carousel-dots" aria-label="Teacher carousel pages">
-              <button
-                v-for="page in todayCarouselPages"
-                :key="page.index"
-                type="button"
-                :class="{ active: todayTeacherIndex === page.start }"
-                :aria-label="`Show teacher slide ${page.index + 1}`"
-                @click="todayTeacherIndex = page.start"
-              ><span></span></button>
-            </div>
-          </div>
+        <div
+          v-if="todayScheduleLoading"
+          class="today-teachers-loading"
+        >Loading today’s teaching schedule…</div>
+        <div
+          v-else-if="todayTeachers.length"
+          ref="todayScheduleWrap"
+          class="today-schedule-table-wrap"
+          :class="{ 'carousel-enabled': shouldAnimateTodaySchedule, 'dragging': isCarouselDragging }"
+          @pointerdown="beginCarouselSwipe"
+          @pointermove="onCarouselSwipe"
+          @pointerup="endCarouselSwipe"
+          @pointerleave="endCarouselSwipe"
+          @pointercancel="endCarouselSwipe"
+        >
+          <table class="today-schedule-table" :class="{ 'carousel-table': shouldAnimateTodaySchedule }">
+            <thead>
+              <tr>
+                <th v-for="teacher in visibleTodayTeachers" :key="teacher.name" class="teacher-col-header">
+                  <img :src="teacher.avatar" :alt="teacher.name" class="teacher-header-avatar" />
+                  <div class="teacher-header-info">
+                    <span class="teacher-header-name">{{ teacher.name }}</span>
+                    <span :class="['teacher-header-status', teacher.currentStatus.className]">{{ teacher.currentStatus.label }}</span>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(rowIndex) in getMaxScheduleLength(visibleTodayTeachers)" :key="`row-${rowIndex}`" class="schedule-row">
+                <td v-for="teacher in visibleTodayTeachers" :key="`${teacher.name}-${rowIndex}`" class="schedule-cell">
+                  <div v-if="teacher.schedule[rowIndex - 1]" :class="['schedule-entry', getTodayEntryState(teacher.schedule[rowIndex - 1])]">
+                    <time class="schedule-time">{{ teacher.schedule[rowIndex - 1].timeIn }}<small>{{ teacher.schedule[rowIndex - 1].timeOut }}</small></time>
+                    <div class="schedule-details">
+                      <strong class="schedule-subject">{{ teacher.schedule[rowIndex - 1].subject }}</strong>
+                      <span class="schedule-section">{{ [teacher.schedule[rowIndex - 1].section, teacher.schedule[rowIndex - 1].room].filter(Boolean).join(' · ') || 'Class details unavailable' }}</span>
+                    </div>
+                    <em class="schedule-label">{{ getTodayEntryLabel(teacher.schedule[rowIndex - 1]) }}</em>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <div v-else class="today-teachers-empty">
           <span>No classes scheduled today</span>
@@ -360,8 +349,13 @@ const todayScheduleEntries = ref([])
 const teacherDirectory = ref([])
 const todayScheduleLoading = ref(true)
 const currentDateTime = ref(new Date())
-const todayTeacherIndex = ref(0)
-const teachersPerSlide = 2
+const carouselAnimating = ref(true)
+const teachersPerSlide = 4
+const todayScheduleWrap = ref(null)
+const isCarouselDragging = ref(false)
+const carouselDragStartX = ref(0)
+const carouselDragStartOffset = ref(0)
+const carouselDragOffset = ref(0)
 let dashboardRealtimeTimer = null
 
 const todayName = computed(() => currentDateTime.value.toLocaleDateString('en-US', { weekday: 'long' }))
@@ -434,24 +428,92 @@ const todayTeachers = computed(() => {
         ? { label: `Next ${next.timeIn}`, className: 'is-next' }
         : { label: 'Classes complete', className: 'is-done' }
     return teacher
-  }).sort((a, b) => timeToMinutes(a.schedule[0]?.timeIn) - timeToMinutes(b.schedule[0]?.timeIn) || a.name.localeCompare(b.name))
+  }).sort((a, b) => {
+    // Prioritize "Teaching now" status first
+    if (a.currentStatus.className === 'is-live' && b.currentStatus.className !== 'is-live') return -1
+    if (a.currentStatus.className !== 'is-live' && b.currentStatus.className === 'is-live') return 1
+    // Then sort by time
+    return timeToMinutes(a.schedule[0]?.timeIn) - timeToMinutes(b.schedule[0]?.timeIn) || a.name.localeCompare(b.name)
+  })
 })
 
-const todayTeacherMaxIndex = computed(() => todayTeachers.value.length
-  ? Math.floor((todayTeachers.value.length - 1) / teachersPerSlide) * teachersPerSlide
-  : 0)
-const visibleTodayTeachers = computed(() => todayTeachers.value.slice(todayTeacherIndex.value, todayTeacherIndex.value + teachersPerSlide))
+const todayTeacherMaxIndex = computed(() => todayTeachers.value.length)
+const shouldAnimateTodaySchedule = computed(() => todayTeachers.value.length > 3)
+// Create a duplicated list for a smooth infinite carousel without visible breaks
+const infiniteTeachers = computed(() => {
+  const teachers = todayTeachers.value
+  if (!shouldAnimateTodaySchedule.value || teachers.length <= 3) return teachers
+  return [...teachers, ...teachers, ...teachers]
+})
+const visibleTodayTeachers = computed(() => infiniteTeachers.value)
 const todayCarouselPages = computed(() => Array.from(
   { length: Math.ceil(todayTeachers.value.length / teachersPerSlide) },
   (_, index) => ({ index, start: index * teachersPerSlide })
 ))
 
 function previousTodayTeachers() {
-  todayTeacherIndex.value = Math.max(0, todayTeacherIndex.value - teachersPerSlide)
+  // Placeholder - carousel is fully automatic via CSS
 }
 
 function nextTodayTeachers() {
-  todayTeacherIndex.value = Math.min(todayTeacherMaxIndex.value, todayTeacherIndex.value + teachersPerSlide)
+  // Placeholder - carousel is fully automatic via CSS
+}
+
+function beginCarouselSwipe(event) {
+  if (!shouldAnimateTodaySchedule.value) return
+  const table = todayScheduleWrap.value?.querySelector('.today-schedule-table')
+  if (!table) return
+
+  isCarouselDragging.value = true
+  carouselDragStartX.value = event.clientX
+  carouselDragStartOffset.value = carouselDragOffset.value
+  table.style.transition = 'transform 0.12s linear'
+}
+
+function onCarouselSwipe(event) {
+  if (!isCarouselDragging.value) return
+
+  const deltaX = event.clientX - carouselDragStartX.value
+  const nextOffset = carouselDragStartOffset.value + deltaX
+  carouselDragOffset.value = Math.max(-220, Math.min(220, nextOffset))
+
+  const table = todayScheduleWrap.value?.querySelector('.today-schedule-table')
+  if (!table) return
+
+  table.style.setProperty('--drag-shift', `${carouselDragOffset.value}px`)
+}
+
+function endCarouselSwipe() {
+  if (!isCarouselDragging.value) return
+
+  isCarouselDragging.value = false
+  const table = todayScheduleWrap.value?.querySelector('.today-schedule-table')
+  if (!table) return
+
+  const deltaX = carouselDragOffset.value
+  const direction = deltaX < 0 ? -1 : 1
+  const distance = Math.abs(deltaX)
+  const momentumBoost = distance > 30 ? Math.min(90, distance * 0.4) : 0
+  const finalOffset = direction * momentumBoost
+
+  table.style.transition = 'transform 0.45s ease'
+  carouselDragOffset.value = finalOffset
+  table.style.setProperty('--drag-shift', `${finalOffset}px`)
+
+  window.setTimeout(() => {
+    carouselDragOffset.value = 0
+    table.style.setProperty('--drag-shift', '0px')
+    table.style.transition = ''
+  }, 450)
+}
+
+function startCarouselAutoAdvance() {
+  // Animation is handled purely by CSS @keyframes
+  // This function is kept for compatibility
+}
+
+function getMaxScheduleLength(teachers) {
+  return Math.max(...teachers.map(t => t.schedule.length), 0)
 }
 
 async function loadTodayTeacherSchedules({ quiet = false } = {}) {
@@ -770,6 +832,8 @@ onMounted(() => {
     currentDateTime.value = new Date()
     loadTodayTeacherSchedules({ quiet: true })
   }, 60000)
+  // Start carousel auto-advance after initial load
+  nextTick(() => startCarouselAutoAdvance())
 })
 
 onUnmounted(() => {
@@ -919,12 +983,21 @@ function confirmLogout() {
   justify-content: space-between;
   margin-bottom: 28px;
 }
+.page-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: #68747d;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
 .page-title {
-  font-size: 2rem;
-  font-weight: 600;
-  color: #30353a;
-  letter-spacing: -0.5px;
-  line-height: 1.2;
+  margin: 0;
+  color: #202830;
+  font-size: clamp(2rem, 3vw, 2.55rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
 }
 .page-sub {
   font-size: 0.95rem;
@@ -1108,69 +1181,313 @@ function confirmLogout() {
 .today-teachers-header h2 { margin: 0; color: #202a31; font-size: 1.35rem; letter-spacing: -.025em; line-height: 1.35; }
 .today-teachers-header p { margin: 5px 0 0; color: #63717a; font-size: .8rem; }
 .today-teachers-header p span { margin-left: 7px; padding-left: 9px; border-left: 1px solid #ccd4d8; color: #89939a; }
-.today-carousel-controls { display: flex; align-items: center; gap: 7px; }
-.today-carousel-controls > span { padding: 8px 13px; color: #4f5b63; border: 1px solid #bfc7cc; border-radius: 99px; background: linear-gradient(180deg, #fbfcfc, #e5e8ea); font-size: .72rem; font-weight: 700; box-shadow: inset 0 1px 0 #fff, 0 3px 9px rgba(44,55,63,.08); }
-.today-carousel-controls button { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid #d3dade; border-radius: 10px; background: #fff; color: #3f4e57; box-shadow: 0 3px 9px rgba(42,53,61,.07); cursor: pointer; }
-.today-carousel-controls button:hover:not(:disabled) { border-color: #9eabb2; background: #eef2f4; transform: translateY(-1px); }
-.today-carousel-controls button:disabled { cursor: default; opacity: .4; }
-.today-carousel-controls svg { width: 17px; height: 17px; }
-.today-carousel-stage { position: relative; overflow: visible; padding: 3px 48px; }
-.today-stage-arrow { position: absolute; z-index: 3; top: 50%; display: grid; width: 42px; height: 42px; padding: 0 0 4px; place-items: center; border: 1px solid #aeb8be; border-radius: 50%; background: linear-gradient(145deg, #f9fafb, #d9dde0); color: #344047; box-shadow: inset 0 1px 0 #fff, 0 7px 18px rgba(36,48,56,.16); font: 500 2rem/1 Arial, sans-serif; cursor: pointer; transform: translateY(-50%); transition: color .18s ease, background .18s ease, border-color .18s ease, transform .18s ease; }
-.today-stage-arrow.previous { left: 1px; }
-.today-stage-arrow.next { right: 1px; }
-.today-stage-arrow:hover:not(:disabled) { color: #fff; border-color: #4e5960; background: linear-gradient(145deg, #747e84, #3f494f); transform: translateY(-50%) scale(1.06); }
-.today-stage-arrow:disabled { color: #9ba4a9; background: linear-gradient(145deg, #edf0f1, #d8dcde); box-shadow: inset 0 1px 0 rgba(255,255,255,.8); cursor: default; opacity: .64; }
-.today-teachers-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
-.today-carousel-stage > .today-teachers-grid { animation: today-slide-in .3s cubic-bezier(.22,.72,.25,1); }
-@keyframes today-slide-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
-.today-teachers-grid.teacher-count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.today-teachers-grid.teacher-count-1 { width: min(100%, 720px); grid-template-columns: minmax(0, 1fr); margin-inline: auto; }
-.today-teachers-grid.teacher-count-1 .today-teacher-card > header { padding-left: 18px; padding-right: 18px; }
-.today-teachers-grid.teacher-count-1 .today-schedule-list { padding-left: 18px; padding-right: 18px; }
-.today-teacher-card { display: flex; min-width: 0; flex-direction: column; overflow: hidden; border: 1px solid #bfc7cc; border-radius: 15px; background: linear-gradient(145deg, #f8f9fa, #e7eaec); box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 6px 17px rgba(44,55,63,.11); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
-.today-teacher-card:hover { border-color: #9faab0; box-shadow: inset 0 1px 0 #fff, 0 10px 24px rgba(44,55,63,.15); transform: translateY(-2px); }
-.today-teacher-card > header { display: flex; min-height: 82px; align-items: center; gap: 13px; padding: 16px 18px; border-bottom: 1px solid #cbd2d6; background: linear-gradient(135deg, #fbfcfc, #e1e5e7); }
-.today-teacher-card > header img { width: 48px; height: 48px; flex: 0 0 48px; border: 2px solid #fff; border-radius: 13px; object-fit: cover; box-shadow: 0 0 0 1px #d4dce0, 0 4px 10px rgba(36,48,56,.1); }
-.today-teacher-card > header > div { min-width: 0; flex: 1; }
-.today-teacher-card h3 { overflow: hidden; margin: 0; color: #263138; font-size: .94rem; text-overflow: ellipsis; white-space: nowrap; }
-.today-teacher-card header p { margin: 4px 0 0; color: #69767e; font-size: .7rem; }
-.today-teacher-card header p strong { color: #4b5961; }
-.teacher-day-status { flex: 0 0 auto; padding: 6px 9px; border-radius: 99px; font-size: .61rem; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
-.teacher-day-status.is-live { color: #276842; border: 1px solid #bedbc8; background: #e9f5ed; }
-.teacher-day-status.is-next { color: #65562d; border: 1px solid #dfd3b3; background: #f8f3e5; }
-.teacher-day-status.is-done { color: #68747c; border: 1px solid #d9dfe2; background: #f0f3f4; }
-.today-schedule-list { max-height: 230px; min-height: 0; margin: 0; padding: 11px 18px 15px; overflow-y: auto; scrollbar-color: #aeb8bd transparent; scrollbar-width: thin; list-style: none; }
-.today-schedule-list::-webkit-scrollbar { width: 6px; }
-.today-schedule-list::-webkit-scrollbar-track { background: transparent; }
-.today-schedule-list::-webkit-scrollbar-thumb { border-radius: 99px; background: #aeb8bd; }
-.today-schedule-list li { position: relative; display: grid; grid-template-columns: 72px 12px minmax(0,1fr) auto; gap: 10px; align-items: start; min-height: 62px; padding: 11px 0; }
-.today-schedule-list li:not(:last-child)::after { content: ''; position: absolute; left: 87px; top: 27px; bottom: -15px; width: 1px; background: #bfc8cd; }
-.today-schedule-list time { color: #3d4b54; font-size: .73rem; font-weight: 700; white-space: nowrap; }
-.today-schedule-list time small { display: block; margin-top: 3px; color: #7e8a91; font-size: .62rem; font-weight: 500; }
-.schedule-timeline-dot { position: relative; z-index: 1; width: 9px; height: 9px; margin-top: 3px; border: 2px solid #aab5bb; border-radius: 50%; background: #fff; }
-.today-schedule-list li > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-.today-schedule-list strong { overflow: hidden; color: #2e3a42; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
-.today-schedule-list li > div > span { overflow: hidden; color: #6d7a82; font-size: .67rem; text-overflow: ellipsis; white-space: nowrap; }
-.today-schedule-list li > em { align-self: center; padding: 5px 7px; border-radius: 7px; background: #f0f3f4; color: #6d7981; font-size: .55rem; font-style: normal; font-weight: 800; text-transform: uppercase; }
-.today-schedule-list li.is-upcoming > em { color: #6b5b2d; background: #f8f2df; }
-.today-schedule-list li.is-current > em { color: #286c45; background: #dcefe3; }
-.today-schedule-list li.is-current { margin: 2px -7px; padding: 9px 7px; border-radius: 8px; background: #edf6f0; }
-.today-schedule-list li.is-current::after { left: 94px; }
-.today-schedule-list li.is-current .schedule-timeline-dot { border-color: #3f805a; background: #4f9468; box-shadow: 0 0 0 3px #dceee3; }
-.today-schedule-list li.is-complete { opacity: .57; }
-.today-schedule-list li.is-complete .schedule-timeline-dot { border-color: #8d999f; background: #8d999f; }
-.today-teachers-loading,.today-teachers-empty { display: flex; min-height: 150px; align-items: center; justify-content: center; flex-direction: column; color: #748088; font-size: .76rem; text-align: center; }
-.today-teachers-empty span { color: #38454d; font-size: .86rem; font-weight: 700; }
-.today-teachers-empty p { margin: 5px 0 0; color: #818c93; font-size: .7rem; }
-.today-carousel-footer { position: relative; z-index: 4; display: flex; min-height: 32px; align-items: center; justify-content: center; gap: 13px; margin: 14px 0 0; padding: 0; }
-.today-footer-arrow { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid #d2dade; border-radius: 50%; background: #fff; color: #415059; box-shadow: 0 3px 9px rgba(42,53,61,.08); cursor: pointer; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
-.today-footer-arrow:hover:not(:disabled) { border-color: #9eabb2; background: #edf1f3; transform: scale(1.05); }
-.today-footer-arrow:disabled { cursor: default; opacity: .35; }
-.today-footer-arrow svg { width: 16px; height: 16px; }
-.today-carousel-dots { display: flex; align-items: center; gap: 4px; padding: 5px 7px; border: 1px solid #bfc8cd; border-radius: 99px; background: linear-gradient(180deg, #f8f9fa, #dfe3e5); box-shadow: inset 0 1px 0 rgba(255,255,255,.9); }
-.today-carousel-dots button { display: grid; width: 18px; height: 18px; padding: 0; place-items: center; border: 0; background: transparent; cursor: pointer; }
-.today-carousel-dots button span { display: block; width: 6px; height: 6px; border-radius: 99px; background: #aab3b8; transition: width .2s ease, background .2s ease; }
-.today-carousel-dots button.active span { width: 16px; background: #505c63; }
+/* Table format styles */
+.today-schedule-table-wrap { 
+  overflow: hidden;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.7);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+  position: relative;
+  animation: tableSlideIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  cursor: grab;
+  user-select: none;
+  touch-action: pan-y;
+}
+.today-schedule-table-wrap.dragging {
+  cursor: grabbing;
+}
+@keyframes tableSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.today-schedule-table {
+  --drag-shift: 0px;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  background: #fff;
+  animation: none;
+  will-change: transform;
+}
+.carousel-enabled .today-schedule-table {
+  animation: infiniteCarousel 34s linear infinite;
+}
+@keyframes infiniteCarousel {
+  0% {
+    transform: translateX(var(--drag-shift, 0px));
+  }
+  100% {
+    transform: translateX(calc(var(--drag-shift, 0px) - 50%));
+  }
+}
+.teacher-col-header { 
+  padding: 22px 18px 20px;
+  text-align: center;
+  border-bottom: 3px solid #e1e6e9;
+  border-right: 1px solid #e8ecf0;
+  background: linear-gradient(180deg, #fbfcfd 0%, #f3f5f7 100%);
+  position: relative;
+  min-width: 240px;
+  width: 240px;
+  max-width: 240px;
+  transition: all 0.3s ease;
+  vertical-align: top;
+}
+.teacher-col-header:last-child {
+  border-right: none;
+}
+.teacher-header-avatar { 
+  width: 64px; 
+  height: 64px; 
+  border: 3px solid #fff; 
+  border-radius: 16px; 
+  object-fit: cover; 
+  box-shadow: 0 6px 16px rgba(36,48,56,0.14); 
+  margin: 0 auto 12px;
+  display: block;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.teacher-col-header:hover .teacher-header-avatar {
+  transform: scale(1.08) rotate(2deg);
+}
+.teacher-header-info { 
+  text-align: center; 
+}
+.teacher-header-name { 
+  display: block; 
+  font-weight: 700; 
+  color: #202830; 
+  font-size: 0.95rem; 
+  margin-bottom: 6px; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.teacher-header-status { 
+  display: inline-block; 
+  flex: 0 0 auto; 
+  padding: 6px 10px; 
+  border-radius: 8px; 
+  font-size: 0.62rem; 
+  font-weight: 800; 
+  letter-spacing: 0.05em; 
+  white-space: nowrap;
+  text-transform: uppercase;
+  animation: statusPulse 1.5s ease-in-out infinite;
+}
+.teacher-header-status.is-live { 
+  color: #146a3a; 
+  border: 1.5px solid #4caf50; 
+  background: #e8f5e9;
+  box-shadow: 0 2px 6px rgba(76,175,80,0.15);
+}
+@keyframes statusPulse {
+  0%, 100% { box-shadow: 0 2px 6px rgba(76,175,80,0.15); }
+  50% { box-shadow: 0 2px 12px rgba(76,175,80,0.3); }
+}
+.teacher-header-status.is-next { 
+  color: #5d4e1f; 
+  border: 1.5px solid #ffa726; 
+  background: #fff3e0;
+  box-shadow: 0 2px 6px rgba(255,167,38,0.12);
+}
+.teacher-header-status.is-done { 
+  color: #546e7a; 
+  border: 1.5px solid #90a4ae; 
+  background: #eceff1;
+  box-shadow: 0 2px 6px rgba(144,164,174,0.12);
+}
+.schedule-row {
+  border-bottom: 1px solid #e8ecf0;
+  transition: background 0.15s ease;
+}
+.schedule-row:hover {
+  background: #f8f9fa;
+}
+.schedule-cell {
+  padding: 14px 12px;
+  border-right: 1px solid #e8ecf0;
+  text-align: center;
+  vertical-align: top;
+  min-height: 130px;
+  display: table-cell;
+  min-width: 240px;
+  width: 240px;
+  max-width: 240px;
+}
+.schedule-cell:last-child { 
+  border-right: none; 
+}
+.schedule-entry { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 8px; 
+  min-height: 110px; 
+  padding: 13px 12px 12px;
+  border: 1.5px solid #e1e6e9;
+  border-radius: 12px; 
+  background: #f9fafb;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(25, 35, 45, 0.04);
+}
+.schedule-entry::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: transparent;
+  transition: all 0.3s ease;
+}
+.schedule-entry.is-current { 
+  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+  border-color: #4caf50;
+  box-shadow: 0 3px 10px rgba(76,175,80,0.12), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.schedule-entry.is-current::before {
+  background: #4caf50;
+  animation: liveIndicator 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes liveIndicator {
+  0%, 100% { height: 3px; background: #4caf50; }
+  50% { height: 4px; background: #66bb6a; }
+}
+.schedule-entry.is-upcoming { 
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  border-color: #ffa726;
+  box-shadow: 0 3px 10px rgba(255,167,38,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.schedule-entry.is-upcoming::before {
+  background: #ffa726;
+}
+.schedule-entry.is-complete { 
+  opacity: 0.6; 
+  background: #eceff1;
+  border-color: #90a4ae;
+  box-shadow: 0 2px 8px rgba(144,164,174,0.08);
+}
+.schedule-entry.is-complete::before {
+  background: #90a4ae;
+}
+.schedule-entry:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.12);
+}
+.schedule-time { 
+  display: block; 
+  font-weight: 700; 
+  font-size: 0.78rem; 
+  color: #1a2332; 
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+.schedule-time small { 
+  display: block; 
+  margin-top: 3px; 
+  font-size: 0.66rem; 
+  font-weight: 600; 
+  color: #64727d;
+}
+.schedule-details { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 3px;
+  flex: 1;
+  justify-content: center;
+}
+.schedule-subject { 
+  display: block; 
+  color: #1f2937; 
+  font-size: 0.79rem; 
+  font-weight: 700; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.schedule-section { 
+  display: block; 
+  color: #64727d; 
+  font-size: 0.68rem; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap;
+  font-weight: 500;
+}
+.schedule-label { 
+  display: inline-block; 
+  padding: 4px 8px; 
+  border-radius: 6px; 
+  background: #f0f3f5; 
+  color: #546e7a; 
+  font-size: 0.56rem; 
+  font-style: normal; 
+  font-weight: 800; 
+  text-transform: uppercase; 
+  text-align: center;
+  letter-spacing: 0.04em;
+  margin: 0 auto;
+  min-width: max-content;
+  animation: labelFadeIn 0.6s ease forwards;
+  opacity: 0;
+}
+@keyframes labelFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.schedule-entry.is-upcoming .schedule-label { 
+  color: #5d4e1f; 
+  background: #ffd699;
+}
+.schedule-entry.is-current .schedule-label { 
+  color: #146a3a; 
+  background: #81c784;
+  animation: labelPulse 1.5s ease-in-out infinite;
+  opacity: 1;
+}
+@keyframes labelPulse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.today-teachers-loading, .today-teachers-empty { 
+  display: flex; 
+  min-height: 150px; 
+  align-items: center; 
+  justify-content: center; 
+  flex-direction: column; 
+  color: #747d84; 
+  font-size: 0.76rem; 
+  text-align: center;
+}
+.today-teachers-empty span { 
+  color: #2c3e50; 
+  font-size: 0.92rem; 
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.today-teachers-empty p { 
+  margin: 0; 
+  color: #818c93; 
+  font-size: 0.72rem;
+}
 
 /* Charts */
 .charts-row {

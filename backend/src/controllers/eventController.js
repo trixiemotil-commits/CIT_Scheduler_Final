@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Event = require("../models/Event");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
+const { logActivity } = require("../utils/activityLogWriter");
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -116,6 +117,14 @@ async function createEvent(req, res) {
       console.warn("Event created, but student notifications failed:", notificationError.message);
     }
 
+    await logActivity({
+      actor: req.user,
+      action: `Created event ${event.title}`,
+      path: req.originalUrl || "/api/events",
+      method: req.method,
+      req,
+    });
+
     return res.status(201).json({ event: serializeEvent(event), notifiedStudents });
   } catch (error) {
     console.error("Failed to create event:", error);
@@ -152,6 +161,14 @@ async function updateEvent(req, res) {
     }
     await existing.save();
 
+    await logActivity({
+      actor: req.user,
+      action: `Updated event ${existing.title}${existing.status === "archived" ? " (archived)" : ""}`,
+      path: req.originalUrl || `/api/events/${req.params.id}`,
+      method: req.method,
+      req,
+    });
+
     return res.json({ event: serializeEvent(existing) });
   } catch (error) {
     console.error("Failed to update event:", error);
@@ -169,6 +186,15 @@ async function deleteEvent(req, res) {
     if (!event) {
       return res.status(404).json({ message: "Event not found." });
     }
+
+    await logActivity({
+      actor: req.user,
+      action: `Deleted event ${event.title}`,
+      path: req.originalUrl || `/api/events/${req.params.id}`,
+      method: req.method,
+      req,
+    });
+
     return res.json({ message: "Event deleted." });
   } catch (error) {
     console.error("Failed to delete event:", error);

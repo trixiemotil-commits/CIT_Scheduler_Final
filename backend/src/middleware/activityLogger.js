@@ -14,8 +14,8 @@ function describeActivity(method, path) {
 
 function activityLogger(req, res, next) {
   res.on("finish", () => {
-    const role = req.user?.role;
-    if (!req.user || !["teacher", "student"].includes(role) || req.method === "GET" || res.statusCode >= 400 || req.originalUrl.startsWith("/api/activity-logs")) {
+    const role = String(req.user?.role || "").toLowerCase();
+    if (!req.user || !["admin", "teacher", "student"].includes(role) || req.method === "GET" || res.statusCode >= 400 || req.originalUrl.startsWith("/api/activity-logs")) {
       return;
     }
 

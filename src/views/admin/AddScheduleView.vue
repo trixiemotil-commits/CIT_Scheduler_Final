@@ -111,12 +111,12 @@
       <div v-if="scheduleViewMode === 'timetable' && !addMode" class="mode-select-container">
         <p class="step-hint">Choose how you want to assign schedules</p>
         <div class="mode-grid">
-          <button class="mode-card" @click="addMode = 'teacher'; loadAddTeachers()">
+          <button class="mode-card" @click="addMode = 'student'">
             <div class="mode-icon-wrap">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M4 22v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg>
             </div>
-            <div class="mode-label">Teachers</div>
-            <div class="mode-desc">Select a teacher and manage their weekly schedule</div>
+            <div class="mode-label">Student</div>
+            <div class="mode-desc">Choose student year and section to assign schedules</div>
           </button>
           <button class="mode-card" @click="addMode = 'room'">
             <div class="mode-icon-wrap">
@@ -125,30 +125,30 @@
             <div class="mode-label">Room</div>
             <div class="mode-desc">Select a room and assign schedules to available slots</div>
           </button>
-          <button class="mode-card" @click="addMode = 'student'">
+          <button class="mode-card" @click="addMode = 'teacher'; loadAddTeachers()">
             <div class="mode-icon-wrap">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M4 22v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
-            <div class="mode-label">Student</div>
-            <div class="mode-desc">Choose student year and section to assign schedules</div>
+            <div class="mode-label">Faculty</div>
+            <div class="mode-desc">Select a faculty member and manage their weekly schedule</div>
           </button>
         </div>
       </div>
 
-      <!-- ── By Teacher: pick teacher ── -->
+      <!-- ── Faculty selection ── -->
       <div v-else-if="scheduleViewMode === 'timetable' && addMode === 'teacher' && !selectedTeacher" class="step-container">
         <div v-if="loadingAddTeachers" class="loading-state">
           <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
-          Loading teachers…
+          Loading faculty…
         </div>
         <template v-else>
-          <p class="step-hint">Select a teacher to manage their schedule</p>
+          <p class="step-hint">Select a faculty member to manage their schedule</p>
           <div class="teacher-search-wrap">
             <svg class="teacher-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="7"/>
               <line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            <input v-model.trim="addTeacherSearchQuery" type="text" class="teacher-search-input" placeholder="Search teacher name..." />
+            <input v-model.trim="addTeacherSearchQuery" type="text" class="teacher-search-input" placeholder="Search faculty name..." />
           </div>
           <div v-if="filteredAddTeacherList.length" class="teacher-grid">
             <button v-for="teacher in filteredAddTeacherList" :key="teacher.name" class="teacher-card" @click="selectedTeacher = teacher.name">
@@ -1250,17 +1250,17 @@
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
 import {
-  colorForRoom,
-  colorForRoomType,
-  days,
-  entries,
-  parseTime,
-  roomOptions,
-  sections,
-  subjectOptions,
-  teacherOptions,
-  timeOptions,
-  years,
+    colorForRoom,
+    colorForRoomType,
+    days,
+    entries,
+    parseTime,
+    roomOptions,
+    sections,
+    subjectOptions,
+    teacherOptions,
+    timeOptions,
+    years,
 } from '@/composables/useSchedule.js'
 import Swal from 'sweetalert2'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'

@@ -10,7 +10,7 @@ router.get("/", authRequired, authorizeRoles("admin"), async (req, res) => {
   try {
     const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
     const page = Math.max(Number(req.query.page) || 1, 1);
-    const role = ["teacher", "student"].includes(req.query.role) ? req.query.role : null;
+    const role = ["admin", "teacher", "student"].includes(String(req.query.role || "").toLowerCase()) ? String(req.query.role).toLowerCase() : null;
     const search = String(req.query.search || "").trim().slice(0, 100);
     const from = req.query.from ? new Date(req.query.from) : null;
     const to = req.query.to ? new Date(req.query.to) : null;
@@ -75,7 +75,7 @@ router.get("/", authRequired, authorizeRoles("admin"), async (req, res) => {
   }
 });
 
-router.post("/navigation", authRequired, authorizeRoles("teacher", "student"), async (req, res) => {
+router.post("/navigation", authRequired, authorizeRoles("admin", "teacher", "student"), async (req, res) => {
   try {
     const routeLabel = String(req.body?.routeLabel || "a page").trim().slice(0, 120);
     const routePath = String(req.body?.routePath || "").trim().slice(0, 200);
