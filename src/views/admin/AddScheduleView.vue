@@ -338,27 +338,15 @@
               </label>
               <label class="list-field list-field-wide">
                 <span>Subject</span>
-                <select v-model="listAddForm.subject" class="form-select"><option value="" disabled>Subject</option><option v-for="s in listSubjectOptions" :key="s" :value="s">{{ s }}</option></select>
+                <TypeaheadSelect v-model="listAddForm.subject" :options="listSubjectOptions" placeholder="Subject" />
               </label>
               <label class="list-field list-field-wide">
                 <span>Teacher</span>
-                <select v-model="listAddForm.teacher" class="form-select">
-                  <option value="" disabled>Teacher</option>
-                  <option value="CIT Faculty">CIT Faculty</option>
-                  <option v-for="t in teacherOptions" :key="t" :value="t">{{ t }}</option>
-                </select>
-              </label>
-              <label class="list-field">
-                <span>Room</span>
-                <select v-model="listAddForm.room" class="form-select"><option value="" disabled>Room</option><option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option></select>
+                <TypeaheadSelect v-model="listAddForm.teacher" :options="teacherSelectOptions" placeholder="Teacher" />
               </label>
               <label class="list-field">
                 <span>Room type</span>
                 <select v-model="listAddForm.roomType" class="form-select"><option value="Lecture">Lec</option><option value="Comlab/Laboratory">Lab</option></select>
-              </label>
-              <label class="list-field">
-                <span>Section</span>
-                <select v-model="listAddForm.section" class="form-select"><option value="" disabled>Section</option><option v-for="s in getSectionsForYear(listAddForm.year)" :key="s" :value="s">{{ s }}</option></select>
               </label>
               <div class="list-field list-campus-field">
                 <span>Campus</span>
@@ -612,12 +600,7 @@
               <label v-if="!(selectedTeacher && !editMode)" class="form-label">Teacher</label>
               <div v-if="selectedTeacher && !editMode" class="schedule-for-text">Schedule for Prof. {{ selectedTeacher }}</div>
               <div v-else class="form-select-wrap">
-                <select v-model="form.teacher" class="form-select">
-                  <option value="" disabled>Select Teacher</option>
-                  <option value="CIT Faculty">CIT Faculty</option>
-                  <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
-                </select>
-                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                <TypeaheadSelect v-model="form.teacher" :options="teacherSelectOptions" placeholder="Select Teacher" />
               </div>
             </div>
             <template v-if="fromButton && !editMode">
@@ -694,11 +677,7 @@
                 Lunch Break selected
               </div>
               <div v-else class="form-select-wrap">
-                <select v-model="form.subject" class="form-select">
-                  <option value="" disabled>Select Subject</option>
-                  <option v-for="s in modalSubjectOptions" :key="s" :value="s">{{ s }}</option>
-                </select>
-                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                <TypeaheadSelect v-model="form.subject" :options="modalSubjectOptions" placeholder="Select Subject" />
               </div>
             </div>
             <template v-if="!form.parallel">
@@ -897,12 +876,7 @@
                 <label v-if="!selectedTeacher" class="form-label">Teacher</label>
                 <div v-if="selectedTeacher" class="schedule-for-text">Schedule for Prof. {{ selectedTeacher }}</div>
                 <div v-else class="form-select-wrap">
-                  <select v-model="addForm.teacher" class="form-select">
-                    <option value="" disabled>Select Teacher</option>
-                    <option value="CIT Faculty">CIT Faculty</option>
-                    <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
-                  </select>
-                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                  <TypeaheadSelect v-model="addForm.teacher" :options="teacherSelectOptions" placeholder="Select Teacher" />
                 </div>
               </div>
               <div class="form-row-inline">
@@ -990,11 +964,7 @@
               <div class="form-row-inline">
                 <label class="form-label">Subject</label>
                 <div class="form-select-wrap">
-                  <select v-model="addForm.subject" class="form-select">
-                    <option value="" disabled>Select Subject</option>
-                    <option v-for="s in modalSubjectOptionsForAdd" :key="s" :value="s">{{ s }}</option>
-                  </select>
-                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                  <TypeaheadSelect v-model="addForm.subject" :options="modalSubjectOptionsForAdd" placeholder="Select Subject" />
                 </div>
               </div>
               <template v-if="!addForm.parallel">
@@ -1249,18 +1219,19 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import TypeaheadSelect from '@/components/TypeaheadSelect.vue'
 import {
-    colorForRoom,
-    colorForRoomType,
-    days,
-    entries,
-    parseTime,
-    roomOptions,
-    sections,
-    subjectOptions,
-    teacherOptions,
-    timeOptions,
-    years,
+  colorForRoom,
+  colorForRoomType,
+  days,
+  entries,
+  parseTime,
+  roomOptions,
+  sections,
+  subjectCatalog,
+  teacherOptions,
+  timeOptions,
+  years,
 } from '@/composables/useSchedule.js'
 import Swal from 'sweetalert2'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
@@ -1275,6 +1246,10 @@ function endTimeOptionsAfter(startTime) {
 }
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+const teacherSelectOptions = computed(() => [
+  { label: 'CIT Faculty', value: 'CIT Faculty' },
+  ...teacherOptions.value.map(teacher => ({ label: `Prof. ${teacher}`, value: teacher })),
+])
 
 function returnToTermWorkspace() {
   const term = String(route.query.academicTermId || '').trim()
@@ -2276,62 +2251,34 @@ watch(showSchedModal, (val) => {
   }
 })
 const modalTimeError = ref('')
-// majors and elective -> major mapping (simple heuristic)
-const majorOptions = ['','Software','Network','Multimedia','Security','General']
-const electiveMajorMap = {
-  'Network Security': 'Security',
-  'Game Development': 'Multimedia',
-  'Intelligent Systems': 'Software',
-  '3D Animation': 'Multimedia',
-  'Computer Forensics': 'Security',
-  'Ethical Hacking': 'Security',
-  'Cloud Computing': 'Network',
-  'Script Writing': 'Multimedia',
-  'Applied Analytics': 'General',
+const majorOptions = ['', 'Business Informatics', 'Systems Development', 'Computer Security', 'Digital Arts']
+
+function normalizedSemester(semester) {
+  return /2nd|second/i.test(String(semester || '')) ? '2nd Semester' : '1st Semester'
 }
 
 function subjectMatchesMajor(subject, major) {
-  if (!major) return false
-  return Object.keys(electiveMajorMap).some(k => subject.includes(k) && electiveMajorMap[k] === major)
+  return Boolean(major && subjectCatalog.some(option => option.label === subject && option.major === major))
 }
 
-const modalSubjectOptions = computed(() => {
-  const base = subjectOptions.filter((subject) => subject !== 'Lunch Break')
-  // hide electives for 1st/2nd and for years other than 3rd when no special rule
-  if (form.year === '1st Year' || form.year === '2nd Year') return base.filter(s => !/Elective/i.test(s))
-  if (form.year === '3rd Year') {
-    const nonElectives = base.filter(s => !/Elective/i.test(s))
-    const electives = base.filter(s => /Elective/i.test(s))
-    if (!form.major) return nonElectives
-    return nonElectives.concat(electives.filter(s => subjectMatchesMajor(s, form.major)))
+function getSubjectOptions(year, major) {
+  const term = selectedTerm.value || publishedTerm.value
+  const semester = normalizedSemester(term?.semester)
+  const isFourthYearFirstSemester = year === '4th Year' && semester === '1st Semester'
+  return subjectCatalog
+    .filter((option) => {
+      if (option.year === 'Elective') {
+        return (year === '3rd Year' && semester === '2nd Semester' && subjectMatchesMajor(option.label, major))
+          || (isFourthYearFirstSemester && Boolean(major))
+      }
+      return option.year === year && option.semester === semester
+    })
+    .map((option) => option.major ? `${option.label} (${option.major})` : option.label)
   }
-  // for other years (including 4th), only non-electives
-  return base.filter(s => !/Elective/i.test(s))
-})
-// computed for add panel (uses addForm.year/addForm.major)
-const modalSubjectOptionsForAdd = computed(() => {
-  const base = subjectOptions.filter((subject) => subject !== 'Lunch Break')
-  if (addForm.year === '1st Year' || addForm.year === '2nd Year') return base.filter(s => !/Elective/i.test(s))
-  if (addForm.year === '3rd Year') {
-    const nonElectives = base.filter(s => !/Elective/i.test(s))
-    const electives = base.filter(s => /Elective/i.test(s))
-    if (!addForm.major) return nonElectives
-    return nonElectives.concat(electives.filter(s => subjectMatchesMajor(s, addForm.major)))
-  }
-  return base.filter(s => !/Elective/i.test(s))
-})
-// list view subject options based on listAddForm.year/major
-const listSubjectOptions = computed(() => {
-  const base = subjectOptions.filter((subject) => subject !== 'Lunch Break')
-  if (listAddForm.year === '1st Year' || listAddForm.year === '2nd Year') return base.filter(s => !/Elective/i.test(s))
-  if (listAddForm.year === '3rd Year') {
-    const nonElectives = base.filter(s => !/Elective/i.test(s))
-    const electives = base.filter(s => /Elective/i.test(s))
-    if (!listAddForm.major) return nonElectives
-    return nonElectives.concat(electives.filter(s => subjectMatchesMajor(s, listAddForm.major)))
-  }
-  return base.filter(s => !/Elective/i.test(s))
-})
+
+const modalSubjectOptions = computed(() => getSubjectOptions(form.year, form.major))
+const modalSubjectOptionsForAdd = computed(() => getSubjectOptions(addForm.year, addForm.major))
+const listSubjectOptions = computed(() => getSubjectOptions(listAddForm.year, listAddForm.major))
 const lunchBreakForm = reactive({ timeIn: '', timeOut: '' })
 const lunchBreakTimeError = computed(() => {
   if (!lunchBreakForm.timeIn || !lunchBreakForm.timeOut) return ''
@@ -2762,6 +2709,21 @@ const addForm = reactive({
   roomType: 'Lecture',
   parallel: false, parallelCount: 2,
   parallelSlots: [{ section: '', room: '', roomType: 'Lecture' }, { section: '', room: '', roomType: 'Lecture' }],
+})
+
+function clearInvalidSubject(formState, options) {
+  if (formState.subject && !options.includes(formState.subject)) formState.subject = ''
+}
+
+watch([
+  selectedTerm,
+  () => form.year, () => form.major,
+  () => addForm.year, () => addForm.major,
+  () => listAddForm.year, () => listAddForm.major,
+], () => {
+  clearInvalidSubject(form, modalSubjectOptions.value)
+  clearInvalidSubject(addForm, modalSubjectOptionsForAdd.value)
+  clearInvalidSubject(listAddForm, listSubjectOptions.value)
 })
 
 watch(() => addForm.parallelCount, (val) => {

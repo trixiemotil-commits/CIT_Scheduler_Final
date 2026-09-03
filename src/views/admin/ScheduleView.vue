@@ -226,11 +226,7 @@
               <div v-if="selectedTeacher && !editMode" class="schedule-for-text">Schedule for Prof. {{ selectedTeacher }}</div>
               <div v-else-if="selectedTeacher" class="form-value-locked">Prof. {{ selectedTeacher }}</div>
               <div v-else class="form-select-wrap">
-                <select v-model="form.teacher" class="form-select">
-                  <option value="" disabled>Select Teacher</option>
-                  <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
-                </select>
-                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                <TypeaheadSelect v-model="form.teacher" :options="teacherSelectOptions" placeholder="Select Teacher" />
               </div>
             </div>
             <!-- Day (only when opened from New Schedule button) -->
@@ -301,11 +297,7 @@
             <div class="form-row-inline">
               <label class="form-label">Subject</label>
               <div class="form-select-wrap">
-                <select v-model="form.subject" class="form-select">
-                  <option value="" disabled>Select Subject</option>
-                  <option v-for="s in subjectOptions" :key="s" :value="s">{{ s }}</option>
-                </select>
-                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                <TypeaheadSelect v-model="form.subject" :options="subjectOptions" placeholder="Select Subject" />
               </div>
             </div>
 
@@ -463,12 +455,7 @@
                 <label v-if="!selectedTeacher" class="form-label">Teacher</label>
                 <div v-if="selectedTeacher" class="schedule-for-text">Schedule for Prof. {{ selectedTeacher }}</div>
                 <div v-else class="form-select-wrap">
-                  <select v-model="addForm.teacher" class="form-select">
-                    <option value="" disabled>Select Teacher</option>
-                    <option value="CIT Faculty">CIT Faculty</option>
-                    <option v-for="t in teacherOptions" :key="t" :value="t">Prof. {{ t }}</option>
-                  </select>
-                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                  <TypeaheadSelect v-model="addForm.teacher" :options="teacherSelectOptions" placeholder="Select Teacher" />
                 </div>
               </div>
               <!-- Day -->
@@ -552,11 +539,7 @@
               <div class="form-row-inline">
                 <label class="form-label">Subject</label>
                 <div class="form-select-wrap">
-                  <select v-model="addForm.subject" class="form-select">
-                    <option value="" disabled>Select Subject</option>
-                    <option v-for="s in subjectOptions" :key="s" :value="s">{{ s }}</option>
-                  </select>
-                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                  <TypeaheadSelect v-model="addForm.subject" :options="subjectOptions" placeholder="Select Subject" />
                 </div>
               </div>
               <!-- Room (not parallel) -->
@@ -819,18 +802,19 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import TypeaheadSelect from '@/components/TypeaheadSelect.vue'
 import {
-  colorForRoom,
-  colorForRoomType,
-  days,
-  entries,
-  parseTime,
-  roomOptions,
-  sections,
-  subjectOptions,
-  teacherOptions,
-  timeOptions,
-  years,
+    colorForRoom,
+    colorForRoomType,
+    days,
+    entries,
+    parseTime,
+    roomOptions,
+    sections,
+    subjectOptions,
+    teacherOptions,
+    timeOptions,
+    years,
 } from '@/composables/useSchedule.js'
 import Swal from 'sweetalert2'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
@@ -839,6 +823,9 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+const teacherSelectOptions = computed(() => [
+  ...teacherOptions.value.map(teacher => ({ label: `Prof. ${teacher}`, value: teacher })),
+])
 
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
