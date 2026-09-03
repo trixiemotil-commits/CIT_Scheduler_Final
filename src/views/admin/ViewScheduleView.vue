@@ -441,7 +441,6 @@
 </template>
 
 <script setup>
-import Swal from 'sweetalert2'
 import { getToken, getUser, logout } from '@/auth.js'
 import {
     colorForRoomType,
