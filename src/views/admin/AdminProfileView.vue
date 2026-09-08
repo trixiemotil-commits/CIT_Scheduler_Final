@@ -150,7 +150,7 @@
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Employee Id</label>
-                <input v-model="editForm.employeeId" class="edit-input" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="00-0000-000000" @input="formatEmployeeId" />
+                <input v-model="editForm.employeeId" class="edit-input" type="text" inputmode="text" autocomplete="off" maxlength="11" placeholder="AU2025-00000" @input="formatEmployeeId" />
               </div>
             </div>
           </div>
@@ -304,9 +304,12 @@ function closeEdit() {
 }
 
 function formatEmployeeId() {
-  const digits = String(editForm.value.employeeId || '').replace(/\D/g, '').slice(0, 12)
-  const parts = [digits.slice(0, 2), digits.slice(2, 6), digits.slice(6, 12)].filter(Boolean)
-  editForm.value.employeeId = parts.join('-')
+  const digits = String(editForm.value.employeeId || '').replace(/\D/g, '').slice(0, 9)
+  if (!digits) {
+    editForm.value.employeeId = ''
+    return
+  }
+  editForm.value.employeeId = `AU${digits.slice(0, 4)}${digits.length > 4 ? `-${digits.slice(4, 9)}` : ''}`
 }
 
 async function handleAvatarChange(event) {
@@ -362,8 +365,8 @@ async function saveProfile() {
     Swal.fire({ icon: 'warning', title: 'Full name required', text: 'Enter both your first and last name.' })
     return
   }
-  if (editForm.value.employeeId && !/^\d{2}-\d{4}-\d{6}$/.test(editForm.value.employeeId)) {
-    Swal.fire({ icon: 'warning', title: 'Invalid employee ID', text: 'Use the format 00-0000-000000. Numbers and hyphens only.' })
+  if (editForm.value.employeeId && !/^AU\d{4}-\d{5}$/.test(editForm.value.employeeId)) {
+    Swal.fire({ icon: 'warning', title: 'Invalid employee ID', text: 'Use the format AU2025-00000.' })
     return
   }
 

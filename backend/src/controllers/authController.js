@@ -6,6 +6,7 @@ const { sendPasswordOtpEmail } = require("../config/mail");
 const ConsultationRequest = require('../models/ConsultationRequest')
 const Notification = require('../models/Notification')
 const { logActivity } = require("../utils/activityLogWriter");
+const { notifyActiveAdmins } = require('../utils/adminNotification')
 
 // Verify reCAPTCHA token with Google
 async function verifyRecaptcha(token, remoteIp = null) {
@@ -159,15 +160,20 @@ async function register(req, res) {
       });
     }
 
-    // verify reCAPTCHA on register as well
-    const recaptchaToken = req.body?.recaptchaToken
-    if (!recaptchaToken) {
-      return res.status(400).json({ message: "reCAPTCHA token is missing. Please complete the reCAPTCHA challenge." });
-    }
+    if (req.body?.client === "mobile") {
+      if (!validateMobileMathChallenge(req.body)) {
+        return res.status(403).json({ message: "Incorrect math answer. Please try again." });
+      }
+    } else {
+      const recaptchaToken = req.body?.recaptchaToken
+      if (!recaptchaToken) {
+        return res.status(400).json({ message: "reCAPTCHA token is missing. Please complete the reCAPTCHA challenge." });
+      }
 
-    const recaptchaOk = await verifyRecaptcha(recaptchaToken, req.ip || null)
-    if (!recaptchaOk) {
-      return res.status(403).json({ message: "reCAPTCHA verification failed. Please try again." });
+      const recaptchaOk = await verifyRecaptcha(recaptchaToken, req.ip || null)
+      if (!recaptchaOk) {
+        return res.status(403).json({ message: "reCAPTCHA verification failed. Please try again." });
+      }
     }
 
     const existingUser = await User.findOne({
@@ -193,6 +199,18 @@ async function register(req, res) {
       role: "student",
       account_status: "Pending",
     });
+
+    try {
+      await notifyActiveAdmins({
+        type: 'account_registration',
+        title: 'New account pending approval',
+        message: `${user.firstName} ${user.lastName} registered a student account.`,
+        related: { userId: user._id.toString() },
+        route: '/admin/users',
+      })
+    } catch (notificationError) {
+      console.warn('Registration succeeded, but admin notification failed:', notificationError.message)
+    }
 
     return res.status(201).json({
       message: "Account created successfully and is pending approval.",
@@ -234,14 +252,19 @@ async function login(req, res) {
       return res.status(400).json({ message: "Email and password are required." });
     }
 
-    // Require reCAPTCHA token and verify it server-side
-    if (!recaptchaToken) {
-      return res.status(400).json({ message: "reCAPTCHA token is missing. Please complete the reCAPTCHA challenge." });
-    }
+    if (req.body?.client === "mobile") {
+      if (!validateMobileMathChallenge(req.body)) {
+        return res.status(403).json({ message: "Incorrect math answer. Please try again." });
+      }
+    } else {
+      if (!recaptchaToken) {
+        return res.status(400).json({ message: "reCAPTCHA token is missing. Please complete the reCAPTCHA challenge." });
+      }
 
-    const recaptchaOk = await verifyRecaptcha(recaptchaToken, req.ip || null);
-    if (!recaptchaOk) {
-      return res.status(403).json({ message: "reCAPTCHA verification failed. Please try again." });
+      const recaptchaOk = await verifyRecaptcha(recaptchaToken, req.ip || null);
+      if (!recaptchaOk) {
+        return res.status(403).json({ message: "reCAPTCHA verification failed. Please try again." });
+      }
     }
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
@@ -311,6 +334,17 @@ function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function validateMobileMathChallenge(body) {
+  if (body?.client !== "mobile") return true;
+
+  const challenge = normalizeString(body.mathChallenge);
+  const answer = Number(body.mathAnswer);
+  const match = challenge.match(/^(\d{1,2})\s*\+\s*(\d{1,2})$/);
+  if (!match || !Number.isInteger(answer)) return false;
+
+  return Number(match[1]) + Number(match[2]) === answer;
+}
+
 async function updateMe(req, res) {
   try {
     const user = await User.findById(req.user.id);
@@ -346,8 +380,8 @@ async function updateMe(req, res) {
     }
 
     if (employeeId) {
-      if (!/^\d{2}-\d{4}-\d{6}$/.test(employeeId)) {
-        return res.status(400).json({ message: "Employee ID must use the format 00-0000-000000." });
+      if (!/^AU\d{4}-\d{5}$/.test(employeeId)) {
+        return res.status(400).json({ message: "Employee ID must use the format AU2025-00000." });
       }
       const idOwner = await User.findOne({ employeeId });
       if (idOwner && idOwner._id.toString() !== user._id.toString()) {
@@ -457,6 +491,21 @@ async function updateMe(req, res) {
       }
     } catch (err) {
       console.warn('Failed to create teacher status notifications:', err.message)
+    }
+
+    if (isTeacher && String(prevTeacherStatus || '') !== String(user.teacher_status || '')) {
+      try {
+        await notifyActiveAdmins({
+          actorId: user._id,
+          type: 'teacher_status_admin',
+          title: 'Teacher status changed',
+          message: `${user.firstName || ''} ${user.lastName || ''} is now ${user.teacher_status}.`.trim(),
+          related: { teacherId: user._id.toString(), status: user.teacher_status },
+          route: '/admin/teachers',
+        })
+      } catch (notificationError) {
+        console.warn('Teacher update succeeded, but admin notification failed:', notificationError.message)
+      }
     }
 
     return res.status(200).json({ message: "Profile updated successfully.", user: toSafeUser(user) });

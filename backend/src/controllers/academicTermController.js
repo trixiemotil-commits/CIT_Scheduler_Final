@@ -1,5 +1,6 @@
 const AcademicTerm = require("../models/AcademicTerm");
 const { logActivity } = require("../utils/activityLogWriter");
+const { notifyActiveAdmins } = require("../utils/adminNotification");
 
 function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -119,6 +120,19 @@ async function createTerm(req, res) {
       req,
     });
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "academic_term_created_admin",
+        title: "Academic term created",
+        message: `${schoolYear} ${semester} was added.`,
+        related: { termId: term._id.toString() },
+        route: "/admin/academic-terms",
+      });
+    } catch (notificationError) {
+      console.warn("Academic term created, but admin notification failed:", notificationError.message);
+    }
+
     return res.status(201).json({ term });
   } catch (error) {
     console.error("Failed to create academic term:", error);
@@ -172,6 +186,19 @@ async function updateTerm(req, res) {
       req,
     });
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "academic_term_updated_admin",
+        title: "Academic term updated",
+        message: `${term.schoolYear || "Academic term"} ${term.semester || ""} was updated.`.trim(),
+        related: { termId: term._id.toString() },
+        route: "/admin/academic-terms",
+      });
+    } catch (notificationError) {
+      console.warn("Academic term updated, but admin notification failed:", notificationError.message);
+    }
+
     return res.json({ term });
   } catch (error) {
     console.error("Failed to update academic term:", error);
@@ -204,6 +231,19 @@ async function useTerm(req, res) {
       req,
     });
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "academic_term_in_use_admin",
+        title: "Academic term activated",
+        message: `${target.schoolYear} ${target.semester} is now the term in use.`,
+        related: { termId: target._id.toString() },
+        route: "/admin/academic-terms",
+      });
+    } catch (notificationError) {
+      console.warn("Academic term activated, but admin notification failed:", notificationError.message);
+    }
+
     return res.json({ term: target });
   } catch (error) {
     console.error("Failed to set academic term in use:", error);
@@ -235,6 +275,19 @@ async function publishTerm(req, res) {
       method: req.method,
       req,
     });
+
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "academic_term_published_admin",
+        title: "Academic term published",
+        message: `${target.schoolYear} ${target.semester} was published.`,
+        related: { termId: target._id.toString() },
+        route: "/admin/academic-terms",
+      });
+    } catch (notificationError) {
+      console.warn("Academic term published, but admin notification failed:", notificationError.message);
+    }
 
     return res.json({ term: target });
   } catch (error) {

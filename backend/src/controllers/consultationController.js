@@ -7,6 +7,7 @@ const User = require("../models/User");
 const Notification = require("../models/Notification");
 const AcademicTerm = require("../models/AcademicTerm");
 const { logActivity } = require("../utils/activityLogWriter");
+const { notifyActiveAdmins } = require("../utils/adminNotification");
 
 const MAX_WEEKLY_MINUTES = 240; // 4 hours
 
@@ -628,6 +629,18 @@ async function createConsultationRequest(req, res) {
       console.warn('Failed to create notification for teacher:', err.message)
     }
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user.id,
+        type: 'consultation_request_admin',
+        title: 'New consultation request',
+        message: `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}.`,
+        related: { consultationRequestId: requestDoc._id.toString() },
+      })
+    } catch (err) {
+      console.warn('Failed to create notification for admins:', err.message)
+    }
+
     await logActivity({
       actor: req.user,
       action: `Requested consultation with ${teacherName} for ${requestDoc.subject}`,
@@ -947,6 +960,18 @@ async function updateConsultationRequestStatus(req, res) {
       }
     } catch (err) {
       console.warn('Failed to create notification for student:', err.message)
+    }
+
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id || null,
+        type: 'consultation_status_admin',
+        title: `Consultation ${nextStatus}`,
+        message: `A consultation request for ${requestDoc.subject} was updated to ${nextStatus}.`,
+        related: { consultationRequestId: requestDoc._id.toString(), status: nextStatus },
+      })
+    } catch (err) {
+      console.warn('Failed to create admin status notification:', err.message)
     }
 
     return res.json({ message: "Consultation request updated.", request: toClientRequest(requestDoc) });

@@ -41,6 +41,11 @@
           <RouterLink to="/forgot-password" class="action-link">Forgot Password?</RouterLink>
         </div>
 
+        <div v-if="isMobileApp" class="math-challenge">
+          <label :for="'login-math-answer'">Solve {{ loginMathChallenge.question }}</label>
+          <input id="login-math-answer" v-model="loginMathAnswer" type="number" inputmode="numeric" class="input-field" placeholder="Answer" autocomplete="off" />
+        </div>
+
         <!-- reCAPTCHA widget -->
         <div v-if="siteKey" class="captcha-wrap">
           <div ref="signinCaptchaRef" class="captcha-box"></div>
@@ -95,6 +100,11 @@
 
         <div class="row-end">
           <button type="button" class="action-link plain-btn" @click="activeTab = 'signin'">Already have an account?</button>
+        </div>
+
+        <div v-if="isMobileApp" class="math-challenge">
+          <label :for="'signup-math-answer'">Solve {{ signUpMathChallenge.question }}</label>
+          <input id="signup-math-answer" v-model="signUpMathAnswer" type="number" inputmode="numeric" class="input-field" placeholder="Answer" autocomplete="off" />
         </div>
 
         <div v-if="signUpSuccess" class="success-msg">{{ signUpSuccess }}</div>
@@ -206,6 +216,7 @@
 
 <script setup>
 import { login, logout, register, selectRole } from '@/auth.js'
+import { Capacitor } from '@capacitor/core'
 import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
@@ -301,11 +312,16 @@ const loginAlert = ref(null)
 const signUpError = ref('')
 const signUpSuccess = ref('')
 const router = useRouter()
-const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || ''
+const isMobileApp = Capacitor.isNativePlatform()
+const siteKey = isMobileApp ? '' : (import.meta.env.VITE_RECAPTCHA_SITE_KEY || '')
 const signinCaptchaRef = ref(null)
 const signupCaptchaRef = ref(null)
 const signinWidgetId = ref(null)
 const signupWidgetId = ref(null)
+const loginMathAnswer = ref('')
+const signUpMathAnswer = ref('')
+const loginMathChallenge = ref({ question: '', answer: 0 })
+const signUpMathChallenge = ref({ question: '', answer: 0 })
 const tronCanvas = ref(null)
 let disposeTronBackground = null
 
@@ -575,6 +591,19 @@ function resetRecaptcha(widgetRef) {
     try { if (window.grecaptcha) window.grecaptcha.reset() } catch (_) {}
   }
 }
+
+function createMathChallenge() {
+  const first = Math.floor(Math.random() * 90) + 10
+  const second = Math.floor(Math.random() * 90) + 10
+  return { question: `${first} + ${second} =`, answer: first + second }
+}
+
+function resetMathChallenges() {
+  loginMathChallenge.value = createMathChallenge()
+  signUpMathChallenge.value = createMathChallenge()
+  loginMathAnswer.value = ''
+  signUpMathAnswer.value = ''
+}
 const signIn = reactive({ email: '', password: '', remember: false, showPw: false })
 const signUp = reactive({ firstName: '', lastName: '', studentId: '', email: '', password: '', confirmPassword: '', showPw: false, showConfirmPw: false })
 
@@ -606,6 +635,12 @@ function closeLoginAlert() {
 async function handleLogin() {
   loginError.value = ''
   try {
+    if (isMobileApp && Number(loginMathAnswer.value) !== loginMathChallenge.value.answer) {
+      showLoginAlert('captcha', 'Verification required', 'Please enter the correct math answer.')
+      resetMathChallenges()
+      return
+    }
+
     // Ensure reCAPTCHA response is present before sending credentials
     let recaptchaToken = null
     try {
@@ -623,7 +658,12 @@ async function handleLogin() {
       return
     }
 
-    const payload = await login(signIn.email, signIn.password, recaptchaToken)
+    const payload = await login(
+      signIn.email,
+      signIn.password,
+      isMobileApp ? null : recaptchaToken,
+      isMobileApp ? { question: loginMathChallenge.value.question.replace(' =', ''), answer: Number(loginMathAnswer.value) } : null
+    )
     const user = payload?.user
     const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
     const normalizedRoles = roles.map(role => String(role).toLowerCase())
@@ -642,6 +682,7 @@ async function handleLogin() {
       isCaptchaError ? 'The reCAPTCHA check expired or could not be verified. Please complete it again.' : loginError.value
     )
     try { resetRecaptcha(signinWidgetId) } catch (_) {}
+    if (isMobileApp) resetMathChallenges()
   }
 }
 
@@ -705,8 +746,14 @@ async function handleSignUp() {
     return
   }
 
+  if (isMobileApp && Number(signUpMathAnswer.value) !== signUpMathChallenge.value.answer) {
+    signUpError.value = 'Please enter the correct math answer.'
+    resetMathChallenges()
+    return
+  }
+
   try {
-    // obtain recaptcha token from the signup widget
+    // Obtain reCAPTCHA only for the web client.
     let recaptchaToken = null
     try {
       if (window.grecaptcha && signupWidgetId.value != null) {
@@ -716,7 +763,7 @@ async function handleSignUp() {
       }
     } catch (e) { /* ignore */ }
 
-    if (!recaptchaToken) {
+    if (!isMobileApp && !recaptchaToken) {
       signUpError.value = 'Please complete the reCAPTCHA verification.'
       return
     }
@@ -728,7 +775,9 @@ async function handleSignUp() {
       email,
       password: signUp.password,
       role: 'student',
-      recaptchaToken
+      ...(isMobileApp
+        ? { client: 'mobile', mathChallenge: signUpMathChallenge.value.question.replace(' =', ''), mathAnswer: Number(signUpMathAnswer.value) }
+        : { recaptchaToken })
     })
     signUpSuccess.value = 'Account created successfully. Your account is pending admin approval.'
     signUp.password = ''
@@ -757,6 +806,7 @@ function onStudentIdInput(event) {
 
 onMounted(() => {
   initialiseTronBackground()
+  if (isMobileApp) resetMathChallenges()
 })
 
 onUnmounted(() => {

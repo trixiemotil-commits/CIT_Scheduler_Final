@@ -3,6 +3,7 @@ const Event = require("../models/Event");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 const { logActivity } = require("../utils/activityLogWriter");
+const { notifyActiveAdmins } = require("../utils/adminNotification");
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -117,6 +118,19 @@ async function createEvent(req, res) {
       console.warn("Event created, but student notifications failed:", notificationError.message);
     }
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "event_created_admin",
+        title: "New event created",
+        message: `${event.title} was added to the events calendar.`,
+        related: { eventId: event._id.toString() },
+        route: "/admin/events",
+      });
+    } catch (notificationError) {
+      console.warn("Event created, but admin notification failed:", notificationError.message);
+    }
+
     await logActivity({
       actor: req.user,
       action: `Created event ${event.title}`,
@@ -161,6 +175,19 @@ async function updateEvent(req, res) {
     }
     await existing.save();
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "event_updated_admin",
+        title: "Event updated",
+        message: `${existing.title} was updated${existing.status === "archived" ? " and archived" : ""}.`,
+        related: { eventId: existing._id.toString(), status: existing.status },
+        route: "/admin/events",
+      });
+    } catch (notificationError) {
+      console.warn("Event updated, but admin notification failed:", notificationError.message);
+    }
+
     await logActivity({
       actor: req.user,
       action: `Updated event ${existing.title}${existing.status === "archived" ? " (archived)" : ""}`,
@@ -185,6 +212,19 @@ async function deleteEvent(req, res) {
     const event = await Event.findByIdAndDelete(req.params.id);
     if (!event) {
       return res.status(404).json({ message: "Event not found." });
+    }
+
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "event_deleted_admin",
+        title: "Event deleted",
+        message: `${event.title} was removed from the events calendar.`,
+        related: { eventId: event._id.toString() },
+        route: "/admin/events",
+      });
+    } catch (notificationError) {
+      console.warn("Event deleted, but admin notification failed:", notificationError.message);
     }
 
     await logActivity({

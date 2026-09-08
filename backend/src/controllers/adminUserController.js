@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const { logActivity } = require("../utils/activityLogWriter");
+const { notifyActiveAdmins } = require("../utils/adminNotification");
 
 const ROLE_LABELS = {
   admin: "Admin",
@@ -205,6 +206,19 @@ async function createUser(req, res) {
       req,
     });
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "account_created_admin",
+        title: "User account created",
+        message: `${user.firstName} ${user.lastName}'s ${normalizedRoles.join(" & ")} account was created.`,
+        related: { userId: user._id.toString() },
+        route: "/admin/users",
+      });
+    } catch (notificationError) {
+      console.warn("User created, but admin notification failed:", notificationError.message);
+    }
+
     return res.status(201).json({ message: "User created.", user: toClientUser(user) });
   } catch (error) {
     console.error("Failed to create user:", error);
@@ -320,6 +334,19 @@ async function updateUser(req, res) {
       req,
     });
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "account_updated_admin",
+        title: "User account updated",
+        message: `${user.firstName} ${user.lastName}'s account details were updated.`,
+        related: { userId: user._id.toString() },
+        route: "/admin/users",
+      });
+    } catch (notificationError) {
+      console.warn("User updated, but admin notification failed:", notificationError.message);
+    }
+
     return res.json({ message: "User updated.", user: toClientUser(user) });
   } catch (error) {
     console.error("Failed to update user:", error);
@@ -355,6 +382,19 @@ async function updateUserStatus(req, res) {
       req,
     });
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "account_status_admin",
+        title: `Account ${nextStatus.toLowerCase()}`,
+        message: `${user.firstName} ${user.lastName}'s account is now ${nextStatus}.`,
+        related: { userId: user._id.toString(), status: nextStatus },
+        route: "/admin/users",
+      });
+    } catch (notificationError) {
+      console.warn("User status updated, but admin notification failed:", notificationError.message);
+    }
+
     return res.json({ message: "User status updated.", user: toClientUser(user) });
   } catch (error) {
     console.error("Failed to update user status:", error);
@@ -376,6 +416,19 @@ async function approveAllPendingUsers(req, res) {
       method: req.method,
       req,
     });
+
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "accounts_approved_admin",
+        title: "Pending accounts approved",
+        message: `${result.modifiedCount || 0} pending account(s) were approved.`,
+        related: { updatedCount: result.modifiedCount || 0 },
+        route: "/admin/users",
+      });
+    } catch (notificationError) {
+      console.warn("Accounts approved, but admin notification failed:", notificationError.message);
+    }
 
     return res.json({
       message: "Pending users approved.",

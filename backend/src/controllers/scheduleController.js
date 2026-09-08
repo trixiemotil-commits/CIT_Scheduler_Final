@@ -6,6 +6,7 @@ const ConsultationAvailability = require("../models/ConsultationAvailability");
 const ConsultationRequest = require("../models/ConsultationRequest");
 const AcademicTerm = require("../models/AcademicTerm");
 const { logActivity } = require("../utils/activityLogWriter");
+const { notifyActiveAdmins } = require("../utils/adminNotification");
 
 const YEAR_VALUES = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 const DAY_VALUES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -500,6 +501,18 @@ async function createScheduleTable(req, res) {
     }
 
     const table = await ScheduleTable.create({ teacher, label });
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "schedule_table_created_admin",
+        title: "Schedule table created",
+        message: `A schedule table was created for ${teacher}.`,
+        related: { teacher },
+        route: "/admin/schedule/view",
+      });
+    } catch (notificationError) {
+      console.warn("Schedule table created, but admin notification failed:", notificationError.message);
+    }
     return res.status(201).json({ message: "Schedule table created.", table: toClientTable(table) });
   } catch (error) {
     if (error?.code === 11000) {
@@ -587,6 +600,20 @@ async function createSchedule(req, res) {
       method: req.method,
       req,
     });
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "schedule_created_admin",
+        title: isLunchBreak ? "Lunch break added" : "Schedule added",
+        message: isLunchBreak
+          ? `A lunch break was added for ${docs[0]?.teacher || "a teacher"}.`
+          : `A schedule was added for ${docs[0]?.teacher || "a teacher"}.`,
+        related: { teacher: docs[0]?.teacher || "" },
+        route: "/admin/schedule/view",
+      });
+    } catch (notificationError) {
+      console.warn("Schedule saved, but admin notification failed:", notificationError.message);
+    }
     return res.status(201).json({
       message: isLunchBreak ? "Lunch break saved." : "Schedule saved.",
       entries: created.map(toClientEntry),
@@ -699,6 +726,18 @@ async function updateLunchBreak(req, res) {
       method: req.method,
       req,
     });
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "lunch_break_updated_admin",
+        title: "Lunch break updated",
+        message: `A lunch break was updated for ${existing.teacher || "a teacher"}.`,
+        related: { scheduleId: existing._id.toString(), teacher: existing.teacher || "" },
+        route: "/admin/schedule/view",
+      });
+    } catch (notificationError) {
+      console.warn("Lunch break updated, but admin notification failed:", notificationError.message);
+    }
 
     return res.json({ message: "Lunch break updated.", entry: toClientEntry(existing) });
   } catch (error) {
@@ -749,6 +788,18 @@ async function replaceSchedule(req, res) {
       method: req.method,
       req,
     });
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "schedule_updated_admin",
+        title: "Schedule updated",
+        message: `A schedule was updated for ${docs[0]?.teacher || "a teacher"}.`,
+        related: { teacher: docs[0]?.teacher || "" },
+        route: "/admin/schedule/view",
+      });
+    } catch (notificationError) {
+      console.warn("Schedule updated, but admin notification failed:", notificationError.message);
+    }
     return res.json({ message: "Schedule updated.", entries: created.map(toClientEntry) });
   } catch (error) {
     if (error.message && (
@@ -782,6 +833,18 @@ async function deleteSchedule(req, res) {
       method: req.method,
       req,
     });
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "schedule_deleted_admin",
+        title: "Schedule removed",
+        message: "A schedule entry was removed.",
+        related: { deletedCount: result.deletedCount || 0 },
+        route: "/admin/schedule/view",
+      });
+    } catch (notificationError) {
+      console.warn("Schedule removed, but admin notification failed:", notificationError.message);
+    }
 
     return res.json({ message: "Schedule removed.", deletedCount: result.deletedCount || 0 });
   } catch (error) {

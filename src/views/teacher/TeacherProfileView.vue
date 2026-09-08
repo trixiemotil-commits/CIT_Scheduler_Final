@@ -140,7 +140,7 @@
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Employee Id</label>
-                <input v-model="editForm.employeeId" class="edit-input" type="text" placeholder="000-000-000" />
+                <input v-model="editForm.employeeId" class="edit-input" type="text" placeholder="AU2025-00000" />
               </div>
             </div>
             <div class="edit-row two-col">

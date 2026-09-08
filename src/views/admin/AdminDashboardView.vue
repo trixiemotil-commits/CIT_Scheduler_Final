@@ -56,7 +56,7 @@
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <span class="notif-dot"></span>
+            <span v-if="unreadNotifs.length" class="notif-dot"></span>
           </button>
 
           <!-- Notification Dropdown -->
@@ -67,37 +67,40 @@
             <div class="notif-tabs">
               <button :class="['notif-tab', { active: notifTab === 'all' }]" @click="notifTab = 'all'">All</button>
               <button :class="['notif-tab', { active: notifTab === 'unread' }]" @click="notifTab = 'unread'">Unread</button>
-              <span class="notif-see-all">See all</span>
+              <button :class="['notif-tab', { active: notifTab === 'read' } ]" @click="notifTab = 'read'">Read</button>
+              <button class="notif-see-all" type="button" @click="markAllNotificationsRead">Mark all read</button>
             </div>
 
             <div class="notif-list-wrap">
-              <!-- New section -->
-              <template v-if="newNotifs.length">
-                <div class="notif-section-label">New</div>
-                <ul class="notif-list">
-                  <li v-for="n in newNotifs" :key="n.id" class="notif-item">
-                    <img :src="n.avatar" class="notif-avatar" alt="" />
-                    <span class="notif-text">{{ n.message }}</span>
-                    <span v-if="!n.read" class="notif-unread-dot"></span>
-                  </li>
-                </ul>
-              </template>
+              <div v-if="notificationsLoading" class="notif-empty">Loading notifications...</div>
 
-              <!-- Today section -->
-              <template v-if="todayNotifs.length">
-                <div class="notif-section-label">Today</div>
-                <ul class="notif-list">
-                  <li v-for="n in todayNotifs" :key="n.id" class="notif-item">
-                    <img :src="n.avatar" class="notif-avatar" alt="" />
-                    <span class="notif-text">{{ n.message }}</span>
-                    <span v-if="!n.read" class="notif-unread-dot"></span>
-                  </li>
-                </ul>
-              </template>
+              <template v-else>
+                <!-- New section -->
+                <template v-if="newNotifs.length">
+                  <div class="notif-section-label">New</div>
+                  <ul class="notif-list">
+                    <li v-for="n in newNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
+                      <img :src="n.avatar" class="notif-avatar" alt="" />
+                      <span class="notif-text"><strong>{{ n.title }}</strong><small>{{ n.message }}</small></span>
+                      <span v-if="!n.read" class="notif-unread-dot"></span>
+                    </li>
+                  </ul>
+                </template>
 
-              <div v-if="!newNotifs.length && !todayNotifs.length" class="notif-empty">
-                No notifications
-              </div>
+                <!-- Today section -->
+                <template v-if="todayNotifs.length">
+                  <div class="notif-section-label">Today</div>
+                  <ul class="notif-list">
+                    <li v-for="n in todayNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
+                      <img :src="n.avatar" class="notif-avatar" alt="" />
+                      <span class="notif-text"><strong>{{ n.title }}</strong><small>{{ n.message }}</small></span>
+                      <span v-if="!n.read" class="notif-unread-dot"></span>
+                    </li>
+                  </ul>
+                </template>
+
+                <div v-if="!newNotifs.length && !todayNotifs.length" class="notif-empty">No notifications</div>
+              </template>
             </div>
           </div>
         </div>
@@ -304,6 +307,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import useNotifications from '@/composables/useNotifications.js'
 import Chart from 'chart.js/auto'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -607,18 +611,77 @@ async function loadDashboardSummary() {
 /* ── Notifications ── */
 const showNotif = ref(false)
 const notifTab = ref('all')
-const notifications = ref([
-  { id: 1, avatar: 'https://i.pravatar.cc/100?img=12', message: 'Prof. John has finished the class session.', read: false, group: 'new' },
-  { id: 2, avatar: 'https://i.pravatar.cc/100?img=15', message: 'Prof. John has finished the class session.', read: true,  group: 'today' },
-  { id: 3, avatar: 'https://i.pravatar.cc/100?img=22', message: 'Prof. John has finished the class session.', read: true,  group: 'today' },
-  { id: 4, avatar: 'https://i.pravatar.cc/100?img=33', message: 'Prof. John has finished the class session.', read: true,  group: 'today' },
-  { id: 5, avatar: 'https://i.pravatar.cc/100?img=44', message: 'Prof. John has finished the class session.', read: true,  group: 'today' },
-])
+const notifications = ref([])
+const notificationsLoading = ref(false)
 const visibleNotifs = computed(() =>
-  notifTab.value === 'unread' ? notifications.value.filter(n => !n.read) : notifications.value
+  notifTab.value === 'unread' ? notifications.value.filter(n => !n.read)
+    : notifTab.value === 'read' ? notifications.value.filter(n => n.read)
+      : notifications.value
 )
+const unreadNotifs = computed(() => notifications.value.filter(n => !n.read))
 const newNotifs   = computed(() => visibleNotifs.value.filter(n => n.group === 'new'))
 const todayNotifs = computed(() => visibleNotifs.value.filter(n => n.group === 'today'))
+
+function notificationGroup(createdAt) {
+  const created = new Date(createdAt)
+  if (Number.isNaN(created.getTime())) return 'today'
+  return Date.now() - created.getTime() < 24 * 60 * 60 * 1000 ? 'new' : 'today'
+}
+
+function normalizeNotification(notification) {
+  return {
+    id: notification.id,
+    title: notification.title || notification.type || 'Notification',
+    message: notification.message || 'You have a new notification.',
+    avatar: notification.data?.avatar || user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.title || 'Notification')}&background=E8A020&color=30353A`,
+    read: Boolean(notification.read),
+    group: notificationGroup(notification.createdAt),
+    route: notification.data?.route || '/admin/activity-logs',
+  }
+}
+
+async function loadNotifications() {
+  notificationsLoading.value = true
+  try {
+    const payload = await apiRequest('/notifications')
+    notifications.value = (Array.isArray(payload.notifications) ? payload.notifications : [])
+      .map(normalizeNotification)
+  } catch (error) {
+    console.error('Failed to load notifications:', error)
+    notifications.value = []
+  } finally {
+    notificationsLoading.value = false
+  }
+}
+
+function handleNotification(notification) {
+  if (!notification?.id) return
+  const item = normalizeNotification(notification)
+  notifications.value = [item, ...notifications.value.filter(existing => existing.id !== item.id)].slice(0, 200)
+}
+
+function markNotificationRead(notificationId) {
+  if (!notificationId) return
+  apiRequest(`/notifications/${notificationId}/read`, { method: 'PATCH' }).catch(() => {})
+  notifications.value = notifications.value.map(notification =>
+    notification.id === notificationId ? { ...notification, read: true } : notification
+  )
+}
+
+async function markAllNotificationsRead() {
+  try {
+    await apiRequest('/notifications/mark-all-read', { method: 'PATCH' })
+    notifications.value = notifications.value.map(notification => ({ ...notification, read: true }))
+  } catch (error) {
+    console.error('Failed to mark notifications as read:', error)
+  }
+}
+
+function openNotification(notification) {
+  markNotificationRead(notification.id)
+  showNotif.value = false
+  router.push(notification.route)
+}
 
 /* ── Charts ── */
 const lineChartRef = ref(null)
@@ -826,6 +889,8 @@ function createBarChart() {
 onMounted(() => {
   loadDashboardSummary()
   loadTodayTeacherSchedules()
+  loadNotifications()
+  useNotifications.addNotificationListener(handleNotification)
   createLineChart()
   createBarChart()
   dashboardRealtimeTimer = window.setInterval(() => {
@@ -838,6 +903,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (dashboardRealtimeTimer) window.clearInterval(dashboardRealtimeTimer)
+  useNotifications.removeNotificationListener(handleNotification)
   if (lineChartInstance) lineChartInstance.destroy()
   if (barChartInstance) barChartInstance.destroy()
 })

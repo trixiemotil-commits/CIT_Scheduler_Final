@@ -64,9 +64,15 @@ async function request(path, options = {}) {
   return body
 }
 
-export async function login(email, password, recaptchaToken = null) {
+export async function login(email, password, recaptchaToken = null, mathChallenge = null) {
   const body = { email, password }
-  if (recaptchaToken) body.recaptchaToken = recaptchaToken
+  if (mathChallenge) {
+    body.client = 'mobile'
+    body.mathChallenge = mathChallenge.question
+    body.mathAnswer = mathChallenge.answer
+  } else if (recaptchaToken) {
+    body.recaptchaToken = recaptchaToken
+  }
 
   const payload = validateAuthPayload(await request('/auth/login', {
     method: 'POST',

@@ -4,6 +4,7 @@ const User = require('../models/User')
 const ConsultationRequest = require('../models/ConsultationRequest')
 const AcademicTerm = require('../models/AcademicTerm')
 const Notification = require('../models/Notification')
+const { notifyActiveAdmins } = require('../utils/adminNotification')
 
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : ''
@@ -314,6 +315,19 @@ async function createAssignment(req, res) {
       console.warn('Failed to notify students about substitute assignment:', err.message)
     }
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: 'substitute_assignment_admin',
+        title: 'Substitute assignment created',
+        message: `A substitute assignment was created for ${date}.`,
+        related: { substituteAssignmentId: populated._id.toString(), date },
+        route: '/admin/teachers',
+      })
+    } catch (notificationError) {
+      console.warn('Substitute assignment created, but admin notification failed:', notificationError.message)
+    }
+
     await logActivity({
       actor: req.user,
       action: `Assigned substitute teacher ${substituteTeacher} for ${originalTeacher} on ${date}`,
@@ -414,6 +428,19 @@ async function syncAssignments(req, res) {
       console.warn('Substitutes updated, but student notifications failed:', notificationError.message)
     }
 
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: 'substitute_assignments_admin',
+        title: grouped.size ? 'Substitute assignments updated' : 'Substitute assignments removed',
+        message: `Substitute assignments for ${date} were ${grouped.size ? 'updated' : 'removed'}.`,
+        related: { originalTeacher, date, assignmentCount: grouped.size },
+        route: '/admin/teachers',
+      })
+    } catch (notificationError) {
+      console.warn('Substitutes updated, but admin notification failed:', notificationError.message)
+    }
+
     await logActivity({
       actor: req.user,
       action: `Updated substitute assignments for ${originalTeacher} on ${date}`,
@@ -498,6 +525,18 @@ async function deleteAssignment(req, res) {
     const { id } = req.params
     const doc = await SubstituteAssignment.findByIdAndDelete(id)
     if (!doc) return res.status(404).json({ message: 'Assignment not found.' })
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: 'substitute_assignment_deleted_admin',
+        title: 'Substitute assignment deleted',
+        message: 'A substitute assignment was deleted.',
+        related: { substituteAssignmentId: id },
+        route: '/admin/teachers',
+      })
+    } catch (notificationError) {
+      console.warn('Substitute assignment deleted, but admin notification failed:', notificationError.message)
+    }
     await logActivity({
       actor: req.user,
       action: `Deleted substitute assignment ${id}`,
@@ -529,6 +568,19 @@ async function deleteAssignmentsForTeacher(req, res) {
       originalTeacher,
       date: { $gte: startOfDayUTC(target), $lte: endOfDayUTC(target) },
     })
+
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: 'substitute_assignments_deleted_admin',
+        title: 'Substitute assignments removed',
+        message: `Substitute assignments for ${date} were removed.`,
+        related: { originalTeacher, date, deletedCount: result.deletedCount || 0 },
+        route: '/admin/teachers',
+      })
+    } catch (notificationError) {
+      console.warn('Substitute assignments removed, but admin notification failed:', notificationError.message)
+    }
 
     await logActivity({
       actor: req.user,

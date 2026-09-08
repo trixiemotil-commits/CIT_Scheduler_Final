@@ -355,8 +355,8 @@
               <input v-model="userForm.email" class="form-input" type="email" placeholder="juan.delacruz.au@phinmaed.com" required />
             </div>
             <div class="form-group">
-              <label class="form-label">School ID Number <span class="form-required">*</span></label>
-              <input v-model="userForm.schoolId" class="form-input" type="text" inputmode="numeric" maxlength="14" placeholder="01-1234-123456" required @input="formatSchoolId" />
+              <label class="form-label">{{ isTeacherRole ? 'Employee ID' : 'School ID Number' }} <span class="form-required">*</span></label>
+              <input v-model="userForm.schoolId" class="form-input" type="text" :inputmode="isTeacherRole ? 'text' : 'numeric'" :maxlength="isTeacherRole ? 11 : 14" :placeholder="isTeacherRole ? 'AU2025-00000' : '01-1234-123456'" required @input="formatSchoolId" />
             </div>
           </div>
 
@@ -370,7 +370,7 @@
           <div class="form-row form-row--single">
             <div class="form-group">
               <label class="form-label">Role <span class="form-required">*</span></label>
-              <select v-model="userForm.role" class="form-input" required>
+              <select v-model="userForm.role" class="form-input" required @change="handleRoleChange">
                 <option value="" disabled>Select role…</option>
                 <option value="Admin">Admin</option>
                 <option value="Teacher">Teacher</option>
@@ -784,6 +784,13 @@ function formatSchoolIdValue(value) {
   return [digits.slice(0, 2), digits.slice(2, 6), digits.slice(6, 12)].filter(Boolean).join('-')
 }
 
+function formatEmployeeIdValue(value) {
+  const normalized = String(value || '').toUpperCase().replace(/[^A-Z0-9-]/g, '')
+  const digits = normalized.replace(/[^0-9]/g, '').slice(0, 9)
+  if (!digits) return ''
+  return `AU${digits.slice(0, 4)}${digits.length > 4 ? `-${digits.slice(4, 9)}` : ''}`
+}
+
 function mapUserForUi(user) {
   const firstName = user.firstName || ''
   const lastName  = user.lastName || ''
@@ -800,7 +807,7 @@ function mapUserForUi(user) {
     status: user.status || 'Active',
     dateAdded: formatDisplayDate(user.dateAdded || user.createdAt),
     avatar: user.avatar || fallbackAvatar(name),
-    schoolId: formatSchoolIdValue(user.schoolId || user.studentId || user.employeeId),
+    schoolId: user.employeeId ? formatEmployeeIdValue(user.employeeId) : formatSchoolIdValue(user.schoolId || user.studentId),
     phone: user.phone || '',
     studentId: user.studentId || '',
     employeeId: user.employeeId || '',
@@ -920,7 +927,15 @@ function trimValue(value) {
 }
 
 function formatSchoolId(event) {
-  userForm.value.schoolId = formatSchoolIdValue(event.target.value)
+  userForm.value.schoolId = isTeacherRole.value
+    ? formatEmployeeIdValue(event.target.value)
+    : formatSchoolIdValue(event.target.value)
+}
+
+const isTeacherRole = computed(() => ['Admin', 'Teacher', 'Admin & Teacher'].includes(userForm.value.role))
+
+function handleRoleChange() {
+  userForm.value.schoolId = ''
 }
 
 function buildUserPayload(includePassword) {
@@ -990,7 +1005,7 @@ function openEditUser(user) {
     firstName: parts[0] || '',
     lastName:  parts.slice(1).join(' ') || '',
     email:      user.email,
-    schoolId:   formatSchoolIdValue(user.schoolId || user.studentId || user.employeeId),
+    schoolId:   user.employeeId ? formatEmployeeIdValue(user.employeeId) : formatSchoolIdValue(user.schoolId || user.studentId),
     role:       user.role,
     status:     user.status,
     yearLevel:  user.yearLevel || '',
@@ -1008,6 +1023,16 @@ function saveUser() {
 
   if (!trimmedSchoolId) {
     formError.value = 'School ID Number is required.'
+    return
+  }
+
+  if (isTeacherRole.value && !/^AU\d{4}-\d{5}$/.test(trimmedSchoolId)) {
+    formError.value = 'Employee ID must use the format AU2025-00000.'
+    return
+  }
+
+  if (!isTeacherRole.value && !/^\d{2}-\d{4}-\d{6}$/.test(trimmedSchoolId)) {
+    formError.value = 'School ID must use the format 00-0000-000000.'
     return
   }
 
