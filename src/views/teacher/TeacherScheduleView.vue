@@ -295,8 +295,8 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { timeOptions } from '@/composables/useSchedule.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
+import { timeOptions } from '@/composables/useSchedule.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
