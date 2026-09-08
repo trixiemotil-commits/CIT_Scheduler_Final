@@ -1065,7 +1065,8 @@
             </transition>
             <div class="panel-footer">
               <button class="reset-btn" @click="resetAddForm">Reset</button>
-              <button class="save-btn" @click="addEntry" :disabled="!addFormValid">
+              <div v-if="!addFormWithinUnitLimit" class="time-error">This teacher cannot exceed 30 units.</div>
+              <button class="save-btn" @click="addEntry" :disabled="!addFormValid || !addFormWithinUnitLimit">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add to Schedule
               </button>
@@ -1246,9 +1247,79 @@ function endTimeOptionsAfter(startTime) {
 }
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+function isGenericTeacher(teacher) {
+  return String(teacher || '').trim().toLowerCase() === 'cit faculty'
+}
+
+function scheduleWorkload(scheduleEntries) {
+  const groups = new Map()
+  scheduleEntries
+    .filter(entry => entry.entryType !== 'lunch' && entry.teacher && !entry.isSubstitute && !isGenericTeacher(entry.teacher))
+    .forEach((entry, index) => {
+      const sections = entry.parallel
+        ? ((entry.parallelSlots || []).map(slot => slot.section).filter(Boolean).sort().join(',') || entry.parallelGroupId)
+        : entry.section
+      const groupKey = `${entry.teacher}|${entry.year}|${entry.subject}|${entry.parallel ? 'parallel' : 'single'}|${sections || index}`
+      const group = groups.get(groupKey) || { entries: [], parallel: Boolean(entry.parallel) }
+      group.entries.push(entry)
+      groups.set(groupKey, group)
+    })
+
+  return Array.from(groups.values()).reduce((total, group) => {
+    const first = group.entries[0]
+    const sectionCount = group.parallel ? Math.max(2, Number(first.parallelCount) || group.entries.length) : 1
+    const hasLab = group.entries.some(entry => entry.roomType === 'Comlab/Laboratory')
+    const hours = new Set(group.entries.map(entry => group.parallel
+      ? `${entry.day}|${entry.timeIn}|${entry.timeOut}`
+      : `${entry.day}|${entry.timeIn}|${entry.timeOut}|${entry.roomType || 'Lecture'}`
+    ))
+    const totalHours = Array.from(hours).reduce((sum, value) => {
+      const [, timeIn, timeOut] = value.split('|')
+      return sum + Math.max(0, parseTime(timeOut) - parseTime(timeIn)) / 60
+    }, 0)
+    return {
+      hours: total.hours + totalHours,
+      units: total.units + (group.parallel ? (sectionCount + 1) * (hasLab ? 2.5 : 1.5) : (hasLab ? 5 : 3)),
+    }
+  }, { hours: 0, units: 0 })
+}
+
+function workloadEntriesForSource(source) {
+  const common = {
+    entryType: 'class', teacher: source.teacher, year: source.year,
+    subject: source.subject, day: source.day, timeIn: source.timeIn, timeOut: source.timeOut,
+  }
+  if (source.parallel) {
+    return source.parallelSlots.filter(slot => slot.section).map(slot => ({
+      ...common,
+      parallel: true,
+      parallelCount: source.parallelCount,
+      parallelSlots: source.parallelSlots,
+      section: slot.section,
+      roomType: slot.roomType || 'Lecture',
+    }))
+  }
+  return [{ ...common, parallel: false, section: source.section, roomType: source.roomType || 'Lecture' }]
+}
+
+function workloadForTeacher(teacher) {
+  const normalizedTeacher = String(teacher || '').trim().toLowerCase()
+  return scheduleWorkload(Object.values(entries).filter(entry =>
+    String(entry.teacher || '').trim().toLowerCase() === normalizedTeacher
+    && (!getSelectedTermId() || String(entry.academicTermId || '') === String(getSelectedTermId()))
+  ))
+}
+
+function workloadLabel(teacher) {
+  const workload = workloadForTeacher(teacher)
+  const hours = workload.hours % 1 ? workload.hours.toFixed(1) : workload.hours
+  const units = workload.units % 1 ? workload.units.toFixed(1) : workload.units
+  return `${teacher} (${hours} hours - ${units}/30 units)`
+}
+
 const teacherSelectOptions = computed(() => [
   { label: 'CIT Faculty', value: 'CIT Faculty' },
-  ...teacherOptions.value.map(teacher => ({ label: `Prof. ${teacher}`, value: teacher })),
+  ...teacherOptions.value.map(teacher => ({ label: workloadLabel(teacher), value: teacher })),
 ])
 
 function returnToTermWorkspace() {
@@ -1923,6 +1994,7 @@ function syncEntriesFromApi(apiEntries) {
     const roomBasedColor = colorForRoomType(entry.roomType, entry.room)
     entries[key] = {
       id: entry.id || '',
+      academicTermId: entry.academicTermId || null,
       teacher: entry.teacher,
       subject: entry.subject,
       campus: inferredCampus,
@@ -1946,7 +2018,7 @@ function syncEntriesFromApi(apiEntries) {
       subbedLabel: entry.subbedLabel || '',
       color: isLunch
         ? 'color-gray'
-        : (roomBasedColor || entry.color || 'color-yellow'),
+        : (isGenericTeacher(entry.teacher) ? 'color-pink' : (roomBasedColor || entry.color || 'color-yellow')),
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -2238,6 +2310,7 @@ const form = reactive({
   _oldSlot: '',
   _oldYear: '',
   _oldTableLabel: '',
+  _oldTeacher: '',
   _oldSection: '',
   _oldDay: '',
 })
@@ -2497,6 +2570,7 @@ function openAddModal(slot, day) {
   form.slot            = ''
   form._oldSlot        = ''
   form._oldYear        = ''
+  form._oldTeacher     = ''
   form._oldSection     = ''
   form._oldDay         = ''
   form.year            = ''
@@ -2552,6 +2626,7 @@ function openEditModal(slot, day, e) {
   form._oldSlot        = e.slot || ''
   form._oldYear        = e.year ?? years[0]
   form._oldTableLabel  = e.tableLabel ?? e.teacher ?? ''
+  form._oldTeacher     = e.teacher ?? e.tableLabel ?? ''
   form._oldSection     = e.section ?? sections[0]
   form._oldDay         = day
   form.parallelSlots.splice(
@@ -2565,6 +2640,25 @@ function openEditModal(slot, day, e) {
 function buildOldDescriptor() {
   const oldTableLabel = form._oldTableLabel || form.teacher
   const academicTermId = getSelectedTermId() || undefined
+  const originalTeacher = form._oldTeacher || oldTableLabel
+  const changingTeacher = originalTeacher && form.teacher && originalTeacher !== form.teacher
+  if (changingTeacher) {
+    return {
+      tableLabel: oldTableLabel,
+      recurringAssignment: true,
+      originalTeacher,
+      subject: form.subject,
+      year: form._oldYear || form.year,
+      sections: form.parallel
+        ? form.parallelSlots.map(slot => slot.section).filter(Boolean)
+        : [form._oldSection],
+      section: form._oldSection,
+      day: form._oldDay,
+      timeIn: form.timeIn,
+      timeOut: form.timeOut,
+      academicTermId,
+    }
+  }
   if (form._parallelGroupId) {
     return { tableLabel: oldTableLabel, parallelGroupId: form._parallelGroupId, academicTermId }
   }
@@ -2598,6 +2692,12 @@ async function applyRouteContext() {
 
 function isEntryBeingEdited(entry) {
   const old = buildOldDescriptor()
+  if (old.recurringAssignment) {
+    return (entry.teacher === old.originalTeacher || entry.teacher === form.teacher)
+      && entry.subject === old.subject
+      && entry.year === old.year
+      && old.sections.includes(entry.section)
+  }
   if (old.parallelGroupId) {
     return entry.tableLabel === old.tableLabel && entry.parallelGroupId === old.parallelGroupId
   }
@@ -2658,14 +2758,96 @@ async function saveEntry() {
   } catch (error) { await showScheduleError(error) }
 }
 
+function recurringAssignmentEntries(old) {
+  return Object.values(entries).filter(entry =>
+    entry.entryType !== 'lunch'
+    && (entry.teacher === old.originalTeacher || entry.teacher === form.teacher)
+    && entry.subject === old.subject
+    && entry.year === old.year
+    && old.sections.includes(entry.section)
+  )
+}
+
+async function replaceRecurringAssignment(payload, old) {
+  const targets = recurringAssignmentEntries(old)
+  const groups = new Map()
+  targets.forEach(entry => {
+    const key = entry.parallel
+      ? `parallel:${entry.parallelGroupId || `${entry.day}|${entry.timeIn}|${entry.timeOut}`}`
+      : `single:${entry.day}|${entry.timeIn}|${entry.timeOut}|${entry.section}|${entry.roomType || 'Lecture'}`
+    if (!groups.has(key)) groups.set(key, entry)
+  })
+
+  const replacements = Array.from(groups.values()).map(target => {
+    const next = {
+      ...payload,
+      day: target.day,
+      timeIn: target.timeIn,
+      timeOut: target.timeOut,
+      parallel: Boolean(target.parallel),
+      parallelCount: target.parallel ? target.parallelCount : 1,
+    }
+    if (target.parallel) {
+      next.parallelSlots = target.parallelSlots
+    } else {
+      next.section = target.section
+      next.room = target.room
+      next.roomType = target.roomType || 'Lecture'
+    }
+    return { target, next }
+  })
+
+  const isReplacementTarget = (_key, entry) => replacements.some(({ target }) => {
+    if (target.id && entry.id && target.id === entry.id) return true
+    if (target.parallelGroupId && entry.parallelGroupId) {
+      return target.tableLabel === entry.tableLabel && target.parallelGroupId === entry.parallelGroupId
+    }
+    return target.tableLabel === entry.tableLabel
+      && target.day === entry.day
+      && target.timeIn === entry.timeIn
+      && target.timeOut === entry.timeOut
+      && target.section === entry.section
+      && target.room === entry.room
+  })
+  const conflicts = replacements.flatMap(({ next }) => checkScheduleConflict(next, isReplacementTarget))
+  if (conflicts.length) {
+    await showConflictDialog(conflicts)
+    return false
+  }
+
+  for (const { target, next } of replacements) {
+    const legacyOld = target.parallel && target.parallelGroupId
+      ? { tableLabel: target.tableLabel, parallelGroupId: target.parallelGroupId, academicTermId: old.academicTermId }
+      : {
+        tableLabel: target.tableLabel,
+        section: target.section,
+        day: target.day,
+        timeIn: target.timeIn,
+        timeOut: target.timeOut,
+        academicTermId: old.academicTermId,
+      }
+    await apiRequest('/schedules/replace', {
+      method: 'POST',
+      body: JSON.stringify({ old: legacyOld, next }),
+    })
+  }
+  return true
+}
+
 async function proceedWithSave(payload) {
   try {
     if (editMode.value && form._oldDay) payload.day = form._oldDay
     if (editMode.value) {
-      await apiRequest('/schedules/replace', {
-        method: 'POST',
-        body: JSON.stringify({ old: buildOldDescriptor(), next: payload }),
-      })
+      const old = buildOldDescriptor()
+      if (old.recurringAssignment) {
+        const replaced = await replaceRecurringAssignment(payload, old)
+        if (!replaced) return
+      } else {
+        await apiRequest('/schedules/replace', {
+          method: 'POST',
+          body: JSON.stringify({ old, next: payload }),
+        })
+      }
     } else {
       await apiRequest('/schedules', { method: 'POST', body: JSON.stringify(payload) })
     }
@@ -2775,9 +2957,17 @@ const addFormValid = computed(() =>
   addForm.day && addForm.timeIn && addForm.timeOut &&
   addForm.teacher && addForm.subject && !addTimeError.value
 )
+const addFormUnits = computed(() => {
+  return scheduleWorkload([
+    ...Object.values(entries),
+    ...workloadEntriesForSource(addForm),
+  ]).units
+})
+const addFormWithinUnitLimit = computed(() => isGenericTeacher(addForm.teacher) || addFormUnits.value <= 30)
 
 async function addEntry() {
   if (!addFormValid.value) return
+  if (!addFormWithinUnitLimit.value) return
   if (addForm.parallel && addForm.parallelSlots.every(ps => !ps.section)) return
   try {
     const payload = buildSchedulePayload(addForm)
@@ -3569,6 +3759,7 @@ onMounted(async () => {
 .free-time-cell .click-to-add { color: #6d28d9; }
 .color-green  { background: #1f6b45; color: #fff; }
 .color-yellow { background: #e9c46a; color: #5a3e00; }
+.color-pink   { background: #e9a8c1; color: #5a1732; }
 .color-orange { background: #f4a261; color: #5a2d00; }
 .color-blue   { background: #4a90d9; color: #fff; }
 .color-gray   { background: #626c76; color: #ffffff; }
