@@ -9,6 +9,7 @@ const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins } = require("../utils/adminNotification");
 
 const YEAR_VALUES = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
+const MAX_TEACHER_UNITS = 30;
 const DAY_VALUES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 let ensureDefaultsPromise = null;
 
@@ -74,6 +75,45 @@ function colorForSchedule(room, subject) {
   return /(\b406\b|\b407\b|\b408\b|\b409\b|comlab|\bcl\b)/i.test(normalizedRoom)
     ? "color-green"
     : "color-yellow";
+}
+
+function isGenericTeacher(teacher) {
+  return normalizeString(teacher).toLowerCase() === "cit faculty";
+}
+
+function workloadForEntries(entries) {
+  const groups = new Map();
+  entries.forEach((entry, index) => {
+    const sections = entry.parallel
+      ? ((entry.parallelSlots || []).map((slot) => normalizeString(slot?.section)).filter(Boolean).sort().join(",") || normalizeString(entry.parallelGroupId))
+      : normalizeString(entry.section);
+    const key = `${normalizeString(entry.teacher)}|${normalizeString(entry.year)}|${normalizeString(entry.subject)}|${entry.parallel ? "parallel" : "single"}|${sections || index}`;
+    const group = groups.get(key) || { entries: [], parallel: Boolean(entry.parallel) };
+    group.entries.push(entry);
+    groups.set(key, group);
+  });
+
+  return Array.from(groups.values()).reduce((total, group) => {
+    const first = group.entries[0];
+    const sectionCount = group.parallel ? Math.max(2, Number(first.parallelCount) || group.entries.length) : 1;
+    const hasLab = group.entries.some(entry => entry.roomType === "Comlab/Laboratory");
+    return total + (group.parallel ? (sectionCount + 1) * (hasLab ? 2.5 : 1.5) : (hasLab ? 5 : 3));
+  }, 0);
+}
+
+async function assertTeacherUnitLimit(docs, academicTermId, excludedIds = []) {
+  const teacher = normalizeString(docs[0]?.teacher);
+  if (!teacher || isGenericTeacher(teacher) || docs[0]?.entryType === "lunch") return;
+
+  const filter = { teacher, entryType: "class", academicTermId: academicTermId || null };
+  if (excludedIds.length) filter._id = { $nin: excludedIds };
+  const existing = await ScheduleEntry.find(filter)
+    .select("_id teacher entryType parallel parallelGroupId parallelCount roomType timeInMinutes timeOutMinutes")
+    .lean();
+  const units = workloadForEntries(existing.concat(docs));
+  if (units > MAX_TEACHER_UNITS) {
+    throw new Error(`Teacher workload cannot exceed ${MAX_TEACHER_UNITS} units.`);
+  }
 }
 
 function toClientTable(table) {
@@ -247,7 +287,7 @@ function buildEntryDocs(payload, academicTermId = null) {
       parallelGroupId,
       parallelCount,
       parallelSlots: slots,
-      color: slot.roomType === "Comlab/Laboratory" ? "color-green" : colorForSchedule("", subject),
+      color: isGenericTeacher(teacher) ? "color-pink" : (slot.roomType === "Comlab/Laboratory" ? "color-green" : colorForSchedule("", subject)),
       academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
       addedAt,
     }));
@@ -282,7 +322,7 @@ function buildEntryDocs(payload, academicTermId = null) {
       parallelGroupId: null,
       parallelCount: 1,
       parallelSlots: [],
-      color: roomType === "Comlab/Laboratory" ? "color-green" : colorForSchedule("", subject),
+      color: isGenericTeacher(teacher) ? "color-pink" : (roomType === "Comlab/Laboratory" ? "color-green" : colorForSchedule("", subject)),
       academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
       addedAt,
     },
@@ -342,6 +382,24 @@ function getDescriptorFilter(oldDescriptor) {
 
   const academicTermId = resolveAcademicTermReference(oldDescriptor?.academicTermId);
   const termFilter = academicTermId ? { academicTermId } : {};
+  if (oldDescriptor?.recurringAssignment) {
+    const subject = normalizeString(oldDescriptor?.subject);
+    const year = normalizeString(oldDescriptor?.year);
+    const sections = Array.isArray(oldDescriptor?.sections)
+      ? oldDescriptor.sections.map(normalizeString).filter(Boolean)
+      : [];
+    if (!subject || !year || !sections.length) {
+      throw new Error("Missing recurring schedule descriptor.");
+    }
+    return {
+      teacher: normalizeString(oldDescriptor?.originalTeacher) || "CIT Faculty",
+      entryType: "class",
+      subject,
+      year,
+      section: { $in: sections },
+      ...termFilter,
+    };
+  }
   const parallelGroupId = normalizeString(oldDescriptor?.parallelGroupId);
   if (parallelGroupId) {
     return {
@@ -378,6 +436,51 @@ async function getExcludedIds(oldDescriptor) {
   const filter = getDescriptorFilter(oldDescriptor);
   const existing = await ScheduleEntry.find(filter).select("_id");
   return existing.map((entry) => entry._id);
+}
+
+async function buildRecurringReplacementDocs(oldDescriptor, next, academicTermId) {
+  const matching = await ScheduleEntry.find(getDescriptorFilter(oldDescriptor))
+    .sort({ day: 1, timeInMinutes: 1, section: 1 })
+    .lean();
+  if (!matching.length) {
+    throw new Error("No matching recurring schedule found.");
+  }
+
+  const parallel = matching.some(entry => entry.parallel);
+  if (!parallel) {
+    return matching.map(entry => buildEntryDocs({
+      ...next,
+      parallel: false,
+      day: entry.day,
+      timeIn: entry.timeIn,
+      timeOut: entry.timeOut,
+      section: entry.section,
+      room: entry.room,
+      roomType: entry.roomType,
+    }, academicTermId)[0]);
+  }
+
+  const byMeeting = new Map();
+  matching.forEach(entry => {
+    const key = `${entry.day}|${entry.timeIn}|${entry.timeOut}`;
+    const meeting = byMeeting.get(key) || [];
+    meeting.push(entry);
+    byMeeting.set(key, meeting);
+  });
+
+  return Array.from(byMeeting.values()).flatMap(meeting => buildEntryDocs({
+    ...next,
+    parallel: true,
+    parallelCount: meeting[0].parallelCount || next.parallelCount,
+    day: meeting[0].day,
+    timeIn: meeting[0].timeIn,
+    timeOut: meeting[0].timeOut,
+    parallelSlots: meeting.map(entry => ({
+      section: entry.section,
+      room: entry.room,
+      roomType: entry.roomType,
+    })),
+  }, academicTermId));
 }
 
 async function findConflict(doc, excludedIds = []) {
@@ -588,6 +691,7 @@ async function createSchedule(req, res) {
     const academicTermId = resolveAcademicTermReference(payload?.academicTermId) || await getActiveAcademicTermReference();
     const isLunchBreak = normalizeString(payload.entryType).toLowerCase() === "lunch";
     const docs = isLunchBreak ? [buildLunchBreakDoc(payload, academicTermId)] : buildEntryDocs(payload, academicTermId);
+    await assertTeacherUnitLimit(docs, academicTermId);
     await ensureTableExists(docs[0].tableLabel);
 
     for (const doc of docs) {
@@ -641,7 +745,9 @@ async function createSchedule(req, res) {
       error.message.startsWith("Missing") ||
       error.message.includes("required") ||
       error.message.includes("Time Out") ||
-      error.message.includes("parallel schedule")
+      error.message.includes("parallel schedule") ||
+      error.message.includes("recurring schedule") ||
+      error.message.includes("cannot exceed")
     )) {
       return res.status(400).json({ message: error.message });
     }
@@ -781,10 +887,13 @@ async function replaceSchedule(req, res) {
     }
 
     const academicTermId = resolveAcademicTermReference(next?.academicTermId) || await getActiveAcademicTermReference();
-    const docs = buildEntryDocs(next, academicTermId);
+    const excludedIds = await getExcludedIds(oldDescriptor);
+    const docs = oldDescriptor.recurringAssignment
+      ? await buildRecurringReplacementDocs(oldDescriptor, next, academicTermId)
+      : buildEntryDocs(next, academicTermId);
+    await assertTeacherUnitLimit(docs, academicTermId, excludedIds);
     await ensureTableExists(docs[0].tableLabel);
 
-    const excludedIds = await getExcludedIds(oldDescriptor);
     for (const doc of docs) {
       const conflictMessage = await findConflict(docForConflictCheck(doc), excludedIds);
       if (conflictMessage) {
@@ -832,7 +941,9 @@ async function replaceSchedule(req, res) {
       error.message.startsWith("Missing") ||
       error.message.includes("required") ||
       error.message.includes("Time Out") ||
-      error.message.includes("parallel schedule")
+      error.message.includes("parallel schedule") ||
+      error.message.includes("recurring schedule") ||
+      error.message.includes("cannot exceed")
     )) {
       return res.status(400).json({ message: error.message });
     }
