@@ -52,11 +52,11 @@
           <div class="teacher-footer">
             <span class="price">&nbsp;</span>
             <button
-              :class="['action-btn', t.available ? 'green' : 'disabled']"
-              :disabled="!t.available"
+              :class="['action-btn', t.available && t.hasConsultationSlots ? 'green' : 'disabled']"
+              :disabled="!t.available || !t.hasConsultationSlots"
               @click="openRequest(t)"
             >
-              {{ t.available ? 'Book Consultation' : 'Request Consultation' }}
+              {{ !t.hasConsultationSlots && t.available ? 'No consultation hours' : (t.available ? 'Book Consultation' : 'Request Consultation') }}
             </button>
           </div>
         </div>
@@ -81,11 +81,11 @@
           <div class="teacher-footer">
             <span class="price">&nbsp;</span>
             <button
-              :class="['action-btn', t.available ? 'green' : 'disabled']"
-              :disabled="!t.available"
+              :class="['action-btn', t.available && t.hasConsultationSlots ? 'green' : 'disabled']"
+              :disabled="!t.available || !t.hasConsultationSlots"
               @click="openRequest(t)"
             >
-              {{ t.available ? 'Book Consultation' : 'Request Consultation' }}
+              {{ !t.hasConsultationSlots && t.available ? 'No consultation hours' : (t.available ? 'Book Consultation' : 'Request Consultation') }}
             </button>
           </div>
         </div>
@@ -369,9 +369,9 @@ function mapTeacher(teacher) {
     ? [...new Set(studentSubjects.length ? studentSubjects : matchedSubjects)]
     : subjects
 
-  const isStatusAvailable = ['In School'].includes(resolvedStatus)
+  const isStatusAvailable = resolvedStatus !== 'On Leave'
   const hasSlots = consultationSlots.length > 0
-  const isAvailable = hasSlots && teacherAvailability !== 'Unavailable' && isStatusAvailable
+  const isAvailable = hasSlots && teacherAvailability.toLowerCase() !== 'unavailable' && isStatusAvailable
 
   return {
     id: teacher.id,
@@ -381,7 +381,8 @@ function mapTeacher(teacher) {
     initials: initialsFor(teacher.name),
     color: colorForName(teacher.name),
     status: resolvedStatus,
-    available: subjectTeacherMatch ? hasSlots : isAvailable,
+    available: isStatusAvailable && teacherAvailability.toLowerCase() !== 'unavailable',
+    hasConsultationSlots: hasSlots,
     tags: resolvedSubjects.slice(0, 3),
     subjectList: resolvedSubjects,
     assignedYearSections,

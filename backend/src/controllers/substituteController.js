@@ -330,7 +330,7 @@ async function createAssignment(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Assigned substitute teacher ${substituteTeacher} for ${originalTeacher} on ${date}`,
+      action: `Substituted a class for ${originalTeacher}: assigned ${substituteTeacher} on ${date}`,
       path: req.originalUrl || "/api/substitutions",
       method: req.method,
       req,

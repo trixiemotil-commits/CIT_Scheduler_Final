@@ -171,6 +171,10 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v15H4zM4 9h16M8 3v4M16 3v4M12 12v5M9.5 14.5h5"/></svg>
                 <span>Add schedule</span>
               </button>
+              <button class="excel-btn" title="Download all schedules for this term" @click="downloadTermExcel(term)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/></svg>
+                <span>Download Excel</span>
+              </button>
               <button class="edit-btn" title="Edit this term's details" @click="openTermModal(term)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-.7L19 7.8 16.2 5 4.7 16.5 4 20Z"/></svg>
                 <span>Edit details</span>
@@ -430,6 +434,176 @@ async function chooseWorkspaceMode(mode) {
     await Swal.fire({ icon: 'error', title: 'Unable to load schedules', text: error.message })
   } finally { workspaceLoading.value = false }
 }
+
+async function downloadTermExcel(term) {
+  const academicTermId = termId(term)
+  if (!academicTermId) return
+
+  const colors = {
+    'color-green': { fill: '1F6B45', font: 'FFFFFF' },
+    'color-yellow': { fill: 'E9C46A', font: '5A3E00' },
+    'color-orange': { fill: 'F4A261', font: '5A2D00' },
+    'color-blue': { fill: '4A90D9', font: 'FFFFFF' },
+    'color-gray': { fill: '626C76', font: 'FFFFFF' },
+    'color-purple': { fill: '7B5EA7', font: 'FFFFFF' },
+    'color-red': { fill: 'E63946', font: 'FFFFFF' },
+  }
+  const columns = ['Name', 'Day', 'Start', 'End', 'Subject', 'Year', 'Section', 'Room', 'Type']
+  const dayOrder = Object.fromEntries(weekdays.map((day, index) => [day, index]))
+
+  try {
+    Swal.fire({ title: 'Preparing Excel file', text: 'Loading this term\'s schedules…', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() })
+    const XLSX = await import('xlsx-js-style')
+    const response = await apiRequest(`/schedules?academicTermId=${encodeURIComponent(academicTermId)}`)
+    const entries = Array.isArray(response.entries) ? response.entries : []
+    const sortEntries = (first, second) => (dayOrder[first.day] ?? 99) - (dayOrder[second.day] ?? 99) || String(first.timeIn || '').localeCompare(String(second.timeIn || '')) || String(first.subject || '').localeCompare(String(second.subject || ''))
+    const masterColumns = ['Faculty', 'Room', 'Year', 'Section', 'Day', 'Start', 'End', 'Subject', 'Type']
+    const exportFormula = (sheetName, column, sourceRow) => {
+      const source = "'Schedule Data'!"
+      if (column === 'Name') {
+        if (sheetName === 'Room') return `${source}B${sourceRow}`
+        if (sheetName === 'Faculty') return `${source}A${sourceRow}`
+        return `IF(AND(${source}C${sourceRow}<>"",${source}D${sourceRow}<>""),${source}C${sourceRow}&" · "&${source}D${sourceRow},IF(${source}C${sourceRow}<>"",${source}C${sourceRow},IF(${source}D${sourceRow}<>"",${source}D${sourceRow},"Unassigned group")))`
+      }
+      const sourceColumn = { Day: 'E', Start: 'F', End: 'G', Subject: 'H', Year: 'C', Section: 'D', Room: 'B', Type: 'I' }[column]
+      return `${source}${sourceColumn}${sourceRow}`
+    }
+    const masterRows = entries.map(entry => ({
+      Faculty: entry.teacher || '',
+      Room: entry.room || '',
+      Year: entry.year || '',
+      Section: entry.section || '',
+      Day: entry.day || '',
+      Start: entry.timeIn || '',
+      End: entry.timeOut || '',
+      Subject: entry.subject || (entry.entryType === 'lunch' ? 'Lunch Break' : ''),
+      Type: (() => {
+        const type = String(entry.entryType || 'class').trim()
+        return type.charAt(0).toUpperCase() + type.slice(1)
+      })(),
+      _color: colors[entry.color] || colors['color-yellow'],
+    }))
+    const rowFor = (nameKey) => entries
+      .slice()
+      .sort(sortEntries)
+      .map(entry => ({
+        Name: nameKey(entry),
+        Day: entry.day || '',
+        Start: entry.timeIn || '',
+        End: entry.timeOut || '',
+        Subject: entry.subject || (entry.entryType === 'lunch' ? 'Lunch Break' : ''),
+        Year: entry.year || '',
+        Section: entry.section || '',
+        Room: entry.room || '',
+        Type: (() => {
+          const type = String(entry.entryType || 'class').trim()
+          return type.charAt(0).toUpperCase() + type.slice(1)
+        })(),
+        _color: colors[entry.color] || colors['color-yellow'],
+        _sourceRow: entries.indexOf(entry) + 2,
+      }))
+
+    const sheetDefinitions = [
+      { name: 'Room', nameKey: entry => entry.room || 'Unassigned room' },
+      { name: 'Student', nameKey: entry => [entry.year, entry.section].filter(Boolean).join(' · ') || 'Unassigned group' },
+      { name: 'Faculty', nameKey: entry => entry.teacher || 'Unassigned faculty' },
+    ]
+    const workbook = XLSX.utils.book_new()
+    workbook.Workbook = { CalcPr: { calcMode: 'auto', fullCalcOnLoad: true, forceFullCalc: true } }
+    const masterSheet = XLSX.utils.json_to_sheet(masterRows, { header: masterColumns })
+    const masterHeaderStyle = { fill: { fgColor: { rgb: '354653' } }, font: { bold: true, color: { rgb: 'FFFFFF' } }, alignment: { horizontal: 'center' } }
+    masterColumns.forEach((_, columnIndex) => {
+      const cell = XLSX.utils.encode_cell({ r: 0, c: columnIndex })
+      if (masterSheet[cell]) masterSheet[cell].s = masterHeaderStyle
+    })
+    masterRows.forEach((row, rowIndex) => {
+      const style = { fill: { fgColor: { rgb: row._color.fill } }, font: { color: { rgb: row._color.font } } }
+      masterColumns.forEach((_, columnIndex) => {
+        const cell = XLSX.utils.encode_cell({ r: rowIndex + 1, c: columnIndex })
+        if (masterSheet[cell]) masterSheet[cell].s = style
+      })
+    })
+    masterSheet['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 13 }, { wch: 18 }, { wch: 13 }, { wch: 11 }, { wch: 11 }, { wch: 30 }, { wch: 12 }]
+    masterSheet['!freeze'] = { xSplit: 0, ySplit: 1 }
+    XLSX.utils.book_append_sheet(workbook, masterSheet, 'Schedule Data')
+    const legendRows = [
+      ['Color', 'Meaning'],
+      ['Green', 'Laboratory'],
+      ['Yellow', 'Lecture'],
+      ['Orange', 'Main Campus'],
+      ['Blue', 'Consultation'],
+      ['Gray', 'Lunch'],
+      ['Purple', 'Other schedule'],
+      ['Red', 'Other schedule'],
+    ]
+    const legendSheet = XLSX.utils.aoa_to_sheet(legendRows)
+    legendSheet['!cols'] = [{ wch: 16 }, { wch: 24 }]
+    legendRows.forEach((row, rowIndex) => {
+      const colorKey = rowIndex === 0 ? null : `color-${row[0].toLowerCase()}`
+      const color = colorKey ? colors[colorKey] : null
+      for (let columnIndex = 0; columnIndex < row.length; columnIndex++) {
+        const cell = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex })
+        if (legendSheet[cell]) legendSheet[cell].s = rowIndex === 0
+          ? masterHeaderStyle
+          : { fill: { fgColor: { rgb: color?.fill || 'FFFFFF' } }, font: { color: { rgb: color?.font || '000000' } } }
+      }
+    })
+    XLSX.utils.book_append_sheet(workbook, legendSheet, 'Legend')
+    const headerStyle = { fill: { fgColor: { rgb: '354653' } }, font: { bold: true, color: { rgb: 'FFFFFF' } }, alignment: { horizontal: 'center' } }
+    const titleStyle = { fill: { fgColor: { rgb: '1F6B45' } }, font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 13 }, alignment: { horizontal: 'left' } }
+    sheetDefinitions.forEach(({ name, nameKey }) => {
+      const groups = new Map()
+      rowFor(nameKey).forEach(row => {
+        if (!groups.has(row.Name)) groups.set(row.Name, [])
+        groups.get(row.Name).push(row)
+      })
+      const matrix = []
+      const titleRows = []
+      const headerRows = []
+      const dataRows = []
+      groups.forEach((rows, groupName) => {
+        titleRows.push(matrix.length)
+        matrix.push([`${name} schedule: ${groupName}`])
+        headerRows.push(matrix.length)
+        matrix.push(columns)
+        rows.forEach(row => {
+          dataRows.push({ rowIndex: matrix.length, color: row._color })
+          matrix.push(columns.map(column => ({ f: exportFormula(name, column, row._sourceRow) })))
+        })
+        matrix.push([])
+      })
+      if (!matrix.length) matrix.push([`No schedules found for this term.`])
+      const sheet = XLSX.utils.aoa_to_sheet(matrix)
+      titleRows.forEach(rowIndex => {
+        sheet['!merges'] = sheet['!merges'] || []
+        sheet['!merges'].push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: columns.length - 1 } })
+        const cell = XLSX.utils.encode_cell({ r: rowIndex, c: 0 })
+        if (sheet[cell]) sheet[cell].s = titleStyle
+      })
+      headerRows.forEach(rowIndex => columns.forEach((_, columnIndex) => {
+        const cell = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex })
+        if (sheet[cell]) sheet[cell].s = headerStyle
+      }))
+      dataRows.forEach(({ rowIndex, color }) => {
+        const style = { fill: { fgColor: { rgb: color.fill } }, font: { color: { rgb: color.font } } }
+        columns.forEach((_, columnIndex) => {
+          const cell = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex })
+          if (sheet[cell]) sheet[cell].s = style
+        })
+      })
+      sheet['!cols'] = [{ wch: 24 }, { wch: 13 }, { wch: 11 }, { wch: 11 }, { wch: 30 }, { wch: 13 }, { wch: 18 }, { wch: 18 }, { wch: 12 }]
+      XLSX.utils.book_append_sheet(workbook, sheet, name)
+    })
+
+    const safeTermLabel = termLabel(term).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()
+    XLSX.writeFile(workbook, `schedules-${safeTermLabel || 'academic-term'}.xlsx`)
+    Swal.close()
+  } catch (error) {
+    Swal.close()
+    await Swal.fire({ icon: 'error', title: 'Unable to download schedules', text: error.message })
+  }
+}
+
 function openSchedule(target) {
   const query = {
     academicTermId: termId(workspaceTerm.value),
@@ -540,6 +714,7 @@ loadPage()
 .term-actions .view-btn { color: #fff; border-color: #354653; background: #354653; }
 .term-actions .view-btn:hover:not(:disabled) { color: #fff; background: #263744; }
 .term-actions .add-btn { color: #315e47; border-color: #bed4c8; background: #edf7f1; }
+.term-actions .excel-btn { color: #176a94; border-color: #b9d7e6; background: #eaf6fc; }
 .term-actions .publish-btn { color: #176a94; border-color: #b9d7e6; background: #eaf6fc; }
 .term-actions .publish-btn:disabled { color: #668176; border-color: #cfddd5; background: #e7f1eb; opacity: 1; }
 .empty-state { border: 1px dashed #ccd4d9; border-radius: 14px; background: #f8fafb; }

@@ -148,6 +148,10 @@ async function createUser(req, res) {
     const normalizedEmployeeId = normalizeString(employeeId);
     const normalizedStudentId = normalizeString(studentId);
 
+    if (normalizedEmployeeId && normalizedRoles.includes("teacher") && !/^AU\d{4}-\d{5}$/.test(normalizedEmployeeId)) {
+      return res.status(400).json({ message: "Employee ID must use the format AU2025-00000 with five digits after the hyphen." });
+    }
+
     if (!isValidPhinmaEmail(normalizedEmail)) {
       return res.status(400).json({ message: "Email must end with .au@phinmaed.com." });
     }
@@ -200,7 +204,7 @@ async function createUser(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Created ${normalizedRoles.join(" & ")} account for ${user.firstName} ${user.lastName}`,
+      action: `Added ${normalizedRoles.join(" & ")} user ${user.firstName} ${user.lastName}`,
       path: req.originalUrl || "/api/users",
       method: req.method,
       req,
@@ -261,6 +265,10 @@ async function updateUser(req, res) {
     const normalizedEmployeeId = normalizeString(employeeId);
     const normalizedStudentId = normalizeString(studentId);
 
+    if (normalizedEmployeeId && normalizedRoles.includes("teacher") && !/^AU\d{4}-\d{5}$/.test(normalizedEmployeeId)) {
+      return res.status(400).json({ message: "Employee ID must use the format AU2025-00000 with five digits after the hyphen." });
+    }
+
     if (!isValidPhinmaEmail(normalizedEmail)) {
       return res.status(400).json({ message: "Email must end with .au@phinmaed.com." });
     }
@@ -269,6 +277,7 @@ async function updateUser(req, res) {
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
+    const previousTeacherStatus = user.teacher_status;
 
     const emailOwner = await User.findOne({ email: normalizedEmail });
     if (emailOwner && emailOwner.id !== id) {
@@ -328,7 +337,9 @@ async function updateUser(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Updated ${normalizedRoles.join(" & ")} account for ${user.firstName} ${user.lastName}`,
+      action: normalizedRoles.includes("teacher") && String(previousTeacherStatus || "") !== String(user.teacher_status || "")
+        ? `Teacher ${user.firstName} ${user.lastName} is ${user.teacher_status}`
+        : `Updated ${normalizedRoles.join(" & ")} account for ${user.firstName} ${user.lastName}`,
       path: req.originalUrl || `/api/users/${id}`,
       method: req.method,
       req,
@@ -376,7 +387,11 @@ async function updateUserStatus(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Changed ${user.firstName} ${user.lastName} account status to ${nextStatus}`,
+      action: nextStatus === "Archived"
+        ? `Archived user ${user.firstName} ${user.lastName}`
+        : nextStatus === "Active"
+          ? `Approved user ${user.firstName} ${user.lastName}`
+          : `Changed status to ${nextStatus}: user ${user.firstName} ${user.lastName}`,
       path: req.originalUrl || `/api/users/${id}/status`,
       method: req.method,
       req,
@@ -411,7 +426,7 @@ async function approveAllPendingUsers(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Approved all pending user accounts (${result.modifiedCount || 0} updated)`,
+      action: `Approved ${result.modifiedCount || 0} pending user account(s)`,
       path: req.originalUrl || "/api/users/approve-pending",
       method: req.method,
       req,

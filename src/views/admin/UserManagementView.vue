@@ -791,6 +791,13 @@ function formatEmployeeIdValue(value) {
   return `AU${digits.slice(0, 4)}${digits.length > 4 ? `-${digits.slice(4, 9)}` : ''}`
 }
 
+function normalizeLegacyEmployeeId(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 9)
+  if (!digits) return ''
+  const normalized = digits.length === 8 ? `${digits.slice(0, 4)}0${digits.slice(4)}` : digits
+  return `AU${normalized.slice(0, 4)}-${normalized.slice(4, 9)}`
+}
+
 function mapUserForUi(user) {
   const firstName = user.firstName || ''
   const lastName  = user.lastName || ''
@@ -807,7 +814,7 @@ function mapUserForUi(user) {
     status: user.status || 'Active',
     dateAdded: formatDisplayDate(user.dateAdded || user.createdAt),
     avatar: user.avatar || fallbackAvatar(name),
-    schoolId: user.employeeId ? formatEmployeeIdValue(user.employeeId) : formatSchoolIdValue(user.schoolId || user.studentId),
+    schoolId: user.employeeId ? normalizeLegacyEmployeeId(user.employeeId) : formatSchoolIdValue(user.schoolId || user.studentId),
     phone: user.phone || '',
     studentId: user.studentId || '',
     employeeId: user.employeeId || '',

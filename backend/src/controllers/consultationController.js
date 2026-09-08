@@ -217,8 +217,8 @@ function slotDurationMinutes(startTime, endTime) {
   return e - s;
 }
 
-// Returns a conflict message if the teacher has a regular class scheduled that overlaps the proposed consultation
-async function checkClassConflict(teacher, dayOfWeek, startTime, endTime, academicTermId = null) {
+// Returns a conflict message if the teacher has a class during or immediately after the proposed consultation.
+async function checkClassConflict(teacher, dayOfWeek, startTime, endTime, academicTermId = null, includeAdjacent = false) {
   const newStart = parseTimeToMinutes(startTime);
   const newEnd   = parseTimeToMinutes(endTime);
   if (newStart === null || newEnd === null) return null;
@@ -232,9 +232,9 @@ async function checkClassConflict(teacher, dayOfWeek, startTime, endTime, academ
     const entryStart = entry.timeInMinutes  ?? parseTimeToMinutes(entry.timeIn);
     const entryEnd   = entry.timeOutMinutes ?? parseTimeToMinutes(entry.timeOut);
     if (entryStart === null || entryEnd === null) continue;
-    // Overlap: newStart < entryEnd AND newEnd > entryStart
-    if (newStart < entryEnd && newEnd > entryStart) {
-      return `${teacher} already has a class scheduled on ${dayOfWeek} from ${entry.timeIn} to ${entry.timeOut} (${entry.subject}). Consultation cannot overlap with a scheduled class.`;
+    // Block overlap and a class that starts exactly when consultation ends.
+    if ((newStart < entryEnd && newEnd > entryStart) || (includeAdjacent && entryStart === newEnd)) {
+      return `${teacher} has a class on ${dayOfWeek} from ${entry.timeIn} to ${entry.timeOut}${entry.subject ? ` (${entry.subject})` : ''}. Please select another consultation time.`;
     }
   }
   return null;
@@ -446,7 +446,9 @@ async function listTeachersForStudents(req, res) {
           .filter(Boolean);
         const uniqueStudentSubjects = [...new Set(studentSubjects)];
         const isSubjectTeacher = uniqueStudentSubjects.length > 0;
-        const canAcceptRequests = status !== "On Leave" && teacherUser.teacher_availability !== "Unavailable" && availabilitySlots.length > 0
+        const canAcceptRequests = String(status || '').toLowerCase() !== "on leave"
+          && String(teacherUser.teacher_availability || '').toLowerCase() !== "unavailable"
+          && availabilitySlots.length > 0
 
         return {
           id: teacherUser._id.toString(),
@@ -517,16 +519,10 @@ async function createConsultationRequest(req, res) {
       studentContext.section
     );
 
-    if (!isSubjectTeacher) {
-      if (teacherStatus === "On Leave") {
-        return res.status(409).json({
-          message: `${teacherName} can only accept consultation requests while available. Current status: ${teacherStatus}.`,
-        });
-      }
-
-      if (teacherUser.teacher_availability === "Unavailable") {
-        return res.status(409).json({ message: `${teacherName} is not accepting consultation requests at the moment.` });
-      }
+    if (teacherStatus === "On Leave" || teacherUser.teacher_availability === "Unavailable") {
+      return res.status(409).json({
+        message: `${teacherName} is not open for consultation right now. Please select another teacher.`,
+      });
     }
 
     const lookupKeys = [teacherUser.employeeId, teacherName].filter(Boolean);
@@ -578,6 +574,18 @@ async function createConsultationRequest(req, res) {
 
     if (!consultationDate || Number.isNaN(consultationDate.getTime()) || requestMinutes === null) {
       return res.status(400).json({ message: "Selected consultation availability is invalid." });
+    }
+
+    const teacherClassConflict = await checkClassConflict(
+      teacherName,
+      matchedSlot.dayOfWeek,
+      matchedSlot.startTime,
+      matchedSlot.endTime,
+      matchedSlot.academicTermId,
+      true
+    );
+    if (teacherClassConflict) {
+      return res.status(409).json({ message: teacherClassConflict });
     }
 
     const requestDate = new Date();
@@ -804,16 +812,10 @@ async function updateConsultationRequestByStudent(req, res) {
       studentContext.section
     );
 
-    if (!isSubjectTeacher) {
-      if (teacherStatus === "On Leave") {
-        return res.status(409).json({
-          message: `${teacherName} can only accept consultation requests while available. Current status: ${teacherStatus}.`,
-        });
-      }
-
-      if (teacherUser.teacher_availability === "Unavailable") {
-        return res.status(409).json({ message: `${teacherName} is not accepting consultation requests at the moment.` });
-      }
+    if (teacherStatus === "On Leave" || teacherUser.teacher_availability === "Unavailable") {
+      return res.status(409).json({
+        message: `${teacherName} is not open for consultation right now. Please select another teacher.`,
+      });
     }
 
     const lookupKeys = [teacherUser.employeeId, teacherName].filter(Boolean);
@@ -832,6 +834,18 @@ async function updateConsultationRequestByStudent(req, res) {
     const consultationDate = nextDateForDay(matchedSlot.dayOfWeek, matchedSlot.startTime);
     if (!consultationDate || Number.isNaN(consultationDate.getTime())) {
       return res.status(400).json({ message: "Selected consultation availability is invalid." });
+    }
+
+    const teacherClassConflict = await checkClassConflict(
+      teacherName,
+      matchedSlot.dayOfWeek,
+      matchedSlot.startTime,
+      matchedSlot.endTime,
+      matchedSlot.academicTermId,
+      true
+    );
+    if (teacherClassConflict) {
+      return res.status(409).json({ message: teacherClassConflict });
     }
 
     const existingPending = await ConsultationRequest.findOne({
@@ -934,9 +948,17 @@ async function updateConsultationRequestStatus(req, res) {
       notes: logNotes,
     });
 
+    const consultationStatusLabels = {
+      PENDING: 'Requested',
+      APPROVED: 'Approved',
+      RESCHED: 'Rescheduled',
+      COMPLETED: 'Finished',
+      CANCELLED: 'Cancelled',
+      ARCHIVED: 'Archived',
+    };
     await logActivity({
       actor: req.user,
-      action: `${actorRole === "student" ? "Student" : "Teacher"} updated consultation request to ${nextStatus} for ${requestDoc.subject}`,
+      action: `${consultationStatusLabels[nextStatus] || nextStatus} consultation for ${requestDoc.subject || "request"}${statusNotes ? ` (${statusNotes})` : ''}`,
       path: req.originalUrl || `/api/consultations/requests/${req.params.id}/status`,
       method: req.method,
       req,

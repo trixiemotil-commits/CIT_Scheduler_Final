@@ -454,9 +454,12 @@ async function updateMe(req, res) {
 
     await user.save();
 
+    const teacherStatusChanged = isTeacher && String(prevTeacherStatus || '') !== String(user.teacher_status || '')
     await logActivity({
       actor: req.user,
-      action: `Updated profile details for ${user.firstName} ${user.lastName}`,
+      action: teacherStatusChanged
+        ? `Teacher ${user.firstName} ${user.lastName} is ${user.teacher_status}`
+        : `Updated profile details for ${user.firstName} ${user.lastName}`,
       path: req.originalUrl || "/api/auth/me",
       method: req.method,
       req,

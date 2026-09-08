@@ -4,6 +4,8 @@ const { getRequestIp, getDeviceDescription } = require("./requestMetadata");
 async function logActivity({ actor, action, path = "/", method = "POST", req = null }) {
   if (!actor) return null;
 
+  if (req) req.activityLogWritten = true;
+
   const actorId = actor.id || actor._id;
   const actorRole = String(actor.role || actor.roles?.[0] || "").trim().toLowerCase();
   if (!actorId || !actorRole) return null;

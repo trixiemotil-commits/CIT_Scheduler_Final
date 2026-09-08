@@ -114,7 +114,7 @@ async function createTerm(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Created academic term ${schoolYear} ${semester}`,
+      action: `Added term ${schoolYear} ${semester}`,
       path: req.originalUrl || "/api/academic-terms",
       method: req.method,
       req,
@@ -180,7 +180,7 @@ async function updateTerm(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Updated academic term ${term.schoolYear || ""} ${term.semester || ""}`.trim(),
+      action: `Edited term ${term.schoolYear || ""} ${term.semester || ""}`.trim(),
       path: req.originalUrl || "/api/academic-terms",
       method: req.method,
       req,
@@ -225,7 +225,7 @@ async function useTerm(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Set academic term ${target.schoolYear} ${target.semester} as in use`,
+      action: `Selected term ${target.schoolYear} ${target.semester}`,
       path: req.originalUrl || "/api/academic-terms/use",
       method: req.method,
       req,
@@ -270,7 +270,7 @@ async function publishTerm(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Published academic term ${target.schoolYear} ${target.semester}`,
+      action: `Published term ${target.schoolYear} ${target.semester}`,
       path: req.originalUrl || "/api/academic-terms/publish",
       method: req.method,
       req,
