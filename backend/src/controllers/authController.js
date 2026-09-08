@@ -380,8 +380,8 @@ async function updateMe(req, res) {
     }
 
     if (employeeId) {
-      if (!/^AU\d{4}-\d{5}$/.test(employeeId)) {
-        return res.status(400).json({ message: "Employee ID must use the format AU2025-00000." });
+      if (!/^AU\d{4}-\d{4,5}$/.test(employeeId)) {
+        return res.status(400).json({ message: "Employee ID must use the format AU2025-0000 or AU2025-00000." });
       }
       const idOwner = await User.findOne({ employeeId });
       if (idOwner && idOwner._id.toString() !== user._id.toString()) {

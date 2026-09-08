@@ -392,6 +392,14 @@
             </h2>
           </div>
           <div class="sched-topbar-right">
+            <div class="schedule-legend" aria-label="Schedule color legend">
+              <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
+              <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
+              <span><i class="legend-swatch legend-swatch--faculty"></i>CIT Faculty</span>
+              <span><i class="legend-swatch legend-swatch--lunch"></i>Lunch</span>
+              <span><i class="legend-swatch legend-swatch--consultation"></i>Consultation</span>
+              <span><i class="legend-swatch legend-swatch--main-campus"></i>Main Campus</span>
+            </div>
             <!-- Section filter (teacher mode only) -->
             <div v-if="addMode === 'teacher'" class="sched-select-wrap">
               <select class="sched-select" v-model="filterSection">
@@ -1533,7 +1541,7 @@ async function loadAddTeachers() {
     const res = await apiRequest('/users?role=teacher')
     if (res.users && Array.isArray(res.users)) {
       addTeacherList.value = res.users
-        .filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
+        .filter(u => (Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher') && String(u.account_status || 'Active') === 'Active')
         .map(u => {
           const name = `${u.firstName} ${u.lastName}`.trim()
           return {
@@ -3190,7 +3198,7 @@ onMounted(async () => {
     await ensureTermSelection()
     const response = await apiRequest('/users?role=teacher')
     if (response.users && Array.isArray(response.users)) {
-      const teachers = response.users.filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
+      const teachers = response.users.filter(u => (Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher') && String(u.account_status || 'Active') === 'Active')
       if (teachers.length > 0) {
         teacherOptions.value = teachers
           .map(u => `${u.firstName} ${u.lastName}`.trim())
@@ -4294,6 +4302,15 @@ onMounted(async () => {
   font-weight: 500;
 }
 .sched-topbar-right { padding: 4px; border: 1px solid #d3dade; border-radius: 11px; background: #eef1f2; }
+.schedule-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 11px; margin-right: 4px; color: #64717a; font-size: .66rem; font-weight: 650; white-space: nowrap; }
+.schedule-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend-swatch { width: 10px; height: 10px; display: inline-block; border-radius: 3px; }
+.legend-swatch--lecture { background: #e9c46a; }
+.legend-swatch--lab { background: #1f6b45; }
+.legend-swatch--faculty { background: #e9a8c1; }
+.legend-swatch--lunch { background: #626c76; }
+.legend-swatch--consultation { background: #4a90d9; }
+.legend-swatch--main-campus { background: #f4a261; }
 .sched-select { min-height: 38px; border-color: transparent; border-radius: 8px; background: transparent; color: #48545d; font-size: .72rem; font-weight: 600; }
 .sched-select:hover,.sched-select:focus { border-color: #bec7cc; background: #fff; }
 .icon-btn.consult-btn { width: 38px; height: 38px; border-radius: 8px; color: #fff; border-color: #3e4b55; background: linear-gradient(145deg,#62717b,#35434c); box-shadow: 0 3px 8px rgba(38,48,55,.17); }

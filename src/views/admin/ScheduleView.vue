@@ -1865,7 +1865,7 @@ onMounted(async () => {
     // Fetch teachers from database (role=teacher)
     const response = await apiRequest('/users?role=teacher')
     if (response.users && Array.isArray(response.users)) {
-      const teachers = response.users.filter(user => Array.isArray(user.roles) ? user.roles.includes('teacher') : user.role === 'Teacher')
+      const teachers = response.users.filter(user => (Array.isArray(user.roles) ? user.roles.includes('teacher') : user.role === 'Teacher') && String(user.account_status || 'Active') === 'Active')
       if (teachers.length > 0) {
         teacherOptions.value = teachers
           .map(user => `${user.firstName} ${user.lastName}`.trim())

@@ -589,7 +589,7 @@ async function loadEventTeachers() {
     const payload = await response.json()
     if (!response.ok) throw new Error(payload.message || 'Unable to load teachers.')
 
-    eventTeachers.value = (Array.isArray(payload.users) ? payload.users : []).map((teacher) => {
+    eventTeachers.value = (Array.isArray(payload.users) ? payload.users : []).filter((teacher) => String(teacher.account_status || 'Active') === 'Active').map((teacher) => {
       const name = `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || teacher.name || teacher.email || 'Teacher'
       return { id: teacher.id, name, initials: name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() }
     })

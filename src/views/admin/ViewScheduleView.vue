@@ -147,6 +147,14 @@
               <p class="sched-grid-sub">{{ selectedFloor }} &bull; Read-only view</p>
             </div>
             <div class="sched-topbar-right">
+              <div class="schedule-legend" aria-label="Schedule color legend">
+                <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
+                <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
+                <span><i class="legend-swatch legend-swatch--faculty"></i>CIT Faculty</span>
+                <span><i class="legend-swatch legend-swatch--lunch"></i>Lunch</span>
+                <span><i class="legend-swatch legend-swatch--consultation"></i>Consultation</span>
+                <span><i class="legend-swatch legend-swatch--main-campus"></i>Main Campus</span>
+              </div>
               <button class="icon-btn" title="Print" @click="printSchedule">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               </button>
@@ -259,6 +267,14 @@
               <p class="sched-grid-sub">Read-only view</p>
             </div>
             <div class="sched-topbar-right">
+              <div class="schedule-legend" aria-label="Schedule color legend">
+                <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
+                <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
+                <span><i class="legend-swatch legend-swatch--faculty"></i>CIT Faculty</span>
+                <span><i class="legend-swatch legend-swatch--lunch"></i>Lunch</span>
+                <span><i class="legend-swatch legend-swatch--consultation"></i>Consultation</span>
+                <span><i class="legend-swatch legend-swatch--main-campus"></i>Main Campus</span>
+              </div>
               <button class="icon-btn" title="Print" @click="printSchedule">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               </button>
@@ -520,6 +536,8 @@ watch(selectedTerm, async () => {
     await loadScheduleData()
   }
   if (viewMode.value === 'teacher') {
+    teacherList.value = []
+    await loadTeachers()
     await fetchConsultationsForTeacher()
   }
 })
@@ -764,10 +782,22 @@ async function loadTeachers() {
   if (teacherList.value.length) return
   loadingTeachers.value = true
   try {
-    const res = await apiRequest('/users?role=teacher')
-      if (res.users && Array.isArray(res.users)) {
+    const termId = getSelectedTermId()
+    const scheduleQuery = termId ? `?academicTermId=${encodeURIComponent(termId)}` : ''
+    const [res, schedulePayload] = await Promise.all([
+      apiRequest('/users?role=teacher'),
+      apiRequest(`/schedules${scheduleQuery}`),
+    ])
+    const scheduledTeacherNames = new Set((schedulePayload.entries || []).map(entry => String(entry.teacher || '').trim()).filter(Boolean))
+    const viewingHistoricalTerm = Boolean(termId && getTermId(publishedTerm.value) && termId !== getTermId(publishedTerm.value))
+    if (res.users && Array.isArray(res.users)) {
         teacherList.value = res.users
-          .filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
+          .filter(u => {
+            const isTeacher = Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher'
+            const name = `${u.firstName || ''} ${u.lastName || ''}`.trim()
+            const isActive = String(u.account_status || 'Active') === 'Active'
+            return isTeacher && (isActive || (viewingHistoricalTerm && scheduledTeacherNames.has(name)))
+          })
           .map(u => {
             const name = `${u.firstName} ${u.lastName}`.trim()
             return {
@@ -1825,6 +1855,15 @@ function printSchedule() {
   border-radius: 11px;
   background: #eef1f2;
 }
+.schedule-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 11px; margin-right: 4px; color: #64717a; font-size: .66rem; font-weight: 650; white-space: nowrap; }
+.schedule-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend-swatch { width: 10px; height: 10px; display: inline-block; border-radius: 3px; }
+.legend-swatch--lecture { background: #e9c46a; }
+.legend-swatch--lab { background: #1f6b45; }
+.legend-swatch--faculty { background: #e9a8c1; }
+.legend-swatch--lunch { background: #626c76; }
+.legend-swatch--consultation { background: #4a90d9; }
+.legend-swatch--main-campus { background: #f4a261; }
 .sched-grid-title {
   display: flex;
   align-items: center;

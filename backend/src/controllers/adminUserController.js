@@ -148,8 +148,8 @@ async function createUser(req, res) {
     const normalizedEmployeeId = normalizeString(employeeId);
     const normalizedStudentId = normalizeString(studentId);
 
-    if (normalizedEmployeeId && normalizedRoles.includes("teacher") && !/^AU\d{4}-\d{5}$/.test(normalizedEmployeeId)) {
-      return res.status(400).json({ message: "Employee ID must use the format AU2025-00000 with five digits after the hyphen." });
+    if (normalizedEmployeeId && normalizedRoles.includes("teacher") && !/^AU\d{4}-\d{4,5}$/.test(normalizedEmployeeId)) {
+      return res.status(400).json({ message: "Employee ID must use the format AU2025-0000 or AU2025-00000." });
     }
 
     if (!isValidPhinmaEmail(normalizedEmail)) {
@@ -265,8 +265,8 @@ async function updateUser(req, res) {
     const normalizedEmployeeId = normalizeString(employeeId);
     const normalizedStudentId = normalizeString(studentId);
 
-    if (normalizedEmployeeId && normalizedRoles.includes("teacher") && !/^AU\d{4}-\d{5}$/.test(normalizedEmployeeId)) {
-      return res.status(400).json({ message: "Employee ID must use the format AU2025-00000 with five digits after the hyphen." });
+    if (normalizedEmployeeId && normalizedRoles.includes("teacher") && !/^AU\d{4}-\d{4,5}$/.test(normalizedEmployeeId)) {
+      return res.status(400).json({ message: "Employee ID must use the format AU2025-0000 or AU2025-00000." });
     }
 
     if (!isValidPhinmaEmail(normalizedEmail)) {

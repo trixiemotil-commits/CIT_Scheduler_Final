@@ -150,7 +150,7 @@
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Employee Id</label>
-                <input v-model="editForm.employeeId" class="edit-input" type="text" inputmode="text" autocomplete="off" maxlength="11" placeholder="AU2025-00000" @input="formatEmployeeId" />
+                <input v-model="editForm.employeeId" class="edit-input" type="text" inputmode="text" autocomplete="off" maxlength="12" placeholder="AU2025-00000" @input="formatEmployeeId" />
               </div>
             </div>
           </div>
@@ -375,8 +375,8 @@ async function saveProfile() {
     Swal.fire({ icon: 'warning', title: 'Full name required', text: 'Enter both your first and last name.' })
     return
   }
-  if (editForm.value.employeeId && !/^AU\d{4}-\d{5}$/.test(editForm.value.employeeId)) {
-    Swal.fire({ icon: 'warning', title: 'Invalid employee ID', text: 'Use the format AU2025-00000.' })
+  if (editForm.value.employeeId && !/^AU\d{4}-\d{4,5}$/.test(editForm.value.employeeId)) {
+    Swal.fire({ icon: 'warning', title: 'Invalid employee ID', text: 'Use the format AU2025-0000 or AU2025-00000.' })
     return
   }
 

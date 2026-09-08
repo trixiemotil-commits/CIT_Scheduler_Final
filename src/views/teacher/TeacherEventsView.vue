@@ -39,22 +39,32 @@
     <main class="main">
       <header class="main-header">
         <div>
+          <span class="page-eyebrow">School calendar</span>
           <h1 class="page-title">Events</h1>
           <p class="page-sub">View school events posted by admin</p>
         </div>
       </header>
 
-      <!-- Top bar -->
-      <div class="events-topbar">
-        <div class="events-tabs">
-          <button :class="['ev-tab', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active Events</button>
+      <section class="events-section">
+        <div class="events-section-header">
+          <div>
+            <h2 class="events-section-title">Events overview</h2>
+            <p class="events-section-sub">{{ activeEvents.length }} active event{{ activeEvents.length === 1 ? '' : 's' }} shown</p>
+          </div>
+          <div class="event-summary-counts">
+            <span class="event-summary-count event-summary-count--active"><b>{{ activeEvents.length }}</b><small>Active</small></span>
+          </div>
         </div>
-      </div>
+
+        <div class="events-topbar">
+          <div class="events-tabs">
+            <button class="ev-tab active">Active Events <span class="ev-tab-count">{{ activeEvents.length }}</span></button>
+          </div>
+        </div>
 
       <!-- Events Grid -->
       <div class="events-grid">
-        <template v-if="eventsTab === 'active'">
-          <div v-for="ev in activeEvents" :key="ev.id" class="event-card event-card--clickable" @click="openViewEvent(ev)">
+        <div v-for="ev in activeEvents" :key="ev.id" class="event-card event-card--clickable" @click="openViewEvent(ev)">
             <div v-if="ev.image" class="event-card-img-wrap">
               <img :src="ev.image" class="event-card-img" alt="" />
             </div>
@@ -80,47 +90,13 @@
                 {{ ev.location }}
               </span>
             </div>
-          </div>
-          <div v-if="!activeEvents.length" class="events-empty">
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <span>No active events have been posted.</span>
-          </div>
-        </template>
-
-        <template v-else>
-          <div v-for="ev in archivedEvents" :key="ev.id" class="event-card event-card--archived event-card--clickable" @click="openViewEvent(ev)">
-            <div v-if="ev.image" class="event-card-img-wrap">
-              <img :src="ev.image" class="event-card-img" alt="" />
-            </div>
-            <div v-else class="event-card-default-cover" :style="eventCoverStyle(ev)">
-              <span>{{ eventInitials(ev.title) }}</span><small>CIT SCHEDULER EVENT</small>
-            </div>
-            <div class="event-card-head">
-              <span class="event-badge event-badge--archived">Archived</span>
-            </div>
-            <div class="event-card-title">{{ ev.title }}</div>
-            <div class="event-card-desc">{{ ev.description }}</div>
-            <div class="event-card-meta">
-              <span class="event-meta-item">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                {{ ev.date }}
-              </span>
-              <span class="event-meta-item">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
-              </span>
-              <span class="event-meta-item">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                {{ ev.location }}
-              </span>
-            </div>
-          </div>
-          <div v-if="!archivedEvents.length" class="events-empty">
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-            <span>No archived events.</span>
-          </div>
-        </template>
+        </div>
+        <div v-if="!activeEvents.length" class="events-empty">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>No active events have been posted.</span>
+        </div>
       </div>
+      </section>
     </main>
 
     <!-- ═══ View Event Modal ═══ -->
@@ -405,7 +381,6 @@ function confirmLogout() {
 /* ── Events ── */
 const showEventModal = ref(false)
 const editingEvent = ref(null)
-const eventsTab = ref('active')
 const eventForm = ref({ title: '', description: '', date: '', time: '', location: '', image: '', teacherIds: [] })
 const imagePreview = ref('')
 const imgInput = ref(null)
@@ -460,7 +435,6 @@ function confirmTime() {
 
 const events = ref([])
 const activeEvents = computed(() => events.value.filter(e => e.status === 'active'))
-const archivedEvents = computed(() => events.value.filter(e => e.status === 'archived'))
 
 async function eventRequest(path = '', options = {}) {
   const token = getToken()
@@ -934,6 +908,95 @@ onMounted(loadEvents)
   box-shadow: 0 6px 24px rgba(48, 53, 58,0.13);
   transform: translateY(-2px);
   transition: box-shadow 0.2s, transform 0.2s;
+}
+
+/* Reference-style event overview */
+.events-section {
+  width: 100%;
+  padding: 18px 26px 24px;
+  border: 1px solid #d4dbe1;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #fbfcfd, #e9edef);
+  box-shadow: 0 12px 30px rgba(51, 65, 85, .1), inset 0 1px #fff;
+  box-sizing: border-box;
+}
+.events-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #d9e0e5;
+}
+.events-section-title { margin: 0; color: #1f2933; font-size: 1.1rem; font-weight: 750; }
+.events-section-sub { margin: 4px 0 0; color: #7b8790; font-size: .72rem; }
+.event-summary-counts { display: flex; align-items: center; gap: 8px; }
+.event-summary-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 70px;
+  justify-content: center;
+  padding: 7px 10px;
+  border: 1px solid #d9e1e6;
+  border-radius: 10px;
+  background: #f8fafb;
+  color: #52616b;
+}
+.event-summary-count b { font-size: .9rem; }
+.event-summary-count small { font-size: .62rem; font-weight: 700; }
+.event-summary-count--active { border-color: #c7e6d4; color: #28744d; background: #f2fbf5; }
+.event-summary-count--archived { border-color: #eadab7; color: #876526; background: #fffaf0; }
+.events-section .events-topbar { margin: 15px 0 18px; }
+.events-section .ev-tab { padding: 8px 12px; border: 1px solid #d9e1e6; background: #f8fafb; color: #60707b; font-size: .72rem; }
+.events-section .ev-tab.active { border-color: #465761; background: #465761; color: #fff; box-shadow: 0 4px 10px rgba(45, 58, 66, .18); }
+.events-section .ev-tab-count { padding: 1px 6px; background: rgba(255,255,255,.9); color: #52616b; font-size: .62rem; }
+.events-section .ev-tab.active .ev-tab-count { color: #465761; }
+.events-grid { display: flex; flex-direction: column; gap: 16px; }
+.events-section .event-card {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr auto;
+  column-gap: 17px;
+  min-height: 168px;
+  padding: 0 16px 0 0;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 17px;
+  background: linear-gradient(145deg, #f9fafb, #e2e6e9);
+  box-shadow: 0 7px 18px rgba(51,65,85,.08), inset 0 1px #fff;
+}
+.events-section .event-card-img-wrap,
+.events-section .event-card-default-cover {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  width: 190px;
+  height: 168px;
+  margin: 0;
+  border-radius: 0;
+}
+.events-section .event-card-img { transition: none; }
+.events-section .event-card-head { grid-column: 2; grid-row: 1; padding-top: 15px; }
+.events-section .event-card-title { grid-column: 2; grid-row: 2; margin-top: 8px; font-size: .95rem; }
+.events-section .event-card-desc { grid-column: 2; grid-row: 3; margin-top: 5px; font-size: .76rem; color: #64717a; }
+.events-section .event-card-meta { grid-column: 2; grid-row: 4; margin: 12px 0 14px; }
+.events-section .event-meta-item { padding: 5px 8px; border: 1px solid #dbe2e7; border-radius: 999px; background: rgba(255,255,255,.7); font-size: .65rem; color: #60707b; }
+.event-card-default-cover { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; background: linear-gradient(145deg, #415c58, #253b38); }
+.event-card-default-cover span { font-size: 2rem; font-weight: 800; }
+.event-card-default-cover small { margin-top: 5px; font-size: .55rem; font-weight: 750; letter-spacing: .12em; }
+.events-section .event-badge { font-size: .61rem; padding: 4px 10px; }
+
+@media (max-width: 700px) {
+  .events-section { padding: 16px 14px 18px; }
+  .events-section-header { flex-direction: column; }
+  .event-summary-counts { width: 100%; }
+  .event-summary-count { flex: 1; }
+  .events-section .event-card { grid-template-columns: 112px minmax(0, 1fr); min-height: 132px; column-gap: 12px; padding-right: 10px; }
+  .events-section .event-card-img-wrap,
+  .events-section .event-card-default-cover { width: 112px; height: 132px; }
+  .events-section .event-card-title { font-size: .82rem; }
+  .events-section .event-card-desc { font-size: .68rem; }
+  .events-section .event-meta-item { font-size: .58rem; }
 }
 
 /* ═══ VIEW EVENT MODAL ═══ */

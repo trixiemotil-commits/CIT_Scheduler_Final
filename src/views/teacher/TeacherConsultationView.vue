@@ -38,6 +38,7 @@
     <main class="main">
       <header class="main-header">
         <div>
+          <span class="page-eyebrow">Student support</span>
           <h1 class="page-title">Consultation Requests</h1>
           <p class="page-sub">Review and manage student consultation requests</p>
         </div>
@@ -46,8 +47,15 @@
       <!-- Consultation Card -->
       <section class="consult-card">
         <div class="card-header">
-          <div class="card-title">Consultation Requests</div>
-          <div class="card-sub">Review and manage student consultation requests</div>
+          <div class="card-heading">
+            <div class="card-heading-icon" aria-hidden="true">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 8h8M8 12h5"/></svg>
+            </div>
+            <div>
+              <div class="card-title">Consultation Requests</div>
+              <div class="card-sub">Keep track of incoming student appointments and follow-ups.</div>
+            </div>
+          </div>
         </div>
 
         <!-- Filter + bulk action row -->
@@ -990,6 +998,16 @@ function confirmLogout() {
 }
 .page-sub { font-size: 0.95rem; color: #777; margin-top: 4px; }
 
+.page-eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: #71808a;
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
 /* ── Consultation Card ── */
 .consult-card {
   background: #fff;
@@ -1001,9 +1019,42 @@ function confirmLogout() {
   overflow-y: auto;
 }
 
-.card-header { margin-bottom: 18px; }
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e4e9ed;
+}
+.card-heading { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.card-heading-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  color: #fff;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #64747e, #3b4952);
+  box-shadow: 0 5px 12px rgba(59, 73, 82, .18);
+}
 .card-title { font-size: 1.05rem; font-weight: 700; color: #111; }
 .card-sub   { font-size: 0.82rem; color: #888; margin-top: 2px; }
+.card-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border: 1px solid #d8e8df;
+  border-radius: 10px;
+  background: #f3faf6;
+  color: #2d7650;
+}
+.card-total strong { font-size: 1rem; line-height: 1; }
+.card-total span { margin-top: 4px; font-size: .62rem; font-weight: 700; }
 
 /* ── Filter Controls ── */
 .controls-row {
@@ -1018,8 +1069,10 @@ function confirmLogout() {
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  background: #f5f6f8;
-  border-radius: 10px;
+  padding: 5px;
+  background: #eef2f4;
+  border: 1px solid #dce3e7;
+  border-radius: 11px;
   flex: 1;
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -1031,11 +1084,11 @@ function confirmLogout() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 150px;
+  min-width: 142px;
   padding: 11px 16px;
   border: none;
-  border-radius: 6px;
-  background: #6b7280;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #64747e, #3b4952);
   color: #fff;
   font-family: inherit;
   font-size: 0.9rem;
@@ -1045,7 +1098,7 @@ function confirmLogout() {
   flex-shrink: 0;
 }
 
-.btn-approve-all:hover { background: #4b5563; }
+.btn-approve-all:hover { background: linear-gradient(145deg, #71828c, #46555e); }
 
 .btn-approve-all:disabled {
   cursor: not-allowed;
@@ -1066,26 +1119,26 @@ function confirmLogout() {
   white-space: nowrap;
 }
 .filter-tab:hover { background: #f3f4f6; color: #4b5563; }
-.filter-tab.active { background: #4b5563; color: #fff; font-weight: 600; }
+.filter-tab.active { background: #465761; color: #fff; font-weight: 600; box-shadow: 0 3px 8px rgba(45, 58, 66, .16); }
 
 /* ── Request List ── */
 .request-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 /* Request Card */
 .request-card {
-  padding: 16px 18px;
+  padding: 17px 19px;
   border-radius: 12px;
-  border: 1.5px solid #e8e8e8;
+  border: 1px solid #dfe5e9;
   border-left-width: 5px;
-  background: #fff;
-  transition: box-shadow 0.15s;
+  background: linear-gradient(145deg, #fff, #f8fafb);
+  transition: box-shadow 0.16s, transform 0.16s, border-color 0.16s;
   cursor: pointer;
 }
-.request-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+.request-card:hover { border-color: #cbd6dc; box-shadow: 0 8px 20px rgba(51, 65, 85, .09); transform: translateY(-1px); }
 
 .border-pending   { border-left-color: #e8a020; background: #fffdf5; }
 .border-approved  { border-left-color: #4b5563; background: #f8fafc; }
@@ -1107,7 +1160,9 @@ function confirmLogout() {
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  background: #ddd;
+  background: #e8edf0;
+  border: 2px solid #fff;
+  box-shadow: 0 3px 8px rgba(51, 65, 85, .12);
 }
 .req-avatar { width: 100%; height: 100%; object-fit: cover; }
 
@@ -1119,7 +1174,7 @@ function confirmLogout() {
   gap: 10px;
   flex-wrap: wrap;
 }
-.req-name { font-size: 0.98rem; font-weight: 700; color: #111; }
+.req-name { font-size: 0.98rem; font-weight: 700; color: #26333b; }
 .req-id   { font-size: 0.8rem; color: #888; margin-top: 2px; }
 .req-ticket { font-size: 0.78rem; color: #6b7280; font-weight: 600; margin-top: 4px; }
 .req-queue { font-size: 0.78rem; color: #4b5563; font-weight: 600; margin-top: 4px; }
@@ -1216,12 +1271,12 @@ function confirmLogout() {
 .req-subject {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: #5e707b;
   margin-bottom: 5px;
 }
 .req-message {
   font-size: 0.88rem;
-  color: #444;
+  color: #4b5961;
   line-height: 1.5;
   margin-bottom: 8px;
 }
@@ -1932,5 +1987,21 @@ function confirmLogout() {
 @media (max-width: 900px) {
   .main { padding: 20px 16px 32px; }
   .sidebar { width: 200px; min-width: 200px; }
+  .card-header { align-items: flex-start; }
+  .controls-row { align-items: stretch; flex-direction: column; }
+  .btn-approve-all { width: 100%; }
+}
+
+@media (max-width: 560px) {
+  .page-title { font-size: 1.8rem; }
+  .consult-card { padding: 18px 14px 20px; }
+  .card-header { gap: 12px; }
+  .card-total { padding: 6px 8px; }
+  .card-total span { font-size: .57rem; }
+  .req-top { align-items: flex-start; }
+  .req-actions { margin-left: auto; }
+  .btn-approve,
+  .btn-reject,
+  .btn-done { padding: 7px 9px; font-size: .72rem; }
 }
 </style>

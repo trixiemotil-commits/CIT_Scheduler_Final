@@ -4,26 +4,27 @@
 
 [36mvite v5.4.21 [32mbuilding for production...[36m[39m
 transforming...
-[32m✓[39m 286 modules transformed.
+[32m✓[39m 294 modules transformed.
 rendering chunks...
 computing gzip size...
 [2mdist/[22m[32mregisterSW.js                  [39m[1m[2m    0.13 kB[22m[1m[22m
 [2mdist/[22m[32mmanifest.webmanifest           [39m[1m[2m    0.53 kB[22m[1m[22m
-[2mdist/[22m[32mindex.html                     [39m[1m[2m    1.59 kB[22m[1m[22m[2m │ gzip:   0.69 kB[22m
-[2mdist/[22m[35massets/index-M6FsTcnZ.css      [39m[1m[2m  573.82 kB[22m[1m[22m[2m │ gzip:  90.96 kB[22m
-[2mdist/[22m[36massets/p-D7bSXQD3-D4yfIQi0.js  [39m[1m[2m    0.47 kB[22m[1m[22m[2m │ gzip:   0.34 kB[22m
-[2mdist/[22m[36massets/p-Sh0ICmPV-fbr5hBBg.js  [39m[1m[2m    0.67 kB[22m[1m[22m[2m │ gzip:   0.47 kB[22m
-[2mdist/[22m[36massets/p-DIE4pXMl-DWTPHl45.js  [39m[1m[2m    1.02 kB[22m[1m[22m[2m │ gzip:   0.56 kB[22m
-[2mdist/[22m[36massets/p-D6Ynv7Xh-CteoRExK.js  [39m[1m[2m    1.25 kB[22m[1m[22m[2m │ gzip:   0.64 kB[22m
-[2mdist/[22m[36massets/p-C4t5ymfq-BA1s4nXb.js  [39m[1m[2m    1.62 kB[22m[1m[22m[2m │ gzip:   0.83 kB[22m
-[2mdist/[22m[36massets/p-D5Ubpm7D-BsGkuRrd.js  [39m[1m[2m    4.84 kB[22m[1m[22m[2m │ gzip:   2.17 kB[22m
-[2mdist/[22m[36massets/p-C1aScSTo-Xb9An6Vk.js  [39m[1m[2m   10.47 kB[22m[1m[22m[2m │ gzip:   3.07 kB[22m
-[2mdist/[22m[36massets/index-4JR74lo2.js       [39m[1m[33m1,954.75 kB[39m[22m[2m │ gzip: 491.22 kB[22m
-[32m✓ built in 22.57s[39m
+[2mdist/[22m[32mindex.html                     [39m[1m[2m    1.59 kB[22m[1m[22m[2m │ gzip:   0.68 kB[22m
+[2mdist/[22m[35massets/index-BSFci9qL.css      [39m[1m[2m  581.19 kB[22m[1m[22m[2m │ gzip:  92.41 kB[22m
+[2mdist/[22m[36massets/p-D7bSXQD3-pFg30Pyy.js  [39m[1m[2m    0.47 kB[22m[1m[22m[2m │ gzip:   0.34 kB[22m
+[2mdist/[22m[36massets/p-Sh0ICmPV-BizhEzVt.js  [39m[1m[2m    0.67 kB[22m[1m[22m[2m │ gzip:   0.47 kB[22m
+[2mdist/[22m[36massets/p-DIE4pXMl-GeNSDYHp.js  [39m[1m[2m    1.02 kB[22m[1m[22m[2m │ gzip:   0.56 kB[22m
+[2mdist/[22m[36massets/p-D6Ynv7Xh-BbIs3iyR.js  [39m[1m[2m    1.25 kB[22m[1m[22m[2m │ gzip:   0.64 kB[22m
+[2mdist/[22m[36massets/p-C4t5ymfq-Ci6lGZzj.js  [39m[1m[2m    1.62 kB[22m[1m[22m[2m │ gzip:   0.83 kB[22m
+[2mdist/[22m[36massets/p-D5Ubpm7D-B7csMdhQ.js  [39m[1m[2m    4.84 kB[22m[1m[22m[2m │ gzip:   2.16 kB[22m
+[2mdist/[22m[36massets/p-C1aScSTo-Ket5IshI.js  [39m[1m[2m   10.47 kB[22m[1m[22m[2m │ gzip:   3.07 kB[22m
+[2mdist/[22m[36massets/xlsx.min-zl56wAPA.js    [39m[1m[33m  627.81 kB[39m[22m[2m │ gzip: 323.14 kB[22m
+[2mdist/[22m[36massets/index-diYS0V3P.js       [39m[1m[33m1,984.39 kB[39m[22m[2m │ gzip: 500.43 kB[22m
+[32m✓ built in 13.78s[39m
 
 PWA v1.3.0
 mode      generateSW
-precache  29 entries (3878.61 KiB)
+precache  30 entries (4764.79 KiB)
 files generated
   dist/sw.js
   dist/workbox-dcde9eb3.js

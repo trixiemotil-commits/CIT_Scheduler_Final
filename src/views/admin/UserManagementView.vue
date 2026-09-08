@@ -356,7 +356,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">{{ isTeacherRole ? 'Employee ID' : 'School ID Number' }} <span class="form-required">*</span></label>
-              <input v-model="userForm.schoolId" class="form-input" type="text" :inputmode="isTeacherRole ? 'text' : 'numeric'" :maxlength="isTeacherRole ? 11 : 14" :placeholder="isTeacherRole ? 'AU2025-00000' : '01-1234-123456'" required @input="formatSchoolId" />
+              <input v-model="userForm.schoolId" class="form-input" type="text" :inputmode="isTeacherRole ? 'text' : 'numeric'" :maxlength="isTeacherRole ? 12 : 14" :placeholder="isTeacherRole ? 'AU2025-00000' : '01-1234-123456'" required @input="formatSchoolId" />
             </div>
           </div>
 
@@ -1033,8 +1033,8 @@ function saveUser() {
     return
   }
 
-  if (isTeacherRole.value && !/^AU\d{4}-\d{5}$/.test(trimmedSchoolId)) {
-    formError.value = 'Employee ID must use the format AU2025-00000.'
+  if (isTeacherRole.value && !/^AU\d{4}-\d{4,5}$/.test(trimmedSchoolId)) {
+    formError.value = 'Employee ID must use the format AU2025-0000 or AU2025-00000.'
     return
   }
 

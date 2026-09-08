@@ -394,7 +394,7 @@ async function loadPage() {
     const [termResponse, teacherResponse] = await Promise.all([apiRequest('/academic-terms'), apiRequest('/users?role=teacher')])
     terms.value = termResponse.terms || []
     publishedTerm.value = terms.value.find(term => term.isPublished) || null
-    teachers.value = (teacherResponse.users || []).filter(item => Array.isArray(item.roles) ? item.roles.includes('teacher') : String(item.role).toLowerCase() === 'teacher').map(item => ({
+    teachers.value = (teacherResponse.users || []).filter(item => (Array.isArray(item.roles) ? item.roles.includes('teacher') : String(item.role).toLowerCase() === 'teacher') && String(item.account_status || 'Active') === 'Active').map(item => ({
       id: item._id || item.id,
       name: `${item.firstName || ''} ${item.lastName || ''}`.trim(),
       avatar: item.avatar || '',
