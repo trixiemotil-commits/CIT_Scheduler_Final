@@ -6,6 +6,7 @@ const {
 	createUser,
 	updateUser,
 	updateUserStatus,
+	updateTeacherStatus,
 	approveAllPendingUsers,
 } = require("../controllers/adminUserController");
 
@@ -18,6 +19,7 @@ router.post("/verify-current-password", verifyCurrentAdminPassword);
 router.post("/", createUser);
 router.patch("/approve-all-pending", approveAllPendingUsers);
 router.patch("/:id/status", updateUserStatus);
+router.patch("/:id/teacher-status", updateTeacherStatus);
 router.put("/:id", updateUser);
 
 module.exports = router;

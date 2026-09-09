@@ -10,6 +10,8 @@ const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins } = require("../utils/adminNotification");
 
 const MAX_WEEKLY_MINUTES = 240; // 4 hours
+const AVAILABLE_TEACHER_START_MINUTES = 7 * 60;
+const AVAILABLE_TEACHER_END_MINUTES = 18 * 60;
 
 function parseTimeToMinutes(timeStr) {
   const text = (timeStr || "").toString().trim();
@@ -149,40 +151,74 @@ function dateOnlyToUtc(dateStr) {
 
 async function resolveTeacherStatus(userDoc) {
   if (!userDoc || !(Array.isArray(userDoc.roles) ? userDoc.roles : [userDoc.role]).includes("teacher")) {
-    return "On Leave";
+    return "Offline";
   }
 
   if (userDoc.account_status !== "Active") {
-    return "On Leave";
+    return "Offline";
   }
 
-  if (userDoc.teacher_status_expires_at && new Date(userDoc.teacher_status_expires_at) <= new Date()) {
-    return "On School";
-  }
+  const clockIn = userDoc.teacher_time_in ? new Date(userDoc.teacher_time_in) : null;
+  const now = new Date();
+  const clockedInToday = clockIn
+    && !Number.isNaN(clockIn.getTime())
+    && clockIn.getFullYear() === now.getFullYear()
+    && clockIn.getMonth() === now.getMonth()
+    && clockIn.getDate() === now.getDate();
 
-  const directStatus = ["On School", "On Leave"].includes(userDoc.teacher_status)
-    ? userDoc.teacher_status
-    : "On School";
-
-  return directStatus;
+  return clockedInToday ? "On School" : "Offline";
 }
 
-async function isStudentAssignedToTeacher(teacherUser, studentYear, studentSection) {
+function normalizeAcademicYear(value) {
+  const text = String(value || '').trim().toLowerCase();
+  const match = text.match(/([1-4])/);
+  return match ? match[1] : text;
+}
+
+async function isStudentAssignedToTeacher(teacherUser, studentYear, studentSection, subject = '') {
   const teacherName = normalizeTeacherFullName(teacherUser);
   const year = String(studentYear || '').trim();
   const section = String(studentSection || '').trim();
+  const requestedSubject = String(subject || '').trim().toLowerCase();
 
   if (!teacherName || !year || !section) {
     return false;
   }
 
-  const match = await ScheduleEntry.exists({
-    teacher: teacherName,
-    year,
-    section,
-  });
+  const assignments = await ScheduleEntry.find({ teacher: teacherName })
+    .select('year section subject')
+    .lean();
 
-  return Boolean(match);
+  return assignments.some((assignment) => (
+    normalizeAcademicYear(assignment.year) === normalizeAcademicYear(year)
+    && String(assignment.section || '').trim().toLowerCase() === section.toLowerCase()
+    && (!requestedSubject || String(assignment.subject || '').trim().toLowerCase() === requestedSubject)
+  ));
+}
+
+async function autoApproveEligibleSubjectRequest(requestDoc) {
+  if (String(requestDoc?.status || '').toUpperCase() !== 'PENDING') {
+    return false;
+  }
+
+  const teacherUser = await findTeacherUserByIdentifier(requestDoc.employeeId);
+  if (!teacherUser) return false;
+
+  const isSubjectTeacher = Boolean(requestDoc.availabilityId);
+  if (!isSubjectTeacher) return false;
+
+  const availability = await ConsultationAvailability.findById(requestDoc.availabilityId)
+    .select('dayOfWeek startTime endTime employeeId teacher')
+    .lean();
+  if (!availability) return false;
+
+  requestDoc.status = 'APPROVED';
+  requestDoc.isSubjectTeacher = true;
+  await ConsultationRequest.updateOne(
+    { _id: requestDoc._id, status: 'PENDING' },
+    { $set: { status: 'APPROVED' } }
+  );
+  return true;
 }
 
 async function getStudentAcademicContext(userId) {
@@ -293,10 +329,11 @@ function toClientRequest(doc, studentMeta = null, availabilityMeta = null, consu
     requestDate: doc.requestDate,
     consultationDate: doc.consultationDate,
     consultationDayOfWeek: availabilityMeta?.dayOfWeek || "",
-    consultationStartTime: availabilityMeta?.startTime || "",
-    consultationEndTime: availabilityMeta?.endTime || "",
+    consultationStartTime: availabilityMeta?.startTime || doc.consultationStartTime || "",
+    consultationEndTime: availabilityMeta?.endTime || doc.consultationEndTime || "",
     consultationNotes: consultationNotes || "",
     status: doc.status,
+    isSubjectTeacher: Boolean(doc.isSubjectTeacher),
     createdAt: doc.createdAt,
   };
 }
@@ -391,7 +428,7 @@ async function listTeachersForStudents(req, res) {
       : { year: "", section: "" };
 
     const teacherUsers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
-      .select("role firstName lastName employeeId department account_status teacher_status teacher_status_expires_at teacher_availability avatar")
+      .select("role firstName lastName employeeId department account_status teacher_status teacher_time_in teacher_status_expires_at teacher_availability avatar")
       .lean();
 
     const teachers = await Promise.all(
@@ -446,9 +483,8 @@ async function listTeachersForStudents(req, res) {
           .filter(Boolean);
         const uniqueStudentSubjects = [...new Set(studentSubjects)];
         const isSubjectTeacher = uniqueStudentSubjects.length > 0;
-        const canAcceptRequests = String(status || '').toLowerCase() !== "on leave"
-          && String(teacherUser.teacher_availability || '').toLowerCase() !== "unavailable"
-          && availabilitySlots.length > 0
+        const canAcceptRequests = !["on leave", "offline"].includes(String(status || '').toLowerCase())
+          && String(teacherUser.teacher_availability || '').toLowerCase() !== "unavailable";
 
         return {
           id: teacherUser._id.toString(),
@@ -496,13 +532,21 @@ async function createConsultationRequest(req, res) {
       return res.status(403).json({ message: "Only students can create consultation requests." });
     }
 
-    const { teacherId, topic, availabilityId, date, time, notes = "" } = req.body || {};
+    const {
+      teacherId,
+      topic,
+      availabilityId,
+      consultationType,
+      date,
+      time,
+      notes = "",
+    } = req.body || {};
     if (!teacherId || !topic) {
       return res.status(400).json({ message: "teacherId and topic are required." });
     }
 
     if (!availabilityId && (!date || !time)) {
-      return res.status(400).json({ message: "availabilityId is required (or provide date and time for legacy requests)." });
+      return res.status(400).json({ message: "Please provide a consultation date and time." });
     }
 
     const teacherUser = await User.findById(teacherId).lean();
@@ -512,14 +556,13 @@ async function createConsultationRequest(req, res) {
 
     const teacherName = normalizeTeacherFullName(teacherUser);
     const teacherStatus = await resolveTeacherStatus(teacherUser);
-    const studentContext = await getStudentAcademicContext(req.user.id);
-    const isSubjectTeacher = await isStudentAssignedToTeacher(
-      teacherUser,
-      studentContext.year,
-      studentContext.section
-    );
+    const isSubjectTeacher = consultationType === "subject"
+      || (!consultationType && Boolean(availabilityId));
 
-    if (teacherStatus === "On Leave" || teacherUser.teacher_availability === "Unavailable") {
+    if (
+      ["On Leave", "Offline"].includes(teacherStatus)
+      || String(teacherUser.teacher_availability || "").trim().toLowerCase() === "unavailable"
+    ) {
       return res.status(409).json({
         message: `${teacherName} is not open for consultation right now. Please select another teacher.`,
       });
@@ -530,7 +573,7 @@ async function createConsultationRequest(req, res) {
     let consultationDate = null;
     let requestMinutes = null;
 
-    if (availabilityId) {
+    if (isSubjectTeacher && availabilityId) {
       matchedSlot = await ConsultationAvailability.findOne({
         _id: availabilityId,
         $or: [
@@ -555,18 +598,26 @@ async function createConsultationRequest(req, res) {
         return res.status(400).json({ message: "Invalid time provided." });
       }
 
-      const slots = await ConsultationAvailability.find({
-        dayOfWeek,
-        $or: [
-          { employeeId: { $in: lookupKeys } },
-          { teacher: teacherName },
-        ],
-      }).lean();
+      if (
+        requestMinutes < AVAILABLE_TEACHER_START_MINUTES
+        || requestMinutes + 60 > AVAILABLE_TEACHER_END_MINUTES
+      ) {
+        return res.status(400).json({ message: "Available-teacher consultations must be scheduled between 7:00 AM and 6:00 PM." });
+      }
 
-      matchedSlot = slots.find((slot) => isRequestWithinAvailability(requestMinutes, slot.startTime, slot.endTime));
+      if (isSubjectTeacher) {
+        const slots = await ConsultationAvailability.find({
+          dayOfWeek,
+          $or: [
+            { employeeId: { $in: lookupKeys } },
+            { teacher: teacherName },
+          ],
+        }).lean();
+        matchedSlot = slots.find((slot) => isRequestWithinAvailability(requestMinutes, slot.startTime, slot.endTime));
+      }
     }
 
-    if (!matchedSlot) {
+    if (isSubjectTeacher && !matchedSlot) {
       return res.status(409).json({
         message: "Requested time is outside the teacher's consultation hours for the selected day.",
       });
@@ -576,14 +627,19 @@ async function createConsultationRequest(req, res) {
       return res.status(400).json({ message: "Selected consultation availability is invalid." });
     }
 
-    const teacherClassConflict = await checkClassConflict(
-      teacherName,
-      matchedSlot.dayOfWeek,
-      matchedSlot.startTime,
-      matchedSlot.endTime,
-      matchedSlot.academicTermId,
-      true
-    );
+    const consultationDay = DAYS[consultationDate.getUTCDay()];
+    const consultationStartTime = minutesTo24h(requestMinutes);
+    const consultationEndTime = minutesTo24h(requestMinutes + 60);
+    const teacherClassConflict = isSubjectTeacher
+      ? await checkClassConflict(
+        teacherName,
+        consultationDay,
+        consultationStartTime,
+        consultationEndTime,
+        matchedSlot?.academicTermId,
+        true
+      )
+      : null;
     if (teacherClassConflict) {
       return res.status(409).json({ message: teacherClassConflict });
     }
@@ -591,12 +647,15 @@ async function createConsultationRequest(req, res) {
     const requestDate = new Date();
 
     const teacherKey = teacherUser.employeeId || teacherName;
-    const existingPending = await ConsultationRequest.findOne({
+    const duplicateFilter = {
       studentId: req.user.id,
       employeeId: teacherKey,
-      availabilityId: matchedSlot._id,
       status: "PENDING",
-    }).lean();
+      ...(matchedSlot
+        ? { availabilityId: matchedSlot._id }
+        : { consultationDate, consultationStartTime }),
+    };
+    const existingPending = await ConsultationRequest.findOne(duplicateFilter).lean();
 
     if (existingPending) {
       return res.status(409).json({
@@ -607,12 +666,14 @@ async function createConsultationRequest(req, res) {
     const requestDoc = await ConsultationRequest.create({
       studentId: req.user.id,
       employeeId: teacherKey,
-      availabilityId: matchedSlot._id,
+      availabilityId: isSubjectTeacher ? matchedSlot?._id : undefined,
+      consultationStartTime,
+      consultationEndTime,
       subject: String(topic).trim(),
       purpose: String(notes || "").trim(),
       requestDate,
       consultationDate,
-      status: "PENDING",
+      status: isSubjectTeacher ? "APPROVED" : "PENDING",
     });
 
     const requestEndMinutes = requestMinutes + 60;
@@ -623,15 +684,17 @@ async function createConsultationRequest(req, res) {
       notes: "Consultation request created.",
     });
 
-    // Notify teacher about new consultation request
+    // Subject teachers are already assigned to the student, so their requests are approved immediately.
     try {
       await Notification.create({
-        recipientId: teacherUser._id,
+        recipientId: isSubjectTeacher ? req.user.id : teacherUser._id,
         actorId: req.user.id,
-        type: 'consultation_request',
-        title: 'New consultation request',
-        message: `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}.`,
-        related: { consultationRequestId: requestDoc._id.toString() },
+        type: isSubjectTeacher ? 'consultation_status' : 'consultation_request',
+        title: isSubjectTeacher ? 'Consultation APPROVED' : 'New consultation request',
+        message: isSubjectTeacher
+          ? `Your consultation request (${requestDoc.subject}) was approved automatically.`
+          : `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}.`,
+        related: { consultationRequestId: requestDoc._id.toString(), ...(isSubjectTeacher ? { status: 'APPROVED' } : {}) },
       })
     } catch (err) {
       console.warn('Failed to create notification for teacher:', err.message)
@@ -658,7 +721,7 @@ async function createConsultationRequest(req, res) {
     });
 
     return res.status(201).json({
-      message: "Consultation request submitted.",
+      message: isSubjectTeacher ? "Consultation approved." : "Consultation request submitted.",
       request: toClientRequest(requestDoc),
     });
   } catch (error) {
@@ -705,6 +768,8 @@ async function listConsultationRequests(req, res) {
     }
 
     const docs = await ConsultationRequest.find(filter).sort({ createdAt: -1 }).lean();
+
+    await Promise.all(docs.map((doc) => autoApproveEligibleSubjectRequest(doc)));
 
     const studentIds = [...new Set(
       docs
@@ -812,7 +877,7 @@ async function updateConsultationRequestByStudent(req, res) {
       studentContext.section
     );
 
-    if (teacherStatus === "On Leave" || teacherUser.teacher_availability === "Unavailable") {
+    if (["On Leave", "Offline"].includes(teacherStatus) || teacherUser.teacher_availability === "Unavailable") {
       return res.status(409).json({
         message: `${teacherName} is not open for consultation right now. Please select another teacher.`,
       });

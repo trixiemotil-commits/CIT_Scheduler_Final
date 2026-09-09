@@ -471,6 +471,34 @@ async function updateUserStatus(req, res) {
   }
 }
 
+async function updateTeacherStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const nextStatus = sanitizeTeacherStatus(req.body?.teacher_status || req.body?.status);
+    const user = await User.findById(id);
+
+    if (!user || !(getUserRoles(user).includes("teacher"))) {
+      return res.status(404).json({ message: "Teacher not found." });
+    }
+
+    user.teacher_status = nextStatus;
+    await user.save();
+
+    await logActivity({
+      actor: req.user,
+      action: `Teacher ${user.firstName} ${user.lastName} is ${nextStatus}`,
+      path: req.originalUrl || `/api/users/${id}/teacher-status`,
+      method: req.method,
+      req,
+    });
+
+    return res.json({ message: "Teacher status updated.", user: toClientUser(user) });
+  } catch (error) {
+    console.error("Failed to update teacher status:", error);
+    return res.status(500).json({ message: "Failed to update teacher status.", error: error.message });
+  }
+}
+
 async function approveAllPendingUsers(req, res) {
   try {
     const result = await User.updateMany(
@@ -515,5 +543,6 @@ module.exports = {
   createUser,
   updateUser,
   updateUserStatus,
+  updateTeacherStatus,
   approveAllPendingUsers,
 };

@@ -898,22 +898,9 @@ const updateTeacherStatus = async (teacher) => {
   const previousStatus = teacher._lastStatus || teacher.status
 
   try {
-    const payload = {
-      firstName: teacher.firstName || teacher.name?.split(' ')[0] || '',
-      lastName: teacher.lastName || teacher.name?.split(' ').slice(1).join(' ') || 'Teacher',
-      email: teacher.email,
-      role: 'teacher',
-      department: teacher.department || teacher.college || '',
-      phone: teacher.phone || '',
-      account_status: teacher.account_status || 'Active',
-      teacher_status: mapTeacherStatusToApi(teacher.status),
-      employeeId: teacher.employeeId || '',
-      studentId: teacher.studentId || '',
-    }
-
-    const response = await apiRequest(`/users/${teacher.id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
+    const response = await apiRequest(`/users/${teacher.id}/teacher-status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ teacher_status: mapTeacherStatusToApi(teacher.status) }),
     })
 
     if (response?.user) {

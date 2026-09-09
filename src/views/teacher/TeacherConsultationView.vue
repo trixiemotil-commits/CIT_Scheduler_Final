@@ -110,7 +110,7 @@
               </div>
               <div class="req-actions">
                 <!-- Pending actions -->
-                <template v-if="req.status === 'pending'">
+                <template v-if="req.status === 'pending' && !req.isSubjectTeacher && !req.availabilityId">
                   <button class="btn-approve" @click.stop="approve(req.id)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     Approve
@@ -516,7 +516,9 @@ function mapRequest(doc) {
     name: studentName,
     studentId: doc.studentNumber || doc.studentId || '--',
     ticketNumber: doc.ticketNumber || '',
-    status: mapStatusFromApi(doc.status),
+    availabilityId: doc.availabilityId || '',
+    status: doc.availabilityId ? 'approved' : mapStatusFromApi(doc.status),
+    isSubjectTeacher: Boolean(doc.isSubjectTeacher),
     subject: doc.subject || 'Consultation',
     message: doc.purpose || 'No message provided.',
     date: formatRequestDate(doc.consultationDate, doc.requestDate),
@@ -593,7 +595,7 @@ const filteredRequests = computed(() =>
 
 const pendingRequestIds = computed(() =>
   requests.value
-    .filter((r) => r.status === 'pending' && r.id)
+    .filter((r) => r.status === 'pending' && !r.isSubjectTeacher && !r.availabilityId && r.id)
     .map((r) => r.id)
 )
 

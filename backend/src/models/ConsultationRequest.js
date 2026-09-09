@@ -18,8 +18,18 @@ const consultationRequestSchema = new mongoose.Schema(
     availabilityId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ConsultationAvailability",
-      required: true,
+      required: false,
       index: true,
+    },
+    consultationStartTime: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    consultationEndTime: {
+      type: String,
+      trim: true,
+      default: "",
     },
     subject: {
       type: String,
@@ -55,5 +65,11 @@ const consultationRequestSchema = new mongoose.Schema(
 
 consultationRequestSchema.index({ studentId: 1, employeeId: 1, requestDate: 1 });
 consultationRequestSchema.index({ employeeId: 1, consultationDate: 1 });
+
+consultationRequestSchema.pre("validate", function autoApproveSlotRequests() {
+  if (this.availabilityId) {
+    this.status = "APPROVED";
+  }
+});
 
 module.exports = mongoose.model("ConsultationRequest", consultationRequestSchema);
