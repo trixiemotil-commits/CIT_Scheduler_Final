@@ -30,6 +30,8 @@ app.use(cors({
     'ionic://localhost',
     'https://deployed-cit-sched.vercel.app',
     'https://deployed-cit-sched-git-main-iggyt0929-1567s-projects.vercel.app',
+    'https://citscheduler.com',
+'https://www.citscheduler.com',
   ],
   credentials: true,
 }));
