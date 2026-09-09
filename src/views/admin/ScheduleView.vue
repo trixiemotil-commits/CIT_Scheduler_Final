@@ -2074,7 +2074,7 @@ function printSchedule() {
 </html>`
 
   const w = window.open('', '_blank', 'width=1000,height=700')
-  w.document.write(html)
+  w.document.write(html.replace(/@page\{size:landscape;margin:10mm;?\}/, '@page{size:A4 portrait;margin:5mm;}@media print{body{zoom:.76;}}'))
   w.document.close()
 }
 

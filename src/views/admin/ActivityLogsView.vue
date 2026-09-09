@@ -61,7 +61,7 @@
           <form class="um-search-panel" @submit.prevent="applyFilters">
             <label class="um-search-field">
               <span>Search activity</span>
-              <input v-model.trim="searchQuery" type="search" placeholder="Name, email, action, IP or device" />
+              <input v-model.trim="searchQuery" type="search" placeholder="Name, email, or action" />
             </label>
             <label>
               <span>From date &amp; time</span>
@@ -87,13 +87,11 @@
                 <th>Action</th>
                 <th>Role</th>
                 <th>Date &amp; Time</th>
-                <th>IP Address</th>
-                <th>Device</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading && !logs.length">
-                <td colspan="6">
+                <td colspan="4">
                   <div class="um-empty">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span>Loading activity logs...</span>
@@ -101,7 +99,7 @@
                 </td>
               </tr>
               <tr v-else-if="!logs.length">
-                <td colspan="6">
+                <td colspan="4">
                   <div class="um-empty">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span>No activity recorded yet.</span>
@@ -127,8 +125,6 @@
                   ]">{{ log.actorRole }}</span>
                 </td>
                 <td class="um-date">{{ formatTime(log.createdAt) }}</td>
-                <td class="um-email">{{ log.ipAddress || 'Not recorded' }}</td>
-                <td class="um-device">{{ log.device || 'Not recorded' }}</td>
               </tr>
             </tbody>
           </table>
@@ -685,6 +681,7 @@ onMounted(loadLogs)
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
+  border: 1px solid #dfe5eb;
 }
 
 .um-table thead tr {
@@ -704,11 +701,13 @@ onMounted(loadLogs)
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 14px 20px;
+  border: 1px solid #dfe5eb;
 }
 
 .um-table td {
   padding: 14px 20px;
   vertical-align: middle;
+  border: 1px solid #e8edf2;
 }
 
 .um-row {

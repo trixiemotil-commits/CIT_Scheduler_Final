@@ -662,7 +662,8 @@ async function handleLogin() {
       signIn.email,
       signIn.password,
       isMobileApp ? null : recaptchaToken,
-      isMobileApp ? { question: loginMathChallenge.value.question.replace(' =', ''), answer: Number(loginMathAnswer.value) } : null
+      isMobileApp ? { question: loginMathChallenge.value.question.replace(' =', ''), answer: Number(loginMathAnswer.value) } : null,
+      signIn.remember
     )
     const user = payload?.user
     const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)

@@ -417,11 +417,23 @@
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Password <span class="form-required">*</span></label>
-                <input v-model="userForm.password" class="form-input" type="password" placeholder="Min. 8 characters" required />
+                <div class="password-input-wrap">
+                  <input v-model="userForm.password" class="form-input" :type="showAddPassword ? 'text' : 'password'" placeholder="Min. 8 characters" required />
+                  <button type="button" class="password-toggle" :aria-label="showAddPassword ? 'Hide password' : 'Show password'" @click="showAddPassword = !showAddPassword">
+                    <svg v-if="showAddPassword" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                    <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><path d="m4 4 16 16"/></svg>
+                  </button>
+                </div>
               </div>
               <div class="form-group">
                 <label class="form-label">Confirm Password <span class="form-required">*</span></label>
-                <input v-model="userForm.confirmPassword" class="form-input" type="password" placeholder="Re-enter password" required />
+                <div class="password-input-wrap">
+                  <input v-model="userForm.confirmPassword" class="form-input" :type="showConfirmPassword ? 'text' : 'password'" placeholder="Re-enter password" required />
+                  <button type="button" class="password-toggle" :aria-label="showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'" @click="showConfirmPassword = !showConfirmPassword">
+                    <svg v-if="showConfirmPassword" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                    <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><path d="m4 4 16 16"/></svg>
+                  </button>
+                </div>
               </div>
             </div>
           </template>
@@ -998,6 +1010,8 @@ onUnmounted(() => {
 /* ── Add / Edit User ── */
 const showUserModal   = ref(false)
 const editingUser     = ref(null)
+const showAddPassword = ref(false)
+const showConfirmPassword = ref(false)
 const formError       = ref('')
 const showRegisterConfirm = ref(false)
 const showApproveAllConfirm = ref(false)
@@ -1010,6 +1024,8 @@ function openAddUser() {
   editingUser.value     = null
   formError.value       = ''
   userForm.value        = emptyForm()
+  showAddPassword.value = false
+  showConfirmPassword.value = false
   showUserModal.value   = true
 }
 
@@ -1029,6 +1045,8 @@ function openEditUser(user) {
     confirmPassword: '',
     currentPassword: '',
   }
+  showAddPassword.value = false
+  showConfirmPassword.value = false
   showUserModal.value = true
 }
 
@@ -1941,6 +1959,23 @@ function confirmRestoreUser() {
   background: #fff;
   box-shadow: 0 0 0 3px rgba(83, 91, 100,0.09);
 }
+.password-input-wrap { position: relative; }
+.password-input-wrap .form-input { padding-right: 44px; }
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.password-toggle svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.password-toggle:hover { color: #1f2937; }
 .um-pw-error {
   font-size: 0.82rem;
   color: #e63946;

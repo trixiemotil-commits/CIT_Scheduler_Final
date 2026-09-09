@@ -396,8 +396,13 @@ async function loadPage() {
     publishedTerm.value = terms.value.find(term => term.isPublished) || null
     teachers.value = (teacherResponse.users || []).filter(item => (Array.isArray(item.roles) ? item.roles.includes('teacher') : String(item.role).toLowerCase() === 'teacher') && String(item.account_status || 'Active') === 'Active').map(item => ({
       id: item._id || item.id,
+      employeeId: item.employeeId || item.registeredId || '',
       name: `${item.firstName || ''} ${item.lastName || ''}`.trim(),
       avatar: item.avatar || '',
+      position: item.position || '',
+      status: item.teacher_status || item.account_status || '',
+      startDate: item.startDate || '',
+      endDate: item.endDate || '',
     })).filter(item => item.name).sort((a, b) => a.name.localeCompare(b.name))
     const requestedTermId = String(route.query.term || '').trim()
     const requestedTerm = terms.value.find(term => termId(term) === requestedTermId)
@@ -436,6 +441,280 @@ async function chooseWorkspaceMode(mode) {
 }
 
 async function downloadTermExcel(term) {
+  const academicTermId = termId(term)
+  if (!academicTermId) return
+
+  try {
+    Swal.fire({ title: 'Preparing Excel file', text: 'Loading this term\'s faculty loading…', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() })
+    const XLSX = await import('xlsx-js-style')
+    const [scheduleResponse, consultationResponse] = await Promise.all([
+      apiRequest(`/schedules?academicTermId=${encodeURIComponent(academicTermId)}`),
+      apiRequest(`/consultations?academicTermId=${encodeURIComponent(academicTermId)}`),
+    ])
+    const entries = Array.isArray(scheduleResponse.entries) ? scheduleResponse.entries : []
+    const consultations = (Array.isArray(consultationResponse.consultations) ? consultationResponse.consultations : []).map(consultation => ({
+      ...consultation,
+      day: consultation.dayOfWeek,
+      timeIn: consultation.startTime,
+      timeOut: consultation.endTime,
+      subject: 'Consultation Hours',
+      teacher: consultation.teacher || 'CIT Faculty',
+      entryType: 'consultation',
+      color: 'color-blue',
+    }))
+    const exportEntries = [...entries, ...consultations]
+    const loadByFaculty = new Map()
+
+    entries.forEach(entry => {
+      if (!entry?.teacher || entry.entryType === 'lunch') return
+      const start = Number(entry.timeInMinutes)
+      const end = Number(entry.timeOutMinutes)
+      const minutes = Number.isFinite(start) && Number.isFinite(end) && end > start ? end - start : 0
+      loadByFaculty.set(entry.teacher, (loadByFaculty.get(entry.teacher) || 0) + minutes / 60)
+    })
+
+    const headers = ['ID', 'No.', 'FULL NAME', 'POSITION', 'STATUS', 'START DATE', 'END DATE', 'TOTAL LOAD', 'TEACHING LOAD', 'OVERLOAD', 'DELOAD', 'MODULE WRITING']
+    const facultyRows = teachers.value.map((teacher, index) => {
+      const teachingLoad = Number((loadByFaculty.get(teacher.name) || 0).toFixed(2))
+      return [
+        teacher.employeeId,
+        index + 1,
+        teacher.name.toUpperCase(),
+        teacher.position,
+        '',
+        teacher.startDate,
+        teacher.endDate,
+        teachingLoad,
+        teachingLoad,
+        0,
+        0,
+        0,
+      ]
+    })
+    const totals = headers.map((_, index) => index >= 7 ? facultyRows.reduce((sum, row) => sum + (Number(row[index]) || 0), 0) : '')
+    const matrix = [
+      [],
+      ['', termLabel(term)],
+      headers,
+      [],
+      ['[AU] MAIN & SOUTH FULL-TIME FACULTY'],
+      ...facultyRows,
+      totals,
+    ]
+    const sheet = XLSX.utils.aoa_to_sheet(matrix)
+    sheet['!merges'] = [
+      { s: { r: 1, c: 1 }, e: { r: 1, c: headers.length - 1 } },
+      { s: { r: 4, c: 0 }, e: { r: 4, c: headers.length - 1 } },
+    ]
+    sheet['!cols'] = [
+      { wch: 15 }, { wch: 7 }, { wch: 30 }, { wch: 28 }, { wch: 20 }, { wch: 16 },
+      { wch: 18 }, { wch: 13 }, { wch: 15 }, { wch: 13 }, { wch: 12 }, { wch: 18 },
+    ]
+    sheet['!rows'] = [{ hpt: 8 }, { hpt: 24 }, { hpt: 52 }, { hpt: 8 }, { hpt: 20 }]
+    sheet['!freeze'] = { xSplit: 2, ySplit: 5 }
+
+    const border = {
+      top: { style: 'thin', color: { rgb: '000000' } },
+      bottom: { style: 'thin', color: { rgb: '000000' } },
+      left: { style: 'thin', color: { rgb: '000000' } },
+      right: { style: 'thin', color: { rgb: '000000' } },
+    }
+    const headerStyle = { fill: { fgColor: { rgb: '365F91' } }, font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 10 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
+    const loadHeaderStyle = { fill: { fgColor: { rgb: 'FFF2CC' } }, font: { bold: true, color: { rgb: '5A4300' }, sz: 10 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
+    const bodyStyle = { font: { color: { rgb: '263238' }, sz: 9 }, alignment: { vertical: 'center', wrapText: true }, border }
+    const groupStyle = { fill: { fgColor: { rgb: 'D9EAD3' } }, font: { bold: true, color: { rgb: '274E13' }, sz: 10 }, alignment: { horizontal: 'left', vertical: 'center' }, border }
+    const totalStyle = { fill: { fgColor: { rgb: 'FFF2CC' } }, font: { bold: true, color: { rgb: '5A4300' }, sz: 9 }, alignment: { horizontal: 'right', vertical: 'center' }, border }
+
+    sheet.B2.s = { font: { bold: true, color: { rgb: '1F1F1F' }, sz: 14 }, alignment: { horizontal: 'left', vertical: 'center' } }
+    headers.forEach((_, index) => {
+      const cell = sheet[XLSX.utils.encode_cell({ r: 2, c: index })]
+      if (cell) cell.s = index >= 7 ? loadHeaderStyle : headerStyle
+    })
+    for (let column = 0; column < headers.length; column += 1) {
+      const groupCell = sheet[XLSX.utils.encode_cell({ r: 4, c: column })]
+      if (groupCell) groupCell.s = groupStyle
+    }
+    for (let row = 5; row < 5 + facultyRows.length; row += 1) {
+      for (let column = 0; column < headers.length; column += 1) {
+        const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })]
+        if (cell) cell.s = bodyStyle
+      }
+    }
+    for (let column = 0; column < headers.length; column += 1) {
+      const cell = sheet[XLSX.utils.encode_cell({ r: 5 + facultyRows.length, c: column })]
+      if (cell) cell.s = totalStyle
+    }
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const slots = ['7:30 AM', '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM', '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM', '6:00 PM', '6:30 PM', '7:00 PM']
+    const toMinutes = (value) => {
+      const match = String(value || '').match(/(\d+):(\d+)\s*(AM|PM)/i)
+      if (!match) return 0
+      let hour = Number(match[1])
+      const minute = Number(match[2])
+      if (match[3].toUpperCase() === 'PM' && hour !== 12) hour += 12
+      if (match[3].toUpperCase() === 'AM' && hour === 12) hour = 0
+      return hour * 60 + minute
+    }
+    const slotText = (entry) => [entry.subject || (entry.entryType === 'lunch' ? 'Lunch Break' : ''), entry.teacher || 'CIT Faculty', entry.room].filter(Boolean).join(' / ')
+    const legend = [
+      ['Lecture', 'color-yellow'],
+      ['Laboratory', 'color-green'],
+      ['CIT Faculty', 'color-pink'],
+      ['Lunch', 'color-gray'],
+      ['Consultation', 'color-blue'],
+      ['Main Campus', 'color-orange'],
+    ]
+    const scheduleColors = {
+      'color-green': { fill: 'D9EAD3', font: '274E13' },
+      'color-yellow': { fill: 'FFF2CC', font: '5A4300' },
+      'color-orange': { fill: 'FCE4D6', font: '7F4122' },
+      'color-blue': { fill: 'CFE2F3', font: '1F4E79' },
+      'color-gray': { fill: 'D9D9D9', font: '404040' },
+      'color-pink': { fill: 'F4CCCC', font: '761C3B' },
+      'color-purple': { fill: '7B5EA7', font: 'FFFFFF' },
+      'color-red': { fill: 'E63946', font: 'FFFFFF' },
+    }
+    const entryColor = (entry) => {
+      if (!entry?.teacher || entry.teacher === 'CIT Faculty') return scheduleColors['color-pink']
+      return scheduleColors[entry?.color] || scheduleColors['color-yellow']
+    }
+    const gridGroups = (groups, bandLabel) => {
+      const matrix = legend.map(([label]) => [label])
+      const gridEntries = []
+      groups.forEach(group => {
+        matrix.push([])
+        matrix.push([group.label])
+        matrix.push([bandLabel])
+        matrix.push(['Time', '', ...days])
+        const dataStartRow = matrix.length
+        const occupied = days.map(() => new Set())
+        slots.forEach((slot, index) => {
+          const start = toMinutes(slot)
+          const end = start + 30
+          const values = days.map(day => {
+            const dayIndex = days.indexOf(day)
+            if (occupied[dayIndex].has(index)) return ''
+            const entry = group.entries.find(item => item.day === day && toMinutes(item.timeIn) >= start && toMinutes(item.timeIn) < end)
+            if (!entry) return ''
+            const span = Math.max(1, Math.ceil((toMinutes(entry.timeOut) - toMinutes(entry.timeIn)) / 30))
+            for (let offset = 1; offset < span && index + offset < slots.length; offset += 1) occupied[dayIndex].add(index + offset)
+            gridEntries.push({ row: dataStartRow + index, column: dayIndex + 2, span, entry })
+            return slotText(entry)
+          })
+          matrix.push([slot, index + 1 < slots.length ? slots[index + 1] : '', ...values])
+        })
+      })
+      const sheet = XLSX.utils.aoa_to_sheet(matrix)
+      sheet.__gridEntries = gridEntries
+      return sheet
+    }
+    const styleGridSheet = (gridSheet) => {
+      gridSheet['!cols'] = [{ wch: 11 }, { wch: 11 }, ...days.map(() => ({ wch: 25 }))]
+      gridSheet['!freeze'] = { xSplit: 2, ySplit: 8 }
+      const range = XLSX.utils.decode_range(gridSheet['!ref'])
+      for (let row = 0; row <= range.e.r; row += 1) {
+        const firstValue = gridSheet[XLSX.utils.encode_cell({ r: row, c: 0 })]?.v
+        if (row < legend.length) {
+          const legendColor = entryColor({ color: legend[row][1], teacher: 'legend' })
+          for (let column = 0; column < 2; column += 1) {
+            const cell = gridSheet[XLSX.utils.encode_cell({ r: row, c: column })]
+            if (cell) cell.s = { fill: { fgColor: { rgb: legendColor.fill } }, font: { bold: true, color: { rgb: legendColor.font }, sz: 11 }, alignment: { horizontal: 'center', vertical: 'center' }, border }
+          }
+          continue
+        }
+        const rowType = (row - legend.length) % (slots.length + 4)
+        if (rowType === 1 || rowType === 2) {
+          gridSheet['!merges'] = gridSheet['!merges'] || []
+          gridSheet['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: days.length + 1 } })
+        }
+        for (let column = 0; column <= days.length + 1; column += 1) {
+          const cell = gridSheet[XLSX.utils.encode_cell({ r: row, c: column })]
+          if (!cell) continue
+          if (rowType === 1 || rowType === 2) cell.s = groupStyle
+          else if (rowType === 3) cell.s = loadHeaderStyle
+          else if (row >= 8) cell.s = bodyStyle
+        }
+      }
+      ;(gridSheet.__gridEntries || []).forEach(({ row, column, span, entry }) => {
+        const color = entryColor(entry)
+        const cell = gridSheet[XLSX.utils.encode_cell({ r: row, c: column })]
+        if (cell) {
+          cell.s = { fill: { fgColor: { rgb: color.fill } }, font: { bold: true, color: { rgb: color.font }, sz: 9 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
+        }
+        if (span > 1) {
+          gridSheet['!merges'] = gridSheet['!merges'] || []
+          gridSheet['!merges'].push({ s: { r: row, c: column }, e: { r: row + span - 1, c: column } })
+        }
+      })
+      delete gridSheet.__gridEntries
+    }
+    const facultyGroups = teachers.value.map(teacher => ({ label: teacher.name, entries: exportEntries.filter(entry => entry.teacher === teacher.name) }))
+    const unassignedEntries = exportEntries.filter(entry => !entry.teacher || entry.teacher === 'CIT Faculty')
+    if (unassignedEntries.length) facultyGroups.push({ label: 'CIT Faculty', entries: unassignedEntries })
+    const facultyScheduleSheet = gridGroups(facultyGroups, 'Faculty Schedule')
+    const studentGroups = [...new Set(entries.filter(entry => entry.year || entry.section).map(entry => `${entry.year || 'Unknown'} · ${entry.section || 'Unassigned'}`))]
+      .map(label => ({ label, entries: entries.filter(entry => `${entry.year || 'Unknown'} · ${entry.section || 'Unassigned'}` === label) }))
+    const studentScheduleSheet = gridGroups(studentGroups, 'FACE-TO-FACE')
+    styleGridSheet(facultyScheduleSheet)
+    styleGridSheet(studentScheduleSheet)
+
+    const scheduleColumns = ['Subj Code', 'Subj Desc', 'Section', 'Teacher', 'Lec Room', 'Lec Day', 'Lec S Time', 'Lec E Time', 'Session', 'Lab Room', 'Lab Day', 'Lab S Time', 'Lab E Time', 'Session']
+    const splitSubject = (subject) => {
+      const value = String(subject || '').trim()
+      const separatorIndex = value.indexOf('|')
+      if (separatorIndex < 0) return { code: '', description: value }
+      return {
+        code: value.slice(0, separatorIndex).trim(),
+        description: value.slice(separatorIndex + 1).trim(),
+      }
+    }
+    const scheduleRows = exportEntries.map(entry => {
+      const subject = splitSubject(entry.subject)
+      return [
+      subject.code, subject.description, entry.section || '', entry.teacher || 'CIT Faculty', entry.roomType === 'Comlab/Laboratory' ? '' : entry.room || '',
+      entry.roomType === 'Comlab/Laboratory' ? '' : entry.day || '', entry.roomType === 'Comlab/Laboratory' ? '' : entry.timeIn || '', entry.roomType === 'Comlab/Laboratory' ? '' : entry.timeOut || '',
+      entry.roomType === 'Comlab/Laboratory' ? '' : 'Lec', entry.roomType === 'Comlab/Laboratory' ? entry.room || '' : '', entry.roomType === 'Comlab/Laboratory' ? entry.day || '' : '',
+      entry.roomType === 'Comlab/Laboratory' ? entry.timeIn || '' : '', entry.roomType === 'Comlab/Laboratory' ? entry.timeOut || '' : '', entry.roomType === 'Comlab/Laboratory' ? 'Lab' : '',
+      ]
+    })
+    const scheduleSheet = XLSX.utils.aoa_to_sheet([
+      ['CLASS DETAILS', '', '', '', '', 'SESSION 1 : LEC', '', '', '', 'SESSION 1 : LAB', '', '', '', ''],
+      scheduleColumns,
+      ...scheduleRows,
+    ])
+    scheduleSheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, { s: { r: 0, c: 5 }, e: { r: 0, c: 8 } }, { s: { r: 0, c: 9 }, e: { r: 0, c: 13 } }]
+    scheduleSheet['!cols'] = [{ wch: 14 }, { wch: 38 }, { wch: 18 }, { wch: 24 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }]
+    scheduleSheet['!freeze'] = { xSplit: 0, ySplit: 2 }
+    for (let column = 0; column < scheduleColumns.length; column += 1) {
+      const titleCell = scheduleSheet[XLSX.utils.encode_cell({ r: 0, c: column })]
+      const headerCell = scheduleSheet[XLSX.utils.encode_cell({ r: 1, c: column })]
+      if (titleCell) titleCell.s = groupStyle
+      if (headerCell) headerCell.s = loadHeaderStyle
+      for (let row = 2; row < scheduleRows.length + 2; row += 1) {
+        const cell = scheduleSheet[XLSX.utils.encode_cell({ r: row, c: column })]
+        if (cell) {
+          const color = entryColor(exportEntries[row - 2])
+          cell.s = { fill: { fgColor: { rgb: color.fill } }, font: { color: { rgb: color.font }, sz: 9 }, alignment: { vertical: 'center', wrapText: true }, border }
+        }
+      }
+    }
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Faculty Loading')
+    XLSX.utils.book_append_sheet(workbook, facultyScheduleSheet, 'Faculty Schedule')
+    XLSX.utils.book_append_sheet(workbook, scheduleSheet, 'Schedule')
+    XLSX.utils.book_append_sheet(workbook, studentScheduleSheet, 'Student Schedule')
+    const safeTermLabel = termLabel(term).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()
+    XLSX.writeFile(workbook, `faculty-loading-${safeTermLabel || 'academic-term'}.xlsx`)
+    Swal.close()
+  } catch (error) {
+    Swal.close()
+    await Swal.fire({ icon: 'error', title: 'Unable to download faculty loading', text: error.message })
+  }
+}
+
+async function downloadScheduleWorkbook(term) {
   const academicTermId = termId(term)
   if (!academicTermId) return
 

@@ -158,7 +158,7 @@
               <button class="icon-btn" title="Print" @click="printSchedule">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               </button>
-              <button class="icon-btn export-btn" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
+              <button v-if="viewMode === 'room'" class="icon-btn export-btn" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8"/></svg>
                 <span>Excel</span>
               </button>
@@ -278,7 +278,7 @@
               <button class="icon-btn" title="Print" @click="printSchedule">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               </button>
-              <button class="icon-btn export-btn" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
+              <button v-if="viewMode === 'room'" class="icon-btn export-btn" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8"/></svg>
                 <span>Excel</span>
               </button>
@@ -1255,7 +1255,8 @@ function exportScheduleExcel() {
   const sub = [selectedTermLabel.value ? `Term: ${selectedTermLabel.value}` : '', isRoom ? selectedFloor.value : '', `Exported on ${new Date().toLocaleDateString('en-US')}`].filter(Boolean).join(' | ')
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
     @page{size:landscape;margin:10mm}*{box-sizing:border-box}body{font-family:Segoe UI,Arial,sans-serif;padding:14px 18px;font-size:11px;color:#252d33}h2{font-size:16px;margin:0 0 4px}.sub{font-size:10px;color:#66727c;margin:0 0 12px}table{width:100%;border-collapse:collapse;table-layout:fixed;border:1px solid #cfd6df}th{background:#3f4b55;color:#fff;padding:8px 6px;text-align:center;font-size:10px;border:1px solid #26333d}th:first-child{width:68px}td{border:1px solid #d9dfe4;height:44px;vertical-align:top}.half td{border-top:1px dashed #d9dfe4}.time-col{background:#f0f2f4;color:#4b5563;font-size:9px;font-weight:700;text-align:center;vertical-align:middle;padding:4px 2px}.free-cell{background:#f5f1ff}.entry-cell{padding:8px 9px;vertical-align:top;border:3px solid #fff;line-height:1.35;overflow:hidden}.entry-cell span{display:block}.e-teacher{font-size:10px;font-weight:700}.e-main{font-size:10px;font-weight:800}.e-time{font-size:8.5px;margin-top:2px;opacity:.9}.e-section{font-size:9px;margin-top:2px;font-weight:600}</style></head><body><h2>${esc(title)}</h2><p class="sub">${esc(sub)}</p><table><thead><tr><th>Time</th>${DAYS.map(day => `<th>${esc(day)}</th>`).join('')}</tr></thead><tbody>${bodyHTML}</tbody></table></body></html>`
-  const blob = new Blob([`\ufeff${html}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
+  const excelHtml = html.replace('</head>', '<style>body{padding:8px;font-size:9px;}h2{font-size:13px;margin-bottom:2px}.sub{font-size:8px;margin-bottom:6px}table{width:100%;table-layout:fixed;border:1px solid #000}th{padding:4px 3px;font-size:8px;border:1px solid #000}th:first-child{width:54px}tbody tr{height:24px;min-height:24px;max-height:24px}td{border:1px solid #000;height:24px}.time-col{font-size:8px;padding:2px 1px}.entry-cell{padding:3px 4px;border:0;border-radius:0;line-height:1.1}.entry-cell span{line-height:1.1}.e-teacher{font-size:8px}.e-main{font-size:8px}.e-time{font-size:7px;margin-top:1px}.e-section{font-size:7px;margin-top:1px}</style></head>')
+  const blob = new Blob([`\ufeff${excelHtml}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -1437,7 +1438,11 @@ function printSchedule() {
 <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<\/script>
 </body></html>`
   const w = window.open('', '_blank', 'width=1100,height=800')
-  w.document.write(html)
+  const printHtml = html
+    .replace(/border:4px solid #fff/g, 'border:0')
+    .replace(/border:3px solid #fff/g, 'border:0')
+    .replace('</head>', '<style>@page{size:A4 landscape;margin:4mm;}body{padding:4mm;font-size:7px;}h2{font-size:11px;margin-bottom:1px}.sub{font-size:6.5px;margin-bottom:3px}table{border:1px solid #000}th{padding:2px 1px;font-size:6.5px;border:1px solid #000}th.time-hdr{width:42px}tbody tr{height:18px;min-height:18px;max-height:18px}td{height:18px;border:1px solid #000}td.time-col{font-size:6.5px;padding:1px}.entry-cell{padding:1px 2px;border:0;line-height:1}.entry-cell span{line-height:1}.e-teacher{font-size:6px}.e-subject,.e-main{font-size:6px}.e-time{font-size:5.5px;margin-top:0}.e-section{font-size:5.5px;margin-top:0}</style></head>')
+  w.document.write(printHtml)
   w.document.close()
 }
 </script>

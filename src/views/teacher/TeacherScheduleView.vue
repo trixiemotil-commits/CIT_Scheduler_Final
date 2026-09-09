@@ -67,10 +67,6 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 22h12v-9H6z"/><path d="M6 14h12"/></svg>
               Print
             </button>
-            <button class="icon-btn excel-btn" @click="exportScheduleExcel" :disabled="isLoading" title="Download Excel" aria-label="Download Excel">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8"/></svg>
-              Excel
-            </button>
           </div>
         </div>
 
@@ -832,38 +828,6 @@ function printSchedule() {
     window.print()
     expandedDay.value = previousExpandedDay
   })
-}
-
-function exportScheduleExcel() {
-  const esc = (value) => String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-
-  const rows = [
-    ...filteredClasses.value.map((entry) => ({ ...entry, type: entry.entryType || 'class' })),
-    ...filteredConsultations.value.map((entry) => ({
-      ...entry,
-      subject: 'Consultation Hours',
-      section: '',
-      room: '',
-      type: 'consultation',
-    })),
-  ]
-
-  const body = rows.map((entry) => `
-    <tr><td>${esc(entry.teacher || userName.value)}</td><td>${esc(entry.day)}</td><td>${esc(entry.start)}</td><td>${esc(entry.end)}</td><td>${esc(entry.subject)}</td><td>${esc(entry.section)}</td><td>${esc(entry.room)}</td><td>${esc(entry.type)}</td></tr>`).join('')
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>table{border-collapse:collapse;font-family:Arial,sans-serif}th,td{border:1px solid #999;padding:6px 8px}th{background:#30353a;color:#fff}</style></head><body><h2>My Schedule - ${esc(userName.value || 'Teacher')}</h2><p>Subject filter: ${esc(selectedSubject.value || 'All')}</p><table><thead><tr><th>Teacher</th><th>Day</th><th>Start</th><th>End</th><th>Subject</th><th>Section</th><th>Room</th><th>Type</th></tr></thead><tbody>${body || '<tr><td colspan="8">No schedule entries found.</td></tr>'}</tbody></table></body></html>`
-  const blob = new Blob([`\ufeff${html}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'my-schedule.xls'
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
 }
 
 /* ── Logout ── */
