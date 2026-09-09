@@ -70,15 +70,14 @@
       <!-- Top bar -->
       <div class="um-topbar">
         <div class="um-view-tabs">
-          <button :class="['um-view-tab', activeView === 'active' ? 'um-view-tab--on' : '']" @click="activeView = 'active'">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            All Users
-          </button>
-          <button :class="['um-view-tab', activeView === 'archived' ? 'um-view-tab--on' : '']" @click="activeView = 'archived'">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-            Archived
-            <span v-if="users.filter(u => u.status === 'Archived').length > 0" class="um-view-tab-badge">{{ users.filter(u => u.status === 'Archived').length }}</span>
-          </button>
+          <select v-model="statusFilter" class="um-filter-select um-filter-select--status">
+            <option value="all">All Users</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="denied">Denied</option>
+            <option value="inactive">Inactive</option>
+            <option value="archived">Archived</option>
+          </select>
         </div>
         <div class="um-topbar-right">
           <button
@@ -143,7 +142,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
           <div class="um-stat-info">
-            <div class="um-stat-val">{{ users.filter(u => Array.isArray(u.roles) ? u.roles.includes('admin') : u.role === 'Admin').length }}</div>
+            <div class="um-stat-val">{{ adminUserCount }}</div>
             <div class="um-stat-label">Admins</div>
           </div>
         </div>
@@ -152,35 +151,44 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
           </div>
           <div class="um-stat-info">
-            <div class="um-stat-val">{{ users.filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher').length }}</div>
+            <div class="um-stat-val">{{ teacherUserCount }}</div>
             <div class="um-stat-label">Teachers</div>
           </div>
         </div>
-        <div :class="['um-stat-card', 'um-stat-card--clickable', { 'um-stat-card--selected': userStatFilter === 'admin-teacher' }]" role="button" tabindex="0" aria-label="Show admin and teacher accounts" @click="selectUserStat('admin-teacher')" @keydown.enter="selectUserStat('admin-teacher')" @keydown.space.prevent="selectUserStat('admin-teacher')">
-          <div class="um-stat-icon um-stat-icon--admin-teacher">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+        <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show first-year students" @click="selectUserStat('year-1')" @keydown.enter="selectUserStat('year-1')" @keydown.space.prevent="selectUserStat('year-1')">
+          <div class="um-stat-icon um-stat-icon--year-1">
+            <span>1</span>
           </div>
           <div class="um-stat-info">
-            <div class="um-stat-val">{{ users.filter(u => Array.isArray(u.roles) && u.roles.includes('admin') && u.roles.includes('teacher')).length }}</div>
-            <div class="um-stat-label">Admin &amp; Teacher</div>
+            <div class="um-stat-val">{{ yearLevelCounts.first }}</div>
+            <div class="um-stat-label">1st Year</div>
           </div>
         </div>
-        <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show active users" @click="selectUserStat('active')" @keydown.enter="selectUserStat('active')" @keydown.space.prevent="selectUserStat('active')">
-          <div class="um-stat-icon um-stat-icon--active">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show second-year students" @click="selectUserStat('year-2')" @keydown.enter="selectUserStat('year-2')" @keydown.space.prevent="selectUserStat('year-2')">
+          <div class="um-stat-icon um-stat-icon--year-2">
+            <span>2</span>
           </div>
           <div class="um-stat-info">
-            <div class="um-stat-val">{{ users.filter(u => u.status === 'Active').length }}</div>
-            <div class="um-stat-label">Active</div>
+            <div class="um-stat-val">{{ yearLevelCounts.second }}</div>
+            <div class="um-stat-label">2nd Year</div>
           </div>
         </div>
-        <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show archived users" @click="selectUserStat('archived')" @keydown.enter="selectUserStat('archived')" @keydown.space.prevent="selectUserStat('archived')">
-          <div class="um-stat-icon um-stat-icon--archived">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show third-year students" @click="selectUserStat('year-3')" @keydown.enter="selectUserStat('year-3')" @keydown.space.prevent="selectUserStat('year-3')">
+          <div class="um-stat-icon um-stat-icon--year-3">
+            <span>3</span>
           </div>
           <div class="um-stat-info">
-            <div class="um-stat-val">{{ users.filter(u => u.status === 'Archived').length }}</div>
-            <div class="um-stat-label">Archived</div>
+            <div class="um-stat-val">{{ yearLevelCounts.third }}</div>
+            <div class="um-stat-label">3rd Year</div>
+          </div>
+        </div>
+        <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show fourth-year students" @click="selectUserStat('year-4')" @keydown.enter="selectUserStat('year-4')" @keydown.space.prevent="selectUserStat('year-4')">
+          <div class="um-stat-icon um-stat-icon--year-4">
+            <span>4</span>
+          </div>
+          <div class="um-stat-info">
+            <div class="um-stat-val">{{ yearLevelCounts.fourth }}</div>
+            <div class="um-stat-label">4th Year</div>
           </div>
         </div>
       </div>
@@ -700,6 +708,7 @@ const activeView  = ref('active')
 const searchQuery = ref('')
 const roleFilter  = ref('')
 const userStatFilter = ref('')
+const statusFilter = ref('all')
 
 /* ── Users Data ── */
 const users = ref([])
@@ -728,9 +737,30 @@ const pendingCount = computed(() => {
   return users.value.filter((u) => u.status === 'Pending').length
 })
 
+const adminUserCount = computed(() => users.value.filter(u => {
+  const roles = Array.isArray(u.roles) ? u.roles : []
+  return roles.includes('admin') || u.role === 'Admin'
+}).length)
+
+const teacherUserCount = computed(() => users.value.filter(u => {
+  const roles = Array.isArray(u.roles) ? u.roles : []
+  return roles.includes('teacher') || u.role === 'Teacher'
+}).length)
+
+const yearLevelCounts = computed(() => {
+  const counts = { first: 0, second: 0, third: 0, fourth: 0 }
+  for (const user of users.value) {
+    const year = String(user.yearLevel || user.studentYear || user.year || '').trim().toLowerCase()
+    if (year.includes('1st') || year.includes('first')) counts.first += 1
+    else if (year.includes('2nd') || year.includes('second')) counts.second += 1
+    else if (year.includes('3rd') || year.includes('third')) counts.third += 1
+    else if (year.includes('4th') || year.includes('fourth')) counts.fourth += 1
+  }
+  return counts
+})
+
 const filteredUsers = computed(() => {
   return users.value.filter(u => {
-    const matchView   = activeView.value === 'archived' ? u.status === 'Archived' : u.status !== 'Archived'
     const query = searchQuery.value.trim().toLowerCase()
     const department = (u.department || '').toLowerCase()
     const matchSearch = query === '' ||
@@ -741,20 +771,27 @@ const filteredUsers = computed(() => {
     const matchRole = roleFilter.value === '' ||
       (roleFilter.value === 'Admin & Teacher' && roles.includes('admin') && roles.includes('teacher')) ||
       u.role === roleFilter.value
-    const matchStat = userStatFilter.value === '' ||
-      userStatFilter.value === 'archived' ||
-      (userStatFilter.value === 'admins' && roles.includes('admin')) ||
-      (userStatFilter.value === 'teachers' && roles.includes('teacher')) ||
-      (userStatFilter.value === 'admin-teacher' && roles.includes('admin') && roles.includes('teacher')) ||
-      (userStatFilter.value === 'active' && u.status === 'Active')
-    return matchView && matchSearch && matchRole && matchStat
+
+    const statusMatch = statusFilter.value === 'all' || String(u.status || '').toLowerCase() === statusFilter.value.toLowerCase()
+    const yearMatch = userStatFilter.value === '' ||
+      (userStatFilter.value === 'admins' && (roles.includes('admin') || u.role === 'Admin')) ||
+      (userStatFilter.value === 'teachers' && (roles.includes('teacher') || u.role === 'Teacher')) ||
+      (userStatFilter.value === 'year-1' && (String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('1st') || String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('first'))) ||
+      (userStatFilter.value === 'year-2' && (String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('2nd') || String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('second'))) ||
+      (userStatFilter.value === 'year-3' && (String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('3rd') || String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('third'))) ||
+      (userStatFilter.value === 'year-4' && (String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('4th') || String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('fourth')))
+
+    return matchSearch && matchRole && statusMatch && yearMatch
   })
 })
 
 function selectUserStat(stat) {
   userStatFilter.value = stat === 'all' ? '' : stat
   roleFilter.value = stat === 'admin-teacher' ? 'Admin & Teacher' : ''
-  activeView.value = stat === 'archived' ? 'archived' : 'active'
+  if (stat === 'all') statusFilter.value = 'all'
+  else if (['active', 'pending', 'denied', 'inactive'].includes(stat)) statusFilter.value = stat
+  else if (['admins', 'teachers', 'year-1', 'year-2', 'year-3', 'year-4'].includes(stat)) statusFilter.value = 'all'
+  activeView.value = 'active'
 }
 
 const selectablePendingUsers = computed(() => filteredUsers.value.filter((user) => user.status === 'Pending'))
@@ -1637,38 +1674,63 @@ function confirmRestoreUser() {
 
 /* ── Stats Row ── */
 .um-stats-row {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
   margin-bottom: 24px;
+  width: 100%;
+  overflow: hidden;
 }
 .um-stat-card {
-  background: #fff;
-  border-radius: 14px;
-  padding: 18px 20px;
+  flex: 1 1 0;
+  min-width: 120px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,247,248,0.96));
+  border: 1px solid rgba(128, 139, 147, 0.18);
+  border-radius: 16px;
+  padding: 12px 8px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  justify-content: center;
+  gap: 10px;
+  min-height: 82px;
+  box-shadow: 0 8px 18px rgba(53, 63, 71, 0.05), inset 0 1px 0 rgba(255,255,255,0.9);
 }
 .um-stat-icon {
-  width: 46px;
-  height: 46px;
+  width: 36px;
+  height: 36px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  font-weight: 800;
+  font-size: 1rem;
 }
-.um-stat-icon--total   { background: #f3f4f6; color: #4f575f; }
-.um-stat-icon--admin   { background: #e8eefe; color: #2563eb; }
-.um-stat-icon--archived { background: #f3f4f6; color: #6b7280; }
-.um-stat-card--clickable { cursor: pointer; transition: box-shadow 0.18s, transform 0.15s; }
-.um-stat-card--clickable:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.12); transform: translateY(-2px); }
-.um-stat-icon--teacher { background: #fef3c7; color: #b45309; }
-.um-stat-icon--active  { background: #d8dcdf; color: #4f575f; }
-.um-stat-val   { font-size: 1.6rem; font-weight: 800; color: #111; line-height: 1; }
-.um-stat-label { font-size: 0.78rem; color: #888; font-weight: 500; margin-top: 3px; }
+.um-stat-icon span {
+  line-height: 1;
+}
+.um-stat-icon--total   { background: #eef2f4; color: #3f4850; }
+.um-stat-icon--admin   { background: #e6f2ff; color: #2563eb; }
+.um-stat-icon--archived { background: #f4f0ff; color: #7c3aed; }
+.um-stat-card--clickable { cursor: pointer; transition: box-shadow 0.18s, transform 0.15s, border-color 0.18s; }
+.um-stat-card--clickable:hover { box-shadow: 0 10px 20px rgba(17, 24, 39, 0.08); transform: translateY(-2px); border-color: rgba(90, 100, 109, 0.24); }
+.um-stat-card--selected { border-color: rgba(77, 89, 98, 0.38); box-shadow: 0 10px 20px rgba(17, 24, 39, 0.06); }
+.um-stat-icon--teacher { background: #fff3d8; color: #b45309; }
+.um-stat-icon--active  { background: #dff6ea; color: #1e7c59; }
+.um-stat-icon--year-1 { background: #edf4ff; color: #4f46e5; }
+.um-stat-icon--year-2 { background: #eefcf6; color: #138a66; }
+.um-stat-icon--year-3 { background: #fff0ea; color: #d97706; }
+.um-stat-icon--year-4 { background: #f3e8ff; color: #7c3aed; }
+.um-stat-info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  text-align: center;
+}
+.um-stat-val   { font-size: clamp(1.15rem, 1.4vw, 1.6rem); font-weight: 800; color: #1f2937; line-height: 1; }
+.um-stat-label { font-size: 0.72rem; color: #53606d; font-weight: 700; letter-spacing: -0.01em; }
 
 /* ── Table ── */
 .um-table-wrap {
@@ -2705,15 +2767,18 @@ function confirmRestoreUser() {
 .um-stat-label { font-size: .6rem; white-space: nowrap; }
 
 @media (max-width: 1280px) {
-  .um-stats-row { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .um-stats-row { overflow-x: auto; }
+  .um-stat-card { min-width: 118px; }
 }
 
 @media (max-width: 900px) {
-  .um-stats-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .um-stats-row { overflow-x: auto; }
+  .um-stat-card { min-width: 120px; }
 }
 
 @media (max-width: 700px) {
-  .um-stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .um-stats-row { overflow-x: auto; }
+  .um-stat-card { min-width: 120px; }
 }
 
 .um-modal-box--wide {

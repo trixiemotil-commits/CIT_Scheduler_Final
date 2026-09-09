@@ -38,6 +38,7 @@
     <main class="main">
       <header class="main-header teacher-main-header">
         <div>
+          <span class="page-eyebrow">Schedule</span>
           <h1 class="page-title">My Schedule</h1>
           <p class="page-sub">View your weekly class and consultation schedule</p>
         </div>
@@ -68,6 +69,13 @@
               Print
             </button>
           </div>
+        </div>
+
+        <div class="schedule-color-legend" aria-label="Schedule color legend">
+          <span><i class="legend-swatch legend-lecture" aria-hidden="true"></i>Lecture</span>
+          <span><i class="legend-swatch legend-lab" aria-hidden="true"></i>Laboratory</span>
+          <span><i class="legend-swatch legend-consultation" aria-hidden="true"></i>Consultation</span>
+          <span><i class="legend-swatch legend-free" aria-hidden="true"></i>Free time</span>
         </div>
 
         <!-- Grid -->
@@ -108,9 +116,7 @@
                       <div v-if="cell.cls.isSubstitute" class="teacher-subbed-indication">{{ cell.cls.subbedLabel }}</div>
                       <div v-if="cell.cls.room" class="cell-room-sm">{{ cell.cls.room }}</div>
                       <div class="cell-subject-sm">{{ cell.cls.subject }}</div>
-                      <div v-if="cell.cls.color === 'orange'" class="cell-campus-sm">Main Campus</div>
                       <div v-if="cell.cls.year || cell.cls.section" class="cell-tag-sm">{{ cell.cls.year || '--' }} • {{ cell.cls.section || '--' }}</div>
-                      <div v-if="cell.cls.entryType !== 'lunch'" class="cell-tag-sm">{{ cell.cls.parallel ? 'Parallel' : 'Non-parallel' }}</div>
                     </template>
                     <!-- Expanded view -->
                     <template v-else>
@@ -137,7 +143,7 @@
                         </svg>
                         <strong class="cell-exp-subject">{{ cell.cls.subject }}</strong>
                       </div>
-                      <div v-if="cell.cls.year || cell.cls.section" class="cell-exp-section">{{ cell.cls.year || '--' }} • {{ cell.cls.section }}</div>
+                      <div v-if="cell.cls.year || cell.cls.section" class="cell-exp-section">{{ cell.cls.year || '--' }} • {{ cell.cls.section || '--' }}</div>
                     </template>
                   </td>
                   <!-- Consultation cell -->
@@ -190,7 +196,7 @@
                     v-else-if="cell.type === 'empty'"
                     :class="['td-empty', { 'col-expanded': expandedDay === DAYS[ci] }]"
                   >
-                    <span v-if="TIME_SLOTS[ri].start.endsWith(':00')" class="free-time-label">Free time</span>
+                    <span class="free-time-label">Free time</span>
                   </td>
                   <!-- occupied: skip -->
                 </template>
@@ -454,9 +460,11 @@ function resolveGridSpan(startTime, endTime) {
     return null
   }
 
+  const visualEndIndex = Math.min(maxEndIndex, endIndex + 1)
+
   return {
     startIndex,
-    rowspan: Math.max(1, Math.min(maxEndIndex, endIndex) - startIndex),
+    rowspan: Math.max(1, visualEndIndex - startIndex),
   }
 }
 
@@ -843,8 +851,8 @@ function confirmLogout() {
 /* ── Layout ── */
 .layout {
   display: flex;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  overflow: visible;
   background: #f5f6f8;
   font-family: 'Poppins', sans-serif;
 }
@@ -939,11 +947,12 @@ function confirmLogout() {
 .main {
   flex: 1;
   padding: 40px 44px 32px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
   box-sizing: border-box;
 }
 
@@ -952,28 +961,42 @@ function confirmLogout() {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 28px;
+  margin-bottom: 26px;
+}
+.page-eyebrow {
+  display: block;
+  margin: 0 0 2px;
+  color: #6d7880;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 .page-title {
-  font-size: 2.4rem;
+  margin: 0;
+  font-size: clamp(2.2rem, 3vw, 3.6rem);
   font-weight: 700;
-  color: #4b5563;
-  letter-spacing: -0.5px;
-  line-height: 1.2;
+  color: #2f3740;
+  letter-spacing: -0.06em;
+  line-height: 1.06;
 }
-.page-sub { font-size: 0.95rem; color: #777; margin-top: 4px; }
+.page-sub {
+  font-size: 0.95rem;
+  color: #6f7a82;
+  margin: 8px 0 0;
+}
 
 /* ── Schedule Card ── */
 .schedule-card {
   background: #fff;
-  border: 1.5px solid #e0e0e0;
-  border-radius: 16px;
-  padding: 24px 24px 0;
+  border-radius: 18px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  padding: 28px 28px 20px;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 .card-top {
   display: flex;
@@ -988,27 +1011,26 @@ function confirmLogout() {
 /* Filter dropdown */
 .sched-topbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 .sched-topbar-left {
   min-width: 240px;
 }
 .sched-grid-title {
-  font-size: 1.1rem;
+  font-size: 1.65rem;
   font-weight: 700;
-  color: #111827;
-  margin: 0 0 6px;
+  color: #111;
+  margin: 0 0 2px;
 }
 .sched-grid-sub {
   margin: 0;
-  font-size: 0.92rem;
-  color: #6b7280;
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 400;
 }
 .sched-topbar-right {
   display: flex;
@@ -1023,100 +1045,140 @@ function confirmLogout() {
 }
 .subject-select {
   appearance: none;
-  border: 1.5px solid #d0d0d0;
-  border-radius: 8px;
-  padding: 10px 38px 10px 14px;
-  font-family: inherit;
-  font-size: 0.92rem;
-  color: #333;
   background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 7px 32px 7px 12px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: #333;
   cursor: pointer;
   outline: none;
   min-width: 220px;
 }
-.subject-select:focus { border-color: #4b5563; }
+.subject-select:focus { border-color: #9ca3af; }
 .select-arrow {
   position: absolute;
-  right: 12px;
+  right: 10px;
   pointer-events: none;
-  color: #555;
+  color: #666;
 }
 
 .icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border: 1px solid #d1d5db;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid #cfd6dc;
+  border-radius: 8px;
   background: #fff;
-  color: #1f2937;
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-size: 0.9rem;
+  color: #30353a;
+  font: inherit;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  transition: background 0.18s ease, border-color 0.15s ease;
 }
 
 .icon-btn:hover {
-  background: #f8fafc;
+  background: #f2f5f7;
   border-color: #9ca3af;
-  transform: translateY(-1px);
 }
 
 .print-btn {
   white-space: nowrap;
 }
 
+.schedule-color-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px 16px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #4b5563;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.schedule-color-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  display: inline-block;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.legend-lecture { background: #e9c46a; }
+.legend-lab { background: #1f6b45; }
+.legend-consultation { background: #4a90d9; }
+.legend-free { background: #7b5ea7; }
+
 /* ── Table ── */
 .table-scroll {
-  flex: 1;
-  overflow: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  margin-top: 8px;
+  position: relative;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
 }
 
 .table-scroll::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  width: 8px;
+  height: 8px;
 }
 
 .sched-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
+  min-width: 820px;
 }
 
 /* ─ Header: Time Column ─ */
 .th-time {
   background: #4b5563;
   color: #fff;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 600;
   text-align: center;
-  padding: 14px 12px;
+  padding: 12px 10px;
   white-space: nowrap;
-  width: 110px;
+  width: 100px;
   position: sticky;
   top: 0;
-  z-index: 2;
-  border-right: 1px solid #6b7280;
+  left: 0;
+  z-index: 20;
 }
 
 /* ─ Header: Day Columns ─ */
 .th-day {
   background: #4b5563;
   color: #fff;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 600;
   text-align: center;
-  padding: 14px 8px;
+  padding: 12px 10px;
   cursor: pointer;
   white-space: nowrap;
   position: sticky;
   top: 0;
   z-index: 2;
-  border-left: 1px solid #6b7280;
   user-select: none;
   transition: background 0.2s ease, width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1126,27 +1188,33 @@ function confirmLogout() {
 
 /* ─ Body: Time Column ─ */
 .td-time {
-  background: #f9fafb;
-  font-size: 0.78rem;
-  color: #555;
+  background: #f8f9fa;
+  font-size: 0.8rem;
+  color: #4b5563;
   text-align: center;
   padding: 0 10px;
   white-space: nowrap;
-  border: 1px solid #e8e8e8;
+  border: 1px solid #ececec;
   height: 40px;
   vertical-align: middle;
+  position: sticky;
+  left: 0;
+  z-index: 15;
 }
 
 /* ─ Body: Empty Cells ─ */
 .td-empty {
-  border: 1px solid #e8e8e8;
+  border: 1px solid rgba(109, 40, 217, 0.12);
   vertical-align: top;
   width: 120px;
   min-width: 120px;
   height: 48px;
-  padding: 10px 10px;
-  background: #fafafa;
-  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 4px;
+  background: linear-gradient(135deg, rgba(238, 232, 255, 0.9), rgba(245, 241, 255, 0.75));
+  border-radius: 6px;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.35s cubic-bezier(0.22, 1, 0.36, 1), padding 0.35s ease, transform 0.35s ease;
 }
 
 .td-empty.col-expanded {
@@ -1155,27 +1223,33 @@ function confirmLogout() {
 }
 
 .free-time-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   width: 100%;
   height: 100%;
-  color: #4b5563;
+  color: #6d28d9;
   font-size: 0.78rem;
-  font-weight: 600;
-  opacity: 0.85;
+  font-weight: 750;
+  line-height: 1.2;
+  text-align: center;
+  opacity: 1;
+  pointer-events: none;
 }
 
 /* ─ Body: Class Cells ─ */
 .td-class {
   border: 1px solid rgba(0, 0, 0, 0.08);
   vertical-align: middle;
-  padding: 6px 10px;
+  padding: 4px 6px;
   cursor: pointer;
   width: 120px;
   min-width: 120px;
   max-width: 120px;
-  transition: filter 0.2s ease, width 0.4s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1), padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 6px;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: filter 0.2s ease, width 0.35s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.35s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.35s cubic-bezier(0.22, 1, 0.36, 1), padding 0.35s ease, transform 0.35s ease;
+  will-change: width, min-width, max-width, padding;
 }
 
 .td-class:hover {
@@ -1217,18 +1291,18 @@ function confirmLogout() {
 
 /* ─ Cell Colors ─ */
 .cell-green {
-  background: #4b5563;
+  background: #1f6b45;
   color: #fff;
 }
 
 .cell-yellow {
-  background: #e8a020;
-  color: #251500;
+  background: #e9c46a;
+  color: #5a3e00;
 }
 
 .cell-orange {
   background: #f4a261;
-  color: #2e1700;
+  color: #5a2d00;
 }
 
 .cell-blue {
@@ -1238,23 +1312,28 @@ function confirmLogout() {
 
 /* ─ Compact View: Text Styling ─ */
 .cell-room-sm {
-  font-size: 0.78rem;
+  font-size: 0.73rem;
   font-weight: 700;
   margin-bottom: 3px;
   text-align: left;
+  line-height: 1.2;
 }
 
 .cell-subject-sm {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   line-height: 1.35;
   margin-bottom: 4px;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cell-tag-sm {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   opacity: 0.85;
   text-align: left;
+  line-height: 1.25;
 }
 
 .cell-campus-sm {

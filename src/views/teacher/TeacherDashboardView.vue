@@ -44,6 +44,7 @@
       <!-- Header -->
       <header class="main-header">
         <div>
+          <span class="page-eyebrow">Dashboard</span>
           <h1 class="page-title">Teacher Dashboard</h1>
           <p class="page-sub">Manage your schedule and student consultations</p>
         </div>
@@ -1206,12 +1207,12 @@ function confirmLogout() {
 .sidebar {
   width: 280px;
   min-width: 280px;
-  background: #fff;
-  border-right: 1px solid #ececec;
+  background: linear-gradient(180deg, #f1f1f1 0%, #e6e6e4 100%);
+  border-right: 1px solid #d4d4d1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 28px 18px 24px;
+  padding: 24px 18px 22px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -1223,23 +1224,24 @@ function confirmLogout() {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  margin-bottom: 28px;
+  margin-bottom: 18px;
   text-align: center;
 }
 
 .avatar-wrap {
-  width: 96px;
-  height: 96px;
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c4c9cd;
+  border: 3px solid #d8d6d3;
+  box-shadow: 0 8px 18px rgba(29, 32, 35, 0.12);
 }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
 
-.brand { font-size: 1.05rem; font-weight: 600; color: #30353a; }
-.role  { font-size: 0.88rem; color: #444; font-weight: 500; }
-.email { font-size: 0.82rem; color: #888; word-break: break-all; }
+.brand { font-size: 1.05rem; font-weight: 700; color: #2e3135; }
+.role  { font-size: 0.8rem; color: #525a61; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.email { font-size: 0.76rem; color: #707a82; word-break: break-all; }
 .sidebar-presence-wrap { position: relative; width: 100%; margin-top: 10px; }
 .sidebar-presence-btn { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; padding: 0 10px; border: 0; border-radius: 8px; background: #f2f4f3; color: #475467; font: inherit; font-size: 0.78rem; cursor: pointer; }
 .sidebar-presence-btn:hover { background: #e8f1eb; color: #1b4332; }
@@ -1403,19 +1405,23 @@ function confirmLogout() {
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 16px;
+  gap: 12px;
+  padding: 12px 14px;
   border-radius: 10px;
-  font-size: 0.88rem;
-  font-weight: 400;
-  color: #444;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #3b4349;
   text-decoration: none;
-  transition: background 0.18s, color 0.18s;
+  transition: background 0.18s, color 0.18s, transform 0.18s;
   cursor: pointer;
 }
-.nav-item:hover { background: #f1f2f2; color: #30353a; }
-.nav-item.active { background: #30353a; color: #fff; }
-.nav-item.active .nav-icon { color: #fff; }
+.nav-item:hover { background: rgba(255,255,255,.35); color: #2b3138; }
+.nav-item.active {
+  background: rgba(255,255,255,.6);
+  color: #1f2428;
+  box-shadow: inset 0 0 0 1px rgba(89,99,108,.15);
+}
+.nav-item.active .nav-icon { color: #1f2428; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
 /* Logout */
@@ -1442,12 +1448,13 @@ function confirmLogout() {
 /* ═══ MAIN ═══ */
 .main {
   flex: 1;
-  padding: 40px 44px 32px;
+  padding: 40px 42px 32px;
   overflow-y: auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   height: 100vh;
+  background: linear-gradient(180deg, #f0f2f2 0%, #ececeb 100%);
 }
 
 /* Header */
@@ -1455,19 +1462,29 @@ function confirmLogout() {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 32px;
+  margin-bottom: 26px;
+}
+.page-eyebrow {
+  display: block;
+  margin: 0 0 2px;
+  color: #6d7880;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 .page-title {
-  font-size: 2.4rem;
+  margin: 0;
+  font-size: clamp(1.9rem, 2.5vw, 2.5rem);
   font-weight: 700;
-  color: #30353a;
-  letter-spacing: -0.5px;
-  line-height: 1.2;
+  color: #2b3137;
+  letter-spacing: -0.05em;
+  line-height: 1.15;
 }
 .page-sub {
-  font-size: 0.95rem;
-  color: #777;
-  margin-top: 4px;
+  font-size: 0.92rem;
+  color: #6a7279;
+  margin: 6px 0 0;
 }
 
 /* Notification */
@@ -1510,7 +1527,7 @@ function confirmLogout() {
   max-height: min(680px, calc(100vh - 110px));
 }
 .notif-panel-header { padding: 22px 22px 0; }
-.notif-panel-title { font-size: 1.4rem; font-weight: 700; color: #111; }
+.notif-panel-title { font-size: 1.2rem; font-weight: 700; color: #111; }
 .notif-tabs {
   display: flex;
   align-items: center;
@@ -1521,7 +1538,7 @@ function confirmLogout() {
   background: none;
   border: none;
   font-family: inherit;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: #666;
   cursor: pointer;
@@ -1551,25 +1568,37 @@ function confirmLogout() {
 .stat-cards {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 18px;
+  gap: 20px;
   margin-bottom: 32px;
 }
 .stat-card {
-  background: linear-gradient(145deg, #20252a 0%, #090c0f 100%);
-  border: 1px solid #343b42;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(249,249,249,0.92) 0%, rgba(238,239,239,0.95) 100%);
+  border: 1px solid #dfe2e4;
+  border-radius: 18px;
+  padding: 22px 24px;
+  box-shadow: 0 10px 24px rgba(38, 44, 50, 0.08), inset 0 1px 0 rgba(255,255,255,0.9);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
 .stat-left { display: flex; flex-direction: column; gap: 8px; }
-.stat-label { font-size: 0.95rem; color: #f0f2f4; font-weight: 600; letter-spacing: 0.02em; }
-.stat-value { font-size: 2.8rem; font-weight: 800; color: #fff; line-height: 1; }
-.stat-sub   { font-size: 0.85rem; color: #d2d6da; margin-top: 2px; }
-.stat-icon  { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; flex-shrink: 0; color: #d2d6da; }
+.stat-label { font-size: 0.9rem; color: #2e3942; font-weight: 600; letter-spacing: 0.02em; }
+.stat-value { font-size: 2.4rem; font-weight: 800; color: #1f252b; line-height: 1; }
+.stat-sub   { font-size: 0.8rem; color: #6a7280; margin-top: 2px; }
+.stat-icon  {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 74px;
+  height: 74px;
+  flex-shrink: 0;
+  padding: 12px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #efefef 0%, #dfe2e4 100%);
+  border: 1px solid rgba(86,95,100,0.15);
+  color: #2d3438;
+}
 
 /* ── Today's Class ── */
 .today-class { flex: 1; display: flex; flex-direction: column; }
@@ -1580,34 +1609,34 @@ function confirmLogout() {
   margin-bottom: 20px;
 }
 .today-class-title {
-  font-size: 1.32rem;
+  font-size: clamp(1.35rem, 1.8vw, 1.7rem);
   font-weight: 700;
-  color: #111827;
+  color: #212a30;
   margin: 0;
 }
 .today-class-sub {
   margin-top: 4px;
-  font-size: 0.9rem;
-  color: #6b7280;
+  font-size: 0.86rem;
+  color: #6c7880;
 }
 .legend { display: flex; align-items: center; gap: 18px; }
-.legend-item { display: flex; align-items: center; gap: 7px; font-size: 0.85rem; color: #6b7280; font-weight: 500; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #58636d; font-weight: 600; }
 .legend-dot {
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
 }
-.legend-dot.lecture    { background: #fbbf24; }
+.legend-dot.lecture    { background: #f4b740; }
 .legend-dot.laboratory { background: #6b7280; }
-.legend-dot.main-campus { background: #f97316; }
+.legend-dot.main-campus { background: #f0843d; }
 
 /* Carousel */
 .carousel-shell {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(243,245,246,0.94) 100%);
+  border: 1px solid #dde3e6;
+  border-radius: 18px;
   padding: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 26px rgba(36, 43, 47, 0.08), inset 0 1px 0 rgba(255,255,255,0.9);
 }
 .carousel-topbar {
   display: flex;
@@ -1638,11 +1667,11 @@ function confirmLogout() {
   opacity: 0.5;
 }
 .carousel-day-badge {
-  padding: 10px 18px;
+  padding: 9px 16px;
   border-radius: 8px;
   background: #1f2937;
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   min-width: 200px;

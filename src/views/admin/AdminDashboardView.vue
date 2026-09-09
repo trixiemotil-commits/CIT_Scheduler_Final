@@ -216,7 +216,9 @@
               </svg>
             </button>
           </div>
-          <div class="chart-wrap workload-chart-wrap" @wheel="scrollWorkloadHorizontally"><canvas ref="barChartRef" :style="{ cursor: 'pointer', minWidth: `${workloadChartWidth}px` }"></canvas></div>
+          <div class="chart-wrap workload-chart-wrap" @wheel="scrollWorkloadHorizontally">
+            <canvas ref="barChartRef" :style="{ cursor: 'pointer', width: '100%', maxWidth: '100%', minWidth: '100%' }"></canvas>
+          </div>
         </div>
       </section>
 
@@ -732,7 +734,7 @@ const selectedConsultationDay = ref('')
 const selectedConsultationDayRequests = ref([])
 const liveTeacherWorkloads = ref([])
 const publishedTermLabel = ref('')
-const workloadChartWidth = computed(() => Math.max(520, (liveTeacherWorkloads.value.length || 5) * 120))
+const workloadChartWidth = computed(() => Math.max(760, (liveTeacherWorkloads.value.length || 5) * 180))
 
 function scrollWorkloadHorizontally(event) {
   const container = event.currentTarget
@@ -1001,37 +1003,48 @@ function createLineChart() {
   })
 }
 
+function compactTeacherLabel(name) {
+  if (!name) return 'Teacher'
+  const parts = String(name).trim().split(/\s+/)
+  if (parts.length <= 1) return parts[0] || 'Teacher'
+  const first = parts[0]
+  const lastInitial = parts.slice(1).map(part => part[0]).join('')
+  return `${first} ${lastInitial}.`
+}
+
 function createBarChart() {
   if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null }
   const expanded = expandedChart.value === 'bar'
+  const workloadItems = (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads)
+  const labels = workloadItems.map(teacher => teacher.name)
+  const yTickLabels = workloadItems.map(teacher => expanded ? teacher.name : compactTeacherLabel(teacher.name))
+
   barChartInstance = new Chart(barChartRef.value, {
     type: 'bar',
     data: {
-      labels: (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads).map(teacher => teacher.name),
+      labels,
       datasets: [{
-        label: 'Hours',
-        data: (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads).map(teacher => teacher.totalHours),
-        backgroundColor: '#596169',
-        borderRadius: 4,
-        borderSkipped: false
-      }, {
-        label: 'Units',
-        data: (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads).map(teacher => teacher.units || 0),
-        backgroundColor: '#e5a53b',
-        borderRadius: 4,
-        borderSkipped: false
+        label: 'Teacher hours',
+        data: workloadItems.map(teacher => teacher.totalHours),
+        backgroundColor: workloadItems.map((_, index) => index % 2 === 0 ? '#7d8086' : '#e8b14a'),
+        borderRadius: 12,
+        borderSkipped: false,
+        borderWidth: 0,
+        barThickness: 24,
+        maxBarThickness: 28
       }]
     },
     options: {
+      indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
-      layout: { padding: { bottom: 34 } },
+      layout: { padding: { bottom: 16, left: 10, right: 12, top: 8 } },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
             title: (ctx) => ctx[0].label,
-            label: (ctx) => `${ctx.dataset.label} : ${ctx.parsed.y}`
+            label: (ctx) => `Hours: ${ctx.parsed.x}`
           },
           backgroundColor: '#30353a',
           titleColor: '#f4f5f5',
@@ -1047,13 +1060,45 @@ function createBarChart() {
       },
       scales: {
         x: {
-          grid: { display: false },
-          ticks: { color: '#69727c', font: { size: 11 }, autoSkip: false, maxRotation: 45, minRotation: 45 }
+          beginAtZero: true,
+          max: 30,
+          grid: { color: 'rgba(83, 91, 100, 0.12)', lineWidth: 1 },
+          ticks: {
+            color: '#3e4548',
+            font: { size: 11, family: 'Segoe UI, sans-serif', weight: '600' },
+            stepSize: 10,
+            padding: 6,
+            callback: (value) => `${value}h`
+          },
+          border: { display: false },
+          title: { display: false }
         },
         y: {
-          beginAtZero: true,
-          ticks: { color: '#69727c', font: { size: 12 } },
-          grid: { color: 'rgba(83, 91, 100, 0.16)' }
+          grid: { display: false },
+          ticks: {
+            color: '#3e4548',
+            font: {
+              size: expanded ? 11 : 10,
+              family: 'Segoe UI, sans-serif',
+              weight: '600'
+            },
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0,
+            padding: expanded ? 10 : 8,
+            callback: (value, index) => yTickLabels[index] || ''
+          },
+          border: { display: false },
+          title: { display: false }
+        }
+      },
+      datasets: {
+        bar: {
+          borderRadius: 14,
+          borderSkipped: false,
+          barThickness: 22,
+          maxBarThickness: 30,
+          borderWidth: 0,
         }
       }
     }
@@ -1787,24 +1832,29 @@ function confirmLogout() {
 .charts-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 32px;
   flex: 1;
   min-height: 0;
+  margin-top: 12px;
+  margin-bottom: 96px;
 }
 .chart-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 28px 32px 24px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(240,240,239,0.82) 100%);
+  border: 1px solid rgba(120, 127, 133, 0.12);
+  border-radius: 18px;
+  padding: 18px 18px 14px;
+  box-shadow: 0 10px 18px rgba(30, 36, 42, 0.04), inset 0 1px 0 rgba(255,255,255,0.7);
   display: flex;
   flex-direction: column;
-  min-height: 320px;
+  min-height: 380px;
   min-width: 0;
   overflow: hidden;
   transition: box-shadow 0.2s ease, opacity 0.2s ease;
+  margin-bottom: 0;
 }
 .chart-card.chart-expanded {
   grid-column: 1 / -1;
+  min-height: 500px;
 }
 .chart-card.chart-hidden {
   display: none;
@@ -1813,13 +1863,19 @@ function confirmLogout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   flex-shrink: 0;
+  padding: 2px 2px 0;
 }
 .chart-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111;
+  font-size: clamp(0.95rem, 1vw, 1.2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #2a2f34;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.45);
+  max-width: 100%;
+  white-space: normal;
 }
 .expand-btn {
   background: none;
@@ -1834,18 +1890,33 @@ function confirmLogout() {
 .chart-wrap {
   flex: 1;
   min-height: 0;
-  height: 260px;
+  height: 320px;
   position: relative;
 }
 .workload-chart-wrap {
   width: 100%;
   min-width: 0;
-  height: 320px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  height: 330px;
+  overflow: hidden;
+  padding: 10px 12px 10px 8px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  border: 1px solid rgba(90,98,104,0.08);
 }
 .workload-chart-wrap::-webkit-scrollbar { display: none; }
-.workload-chart-wrap canvas { height: 320px !important; }
+.workload-chart-wrap canvas {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  min-height: 290px;
+  flex: 1;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+}
 
 /* Modal */
 .modal-overlay {

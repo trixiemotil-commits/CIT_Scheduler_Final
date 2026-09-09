@@ -15,6 +15,7 @@ const eventRoutes = require("../routes/eventRoutes");
 const activityLogRoutes = require("../routes/activityLogRoutes");
 const activityLogger = require("../middleware/activityLogger");
 const ConsultationAvailability = require("../models/ConsultationAvailability");
+const Event = require("../models/Event");
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -67,9 +68,39 @@ app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
+async function archiveExpiredEvents() {
+  try {
+    const events = await Event.find({ status: "active" }).lean();
+    const now = Date.now();
+    let archivedCount = 0;
+
+    for (const event of events) {
+      if (!event.date) continue;
+      const endDate = new Date(`${event.date}T${event.endTime || "23:59:59"}`);
+      if (Number.isNaN(endDate.getTime())) continue;
+      if (now <= endDate.getTime()) continue;
+
+      const archiveAfter = new Date(endDate);
+      archiveAfter.setMonth(archiveAfter.getMonth() + 1);
+
+      if (now < archiveAfter.getTime()) continue;
+
+      await Event.updateOne({ _id: event._id }, { $set: { status: "archived" } });
+      archivedCount += 1;
+    }
+
+    if (archivedCount > 0) {
+      console.log(`Archived ${archivedCount} event${archivedCount === 1 ? "" : "s"} after their one-month archive window.`);
+    }
+  } catch (error) {
+    console.error("Failed to archive expired events:", error.message);
+  }
+}
+
 async function startServer() {
   try {
     await connectDB();
+    await archiveExpiredEvents();
     // Replace the legacy cross-term uniqueness rule with a term-scoped rule.
     const consultationIndexes = await ConsultationAvailability.collection.indexes();
     if (consultationIndexes.some((index) => index.name === "employeeId_1_dayOfWeek_1")) {
@@ -82,6 +113,10 @@ async function startServer() {
     const server = app.listen(PORT, () => {
       console.log(`Backend server listening on port ${PORT}`);
     });
+
+    setInterval(() => {
+      archiveExpiredEvents();
+    }, 24 * 60 * 60 * 1000);
 
     server.on("error", (error) => {
       if (error?.code === "EADDRINUSE") {
