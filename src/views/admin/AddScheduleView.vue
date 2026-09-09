@@ -1243,17 +1243,17 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import TypeaheadSelect from '@/components/TypeaheadSelect.vue'
 import {
-  colorForRoom,
-  colorForRoomType,
-  days,
-  entries,
-  parseTime,
-  roomOptions,
-  sections,
-  subjectCatalog,
-  teacherOptions,
-  timeOptions,
-  years,
+    colorForRoom,
+    colorForRoomType,
+    days,
+    entries,
+    parseTime,
+    roomOptions,
+    sections,
+    subjectCatalog,
+    teacherOptions,
+    timeOptions,
+    years,
 } from '@/composables/useSchedule.js'
 import Swal from 'sweetalert2'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
