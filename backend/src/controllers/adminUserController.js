@@ -93,6 +93,30 @@ function isValidPhinmaEmail(email) {
   return PHINMA_EMAIL_REGEX.test((email || "").trim());
 }
 
+async function verifyCurrentAdminPassword(req, res) {
+  try {
+    const { currentPassword } = req.body || {};
+    if (!currentPassword) {
+      return res.status(400).json({ message: "Current admin password is required." });
+    }
+
+    const actor = await User.findById(req.user?.id).select("+passwordHash");
+    if (!actor) {
+      return res.status(401).json({ message: "Active admin session not found." });
+    }
+
+    const passwordMatches = await bcrypt.compare(String(currentPassword), actor.passwordHash);
+    if (!passwordMatches) {
+      return res.status(401).json({ message: "Current admin password is incorrect." });
+    }
+
+    return res.json({ message: "Current admin password verified." });
+  } catch (error) {
+    console.error("Failed to verify admin password:", error);
+    return res.status(500).json({ message: "Failed to verify admin password.", error: error.message });
+  }
+}
+
 async function listUsers(req, res) {
   const { role } = req.query;
   const query = {};
@@ -118,6 +142,7 @@ async function createUser(req, res) {
       role,
       roles,
       password,
+      currentPassword,
       phone = "",
       account_status = "Active",
       teacher_status = "On School",
@@ -134,8 +159,22 @@ async function createUser(req, res) {
       return res.status(400).json({ message: "Missing required fields." });
     }
 
+    if (!currentPassword) {
+      return res.status(400).json({ message: "Your current password is required to add a user." });
+    }
+
     if (password.length < 8) {
       return res.status(400).json({ message: "Password must be at least 8 characters long." });
+    }
+
+    const actor = await User.findById(req.user?.id).select("+passwordHash");
+    if (!actor) {
+      return res.status(401).json({ message: "Active admin session not found." });
+    }
+
+    const passwordMatches = await bcrypt.compare(String(currentPassword), actor.passwordHash);
+    if (!passwordMatches) {
+      return res.status(401).json({ message: "Current admin password is incorrect." });
     }
 
     let normalizedRoles;
@@ -239,6 +278,7 @@ async function updateUser(req, res) {
       email,
       role,
       roles,
+      currentPassword,
       phone = "",
       account_status,
       teacher_status = "On School",
@@ -253,6 +293,20 @@ async function updateUser(req, res) {
 
     if (!firstName || !lastName || !email || !role) {
       return res.status(400).json({ message: "Missing required fields." });
+    }
+
+    if (!currentPassword) {
+      return res.status(400).json({ message: "Your current password is required to save edits." });
+    }
+
+    const actor = await User.findById(req.user?.id).select("+passwordHash");
+    if (!actor) {
+      return res.status(401).json({ message: "Active admin session not found." });
+    }
+
+    const passwordMatches = await bcrypt.compare(String(currentPassword), actor.passwordHash);
+    if (!passwordMatches) {
+      return res.status(401).json({ message: "Current admin password is incorrect." });
     }
 
     let normalizedRoles;
@@ -457,6 +511,7 @@ async function approveAllPendingUsers(req, res) {
 
 module.exports = {
   listUsers,
+  verifyCurrentAdminPassword,
   createUser,
   updateUser,
   updateUserStatus,

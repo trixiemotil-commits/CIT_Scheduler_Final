@@ -64,9 +64,14 @@ function parseTimeToMinutes(value) {
   return hour * 60 + minute;
 }
 
-function colorForSchedule(room, subject) {
+function colorForSchedule(room, subject, campus = "South Campus") {
   const normalizedRoom = normalizeString(room);
   const normalizedSubject = normalizeString(subject);
+  const normalizedCampus = normalizeString(campus);
+
+  if (normalizedCampus === "Main Campus") {
+    return "color-orange";
+  }
 
   if (/\blunch\b/i.test(normalizedSubject)) {
     return "color-gray";
@@ -287,7 +292,9 @@ function buildEntryDocs(payload, academicTermId = null) {
       parallelGroupId,
       parallelCount,
       parallelSlots: slots,
-      color: isGenericTeacher(teacher) ? "color-pink" : (slot.roomType === "Comlab/Laboratory" ? "color-green" : colorForSchedule("", subject)),
+      color: isGenericTeacher(teacher)
+        ? "color-pink"
+        : (slot.roomType === "Comlab/Laboratory" && campus !== "Main Campus" ? "color-green" : colorForSchedule("", subject, campus)),
       academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
       addedAt,
     }));
@@ -322,7 +329,9 @@ function buildEntryDocs(payload, academicTermId = null) {
       parallelGroupId: null,
       parallelCount: 1,
       parallelSlots: [],
-      color: isGenericTeacher(teacher) ? "color-pink" : (roomType === "Comlab/Laboratory" ? "color-green" : colorForSchedule("", subject)),
+      color: isGenericTeacher(teacher)
+        ? "color-pink"
+        : (roomType === "Comlab/Laboratory" && campus !== "Main Campus" ? "color-green" : colorForSchedule("", subject, campus)),
       academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
       addedAt,
     },

@@ -406,7 +406,7 @@
             </div>
           </div>
 
-          <!-- ── Section: Credentials (Add only) ── -->
+          <!-- ── Section: Credentials ── -->
           <template v-if="!editingUser">
             <div class="reg-section-title">
               <span class="reg-section-line"></span>
@@ -425,6 +425,13 @@
               </div>
             </div>
           </template>
+
+          <div class="form-row form-row--single">
+            <div class="form-group">
+              <label class="form-label">Current Admin Password <span class="form-required">*</span></label>
+              <input v-model="userForm.currentPassword" class="form-input" type="password" :placeholder="editingUser ? 'Enter your password to confirm changes' : 'Enter your current password to confirm'" required />
+            </div>
+          </div>
 
           <div v-if="formError" class="um-pw-error">{{ formError }}</div>
           <div class="form-actions">
@@ -856,7 +863,8 @@ async function apiRequest(path, options = {}) {
   }
 
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
+    const shouldKeepSession = Boolean(options.noLogoutOnAuth)
+    if ((response.status === 401 || response.status === 403) && !shouldKeepSession) {
       logout()
       router.push('/')
     }
@@ -974,6 +982,7 @@ function buildUserPayload(includePassword) {
     payload.password = userForm.value.password
   }
 
+  payload.currentPassword = userForm.value.currentPassword
   return payload
 }
 
@@ -994,7 +1003,7 @@ const showRegisterConfirm = ref(false)
 const showApproveAllConfirm = ref(false)
 const isSavingUser    = ref(false)
 const studentYearOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
-const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', yearLevel: '', section: '', password: '', confirmPassword: '' })
+const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', yearLevel: '', section: '', password: '', confirmPassword: '', currentPassword: '' })
 const userForm  = ref(emptyForm())
 
 function openAddUser() {
@@ -1005,25 +1014,46 @@ function openAddUser() {
 }
 
 function openEditUser(user) {
-  editingUser.value     = user
-  formError.value       = ''
-  const parts = (user.name || '').split(' ')
+  editingUser.value = user
+  formError.value = ''
   userForm.value = {
-    firstName: parts[0] || '',
-    lastName:  parts.slice(1).join(' ') || '',
-    email:      user.email,
-    schoolId:   user.employeeId ? formatEmployeeIdValue(user.employeeId) : formatSchoolIdValue(user.schoolId || user.studentId),
-    role:       user.role,
-    status:     user.status,
-    yearLevel:  user.yearLevel || '',
-    section:    user.section || '',
-    password:   '',
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    email: user.email,
+    schoolId: user.employeeId ? formatEmployeeIdValue(user.employeeId) : formatSchoolIdValue(user.schoolId || user.studentId),
+    role: user.role,
+    status: user.status,
+    yearLevel: user.yearLevel || '',
+    section: user.section || '',
+    password: '',
     confirmPassword: '',
+    currentPassword: '',
   }
   showUserModal.value = true
 }
 
-function saveUser() {
+async function validateCurrentAdminPassword() {
+  if (!userForm.value.currentPassword) {
+    formError.value = editingUser.value
+      ? 'Your current password is required to save changes.'
+      : 'Your current password is required to add a new user.'
+    return false
+  }
+
+  try {
+    await apiRequest('/users/verify-current-password', {
+      method: 'POST',
+      noLogoutOnAuth: true,
+      body: JSON.stringify({ currentPassword: userForm.value.currentPassword })
+    })
+    return true
+  } catch (error) {
+    formError.value = error.message || 'Current admin password is incorrect.'
+    return false
+  }
+}
+
+async function saveUser() {
   formError.value = ''
   const trimmedSchoolId = (userForm.value.schoolId || '').trim()
   const normalizedEmail = (userForm.value.email || '').trim().toLowerCase()
@@ -1058,6 +1088,10 @@ function saveUser() {
       return
     }
   }
+
+  const passwordVerified = await validateCurrentAdminPassword()
+  if (!passwordVerified) return
+
   // Show sweet alert confirm before committing
   showRegisterConfirm.value = true
 }

@@ -338,7 +338,14 @@
               </label>
               <label class="list-field list-field-wide">
                 <span>Subject</span>
-                <TypeaheadSelect v-model="listAddForm.subject" :options="listSubjectOptions" placeholder="Subject" />
+                <input
+                  v-if="listAddForm.campus === 'Main Campus'"
+                  v-model.trim="listAddForm.subject"
+                  type="text"
+                  class="form-input"
+                  placeholder="Enter Subject"
+                />
+                <TypeaheadSelect v-else v-model="listAddForm.subject" :options="listSubjectOptions" placeholder="Subject" />
               </label>
               <label class="list-field list-field-wide">
                 <span>Teacher</span>
@@ -684,6 +691,9 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
                 Lunch Break selected
               </div>
+              <div v-else-if="form.campus === 'Main Campus'" class="form-input-wrap">
+                <input v-model.trim="form.subject" type="text" class="form-input" placeholder="Enter Subject" />
+              </div>
               <div v-else class="form-select-wrap">
                 <TypeaheadSelect v-model="form.subject" :options="modalSubjectOptions" placeholder="Select Subject" />
               </div>
@@ -971,7 +981,10 @@
               </div>
               <div class="form-row-inline">
                 <label class="form-label">Subject</label>
-                <div class="form-select-wrap">
+                <div v-if="addForm.campus === 'Main Campus'" class="form-input-wrap">
+                  <input v-model.trim="addForm.subject" type="text" class="form-input" placeholder="Enter Subject" />
+                </div>
+                <div v-else class="form-select-wrap">
                   <TypeaheadSelect v-model="addForm.subject" :options="modalSubjectOptionsForAdd" placeholder="Select Subject" />
                 </div>
               </div>
@@ -2000,6 +2013,9 @@ function syncEntriesFromApi(apiEntries) {
     const key = `${tableLabel}|${legacySection || `__lunch_${entry.id || slot}`}|${slot}|${day}`
     const inferredCampus = inferCampus(entry)
     const roomBasedColor = colorForRoomType(entry.roomType, entry.room)
+    const effectiveColor = isLunch
+      ? 'color-gray'
+      : (inferredCampus === 'Main Campus' ? 'color-orange' : (isGenericTeacher(entry.teacher) ? 'color-pink' : (roomBasedColor || entry.color || 'color-yellow')))
     entries[key] = {
       id: entry.id || '',
       academicTermId: entry.academicTermId || null,
@@ -2024,9 +2040,7 @@ function syncEntriesFromApi(apiEntries) {
       entryType: isLunch ? 'lunch' : (entry.entryType || 'class'),
       isSubstitute: Boolean(entry.isSubstitute),
       subbedLabel: entry.subbedLabel || '',
-      color: isLunch
-        ? 'color-gray'
-        : (isGenericTeacher(entry.teacher) ? 'color-pink' : (roomBasedColor || entry.color || 'color-yellow')),
+      color: effectiveColor,
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -2395,8 +2409,22 @@ watch(() => form.parallelCount, (val) => {
 })
 
 watch(() => form.room, (val) => {
+  if (form.campus === 'Main Campus') {
+    form.color = 'color-orange'
+    return
+  }
   const auto = colorForRoom(val)
   if (auto) form.color = auto
+})
+
+watch(() => form.campus, (campus) => {
+  if (campus === 'Main Campus') {
+    form.color = 'color-orange'
+    return
+  }
+  const auto = colorForRoom(form.room)
+  if (auto) form.color = auto
+  else form.color = 'color-green'
 })
 
 function openLunchBreakPicker() {
@@ -2902,6 +2930,7 @@ const addForm = reactive({
 })
 
 function clearInvalidSubject(formState, options) {
+  if (formState.campus === 'Main Campus') return
   if (formState.subject && !options.includes(formState.subject)) formState.subject = ''
 }
 

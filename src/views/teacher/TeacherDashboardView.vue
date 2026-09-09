@@ -1058,6 +1058,8 @@ function mapClassesForDay(entries, dayName) {
           sectionSet: new Set(),
           roomSet: new Set(),
           hasMainCampus: entry.campus === 'Main Campus' || entry.color === 'color-orange',
+          campus: entry.campus || '',
+          colorToken: entry.color || '',
           parallel: Boolean(entry.parallel),
           sortValue: parseTimeToMinutes(entry.timeIn),
         })
@@ -1066,6 +1068,8 @@ function mapClassesForDay(entries, dayName) {
       const grouped = groups.get(groupKey)
       if (entry.campus === 'Main Campus' || entry.color === 'color-orange') {
         grouped.hasMainCampus = true
+        grouped.campus = entry.campus || grouped.campus
+        grouped.colorToken = entry.color || grouped.colorToken
       }
 
       if (entry.section) grouped.sectionSet.add(entry.section)
@@ -1090,7 +1094,9 @@ function mapClassesForDay(entries, dayName) {
         parallel: item.parallel,
         room: rooms.length ? rooms.join(' and ') : 'TBA',
         hasMainCampus: item.hasMainCampus,
-        roomColor: item.hasMainCampus ? 'room-orange' : roomBadgeClass(rooms[0] || ''),
+        campus: item.campus,
+        colorToken: item.colorToken,
+        roomColor: item.hasMainCampus ? 'room-orange' : roomBadgeClass(rooms[0] || '', item.campus, item.colorToken),
         sortValue: item.sortValue,
       }
     })

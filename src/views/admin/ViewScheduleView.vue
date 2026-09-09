@@ -973,6 +973,9 @@ function syncEntriesFromApi(apiEntries) {
     const key = `${tableLabel}|${sectionKey}|${slot}|${day}`
     const inferredCampus = inferCampus(entry)
     const roomBasedColor = colorForRoomType(entry.roomType, entry.room)
+    const effectiveColor = isLunch
+      ? 'color-gray'
+      : (inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || entry.color || 'color-yellow'))
     entries[key] = {
       entryType: isLunch ? 'lunch' : (entryType || 'class'),
       teacher: entry.teacher,
@@ -992,9 +995,7 @@ function syncEntriesFromApi(apiEntries) {
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map(s => ({ ...s })) : [],
       isSubstitute: Boolean(entry.isSubstitute),
       subbedLabel: entry.subbedLabel || '',
-      color: isLunch
-        ? 'color-gray'
-        : (roomBasedColor || entry.color || 'color-yellow'),
+      color: effectiveColor,
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
