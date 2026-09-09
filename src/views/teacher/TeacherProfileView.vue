@@ -140,7 +140,7 @@
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Employee Id</label>
-                <input v-model="editForm.employeeId" class="edit-input" type="text" placeholder="AU2025-00000" />
+                <input v-model="editForm.employeeId" class="edit-input" type="text" inputmode="text" maxlength="12" placeholder="AU2025-00000" @input="formatEmployeeId" />
               </div>
             </div>
             <div class="edit-row two-col">
@@ -301,11 +301,28 @@ const showEditModal = ref(false)
 const editForm = ref({})
 
 function openEdit() {
-  editForm.value = { ...profile.value }
+  editForm.value = {
+    ...profile.value,
+    employeeId: normalizeEmployeeId(profile.value.employeeId),
+  }
   showEditModal.value = true
 }
 function closeEdit() {
   showEditModal.value = false
+}
+
+function formatEmployeeId(event) {
+  const digits = String(event.target?.value || '').replace(/\D/g, '').slice(0, 9)
+  editForm.value.employeeId = digits
+    ? `AU${digits.slice(0, 4)}${digits.length > 4 ? `-${digits.slice(4, 9)}` : ''}`
+    : ''
+}
+
+function normalizeEmployeeId(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 9)
+  if (!digits) return ''
+  const normalized = digits.length === 8 ? `${digits.slice(0, 4)}0${digits.slice(4)}` : digits
+  return `AU${normalized.slice(0, 4)}-${normalized.slice(4, 9)}`
 }
 
 function onAvatarSelected(event) {
@@ -356,6 +373,17 @@ async function saveProfile() {
     return
   }
 
+  const employeeId = editForm.value.employeeId === 'N/A' ? '' : (editForm.value.employeeId || '').trim()
+  if (employeeId && !/^AU\d{4}-\d{4,5}$/.test(employeeId)) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Invalid employee ID',
+      text: 'Use the format AU2025-0000 or AU2025-00000.',
+      confirmButtonColor: '#4b5563',
+    })
+    return
+  }
+
   try {
     const payload = await apiRequest('/auth/me', {
       method: 'PUT',
@@ -364,7 +392,7 @@ async function saveProfile() {
         lastName,
         email: editForm.value.email,
         phone: editForm.value.contact === 'N/A' ? '' : (editForm.value.contact || ''),
-        employeeId: editForm.value.employeeId === 'N/A' ? '' : (editForm.value.employeeId || ''),
+        employeeId,
         avatar: editForm.value.avatar || profile.value.avatar,
       }),
     })

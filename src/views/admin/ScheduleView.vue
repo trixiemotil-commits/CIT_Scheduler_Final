@@ -96,6 +96,14 @@
                 <rect x="6" y="14" width="12" height="8"/>
               </svg>
             </button>
+            <button class="schedule-export-btn" type="button" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <path d="M8 13h8M8 17h8" />
+              </svg>
+              Excel
+            </button>
           </div>
         </div>
 
@@ -1138,6 +1146,9 @@ function syncEntriesFromApi(apiEntries) {
 
     const inferredCampus = inferCampus(entry)
     const roomBasedColor = colorForRoomType(entry.roomType, entry.room)
+    const effectiveColor = isLunch
+      ? 'color-gray'
+      : (inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || entry.color || 'color-yellow'))
     entries[key] = {
       entryType: isLunch ? 'lunch' : (entryType || 'class'),
       teacher: entry.teacher,
@@ -1157,9 +1168,7 @@ function syncEntriesFromApi(apiEntries) {
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map((slotItem) => ({ ...slotItem })) : [],
       isSubstitute: Boolean(entry.isSubstitute),
       subbedLabel: entry.subbedLabel || '',
-      color: isLunch
-        ? 'color-gray'
-        : (roomBasedColor || entry.color || 'color-yellow'),
+      color: effectiveColor,
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -1857,7 +1866,7 @@ onMounted(async () => {
     // Fetch teachers from database (role=teacher)
     const response = await apiRequest('/users?role=teacher')
     if (response.users && Array.isArray(response.users)) {
-      const teachers = response.users.filter(user => Array.isArray(user.roles) ? user.roles.includes('teacher') : user.role === 'Teacher')
+      const teachers = response.users.filter(user => (Array.isArray(user.roles) ? user.roles.includes('teacher') : user.role === 'Teacher') && String(user.account_status || 'Active') === 'Active')
       if (teachers.length > 0) {
         teacherOptions.value = teachers
           .map(user => `${user.firstName} ${user.lastName}`.trim())
@@ -1878,6 +1887,50 @@ onMounted(async () => {
 })
 
 /* ── Print ── */
+function exportScheduleExcel() {
+  const esc = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+
+  const rows = Object.values(entries)
+    .filter((entry) => entry?.day && entry?.teacher)
+    .filter((entry) => filterYear.value === 'All' || entry.year === filterYear.value)
+    .filter((entry) => filterSection.value === 'All' || entry.section === filterSection.value)
+    .filter((entry) => !selectedTeacher.value || entry.teacher === selectedTeacher.value)
+    .sort((a, b) => `${a.day}|${a.timeIn}|${a.teacher}`.localeCompare(`${b.day}|${b.timeIn}|${b.teacher}`))
+
+  const tableRows = rows.map((entry) => `
+    <tr>
+      <td>${esc(entry.teacher)}</td>
+      <td>${esc(entry.day)}</td>
+      <td>${esc(entry.timeIn)}</td>
+      <td>${esc(entry.timeOut)}</td>
+      <td>${esc(entry.subject)}</td>
+      <td>${esc(entry.section)}</td>
+      <td>${esc(entry.room)}</td>
+      <td>${esc(entry.entryType || 'class')}</td>
+    </tr>`).join('')
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    table{border-collapse:collapse;font-family:Arial,sans-serif}th,td{border:1px solid #999;padding:6px 8px}th{background:#30353a;color:#fff}
+  </style></head><body><h2>Teacher Schedule</h2>
+  <p>Year: ${esc(filterYear.value)} | Section: ${esc(filterSection.value)} | Teacher: ${esc(selectedTeacher.value || 'All')}</p>
+  <table><thead><tr><th>Teacher</th><th>Day</th><th>Start</th><th>End</th><th>Subject</th><th>Section</th><th>Room</th><th>Type</th></tr></thead>
+  <tbody>${tableRows || '<tr><td colspan="8">No schedule entries found.</td></tr>'}</tbody></table></body></html>`
+
+  const blob = new Blob([`\ufeff${html}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `schedule-${filterYear.value === 'All' ? 'all-years' : filterYear.value.replace(/\s+/g, '-')}.xls`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 function printSchedule() {
   const DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
   const SLOTS = timeOptions
@@ -2021,7 +2074,7 @@ function printSchedule() {
 </html>`
 
   const w = window.open('', '_blank', 'width=1000,height=700')
-  w.document.write(html)
+  w.document.write(html.replace(/@page\{size:landscape;margin:10mm;?\}/, '@page{size:A4 portrait;margin:5mm;}@media print{body{zoom:.76;}}'))
   w.document.close()
 }
 
@@ -2159,6 +2212,22 @@ function confirmLogout() {
   flex-wrap: wrap;
 }
 .sched-topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.schedule-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid #cfd6dc;
+  border-radius: 8px;
+  background: #fff;
+  color: #30353a;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.schedule-export-btn:hover { background: #f2f5f7; }
 
 /* Selects */
 .sched-select-wrap { position: relative; display: flex; align-items: center; }

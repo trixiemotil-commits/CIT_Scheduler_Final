@@ -338,7 +338,14 @@
               </label>
               <label class="list-field list-field-wide">
                 <span>Subject</span>
-                <TypeaheadSelect v-model="listAddForm.subject" :options="listSubjectOptions" placeholder="Subject" />
+                <input
+                  v-if="listAddForm.campus === 'Main Campus'"
+                  v-model.trim="listAddForm.subject"
+                  type="text"
+                  class="form-input"
+                  placeholder="Enter Subject"
+                />
+                <TypeaheadSelect v-else v-model="listAddForm.subject" :options="listSubjectOptions" placeholder="Subject" />
               </label>
               <label class="list-field list-field-wide">
                 <span>Teacher</span>
@@ -392,6 +399,14 @@
             </h2>
           </div>
           <div class="sched-topbar-right">
+            <div class="schedule-legend" aria-label="Schedule color legend">
+              <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
+              <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
+              <span><i class="legend-swatch legend-swatch--faculty"></i>CIT Faculty</span>
+              <span><i class="legend-swatch legend-swatch--lunch"></i>Lunch</span>
+              <span><i class="legend-swatch legend-swatch--consultation"></i>Consultation</span>
+              <span><i class="legend-swatch legend-swatch--main-campus"></i>Main Campus</span>
+            </div>
             <!-- Section filter (teacher mode only) -->
             <div v-if="addMode === 'teacher'" class="sched-select-wrap">
               <select class="sched-select" v-model="filterSection">
@@ -675,6 +690,9 @@
               <div v-if="form.subject === 'Lunch Break'" class="lunch-subject-selected">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
                 Lunch Break selected
+              </div>
+              <div v-else-if="form.campus === 'Main Campus'" class="form-input-wrap">
+                <input v-model.trim="form.subject" type="text" class="form-input" placeholder="Enter Subject" />
               </div>
               <div v-else class="form-select-wrap">
                 <TypeaheadSelect v-model="form.subject" :options="modalSubjectOptions" placeholder="Select Subject" />
@@ -963,7 +981,10 @@
               </div>
               <div class="form-row-inline">
                 <label class="form-label">Subject</label>
-                <div class="form-select-wrap">
+                <div v-if="addForm.campus === 'Main Campus'" class="form-input-wrap">
+                  <input v-model.trim="addForm.subject" type="text" class="form-input" placeholder="Enter Subject" />
+                </div>
+                <div v-else class="form-select-wrap">
                   <TypeaheadSelect v-model="addForm.subject" :options="modalSubjectOptionsForAdd" placeholder="Select Subject" />
                 </div>
               </div>
@@ -1222,17 +1243,17 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import TypeaheadSelect from '@/components/TypeaheadSelect.vue'
 import {
-  colorForRoom,
-  colorForRoomType,
-  days,
-  entries,
-  parseTime,
-  roomOptions,
-  sections,
-  subjectCatalog,
-  teacherOptions,
-  timeOptions,
-  years,
+    colorForRoom,
+    colorForRoomType,
+    days,
+    entries,
+    parseTime,
+    roomOptions,
+    sections,
+    subjectCatalog,
+    teacherOptions,
+    timeOptions,
+    years,
 } from '@/composables/useSchedule.js'
 import Swal from 'sweetalert2'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
@@ -1533,7 +1554,7 @@ async function loadAddTeachers() {
     const res = await apiRequest('/users?role=teacher')
     if (res.users && Array.isArray(res.users)) {
       addTeacherList.value = res.users
-        .filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
+        .filter(u => (Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher') && String(u.account_status || 'Active') === 'Active')
         .map(u => {
           const name = `${u.firstName} ${u.lastName}`.trim()
           return {
@@ -1992,6 +2013,9 @@ function syncEntriesFromApi(apiEntries) {
     const key = `${tableLabel}|${legacySection || `__lunch_${entry.id || slot}`}|${slot}|${day}`
     const inferredCampus = inferCampus(entry)
     const roomBasedColor = colorForRoomType(entry.roomType, entry.room)
+    const effectiveColor = isLunch
+      ? 'color-gray'
+      : (inferredCampus === 'Main Campus' ? 'color-orange' : (isGenericTeacher(entry.teacher) ? 'color-pink' : (roomBasedColor || entry.color || 'color-yellow')))
     entries[key] = {
       id: entry.id || '',
       academicTermId: entry.academicTermId || null,
@@ -2016,9 +2040,7 @@ function syncEntriesFromApi(apiEntries) {
       entryType: isLunch ? 'lunch' : (entry.entryType || 'class'),
       isSubstitute: Boolean(entry.isSubstitute),
       subbedLabel: entry.subbedLabel || '',
-      color: isLunch
-        ? 'color-gray'
-        : (isGenericTeacher(entry.teacher) ? 'color-pink' : (roomBasedColor || entry.color || 'color-yellow')),
+      color: effectiveColor,
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -2387,8 +2409,22 @@ watch(() => form.parallelCount, (val) => {
 })
 
 watch(() => form.room, (val) => {
+  if (form.campus === 'Main Campus') {
+    form.color = 'color-orange'
+    return
+  }
   const auto = colorForRoom(val)
   if (auto) form.color = auto
+})
+
+watch(() => form.campus, (campus) => {
+  if (campus === 'Main Campus') {
+    form.color = 'color-orange'
+    return
+  }
+  const auto = colorForRoom(form.room)
+  if (auto) form.color = auto
+  else form.color = 'color-green'
 })
 
 function openLunchBreakPicker() {
@@ -2894,6 +2930,7 @@ const addForm = reactive({
 })
 
 function clearInvalidSubject(formState, options) {
+  if (formState.campus === 'Main Campus') return
   if (formState.subject && !options.includes(formState.subject)) formState.subject = ''
 }
 
@@ -3174,7 +3211,7 @@ function printSchedule() {
 <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<\/script>
 </body></html>`
   const w = window.open('', '_blank', 'width=1000,height=700')
-  w.document.write(html)
+  w.document.write(html.replace(/@page\{size:landscape;margin:10mm;?\}/, '@page{size:A4 portrait;margin:5mm;}@media print{body{zoom:.76;}}'))
   w.document.close()
 }
 
@@ -3190,7 +3227,7 @@ onMounted(async () => {
     await ensureTermSelection()
     const response = await apiRequest('/users?role=teacher')
     if (response.users && Array.isArray(response.users)) {
-      const teachers = response.users.filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
+      const teachers = response.users.filter(u => (Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher') && String(u.account_status || 'Active') === 'Active')
       if (teachers.length > 0) {
         teacherOptions.value = teachers
           .map(u => `${u.firstName} ${u.lastName}`.trim())
@@ -4294,6 +4331,15 @@ onMounted(async () => {
   font-weight: 500;
 }
 .sched-topbar-right { padding: 4px; border: 1px solid #d3dade; border-radius: 11px; background: #eef1f2; }
+.schedule-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 11px; margin-right: 4px; color: #64717a; font-size: .66rem; font-weight: 650; white-space: nowrap; }
+.schedule-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend-swatch { width: 10px; height: 10px; display: inline-block; border-radius: 3px; }
+.legend-swatch--lecture { background: #e9c46a; }
+.legend-swatch--lab { background: #1f6b45; }
+.legend-swatch--faculty { background: #e9a8c1; }
+.legend-swatch--lunch { background: #626c76; }
+.legend-swatch--consultation { background: #4a90d9; }
+.legend-swatch--main-campus { background: #f4a261; }
 .sched-select { min-height: 38px; border-color: transparent; border-radius: 8px; background: transparent; color: #48545d; font-size: .72rem; font-weight: 600; }
 .sched-select:hover,.sched-select:focus { border-color: #bec7cc; background: #fff; }
 .icon-btn.consult-btn { width: 38px; height: 38px; border-radius: 8px; color: #fff; border-color: #3e4b55; background: linear-gradient(145deg,#62717b,#35434c); box-shadow: 0 3px 8px rgba(38,48,55,.17); }

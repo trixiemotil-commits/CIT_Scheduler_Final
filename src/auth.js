@@ -1,13 +1,28 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
-function saveSession({ token, user }) {
-  localStorage.setItem('cit_token', token)
-  localStorage.setItem('cit_user', JSON.stringify(user))
+function sessionStorageFor(remember = false) {
+  return remember ? localStorage : sessionStorage
+}
+
+function activeStorage() {
+  return localStorage.getItem('cit_token') ? localStorage : sessionStorage
+}
+
+function saveSession({ token, user }, remember = false) {
+  const storage = sessionStorageFor(remember)
+  localStorage.removeItem('cit_token')
+  localStorage.removeItem('cit_user')
+  sessionStorage.removeItem('cit_token')
+  sessionStorage.removeItem('cit_user')
+  storage.setItem('cit_token', token)
+  storage.setItem('cit_user', JSON.stringify(user))
 }
 
 function clearSession() {
   localStorage.removeItem('cit_token')
   localStorage.removeItem('cit_user')
+  sessionStorage.removeItem('cit_token')
+  sessionStorage.removeItem('cit_user')
 }
 
 function getRoles(user) {
@@ -64,7 +79,7 @@ async function request(path, options = {}) {
   return body
 }
 
-export async function login(email, password, recaptchaToken = null, mathChallenge = null) {
+export async function login(email, password, recaptchaToken = null, mathChallenge = null, remember = false) {
   const body = { email, password }
   if (mathChallenge) {
     body.client = 'mobile'
@@ -79,7 +94,7 @@ export async function login(email, password, recaptchaToken = null, mathChalleng
     body: JSON.stringify(body)
   }))
 
-  saveSession(payload)
+  saveSession(payload, remember)
   return payload
 }
 
@@ -89,7 +104,7 @@ export async function selectRole(role) {
     headers: { Authorization: `Bearer ${getToken()}` },
     body: JSON.stringify({ role })
   }))
-  saveSession(payload)
+  saveSession(payload, Boolean(localStorage.getItem('cit_token')))
   return payload.user
 }
 
@@ -124,7 +139,7 @@ export function logout() {
 }
 
 export function getUser() {
-  const raw = localStorage.getItem('cit_user')
+  const raw = (localStorage.getItem('cit_user') || sessionStorage.getItem('cit_user'))
   if (!raw) return null
 
   try {
@@ -147,7 +162,7 @@ export function saveMergedUser(freshUser) {
     roles,
   }
 
-  localStorage.setItem('cit_user', JSON.stringify(mergedUser))
+  activeStorage().setItem('cit_user', JSON.stringify(mergedUser))
   return mergedUser
 }
 
@@ -160,12 +175,12 @@ export function setActiveRole(role) {
   if (!user || !requestedRole || !canUseRole) return user
 
   const updatedUser = { ...user, role: requestedRole, roles }
-  localStorage.setItem('cit_user', JSON.stringify(updatedUser))
+  activeStorage().setItem('cit_user', JSON.stringify(updatedUser))
   return updatedUser
 }
 
 export function getToken() {
-  return localStorage.getItem('cit_token')
+  return localStorage.getItem('cit_token') || sessionStorage.getItem('cit_token')
 }
 
 export function isLoggedIn() {

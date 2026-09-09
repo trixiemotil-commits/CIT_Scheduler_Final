@@ -171,6 +171,10 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v15H4zM4 9h16M8 3v4M16 3v4M12 12v5M9.5 14.5h5"/></svg>
                 <span>Add schedule</span>
               </button>
+              <button class="excel-btn" title="Download all schedules for this term" @click="downloadTermExcel(term)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/></svg>
+                <span>Download Excel</span>
+              </button>
               <button class="edit-btn" title="Edit this term's details" @click="openTermModal(term)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-.7L19 7.8 16.2 5 4.7 16.5 4 20Z"/></svg>
                 <span>Edit details</span>
@@ -390,10 +394,15 @@ async function loadPage() {
     const [termResponse, teacherResponse] = await Promise.all([apiRequest('/academic-terms'), apiRequest('/users?role=teacher')])
     terms.value = termResponse.terms || []
     publishedTerm.value = terms.value.find(term => term.isPublished) || null
-    teachers.value = (teacherResponse.users || []).filter(item => Array.isArray(item.roles) ? item.roles.includes('teacher') : String(item.role).toLowerCase() === 'teacher').map(item => ({
+    teachers.value = (teacherResponse.users || []).filter(item => (Array.isArray(item.roles) ? item.roles.includes('teacher') : String(item.role).toLowerCase() === 'teacher') && String(item.account_status || 'Active') === 'Active').map(item => ({
       id: item._id || item.id,
+      employeeId: item.employeeId || item.registeredId || '',
       name: `${item.firstName || ''} ${item.lastName || ''}`.trim(),
       avatar: item.avatar || '',
+      position: item.position || '',
+      status: item.teacher_status || item.account_status || '',
+      startDate: item.startDate || '',
+      endDate: item.endDate || '',
     })).filter(item => item.name).sort((a, b) => a.name.localeCompare(b.name))
     const requestedTermId = String(route.query.term || '').trim()
     const requestedTerm = terms.value.find(term => termId(term) === requestedTermId)
@@ -430,6 +439,450 @@ async function chooseWorkspaceMode(mode) {
     await Swal.fire({ icon: 'error', title: 'Unable to load schedules', text: error.message })
   } finally { workspaceLoading.value = false }
 }
+
+async function downloadTermExcel(term) {
+  const academicTermId = termId(term)
+  if (!academicTermId) return
+
+  try {
+    Swal.fire({ title: 'Preparing Excel file', text: 'Loading this term\'s faculty loading…', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() })
+    const XLSX = await import('xlsx-js-style')
+    const [scheduleResponse, consultationResponse] = await Promise.all([
+      apiRequest(`/schedules?academicTermId=${encodeURIComponent(academicTermId)}`),
+      apiRequest(`/consultations?academicTermId=${encodeURIComponent(academicTermId)}`),
+    ])
+    const entries = Array.isArray(scheduleResponse.entries) ? scheduleResponse.entries : []
+    const consultations = (Array.isArray(consultationResponse.consultations) ? consultationResponse.consultations : []).map(consultation => ({
+      ...consultation,
+      day: consultation.dayOfWeek,
+      timeIn: consultation.startTime,
+      timeOut: consultation.endTime,
+      subject: 'Consultation Hours',
+      teacher: consultation.teacher || 'CIT Faculty',
+      entryType: 'consultation',
+      color: 'color-blue',
+    }))
+    const exportEntries = [...entries, ...consultations]
+    const loadByFaculty = new Map()
+
+    entries.forEach(entry => {
+      if (!entry?.teacher || entry.entryType === 'lunch') return
+      const start = Number(entry.timeInMinutes)
+      const end = Number(entry.timeOutMinutes)
+      const minutes = Number.isFinite(start) && Number.isFinite(end) && end > start ? end - start : 0
+      loadByFaculty.set(entry.teacher, (loadByFaculty.get(entry.teacher) || 0) + minutes / 60)
+    })
+
+    const headers = ['ID', 'No.', 'FULL NAME', 'POSITION', 'STATUS', 'START DATE', 'END DATE', 'TOTAL LOAD', 'TEACHING LOAD', 'OVERLOAD', 'DELOAD', 'MODULE WRITING']
+    const facultyRows = teachers.value.map((teacher, index) => {
+      const teachingLoad = Number((loadByFaculty.get(teacher.name) || 0).toFixed(2))
+      return [
+        teacher.employeeId,
+        index + 1,
+        teacher.name.toUpperCase(),
+        teacher.position,
+        '',
+        teacher.startDate,
+        teacher.endDate,
+        teachingLoad,
+        teachingLoad,
+        0,
+        0,
+        0,
+      ]
+    })
+    const totals = headers.map((_, index) => index >= 7 ? facultyRows.reduce((sum, row) => sum + (Number(row[index]) || 0), 0) : '')
+    const matrix = [
+      [],
+      ['', termLabel(term)],
+      headers,
+      [],
+      ['[AU] MAIN & SOUTH FULL-TIME FACULTY'],
+      ...facultyRows,
+      totals,
+    ]
+    const sheet = XLSX.utils.aoa_to_sheet(matrix)
+    sheet['!merges'] = [
+      { s: { r: 1, c: 1 }, e: { r: 1, c: headers.length - 1 } },
+      { s: { r: 4, c: 0 }, e: { r: 4, c: headers.length - 1 } },
+    ]
+    sheet['!cols'] = [
+      { wch: 15 }, { wch: 7 }, { wch: 30 }, { wch: 28 }, { wch: 20 }, { wch: 16 },
+      { wch: 18 }, { wch: 13 }, { wch: 15 }, { wch: 13 }, { wch: 12 }, { wch: 18 },
+    ]
+    sheet['!rows'] = [{ hpt: 8 }, { hpt: 24 }, { hpt: 52 }, { hpt: 8 }, { hpt: 20 }]
+    sheet['!freeze'] = { xSplit: 2, ySplit: 5 }
+
+    const border = {
+      top: { style: 'thin', color: { rgb: '000000' } },
+      bottom: { style: 'thin', color: { rgb: '000000' } },
+      left: { style: 'thin', color: { rgb: '000000' } },
+      right: { style: 'thin', color: { rgb: '000000' } },
+    }
+    const headerStyle = { fill: { fgColor: { rgb: '365F91' } }, font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 10 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
+    const loadHeaderStyle = { fill: { fgColor: { rgb: 'FFF2CC' } }, font: { bold: true, color: { rgb: '5A4300' }, sz: 10 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
+    const bodyStyle = { font: { color: { rgb: '263238' }, sz: 9 }, alignment: { vertical: 'center', wrapText: true }, border }
+    const groupStyle = { fill: { fgColor: { rgb: 'D9EAD3' } }, font: { bold: true, color: { rgb: '274E13' }, sz: 10 }, alignment: { horizontal: 'left', vertical: 'center' }, border }
+    const totalStyle = { fill: { fgColor: { rgb: 'FFF2CC' } }, font: { bold: true, color: { rgb: '5A4300' }, sz: 9 }, alignment: { horizontal: 'right', vertical: 'center' }, border }
+
+    sheet.B2.s = { font: { bold: true, color: { rgb: '1F1F1F' }, sz: 14 }, alignment: { horizontal: 'left', vertical: 'center' } }
+    headers.forEach((_, index) => {
+      const cell = sheet[XLSX.utils.encode_cell({ r: 2, c: index })]
+      if (cell) cell.s = index >= 7 ? loadHeaderStyle : headerStyle
+    })
+    for (let column = 0; column < headers.length; column += 1) {
+      const groupCell = sheet[XLSX.utils.encode_cell({ r: 4, c: column })]
+      if (groupCell) groupCell.s = groupStyle
+    }
+    for (let row = 5; row < 5 + facultyRows.length; row += 1) {
+      for (let column = 0; column < headers.length; column += 1) {
+        const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })]
+        if (cell) cell.s = bodyStyle
+      }
+    }
+    for (let column = 0; column < headers.length; column += 1) {
+      const cell = sheet[XLSX.utils.encode_cell({ r: 5 + facultyRows.length, c: column })]
+      if (cell) cell.s = totalStyle
+    }
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const slots = ['7:30 AM', '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM', '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM', '6:00 PM', '6:30 PM', '7:00 PM']
+    const toMinutes = (value) => {
+      const match = String(value || '').match(/(\d+):(\d+)\s*(AM|PM)/i)
+      if (!match) return 0
+      let hour = Number(match[1])
+      const minute = Number(match[2])
+      if (match[3].toUpperCase() === 'PM' && hour !== 12) hour += 12
+      if (match[3].toUpperCase() === 'AM' && hour === 12) hour = 0
+      return hour * 60 + minute
+    }
+    const slotText = (entry) => [entry.subject || (entry.entryType === 'lunch' ? 'Lunch Break' : ''), entry.teacher || 'CIT Faculty', entry.room].filter(Boolean).join(' / ')
+    const legend = [
+      ['Lecture', 'color-yellow'],
+      ['Laboratory', 'color-green'],
+      ['CIT Faculty', 'color-pink'],
+      ['Lunch', 'color-gray'],
+      ['Consultation', 'color-blue'],
+      ['Main Campus', 'color-orange'],
+    ]
+    const scheduleColors = {
+      'color-green': { fill: 'D9EAD3', font: '274E13' },
+      'color-yellow': { fill: 'FFF2CC', font: '5A4300' },
+      'color-orange': { fill: 'FCE4D6', font: '7F4122' },
+      'color-blue': { fill: 'CFE2F3', font: '1F4E79' },
+      'color-gray': { fill: 'D9D9D9', font: '404040' },
+      'color-pink': { fill: 'F4CCCC', font: '761C3B' },
+      'color-purple': { fill: '7B5EA7', font: 'FFFFFF' },
+      'color-red': { fill: 'E63946', font: 'FFFFFF' },
+    }
+    const entryColor = (entry) => {
+      if (!entry?.teacher || entry.teacher === 'CIT Faculty') return scheduleColors['color-pink']
+      return scheduleColors[entry?.color] || scheduleColors['color-yellow']
+    }
+    const gridGroups = (groups, bandLabel) => {
+      const matrix = legend.map(([label]) => [label])
+      const gridEntries = []
+      groups.forEach(group => {
+        matrix.push([])
+        matrix.push([group.label])
+        matrix.push([bandLabel])
+        matrix.push(['Time', '', ...days])
+        const dataStartRow = matrix.length
+        const occupied = days.map(() => new Set())
+        slots.forEach((slot, index) => {
+          const start = toMinutes(slot)
+          const end = start + 30
+          const values = days.map(day => {
+            const dayIndex = days.indexOf(day)
+            if (occupied[dayIndex].has(index)) return ''
+            const entry = group.entries.find(item => item.day === day && toMinutes(item.timeIn) >= start && toMinutes(item.timeIn) < end)
+            if (!entry) return ''
+            const span = Math.max(1, Math.ceil((toMinutes(entry.timeOut) - toMinutes(entry.timeIn)) / 30))
+            for (let offset = 1; offset < span && index + offset < slots.length; offset += 1) occupied[dayIndex].add(index + offset)
+            gridEntries.push({ row: dataStartRow + index, column: dayIndex + 2, span, entry })
+            return slotText(entry)
+          })
+          matrix.push([slot, index + 1 < slots.length ? slots[index + 1] : '', ...values])
+        })
+      })
+      const sheet = XLSX.utils.aoa_to_sheet(matrix)
+      sheet.__gridEntries = gridEntries
+      return sheet
+    }
+    const styleGridSheet = (gridSheet) => {
+      gridSheet['!cols'] = [{ wch: 11 }, { wch: 11 }, ...days.map(() => ({ wch: 25 }))]
+      gridSheet['!freeze'] = { xSplit: 2, ySplit: 8 }
+      const range = XLSX.utils.decode_range(gridSheet['!ref'])
+      for (let row = 0; row <= range.e.r; row += 1) {
+        const firstValue = gridSheet[XLSX.utils.encode_cell({ r: row, c: 0 })]?.v
+        if (row < legend.length) {
+          const legendColor = entryColor({ color: legend[row][1], teacher: 'legend' })
+          for (let column = 0; column < 2; column += 1) {
+            const cell = gridSheet[XLSX.utils.encode_cell({ r: row, c: column })]
+            if (cell) cell.s = { fill: { fgColor: { rgb: legendColor.fill } }, font: { bold: true, color: { rgb: legendColor.font }, sz: 11 }, alignment: { horizontal: 'center', vertical: 'center' }, border }
+          }
+          continue
+        }
+        const rowType = (row - legend.length) % (slots.length + 4)
+        if (rowType === 1 || rowType === 2) {
+          gridSheet['!merges'] = gridSheet['!merges'] || []
+          gridSheet['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: days.length + 1 } })
+        }
+        for (let column = 0; column <= days.length + 1; column += 1) {
+          const cell = gridSheet[XLSX.utils.encode_cell({ r: row, c: column })]
+          if (!cell) continue
+          if (rowType === 1 || rowType === 2) cell.s = groupStyle
+          else if (rowType === 3) cell.s = loadHeaderStyle
+          else if (row >= 8) cell.s = bodyStyle
+        }
+      }
+      ;(gridSheet.__gridEntries || []).forEach(({ row, column, span, entry }) => {
+        const color = entryColor(entry)
+        const cell = gridSheet[XLSX.utils.encode_cell({ r: row, c: column })]
+        if (cell) {
+          cell.s = { fill: { fgColor: { rgb: color.fill } }, font: { bold: true, color: { rgb: color.font }, sz: 9 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
+        }
+        if (span > 1) {
+          gridSheet['!merges'] = gridSheet['!merges'] || []
+          gridSheet['!merges'].push({ s: { r: row, c: column }, e: { r: row + span - 1, c: column } })
+        }
+      })
+      delete gridSheet.__gridEntries
+    }
+    const facultyGroups = teachers.value.map(teacher => ({ label: teacher.name, entries: exportEntries.filter(entry => entry.teacher === teacher.name) }))
+    const unassignedEntries = exportEntries.filter(entry => !entry.teacher || entry.teacher === 'CIT Faculty')
+    if (unassignedEntries.length) facultyGroups.push({ label: 'CIT Faculty', entries: unassignedEntries })
+    const facultyScheduleSheet = gridGroups(facultyGroups, 'Faculty Schedule')
+    const studentGroups = [...new Set(entries.filter(entry => entry.year || entry.section).map(entry => `${entry.year || 'Unknown'} · ${entry.section || 'Unassigned'}`))]
+      .map(label => ({ label, entries: entries.filter(entry => `${entry.year || 'Unknown'} · ${entry.section || 'Unassigned'}` === label) }))
+    const studentScheduleSheet = gridGroups(studentGroups, 'FACE-TO-FACE')
+    styleGridSheet(facultyScheduleSheet)
+    styleGridSheet(studentScheduleSheet)
+
+    const scheduleColumns = ['Subj Code', 'Subj Desc', 'Section', 'Teacher', 'Lec Room', 'Lec Day', 'Lec S Time', 'Lec E Time', 'Session', 'Lab Room', 'Lab Day', 'Lab S Time', 'Lab E Time', 'Session']
+    const splitSubject = (subject) => {
+      const value = String(subject || '').trim()
+      const separatorIndex = value.indexOf('|')
+      if (separatorIndex < 0) return { code: '', description: value }
+      return {
+        code: value.slice(0, separatorIndex).trim(),
+        description: value.slice(separatorIndex + 1).trim(),
+      }
+    }
+    const scheduleRows = exportEntries.map(entry => {
+      const subject = splitSubject(entry.subject)
+      return [
+      subject.code, subject.description, entry.section || '', entry.teacher || 'CIT Faculty', entry.roomType === 'Comlab/Laboratory' ? '' : entry.room || '',
+      entry.roomType === 'Comlab/Laboratory' ? '' : entry.day || '', entry.roomType === 'Comlab/Laboratory' ? '' : entry.timeIn || '', entry.roomType === 'Comlab/Laboratory' ? '' : entry.timeOut || '',
+      entry.roomType === 'Comlab/Laboratory' ? '' : 'Lec', entry.roomType === 'Comlab/Laboratory' ? entry.room || '' : '', entry.roomType === 'Comlab/Laboratory' ? entry.day || '' : '',
+      entry.roomType === 'Comlab/Laboratory' ? entry.timeIn || '' : '', entry.roomType === 'Comlab/Laboratory' ? entry.timeOut || '' : '', entry.roomType === 'Comlab/Laboratory' ? 'Lab' : '',
+      ]
+    })
+    const scheduleSheet = XLSX.utils.aoa_to_sheet([
+      ['CLASS DETAILS', '', '', '', '', 'SESSION 1 : LEC', '', '', '', 'SESSION 1 : LAB', '', '', '', ''],
+      scheduleColumns,
+      ...scheduleRows,
+    ])
+    scheduleSheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, { s: { r: 0, c: 5 }, e: { r: 0, c: 8 } }, { s: { r: 0, c: 9 }, e: { r: 0, c: 13 } }]
+    scheduleSheet['!cols'] = [{ wch: 14 }, { wch: 38 }, { wch: 18 }, { wch: 24 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }]
+    scheduleSheet['!freeze'] = { xSplit: 0, ySplit: 2 }
+    for (let column = 0; column < scheduleColumns.length; column += 1) {
+      const titleCell = scheduleSheet[XLSX.utils.encode_cell({ r: 0, c: column })]
+      const headerCell = scheduleSheet[XLSX.utils.encode_cell({ r: 1, c: column })]
+      if (titleCell) titleCell.s = groupStyle
+      if (headerCell) headerCell.s = loadHeaderStyle
+      for (let row = 2; row < scheduleRows.length + 2; row += 1) {
+        const cell = scheduleSheet[XLSX.utils.encode_cell({ r: row, c: column })]
+        if (cell) {
+          const color = entryColor(exportEntries[row - 2])
+          cell.s = { fill: { fgColor: { rgb: color.fill } }, font: { color: { rgb: color.font }, sz: 9 }, alignment: { vertical: 'center', wrapText: true }, border }
+        }
+      }
+    }
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Faculty Loading')
+    XLSX.utils.book_append_sheet(workbook, facultyScheduleSheet, 'Faculty Schedule')
+    XLSX.utils.book_append_sheet(workbook, scheduleSheet, 'Schedule')
+    XLSX.utils.book_append_sheet(workbook, studentScheduleSheet, 'Student Schedule')
+    const safeTermLabel = termLabel(term).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()
+    XLSX.writeFile(workbook, `faculty-loading-${safeTermLabel || 'academic-term'}.xlsx`)
+    Swal.close()
+  } catch (error) {
+    Swal.close()
+    await Swal.fire({ icon: 'error', title: 'Unable to download faculty loading', text: error.message })
+  }
+}
+
+async function downloadScheduleWorkbook(term) {
+  const academicTermId = termId(term)
+  if (!academicTermId) return
+
+  const colors = {
+    'color-green': { fill: '1F6B45', font: 'FFFFFF' },
+    'color-yellow': { fill: 'E9C46A', font: '5A3E00' },
+    'color-orange': { fill: 'F4A261', font: '5A2D00' },
+    'color-blue': { fill: '4A90D9', font: 'FFFFFF' },
+    'color-gray': { fill: '626C76', font: 'FFFFFF' },
+    'color-purple': { fill: '7B5EA7', font: 'FFFFFF' },
+    'color-red': { fill: 'E63946', font: 'FFFFFF' },
+  }
+  const columns = ['Name', 'Day', 'Start', 'End', 'Subject', 'Year', 'Section', 'Room', 'Type']
+  const dayOrder = Object.fromEntries(weekdays.map((day, index) => [day, index]))
+
+  try {
+    Swal.fire({ title: 'Preparing Excel file', text: 'Loading this term\'s schedules…', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() })
+    const XLSX = await import('xlsx-js-style')
+    const response = await apiRequest(`/schedules?academicTermId=${encodeURIComponent(academicTermId)}`)
+    const entries = Array.isArray(response.entries) ? response.entries : []
+    const sortEntries = (first, second) => (dayOrder[first.day] ?? 99) - (dayOrder[second.day] ?? 99) || String(first.timeIn || '').localeCompare(String(second.timeIn || '')) || String(first.subject || '').localeCompare(String(second.subject || ''))
+    const masterColumns = ['Faculty', 'Room', 'Year', 'Section', 'Day', 'Start', 'End', 'Subject', 'Type']
+    const exportFormula = (sheetName, column, sourceRow) => {
+      const source = "'Schedule Data'!"
+      if (column === 'Name') {
+        if (sheetName === 'Room') return `${source}B${sourceRow}`
+        if (sheetName === 'Faculty') return `${source}A${sourceRow}`
+        return `IF(AND(${source}C${sourceRow}<>"",${source}D${sourceRow}<>""),${source}C${sourceRow}&" · "&${source}D${sourceRow},IF(${source}C${sourceRow}<>"",${source}C${sourceRow},IF(${source}D${sourceRow}<>"",${source}D${sourceRow},"Unassigned group")))`
+      }
+      const sourceColumn = { Day: 'E', Start: 'F', End: 'G', Subject: 'H', Year: 'C', Section: 'D', Room: 'B', Type: 'I' }[column]
+      return `${source}${sourceColumn}${sourceRow}`
+    }
+    const masterRows = entries.map(entry => ({
+      Faculty: entry.teacher || '',
+      Room: entry.room || '',
+      Year: entry.year || '',
+      Section: entry.section || '',
+      Day: entry.day || '',
+      Start: entry.timeIn || '',
+      End: entry.timeOut || '',
+      Subject: entry.subject || (entry.entryType === 'lunch' ? 'Lunch Break' : ''),
+      Type: (() => {
+        const type = String(entry.entryType || 'class').trim()
+        return type.charAt(0).toUpperCase() + type.slice(1)
+      })(),
+      _color: colors[entry.color] || colors['color-yellow'],
+    }))
+    const rowFor = (nameKey) => entries
+      .slice()
+      .sort(sortEntries)
+      .map(entry => ({
+        Name: nameKey(entry),
+        Day: entry.day || '',
+        Start: entry.timeIn || '',
+        End: entry.timeOut || '',
+        Subject: entry.subject || (entry.entryType === 'lunch' ? 'Lunch Break' : ''),
+        Year: entry.year || '',
+        Section: entry.section || '',
+        Room: entry.room || '',
+        Type: (() => {
+          const type = String(entry.entryType || 'class').trim()
+          return type.charAt(0).toUpperCase() + type.slice(1)
+        })(),
+        _color: colors[entry.color] || colors['color-yellow'],
+        _sourceRow: entries.indexOf(entry) + 2,
+      }))
+
+    const sheetDefinitions = [
+      { name: 'Room', nameKey: entry => entry.room || 'Unassigned room' },
+      { name: 'Student', nameKey: entry => [entry.year, entry.section].filter(Boolean).join(' · ') || 'Unassigned group' },
+      { name: 'Faculty', nameKey: entry => entry.teacher || 'Unassigned faculty' },
+    ]
+    const workbook = XLSX.utils.book_new()
+    workbook.Workbook = { CalcPr: { calcMode: 'auto', fullCalcOnLoad: true, forceFullCalc: true } }
+    const masterSheet = XLSX.utils.json_to_sheet(masterRows, { header: masterColumns })
+    const masterHeaderStyle = { fill: { fgColor: { rgb: '354653' } }, font: { bold: true, color: { rgb: 'FFFFFF' } }, alignment: { horizontal: 'center' } }
+    masterColumns.forEach((_, columnIndex) => {
+      const cell = XLSX.utils.encode_cell({ r: 0, c: columnIndex })
+      if (masterSheet[cell]) masterSheet[cell].s = masterHeaderStyle
+    })
+    masterRows.forEach((row, rowIndex) => {
+      const style = { fill: { fgColor: { rgb: row._color.fill } }, font: { color: { rgb: row._color.font } } }
+      masterColumns.forEach((_, columnIndex) => {
+        const cell = XLSX.utils.encode_cell({ r: rowIndex + 1, c: columnIndex })
+        if (masterSheet[cell]) masterSheet[cell].s = style
+      })
+    })
+    masterSheet['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 13 }, { wch: 18 }, { wch: 13 }, { wch: 11 }, { wch: 11 }, { wch: 30 }, { wch: 12 }]
+    masterSheet['!freeze'] = { xSplit: 0, ySplit: 1 }
+    XLSX.utils.book_append_sheet(workbook, masterSheet, 'Schedule Data')
+    const legendRows = [
+      ['Color', 'Meaning'],
+      ['Green', 'Laboratory'],
+      ['Yellow', 'Lecture'],
+      ['Orange', 'Main Campus'],
+      ['Blue', 'Consultation'],
+      ['Gray', 'Lunch'],
+      ['Purple', 'Other schedule'],
+      ['Red', 'Other schedule'],
+    ]
+    const legendSheet = XLSX.utils.aoa_to_sheet(legendRows)
+    legendSheet['!cols'] = [{ wch: 16 }, { wch: 24 }]
+    legendRows.forEach((row, rowIndex) => {
+      const colorKey = rowIndex === 0 ? null : `color-${row[0].toLowerCase()}`
+      const color = colorKey ? colors[colorKey] : null
+      for (let columnIndex = 0; columnIndex < row.length; columnIndex++) {
+        const cell = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex })
+        if (legendSheet[cell]) legendSheet[cell].s = rowIndex === 0
+          ? masterHeaderStyle
+          : { fill: { fgColor: { rgb: color?.fill || 'FFFFFF' } }, font: { color: { rgb: color?.font || '000000' } } }
+      }
+    })
+    XLSX.utils.book_append_sheet(workbook, legendSheet, 'Legend')
+    const headerStyle = { fill: { fgColor: { rgb: '354653' } }, font: { bold: true, color: { rgb: 'FFFFFF' } }, alignment: { horizontal: 'center' } }
+    const titleStyle = { fill: { fgColor: { rgb: '1F6B45' } }, font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 13 }, alignment: { horizontal: 'left' } }
+    sheetDefinitions.forEach(({ name, nameKey }) => {
+      const groups = new Map()
+      rowFor(nameKey).forEach(row => {
+        if (!groups.has(row.Name)) groups.set(row.Name, [])
+        groups.get(row.Name).push(row)
+      })
+      const matrix = []
+      const titleRows = []
+      const headerRows = []
+      const dataRows = []
+      groups.forEach((rows, groupName) => {
+        titleRows.push(matrix.length)
+        matrix.push([`${name} schedule: ${groupName}`])
+        headerRows.push(matrix.length)
+        matrix.push(columns)
+        rows.forEach(row => {
+          dataRows.push({ rowIndex: matrix.length, color: row._color })
+          matrix.push(columns.map(column => ({ f: exportFormula(name, column, row._sourceRow) })))
+        })
+        matrix.push([])
+      })
+      if (!matrix.length) matrix.push([`No schedules found for this term.`])
+      const sheet = XLSX.utils.aoa_to_sheet(matrix)
+      titleRows.forEach(rowIndex => {
+        sheet['!merges'] = sheet['!merges'] || []
+        sheet['!merges'].push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: columns.length - 1 } })
+        const cell = XLSX.utils.encode_cell({ r: rowIndex, c: 0 })
+        if (sheet[cell]) sheet[cell].s = titleStyle
+      })
+      headerRows.forEach(rowIndex => columns.forEach((_, columnIndex) => {
+        const cell = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex })
+        if (sheet[cell]) sheet[cell].s = headerStyle
+      }))
+      dataRows.forEach(({ rowIndex, color }) => {
+        const style = { fill: { fgColor: { rgb: color.fill } }, font: { color: { rgb: color.font } } }
+        columns.forEach((_, columnIndex) => {
+          const cell = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex })
+          if (sheet[cell]) sheet[cell].s = style
+        })
+      })
+      sheet['!cols'] = [{ wch: 24 }, { wch: 13 }, { wch: 11 }, { wch: 11 }, { wch: 30 }, { wch: 13 }, { wch: 18 }, { wch: 18 }, { wch: 12 }]
+      XLSX.utils.book_append_sheet(workbook, sheet, name)
+    })
+
+    const safeTermLabel = termLabel(term).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()
+    XLSX.writeFile(workbook, `schedules-${safeTermLabel || 'academic-term'}.xlsx`)
+    Swal.close()
+  } catch (error) {
+    Swal.close()
+    await Swal.fire({ icon: 'error', title: 'Unable to download schedules', text: error.message })
+  }
+}
+
 function openSchedule(target) {
   const query = {
     academicTermId: termId(workspaceTerm.value),
@@ -540,6 +993,7 @@ loadPage()
 .term-actions .view-btn { color: #fff; border-color: #354653; background: #354653; }
 .term-actions .view-btn:hover:not(:disabled) { color: #fff; background: #263744; }
 .term-actions .add-btn { color: #315e47; border-color: #bed4c8; background: #edf7f1; }
+.term-actions .excel-btn { color: #176a94; border-color: #b9d7e6; background: #eaf6fc; }
 .term-actions .publish-btn { color: #176a94; border-color: #b9d7e6; background: #eaf6fc; }
 .term-actions .publish-btn:disabled { color: #668176; border-color: #cfddd5; background: #e7f1eb; opacity: 1; }
 .empty-state { border: 1px dashed #ccd4d9; border-radius: 14px; background: #f8fafb; }
@@ -604,47 +1058,86 @@ loadPage()
   box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
 }
 .mode-grid {
-  width: min(860px, calc(100% - 64px));
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin: 44px auto 52px;
+  display: grid;
+  width: min(1160px, calc(100% - 64px));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin: 46px auto 56px;
+  align-items: stretch;
 }
 .mode-card {
+  display: flex;
   position: relative;
-  min-height: 164px;
-  padding: 26px;
+  min-height: 170px;
+  width: 100%;
+  padding: 24px 26px;
   flex-direction: row;
   justify-content: flex-start;
-  gap: 18px;
+  align-items: center;
+  gap: 22px;
   color: #283139;
-  border-color: #d4dade;
-  border-radius: 15px;
-  background: linear-gradient(145deg, #fff 0%, #f2f4f5 58%, #e1e4e6 100%);
-  box-shadow: 0 10px 24px rgba(40, 48, 54, .1), inset 0 1px 0 #fff;
+  border: 1px solid #dfe3e7;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f7f8f8 0%, #f1f3f4 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 10px 22px rgba(40, 48, 54, .08);
   text-align: left;
   transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
 }
 .mode-card:hover {
-  border-color: #89949c;
-  box-shadow: 0 15px 30px rgba(40, 48, 54, .15), inset 0 1px 0 #fff;
+  border-color: #8e9aa3;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 14px 28px rgba(40, 48, 54, .12);
   transform: translateY(-2px);
 }
 .mode-icon {
-  width: 58px;
-  height: 58px;
-  flex: 0 0 58px;
-  color: #f6f7f7;
-  border: 1px solid #4b555d;
-  border-radius: 14px;
-  background: linear-gradient(145deg, #66717a, #313940);
-  box-shadow: 0 7px 15px rgba(42, 50, 56, .22), inset 0 1px 0 rgba(255,255,255,.2);
+  display: flex;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  align-items: center;
+  justify-content: center;
+  color: #f4f7f8;
+  border: 1px solid #4a535c;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #5e6972, #2c353d);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 9px 16px rgba(42, 49, 56, .18);
 }
-.mode-icon :deep(svg) { width: 27px; height: 27px; }
-.mode-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 7px; }
-.mode-copy strong { color: #232b31; font-size: 1rem; letter-spacing: -.015em; }
-.mode-card .mode-copy small { max-width: 245px; color: #68747d; font-size: .75rem; line-height: 1.55; }
-.mode-arrow { color: #59656e; font-size: 1.25rem; transition: transform .18s ease; }
-.mode-card:hover .mode-arrow { transform: translateX(3px); }
+.mode-icon :deep(svg) { width: 26px; height: 26px; stroke-width: 1.8; }
+.mode-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  align-items: flex-start;
+}
+.mode-copy strong {
+  color: #222b31;
+  font-size: 1.05rem;
+  letter-spacing: -.015em;
+  line-height: 1.2;
+}
+.mode-card .mode-copy small {
+  max-width: 260px;
+  color: #68747d;
+  font-size: .78rem;
+  line-height: 1.55;
+}
+.mode-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  min-width: 20px;
+  color: #535f68;
+  font-size: 1.65rem;
+  line-height: 1;
+  transition: transform .18s ease, color .18s ease;
+}
+.mode-card:hover .mode-arrow {
+  color: #1f2933;
+  transform: translateX(3px);
+}
 .preview-toolbar {
   align-items: center;
   gap: 24px;
@@ -686,12 +1179,15 @@ loadPage()
 }
 .preview-search input:focus { outline: none; border-color: #71808a; box-shadow: 0 0 0 3px rgba(62, 82, 95, .12); }
 .preview-grid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   padding: 20px 28px 28px;
   background: #f3f5f6;
 }
 .preview-card {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   padding: 17px;
   overflow: hidden;
@@ -708,7 +1204,11 @@ loadPage()
   transform: translateY(-2px);
 }
 .preview-card:focus-visible { outline: 3px solid rgba(49, 72, 86, .19); outline-offset: 2px; }
-.preview-card-head { gap: 12px; }
+.preview-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .preview-avatar {
   position: relative;
   width: 42px;
@@ -725,7 +1225,11 @@ loadPage()
 .preview-card-head strong { color: #20282e; font-size: .82rem; font-weight: 700; }
 .preview-card-head small { margin-top: 2px; color: #7a848c; font-size: .64rem; }
 .preview-card-head > .open-arrow { display: none; }
-.mini-schedule { gap: 5px; margin: 16px 0 13px; }
+.mini-schedule {
+  display: grid;
+  gap: 5px;
+  margin: 16px 0 13px;
+}
 .mini-day {
   min-width: 0;
   min-height: 76px;
@@ -776,9 +1280,13 @@ loadPage()
   .term-row { flex-direction: column; }
   .term-actions { width: min(100%, 480px); justify-content: flex-start; }
 }
-@media (max-width: 820px) {
-  .mode-grid { grid-template-columns: 1fr; }
+@media (max-width: 920px) {
+  .mode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .preview-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .mode-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
   .main { padding: 22px 16px 40px; }

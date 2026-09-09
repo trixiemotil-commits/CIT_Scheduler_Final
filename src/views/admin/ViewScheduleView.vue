@@ -147,8 +147,20 @@
               <p class="sched-grid-sub">{{ selectedFloor }} &bull; Read-only view</p>
             </div>
             <div class="sched-topbar-right">
+              <div class="schedule-legend" aria-label="Schedule color legend">
+                <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
+                <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
+                <span><i class="legend-swatch legend-swatch--faculty"></i>CIT Faculty</span>
+                <span><i class="legend-swatch legend-swatch--lunch"></i>Lunch</span>
+                <span><i class="legend-swatch legend-swatch--consultation"></i>Consultation</span>
+                <span><i class="legend-swatch legend-swatch--main-campus"></i>Main Campus</span>
+              </div>
               <button class="icon-btn" title="Print" @click="printSchedule">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              </button>
+              <button v-if="viewMode === 'room'" class="icon-btn export-btn" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8"/></svg>
+                <span>Excel</span>
               </button>
             </div>
           </div>
@@ -255,8 +267,20 @@
               <p class="sched-grid-sub">Read-only view</p>
             </div>
             <div class="sched-topbar-right">
+              <div class="schedule-legend" aria-label="Schedule color legend">
+                <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
+                <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
+                <span><i class="legend-swatch legend-swatch--faculty"></i>CIT Faculty</span>
+                <span><i class="legend-swatch legend-swatch--lunch"></i>Lunch</span>
+                <span><i class="legend-swatch legend-swatch--consultation"></i>Consultation</span>
+                <span><i class="legend-swatch legend-swatch--main-campus"></i>Main Campus</span>
+              </div>
               <button class="icon-btn" title="Print" @click="printSchedule">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              </button>
+              <button v-if="viewMode === 'room'" class="icon-btn export-btn" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8"/></svg>
+                <span>Excel</span>
               </button>
             </div>
           </div>
@@ -512,6 +536,8 @@ watch(selectedTerm, async () => {
     await loadScheduleData()
   }
   if (viewMode.value === 'teacher') {
+    teacherList.value = []
+    await loadTeachers()
     await fetchConsultationsForTeacher()
   }
 })
@@ -756,10 +782,22 @@ async function loadTeachers() {
   if (teacherList.value.length) return
   loadingTeachers.value = true
   try {
-    const res = await apiRequest('/users?role=teacher')
-      if (res.users && Array.isArray(res.users)) {
+    const termId = getSelectedTermId()
+    const scheduleQuery = termId ? `?academicTermId=${encodeURIComponent(termId)}` : ''
+    const [res, schedulePayload] = await Promise.all([
+      apiRequest('/users?role=teacher'),
+      apiRequest(`/schedules${scheduleQuery}`),
+    ])
+    const scheduledTeacherNames = new Set((schedulePayload.entries || []).map(entry => String(entry.teacher || '').trim()).filter(Boolean))
+    const viewingHistoricalTerm = Boolean(termId && getTermId(publishedTerm.value) && termId !== getTermId(publishedTerm.value))
+    if (res.users && Array.isArray(res.users)) {
         teacherList.value = res.users
-          .filter(u => Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher')
+          .filter(u => {
+            const isTeacher = Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher'
+            const name = `${u.firstName || ''} ${u.lastName || ''}`.trim()
+            const isActive = String(u.account_status || 'Active') === 'Active'
+            return isTeacher && (isActive || (viewingHistoricalTerm && scheduledTeacherNames.has(name)))
+          })
           .map(u => {
             const name = `${u.firstName} ${u.lastName}`.trim()
             return {
@@ -935,6 +973,9 @@ function syncEntriesFromApi(apiEntries) {
     const key = `${tableLabel}|${sectionKey}|${slot}|${day}`
     const inferredCampus = inferCampus(entry)
     const roomBasedColor = colorForRoomType(entry.roomType, entry.room)
+    const effectiveColor = isLunch
+      ? 'color-gray'
+      : (inferredCampus === 'Main Campus' ? 'color-orange' : (roomBasedColor || entry.color || 'color-yellow'))
     entries[key] = {
       entryType: isLunch ? 'lunch' : (entryType || 'class'),
       teacher: entry.teacher,
@@ -954,9 +995,7 @@ function syncEntriesFromApi(apiEntries) {
       parallelSlots: Array.isArray(entry.parallelSlots) ? entry.parallelSlots.map(s => ({ ...s })) : [],
       isSubstitute: Boolean(entry.isSubstitute),
       subbedLabel: entry.subbedLabel || '',
-      color: isLunch
-        ? 'color-gray'
-        : (roomBasedColor || entry.color || 'color-yellow'),
+      color: effectiveColor,
       addedAt: formatAddedAt(entry.addedAt),
     }
   })
@@ -1102,6 +1141,131 @@ onMounted(async () => {
   await ensureTermSelection()
   await loadScheduleData()
 })
+
+function exportScheduleExcel() {
+  const isRoom = viewMode.value === 'room'
+  const selectedName = isRoom ? selectedRoom.value : selectedTeacher.value
+  if (!selectedName) return
+
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const SLOTS = timeOptions
+  const colorMap = {
+    'color-green': { bg: '#1f6b45', fg: '#ffffff' },
+    'color-yellow': { bg: '#e9c46a', fg: '#5a3e00' },
+    'color-orange': { bg: '#f4a261', fg: '#5a2d00' },
+    'color-blue': { bg: '#4a90d9', fg: '#ffffff' },
+    'color-gray': { bg: '#626c76', fg: '#ffffff' },
+    'color-purple': { bg: '#7b5ea7', fg: '#ffffff' },
+    'color-red': { bg: '#e63946', fg: '#ffffff' },
+  }
+  const esc = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+
+  const filteredEntries = Object.values(entries).filter(entry =>
+    isRoom ? entry.room === selectedRoom.value : entry.teacher === selectedTeacher.value
+  )
+  const filteredConsultations = isRoom ? [] : consultationSlots.value
+  const slotMins = SLOTS.map(parseTime)
+  const entriesAt = (slotIndex, day) => filteredEntries.filter(entry => {
+    const start = parseTime(entry.timeIn)
+    const next = slotIndex + 1 < slotMins.length ? slotMins[slotIndex + 1] : slotMins[slotIndex] + 30
+    return entry.day === day && start >= slotMins[slotIndex] && start < next
+  })
+  const rowspanFor = (entry) => {
+    const start = parseTime(entry.timeIn)
+    const end = parseTime(entry.timeOut)
+    const slotIndex = slotMins.findIndex((minute, index) => {
+      const next = index + 1 < slotMins.length ? slotMins[index + 1] : minute + 30
+      return start >= minute && start < next
+    })
+    if (slotIndex < 0) return 1
+    let span = 1
+    for (let index = slotIndex + 1; index < SLOTS.length; index++) {
+      if (slotMins[index] >= end) break
+      span++
+    }
+    return Math.max(1, span)
+  }
+  const consultRowspanFor = (consultation) => {
+    const start = parseTime(consultation.startTime)
+    const end = parseTime(consultation.endTime)
+    const slotIndex = slotMins.findIndex((minute, index) => {
+      const next = index + 1 < slotMins.length ? slotMins[index + 1] : minute + 30
+      return start >= minute && start < next
+    })
+    if (slotIndex < 0) return 1
+    let span = 1
+    for (let index = slotIndex + 1; index < SLOTS.length; index++) {
+      if (slotMins[index] >= end) break
+      span++
+    }
+    return Math.max(1, span)
+  }
+  const entryContent = (entry, groupedEntries) => {
+    const sectionRows = groupedEntries
+      .filter(item => item.section || item.room || item.year)
+      .map(item => [item.section, !isRoom ? item.room : '', item.year].filter(Boolean).join(' · '))
+      .filter(Boolean)
+      .map(value => `<span class="e-section">${esc(value)}</span>`)
+      .join('')
+    if (entry.entryType === 'lunch') {
+      return `<span class="e-main">Lunch Break</span><span class="e-time">${esc(entry.timeIn)} - ${esc(entry.timeOut)}</span>`
+    }
+    const teacher = isRoom ? `<span class="e-teacher">${esc(entry.teacher || '—')}</span>` : ''
+    return `${teacher}<span class="e-main">${esc(entry.subject || 'Schedule')}</span><span class="e-time">${esc(entry.timeIn)} - ${esc(entry.timeOut)}</span>${sectionRows}`
+  }
+
+  const occupied = Array.from({ length: SLOTS.length }, () => Array(DAYS.length).fill(false))
+  let bodyHTML = ''
+  for (let slotIndex = 0; slotIndex < SLOTS.length; slotIndex++) {
+    const isHalf = SLOTS[slotIndex].includes(':30')
+    bodyHTML += `<tr${isHalf ? ' class="half"' : ''}><td class="time-col">${esc(SLOTS[slotIndex])}</td>`
+    DAYS.forEach((day, dayIndex) => {
+      if (occupied[slotIndex][dayIndex]) return
+      const matched = entriesAt(slotIndex, day)
+      if (matched.length) {
+        const rowspan = rowspanFor(matched[0])
+        for (let offset = 1; offset < rowspan && slotIndex + offset < SLOTS.length; offset++) occupied[slotIndex + offset][dayIndex] = true
+        const color = colorMap[matched[0].color] || colorMap['color-yellow']
+        bodyHTML += `<td class="entry-cell" rowspan="${rowspan}" style="background:${color.bg};color:${color.fg};">${entryContent(matched[0], matched)}</td>`
+        return
+      }
+      if (!isRoom) {
+        const consultation = filteredConsultations.find(item => {
+          const start = parseTime(item.startTime)
+          const next = slotIndex + 1 < slotMins.length ? slotMins[slotIndex + 1] : slotMins[slotIndex] + 30
+          return item.dayOfWeek === day && start >= slotMins[slotIndex] && start < next && parseTime(item.endTime) > start
+        })
+        if (consultation) {
+          const rowspan = consultRowspanFor(consultation)
+          for (let offset = 1; offset < rowspan && slotIndex + offset < SLOTS.length; offset++) occupied[slotIndex + offset][dayIndex] = true
+          bodyHTML += `<td class="entry-cell" rowspan="${rowspan}" style="background:#4a90d9;color:#ffffff;"><span class="e-main">Consultation</span><span class="e-time">${esc(consultation.startTime)} - ${esc(consultation.endTime)}</span></td>`
+          return
+        }
+      }
+      bodyHTML += '<td class="free-cell"></td>'
+    })
+    bodyHTML += '</tr>'
+  }
+
+  const title = isRoom ? `Room ${selectedRoom.value} - Weekly Schedule` : `Prof. ${selectedTeacher.value} - Weekly Schedule`
+  const sub = [selectedTermLabel.value ? `Term: ${selectedTermLabel.value}` : '', isRoom ? selectedFloor.value : '', `Exported on ${new Date().toLocaleDateString('en-US')}`].filter(Boolean).join(' | ')
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+    @page{size:landscape;margin:10mm}*{box-sizing:border-box}body{font-family:Segoe UI,Arial,sans-serif;padding:14px 18px;font-size:11px;color:#252d33}h2{font-size:16px;margin:0 0 4px}.sub{font-size:10px;color:#66727c;margin:0 0 12px}table{width:100%;border-collapse:collapse;table-layout:fixed;border:1px solid #cfd6df}th{background:#3f4b55;color:#fff;padding:8px 6px;text-align:center;font-size:10px;border:1px solid #26333d}th:first-child{width:68px}td{border:1px solid #d9dfe4;height:44px;vertical-align:top}.half td{border-top:1px dashed #d9dfe4}.time-col{background:#f0f2f4;color:#4b5563;font-size:9px;font-weight:700;text-align:center;vertical-align:middle;padding:4px 2px}.free-cell{background:#f5f1ff}.entry-cell{padding:8px 9px;vertical-align:top;border:3px solid #fff;line-height:1.35;overflow:hidden}.entry-cell span{display:block}.e-teacher{font-size:10px;font-weight:700}.e-main{font-size:10px;font-weight:800}.e-time{font-size:8.5px;margin-top:2px;opacity:.9}.e-section{font-size:9px;margin-top:2px;font-weight:600}</style></head><body><h2>${esc(title)}</h2><p class="sub">${esc(sub)}</p><table><thead><tr><th>Time</th>${DAYS.map(day => `<th>${esc(day)}</th>`).join('')}</tr></thead><tbody>${bodyHTML}</tbody></table></body></html>`
+  const excelHtml = html.replace('</head>', '<style>body{padding:8px;font-size:9px;}h2{font-size:13px;margin-bottom:2px}.sub{font-size:8px;margin-bottom:6px}table{width:100%;table-layout:fixed;border:1px solid #000}th{padding:4px 3px;font-size:8px;border:1px solid #000}th:first-child{width:54px}tbody tr{height:24px;min-height:24px;max-height:24px}td{border:1px solid #000;height:24px}.time-col{font-size:8px;padding:2px 1px}.entry-cell{padding:3px 4px;border:0;border-radius:0;line-height:1.1}.entry-cell span{line-height:1.1}.e-teacher{font-size:8px}.e-main{font-size:8px}.e-time{font-size:7px;margin-top:1px}.e-section{font-size:7px;margin-top:1px}</style></head>')
+  const blob = new Blob([`\ufeff${excelHtml}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${isRoom ? 'room' : 'teacher'}-schedule-${String(selectedName).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()}.xls`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
 
 /* ── Print (color-coded, 30-min intervals) ── */
 function printSchedule() {
@@ -1274,7 +1438,11 @@ function printSchedule() {
 <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<\/script>
 </body></html>`
   const w = window.open('', '_blank', 'width=1100,height=800')
-  w.document.write(html)
+  const printHtml = html
+    .replace(/border:4px solid #fff/g, 'border:0')
+    .replace(/border:3px solid #fff/g, 'border:0')
+    .replace('</head>', '<style>@page{size:A4 landscape;margin:4mm;}body{padding:4mm;font-size:7px;}h2{font-size:11px;margin-bottom:1px}.sub{font-size:6.5px;margin-bottom:3px}table{border:1px solid #000}th{padding:2px 1px;font-size:6.5px;border:1px solid #000}th.time-hdr{width:42px}tbody tr{height:18px;min-height:18px;max-height:18px}td{height:18px;border:1px solid #000}td.time-col{font-size:6.5px;padding:1px}.entry-cell{padding:1px 2px;border:0;line-height:1}.entry-cell span{line-height:1}.e-teacher{font-size:6px}.e-subject,.e-main{font-size:6px}.e-time{font-size:5.5px;margin-top:0}.e-section{font-size:5.5px;margin-top:0}</style></head>')
+  w.document.write(printHtml)
   w.document.close()
 }
 </script>
@@ -1417,6 +1585,7 @@ function printSchedule() {
   background: linear-gradient(145deg, #f6fbff, #cfe5ff);
   transform: translateY(-1px);
 }
+.export-btn { gap: 6px; white-space: nowrap; font-size: .78rem; font-weight: 700; }
 
 /* ── Mode selection ── */
 .mode-select-container { display: flex; flex-direction: column; gap: 16px; }
@@ -1692,6 +1861,15 @@ function printSchedule() {
   border-radius: 11px;
   background: #eef1f2;
 }
+.schedule-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 11px; margin-right: 4px; color: #64717a; font-size: .66rem; font-weight: 650; white-space: nowrap; }
+.schedule-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend-swatch { width: 10px; height: 10px; display: inline-block; border-radius: 3px; }
+.legend-swatch--lecture { background: #e9c46a; }
+.legend-swatch--lab { background: #1f6b45; }
+.legend-swatch--faculty { background: #e9a8c1; }
+.legend-swatch--lunch { background: #626c76; }
+.legend-swatch--consultation { background: #4a90d9; }
+.legend-swatch--main-campus { background: #f4a261; }
 .sched-grid-title {
   display: flex;
   align-items: center;

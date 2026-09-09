@@ -131,8 +131,8 @@
               :class="['teacher-card', `card-${teacher.status.toLowerCase().replace(/\s+/g, '-')}`]"  
             >
               <!-- Status Badge -->
-              <div :class="['status-badge', `badge-${teacher.status.toLowerCase().replace(/\s+/g, '-')}`]">
-                {{ teacher.status }}
+              <div :class="['status-badge', `badge-${teacher.currentStatus.toLowerCase().replace(/\s+/g, '-')}`]">
+                {{ teacher.currentStatus }}
               </div>
 
               <!-- Avatar -->
@@ -526,6 +526,7 @@ const teachers = ref([])
 const loadingTeachers = ref(false)
 const scheduleCache = ref({})
 const scheduleLoading = ref({})
+const currentTime = ref(new Date())
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 async function apiRequest(path, options = {}) {
@@ -698,6 +699,7 @@ function mapTeacherFromApi(user) {
     email: user.email || '',
     avatar: user.avatar || `https://i.pravatar.cc/150?u=${encodeURIComponent(user.id || user.email || fullName)}`,
     status: mapTeacherStatus(user.teacher_status),
+    currentStatus: 'Offline',
     account_status: user.account_status || 'Active',
     teacher_status: user.teacher_status || 'On School',
     employeeId: user.employeeId || '',
@@ -709,6 +711,38 @@ function mapTeacherFromApi(user) {
     substituteAssignments: user.substituteAssignments || {},
     _lastStatus: mapTeacherStatus(user.teacher_status),
   }
+}
+
+function isTeacherActive(teacher) {
+  return teacher.account_status === 'Active'
+}
+
+function getActualTeacherStatus(teacher) {
+  const now = currentTime.value
+  const dayIndex = now.getDay()
+  const minutes = now.getHours() * 60 + now.getMinutes()
+  const withinWorkingWindow = minutes >= 7 * 60 && minutes < 21 * 60
+  if (!withinWorkingWindow || dayIndex === 0) return 'Offline'
+  if (teacher.status === 'On Leave') return 'On Leave'
+  if (teacher.status === 'On Meeting') return 'On Meeting'
+  if (teacher.designatedAreas.some(area => /main/i.test(String(area)))) return 'Off Campus'
+
+  const day = DAY_ORDER[dayIndex - 1]
+  const schedule = getScheduleForTeacher(teacher.name)
+  const isOnClass = schedule.some(entry =>
+    entry.day === day
+    && !isLunchBreakEntry(entry)
+    && (parseTimeToMinutes(entry.timeIn) ?? Infinity) <= minutes
+    && minutes < (parseTimeToMinutes(entry.timeOut) ?? -Infinity)
+  )
+  if (isOnClass) return 'On Class'
+  return 'Free Time'
+}
+
+function refreshActualStatuses() {
+  teachers.value.forEach(teacher => {
+    teacher.currentStatus = getActualTeacherStatus(teacher)
+  })
 }
 
 function getEntryKey(entry) {
@@ -779,12 +813,13 @@ async function loadTeachers() {
   try {
     const payload = await apiRequest('/users?role=teacher')
     teachers.value = Array.isArray(payload.users)
-      ? payload.users.map(mapTeacherFromApi)
+      ? payload.users
+        .filter(user => String(user.account_status || 'Active') === 'Active')
+        .map(mapTeacherFromApi)
       : []
 
-    teachers.value
-      .filter((teacher) => teacher.status === 'On Leave')
-      .forEach((teacher) => loadTeacherSchedule(teacher.name))
+    await Promise.all(teachers.value.map((teacher) => loadTeacherSchedule(teacher.name)))
+    refreshActualStatuses()
   } catch (error) {
     teachers.value = []
     console.error('Failed to load teachers:', error)
@@ -863,22 +898,9 @@ const updateTeacherStatus = async (teacher) => {
   const previousStatus = teacher._lastStatus || teacher.status
 
   try {
-    const payload = {
-      firstName: teacher.firstName || teacher.name?.split(' ')[0] || '',
-      lastName: teacher.lastName || teacher.name?.split(' ').slice(1).join(' ') || 'Teacher',
-      email: teacher.email,
-      role: 'teacher',
-      department: teacher.department || teacher.college || '',
-      phone: teacher.phone || '',
-      account_status: teacher.account_status || 'Active',
-      teacher_status: mapTeacherStatusToApi(teacher.status),
-      employeeId: teacher.employeeId || '',
-      studentId: teacher.studentId || '',
-    }
-
-    const response = await apiRequest(`/users/${teacher.id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
+    const response = await apiRequest(`/users/${teacher.id}/teacher-status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ teacher_status: mapTeacherStatusToApi(teacher.status) }),
     })
 
     if (response?.user) {
@@ -1108,6 +1130,7 @@ const addNewTeacher = async () => {
 }
 
 let teacherRefreshInterval
+let statusClockInterval
 
 function refreshTeachersWhenVisible() {
   if (!document.hidden) loadTeachersIfAllowed()
@@ -1122,12 +1145,17 @@ function loadTeachersIfAllowed() {
 onMounted(() => {
   loadTeachers()
   teacherRefreshInterval = window.setInterval(loadTeachersIfAllowed, 15000)
+  statusClockInterval = window.setInterval(() => {
+    currentTime.value = new Date()
+    refreshActualStatuses()
+  }, 30000)
   window.addEventListener('focus', loadTeachersIfAllowed)
   document.addEventListener('visibilitychange', refreshTeachersWhenVisible)
 })
 
 onUnmounted(() => {
   window.clearInterval(teacherRefreshInterval)
+  window.clearInterval(statusClockInterval)
   window.removeEventListener('focus', loadTeachersIfAllowed)
   document.removeEventListener('visibilitychange', refreshTeachersWhenVisible)
 })

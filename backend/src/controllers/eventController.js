@@ -133,7 +133,7 @@ async function createEvent(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Created event ${event.title}`,
+      action: `Added event ${event.title}`,
       path: req.originalUrl || "/api/events",
       method: req.method,
       req,
@@ -190,7 +190,9 @@ async function updateEvent(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Updated event ${existing.title}${existing.status === "archived" ? " (archived)" : ""}`,
+      action: existing.status === "archived"
+        ? `Event ended: ${existing.title}`
+        : `Edited event ${existing.title}`,
       path: req.originalUrl || `/api/events/${req.params.id}`,
       method: req.method,
       req,

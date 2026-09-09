@@ -64,9 +64,14 @@ function parseTimeToMinutes(value) {
   return hour * 60 + minute;
 }
 
-function colorForSchedule(room, subject) {
+function colorForSchedule(room, subject, campus = "South Campus") {
   const normalizedRoom = normalizeString(room);
   const normalizedSubject = normalizeString(subject);
+  const normalizedCampus = normalizeString(campus);
+
+  if (normalizedCampus === "Main Campus") {
+    return "color-orange";
+  }
 
   if (/\blunch\b/i.test(normalizedSubject)) {
     return "color-gray";
@@ -287,7 +292,9 @@ function buildEntryDocs(payload, academicTermId = null) {
       parallelGroupId,
       parallelCount,
       parallelSlots: slots,
-      color: isGenericTeacher(teacher) ? "color-pink" : (slot.roomType === "Comlab/Laboratory" ? "color-green" : colorForSchedule("", subject)),
+      color: isGenericTeacher(teacher)
+        ? "color-pink"
+        : (slot.roomType === "Comlab/Laboratory" && campus !== "Main Campus" ? "color-green" : colorForSchedule("", subject, campus)),
       academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
       addedAt,
     }));
@@ -322,7 +329,9 @@ function buildEntryDocs(payload, academicTermId = null) {
       parallelGroupId: null,
       parallelCount: 1,
       parallelSlots: [],
-      color: isGenericTeacher(teacher) ? "color-pink" : (roomType === "Comlab/Laboratory" ? "color-green" : colorForSchedule("", subject)),
+      color: isGenericTeacher(teacher)
+        ? "color-pink"
+        : (roomType === "Comlab/Laboratory" && campus !== "Main Campus" ? "color-green" : colorForSchedule("", subject, campus)),
       academicTermId: resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined,
       addedAt,
     },
@@ -604,6 +613,13 @@ async function createScheduleTable(req, res) {
     }
 
     const table = await ScheduleTable.create({ teacher, label });
+    await logActivity({
+      actor: req.user,
+      action: `Assigned teacher ${teacher} to schedule`,
+      path: req.originalUrl || "/api/schedules/tables",
+      method: req.method,
+      req,
+    });
     try {
       await notifyActiveAdmins({
         actorId: req.user?.id,
@@ -697,9 +713,19 @@ async function createSchedule(req, res) {
     }
 
     const created = await ScheduleEntry.insertMany(docs);
+    const createdSchedule = docs[0] || {};
+    const scheduleDetails = [
+      createdSchedule.subject,
+      createdSchedule.day,
+      createdSchedule.timeIn && createdSchedule.timeOut ? `${createdSchedule.timeIn}-${createdSchedule.timeOut}` : '',
+      createdSchedule.room ? `Room ${createdSchedule.room}` : '',
+      createdSchedule.section ? `Section ${createdSchedule.section}` : '',
+    ].filter(Boolean).join(', ');
     await logActivity({
       actor: req.user,
-      action: isLunchBreak ? "Added a lunch break" : `Added a schedule for ${docs[0]?.teacher || "a teacher"}`,
+      action: isLunchBreak
+        ? `Created lunch schedule for ${createdSchedule.teacher || "a teacher"}${scheduleDetails ? ` (${scheduleDetails})` : ''}`
+        : `Created schedule for ${createdSchedule.teacher || "a teacher"}${scheduleDetails ? ` (${scheduleDetails})` : ''}`,
       path: req.originalUrl || req.path,
       method: req.method,
       req,
@@ -756,7 +782,7 @@ async function createLunchBreak(req, res) {
     const created = await ScheduleEntry.create(doc);
     await logActivity({
       actor: req.user,
-      action: `Added a lunch break for ${doc.teacher || "a teacher"}`,
+      action: `Added lunch schedule for ${doc.teacher || "a teacher"}`,
       path: req.originalUrl || req.path,
       method: req.method,
       req,
@@ -827,7 +853,7 @@ async function updateLunchBreak(req, res) {
     await existing.save();
     await logActivity({
       actor: req.user,
-      action: `Updated a lunch break for ${existing.teacher || "a teacher"}`,
+      action: `Edited lunch schedule for ${existing.teacher || "a teacher"} (${existing.day || ''}, ${existing.timeIn || ''}-${existing.timeOut || ''})`,
       path: req.originalUrl || req.path,
       method: req.method,
       req,
@@ -890,9 +916,17 @@ async function replaceSchedule(req, res) {
     await ScheduleEntry.deleteMany(deleteFilter);
 
     const created = await ScheduleEntry.insertMany(docs);
+    const updatedSchedule = docs[0] || {};
+    const updatedDetails = [
+      updatedSchedule.subject,
+      updatedSchedule.day,
+      updatedSchedule.timeIn && updatedSchedule.timeOut ? `${updatedSchedule.timeIn}-${updatedSchedule.timeOut}` : '',
+      updatedSchedule.room ? `Room ${updatedSchedule.room}` : '',
+      updatedSchedule.section ? `Section ${updatedSchedule.section}` : '',
+    ].filter(Boolean).join(', ');
     await logActivity({
       actor: req.user,
-      action: `Updated a schedule for ${docs[0]?.teacher || "a teacher"}`,
+      action: `Edited schedule for ${updatedSchedule.teacher || "a teacher"}${updatedDetails ? ` (${updatedDetails})` : ''}`,
       path: req.originalUrl || req.path,
       method: req.method,
       req,
@@ -939,7 +973,7 @@ async function deleteSchedule(req, res) {
     const result = await ScheduleEntry.deleteMany(filter);
     await logActivity({
       actor: req.user,
-      action: `Deleted a schedule entry`,
+      action: `Deleted schedule entry`,
       path: req.originalUrl || req.path,
       method: req.method,
       req,

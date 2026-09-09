@@ -71,16 +71,11 @@
             <p class="events-section-sub">
               <template v-if="loadingEvents">Loading events...</template>
               <template v-else>
-                {{ eventsTab === 'active' ? activeEvents.length : archivedEvents.length }}
-                {{ eventsTab === 'active' ? 'active' : 'archived' }}
-                event{{ (eventsTab === 'active' ? activeEvents.length : archivedEvents.length) === 1 ? '' : 's' }} shown
+                {{ eventsTab === 'active' ? activeEvents.length : eventsTab === 'ended' ? endedEvents.length : archivedEvents.length }}
+                {{ eventsTab === 'active' ? 'active' : eventsTab === 'ended' ? 'ended' : 'archived' }}
+                event{{ (eventsTab === 'active' ? activeEvents.length : eventsTab === 'ended' ? endedEvents.length : archivedEvents.length) === 1 ? '' : 's' }} shown
               </template>
             </p>
-          </div>
-          <div class="event-summary-counts">
-            <span class="event-summary-count event-summary-count--total"><b>{{ events.length }}</b><small>Total</small></span>
-            <span class="event-summary-count event-summary-count--active"><b>{{ activeEvents.length }}</b><small>Active</small></span>
-            <span class="event-summary-count event-summary-count--archived"><b>{{ archivedEvents.length }}</b><small>Archived</small></span>
           </div>
         </div>
 
@@ -90,6 +85,10 @@
             <button :class="['ev-tab', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">
               Active Events
               <span class="ev-tab-count">{{ activeEvents.length }}</span>
+            </button>
+            <button :class="['ev-tab', { active: eventsTab === 'ended' }]" @click="eventsTab = 'ended'">
+              Ended
+              <span class="ev-tab-count">{{ endedEvents.length }}</span>
             </button>
             <button :class="['ev-tab', { active: eventsTab === 'archived' }]" @click="eventsTab = 'archived'">
               Archived
@@ -156,6 +155,51 @@
           </div>
         </template>
 
+        <template v-else-if="eventsTab === 'ended'">
+          <div v-for="ev in endedEvents" :key="ev.id" class="event-card event-card--clickable event-card--ended" @click="openViewEvent(ev)">
+            <div v-if="ev.image" class="event-card-img-wrap">
+              <img :src="ev.image" class="event-card-img" alt="" />
+            </div>
+            <div v-else class="event-card-default-cover" :style="eventCoverStyle(ev)">
+              <span>{{ eventInitials(ev.title) }}</span>
+              <small>CIT SCHEDULER EVENT</small>
+            </div>
+            <div class="event-card-head">
+              <span class="event-badge event-badge--ended">Event Ended</span>
+              <div class="event-card-actions">
+                <button class="ec-btn ec-btn--edit" @click.stop="openEditEvent(ev)" title="Edit">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Edit
+                </button>
+                <button class="ec-btn ec-btn--archive" @click.stop="archiveEvent(ev)" title="Archive">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                  Archive
+                </button>
+              </div>
+            </div>
+            <div class="event-card-title">{{ ev.title }}</div>
+            <div class="event-card-desc">{{ ev.description }}</div>
+            <div class="event-card-meta">
+              <span class="event-meta-item">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                {{ ev.date }}
+              </span>
+              <span class="event-meta-item">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
+              </span>
+              <span class="event-meta-item">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                {{ ev.location }}
+              </span>
+            </div>
+          </div>
+          <div v-if="!endedEvents.length" class="events-empty">
+            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>No ended events yet.</span>
+          </div>
+        </template>
+
         <template v-else>
           <div v-for="ev in archivedEvents" :key="ev.id" class="event-card event-card--archived event-card--clickable" @click="openViewEvent(ev)">
             <div v-if="ev.image" class="event-card-img-wrap">
@@ -213,9 +257,9 @@
           <div class="ev-view-hero" :style="viewEvent.image ? `background-image:url('${viewEvent.image}')` : eventCoverStyle(viewEvent)">
             <div class="ev-view-hero-overlay"></div>
             <div class="ev-view-hero-content">
-              <span :class="['ev-view-badge', viewEvent.status === 'active' ? 'ev-view-badge--active' : 'ev-view-badge--archived']">
-                <svg v-if="viewEvent.status === 'active'" width="9" height="9" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
-                {{ viewEvent.status === 'active' ? 'Active' : 'Archived' }}
+              <span :class="['ev-view-badge', isEventEnded(viewEvent) ? 'ev-view-badge--ended' : (viewEvent.status === 'active' ? 'ev-view-badge--active' : 'ev-view-badge--archived')]">
+                <svg v-if="!isEventEnded(viewEvent) && viewEvent.status === 'active'" width="9" height="9" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+                {{ isEventEnded(viewEvent) ? 'Event Ended' : (viewEvent.status === 'active' ? 'Active' : 'Archived') }}
               </span>
               <h2 class="ev-view-title">{{ viewEvent.title }}</h2>
             </div>
@@ -442,7 +486,7 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import SystemClockPicker from '@/components/SystemClockPicker.vue'
 import SystemDatePicker from '@/components/SystemDatePicker.vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 // v-click-outside directive
@@ -562,9 +606,20 @@ function confirmTime() {
 
 const events = ref([])
 const loadingEvents = ref(false)
+const now = ref(new Date())
 
-const activeEvents   = computed(() => events.value.filter(e => e.status === 'active'))
-const archivedEvents = computed(() => events.value.filter(e => e.status === 'archived'))
+function isEventEnded(event) {
+  if (!event || !event.date) return false
+
+  const eventDate = new Date(`${event.date}T${event.endTime || '23:59:59'}`)
+  if (Number.isNaN(eventDate.getTime())) return false
+
+  return now.value.getTime() > eventDate.getTime()
+}
+
+const activeEvents = computed(() => events.value.filter((e) => e.status !== 'archived' && !isEventEnded(e)))
+const endedEvents = computed(() => events.value.filter((e) => e.status !== 'archived' && isEventEnded(e)))
+const archivedEvents = computed(() => events.value.filter((e) => e.status === 'archived'))
 const filteredEventTeachers = computed(() => {
   const query = teacherSearchQuery.value.toLowerCase()
   return !query ? eventTeachers.value : eventTeachers.value.filter((teacher) => teacher.name.toLowerCase().includes(query))
@@ -589,7 +644,7 @@ async function loadEventTeachers() {
     const payload = await response.json()
     if (!response.ok) throw new Error(payload.message || 'Unable to load teachers.')
 
-    eventTeachers.value = (Array.isArray(payload.users) ? payload.users : []).map((teacher) => {
+    eventTeachers.value = (Array.isArray(payload.users) ? payload.users : []).filter((teacher) => String(teacher.account_status || 'Active') === 'Active').map((teacher) => {
       const name = `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || teacher.name || teacher.email || 'Teacher'
       return { id: teacher.id, name, initials: name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() }
     })
@@ -767,7 +822,16 @@ function openViewEvent(ev) {
   showViewModal.value = true
 }
 
-onMounted(loadEvents)
+onMounted(() => {
+  loadEvents()
+  const refreshInterval = setInterval(() => {
+    now.value = new Date()
+  }, 30000)
+
+  onBeforeUnmount(() => {
+    clearInterval(refreshInterval)
+  })
+})
 </script>
 
 <style scoped>
@@ -1037,11 +1101,16 @@ onMounted(loadEvents)
   display: flex;
   flex-direction: column;
   gap: 10px;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, opacity 0.2s, filter 0.2s;
 }
 .event-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.11); }
 .event-card--archived { opacity: 0.75; }
 .event-card--archived:hover { opacity: 1; }
+.event-card--ended {
+  opacity: 0.72;
+  filter: grayscale(0.12);
+  background: #f3f4f6;
+}
 
 .event-card-head {
   display: flex;
@@ -1058,6 +1127,7 @@ onMounted(loadEvents)
 }
 .event-badge--active   { background: #d8dcdf; color: #4f575f; }
 .event-badge--archived { background: #f0f0f0; color: #888; }
+.event-badge--ended    { background: #e5e7eb; color: #4b5563; }
 
 .event-card-actions { display: flex; gap: 6px; }
 .ec-btn {
@@ -1217,6 +1287,7 @@ onMounted(loadEvents)
 }
 .ev-view-badge--active   { background: rgba(83, 91, 100,0.88); color: #fff; }
 .ev-view-badge--archived { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
+.ev-view-badge--ended    { background: rgba(107, 114, 128, 0.35); color: #f3f4f6; border: 1px solid rgba(255,255,255,0.3); }
 .ev-view-title {
   font-size: 1.6rem;
   font-weight: 800;

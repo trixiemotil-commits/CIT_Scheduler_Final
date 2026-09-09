@@ -162,7 +162,7 @@
             <tbody>
               <tr v-for="(rowIndex) in getMaxScheduleLength(visibleTodayTeachers)" :key="`row-${rowIndex}`" class="schedule-row">
                 <td v-for="teacher in visibleTodayTeachers" :key="`${teacher.name}-${rowIndex}`" class="schedule-cell">
-                  <div v-if="teacher.schedule[rowIndex - 1]" :class="['schedule-entry', getTodayEntryState(teacher.schedule[rowIndex - 1])]">
+                  <div v-if="teacher.schedule[rowIndex - 1]" :class="['schedule-entry', getTodayEntryState(teacher.schedule[rowIndex - 1]), getTodayEntryColor(teacher.schedule[rowIndex - 1])]">
                     <time class="schedule-time">{{ teacher.schedule[rowIndex - 1].timeIn }}<small>{{ teacher.schedule[rowIndex - 1].timeOut }}</small></time>
                     <div class="schedule-details">
                       <strong class="schedule-subject">{{ teacher.schedule[rowIndex - 1].subject }}</strong>
@@ -204,7 +204,7 @@
         <!-- Teacher Workload -->
         <div class="chart-card" :class="{ 'chart-expanded': expandedChart === 'bar', 'chart-hidden': expandedChart === 'line' }">
           <div class="chart-header">
-            <span class="chart-title">Teacher Workload</span>
+            <span class="chart-title">Teacher Workload<span v-if="publishedTermLabel"> · {{ publishedTermLabel }}</span></span>
             <button class="expand-btn" @click="toggleExpand('bar')">
               <svg v-if="expandedChart === 'bar'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
@@ -216,7 +216,9 @@
               </svg>
             </button>
           </div>
-          <div class="chart-wrap"><canvas ref="barChartRef" style="cursor:pointer"></canvas></div>
+          <div class="chart-wrap workload-chart-wrap" @wheel="scrollWorkloadHorizontally">
+            <canvas ref="barChartRef" :style="{ cursor: 'pointer', width: '100%', maxWidth: '100%', minWidth: '100%' }"></canvas>
+          </div>
         </div>
       </section>
 
@@ -242,11 +244,11 @@
               <div class="modal-teacher-info">
                 <span class="modal-teacher-name">{{ selectedTeacher.name }}</span>
               </div>
-              <span class="modal-hours-badge">{{ selectedTeacher.totalHours }} Hours/Week</span>
+              <span class="modal-hours-badge">{{ selectedTeacher.totalHours }} Hours/Week · {{ selectedTeacher.units || 0 }} Units</span>
             </div>
 
             <!-- Schedule cards grid -->
-            <div class="modal-schedule-grid">
+            <div v-if="selectedTeacher.schedule.length" class="modal-schedule-grid">
               <div v-for="(sc, i) in selectedTeacher.schedule" :key="i" class="modal-sched-card">
                 <div class="modal-sched-top">
                   <span class="modal-day-badge">{{ sc.day }}</span>
@@ -257,6 +259,7 @@
                 <div class="modal-sched-section">{{ sc.section }}</div>
               </div>
             </div>
+            <div v-else class="modal-empty-schedule">No classes assigned for this term.</div>
 
             <!-- Summary -->
             <div class="modal-summary">
@@ -274,9 +277,36 @@
                   <span class="modal-summary-key">Days Teaching</span>
                   <span class="modal-summary-val">{{ selectedTeacher.daysTeaching }}</span>
                 </div>
+                <div class="modal-summary-item">
+                  <span class="modal-summary-key">Total Units</span>
+                  <span class="modal-summary-val">{{ selectedTeacher.units || 0 }}</span>
+                </div>
               </div>
             </div>
           </template>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showConsultationDayModal" class="modal-overlay" @click.self="showConsultationDayModal = false">
+        <div class="modal-box consultation-day-modal">
+          <button class="modal-close" @click="showConsultationDayModal = false">✕</button>
+          <div class="modal-header">
+            <h2 class="modal-title">{{ selectedConsultationDay }} Consultations</h2>
+            <p class="modal-sub">{{ selectedConsultationDayRequests.length }} consultation{{ selectedConsultationDayRequests.length === 1 ? '' : 's' }} requested</p>
+          </div>
+          <div v-if="selectedConsultationDayRequests.length" class="consultation-day-list">
+            <div v-for="request in selectedConsultationDayRequests" :key="request.id" class="consultation-day-item">
+              <div class="consultation-day-item-main">
+                <strong>{{ request.subject || 'Untitled subject' }}</strong>
+                <span>From {{ request.studentName || request.studentNumber || 'Unknown student' }}</span>
+                <span>Requested to {{ request.requestedTeacher || 'Unknown teacher' }}</span>
+              </div>
+              <span v-if="request.status" class="consultation-status">{{ request.status }}</span>
+            </div>
+          </div>
+          <div v-else class="modal-empty-schedule">No consultations were recorded for this day.</div>
         </div>
       </div>
     </Teleport>
@@ -409,12 +439,17 @@ function getTodayEntryLabel(entry) {
   return 'Upcoming'
 }
 
+function getTodayEntryColor(entry) {
+  return /laboratory|lab/i.test(String(entry?.roomType || '')) ? 'is-laboratory' : 'is-lecture'
+}
+
 const todayTeachers = computed(() => {
   const grouped = new Map()
   todayScheduleEntries.value
     .filter((entry) => normalizeName(entry.day) === normalizeName(todayName.value))
     .filter((entry) => normalizeName(entry.entryType) !== 'lunch' && !normalizeName(entry.subject).includes('lunch break'))
     .filter((entry) => entry.teacher)
+    .filter((entry) => normalizeName(entry.teacher) !== 'cit faculty')
     .forEach((entry) => {
       const key = normalizeName(entry.teacher)
       if (!grouped.has(key)) grouped.set(key, { name: entry.teacher, avatar: teacherAvatar(entry.teacher), schedule: [] })
@@ -524,12 +559,11 @@ async function loadTodayTeacherSchedules({ quiet = false } = {}) {
   if (!quiet) todayScheduleLoading.value = true
   try {
     const [schedulePayload, usersPayload] = await Promise.all([
-      apiRequest('/schedules'),
+      apiRequest(`/schedules?dashboardRefresh=${Date.now()}`),
       apiRequest('/users?role=teacher'),
     ])
     todayScheduleEntries.value = Array.isArray(schedulePayload.entries) ? schedulePayload.entries : []
     teacherDirectory.value = Array.isArray(usersPayload.users) ? usersPayload.users : []
-    todayTeacherIndex.value = Math.min(todayTeacherIndex.value, todayTeacherMaxIndex.value)
   } catch (error) {
     console.error('Failed to load today’s teacher schedules:', error)
   } finally {
@@ -693,6 +727,21 @@ let barChartInstance = null
 /* ── Workload Modal ── */
 const showWorkloadModal = ref(false)
 const selectedTeacher = ref(null)
+const consultationDayCounts = ref([0, 0, 0, 0, 0, 0])
+const consultationRequests = ref([])
+const showConsultationDayModal = ref(false)
+const selectedConsultationDay = ref('')
+const selectedConsultationDayRequests = ref([])
+const liveTeacherWorkloads = ref([])
+const publishedTermLabel = ref('')
+const workloadChartWidth = computed(() => Math.max(760, (liveTeacherWorkloads.value.length || 5) * 180))
+
+function scrollWorkloadHorizontally(event) {
+  const container = event.currentTarget
+  if (container.scrollWidth <= container.clientWidth) return
+  event.preventDefault()
+  container.scrollLeft += event.deltaY || event.deltaX
+}
 
 const teacherWorkloads = [
   {
@@ -761,8 +810,123 @@ const teacherWorkloads = [
 ]
 
 function openWorkloadModal(index) {
-  selectedTeacher.value = teacherWorkloads[index]
+  selectedTeacher.value = (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads)[index]
   showWorkloadModal.value = true
+}
+
+function openConsultationDay(index) {
+  selectedConsultationDay.value = chartDays[index] || ''
+  selectedConsultationDayRequests.value = consultationRequests.value.filter(request =>
+    request.consultationDayOfWeek === selectedConsultationDay.value
+    && !['CANCELLED', 'ARCHIVED'].includes(request.status)
+  )
+  showConsultationDayModal.value = true
+}
+
+const chartDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+function minutesFromTime(value) {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (!match) return 0
+  let hour = Number(match[1])
+  if (match[3].toUpperCase() === 'PM' && hour !== 12) hour += 12
+  if (match[3].toUpperCase() === 'AM' && hour === 12) hour = 0
+  return hour * 60 + Number(match[2])
+}
+
+function calculateWorkloads(users, scheduleEntries) {
+  const groups = new Map()
+  scheduleEntries
+    .filter(entry => entry.entryType !== 'lunch' && entry.teacher && String(entry.teacher).toLowerCase() !== 'cit faculty')
+    .forEach((entry, index) => {
+      const sections = entry.parallel
+        ? ((entry.parallelSlots || []).map(slot => slot.section).filter(Boolean).sort().join(',') || entry.parallelGroupId)
+        : entry.section
+      const key = `${entry.teacher}|${entry.year}|${entry.subject}|${entry.parallel ? 'parallel' : 'single'}|${sections || index}`
+      const group = groups.get(key) || { entries: [], parallel: Boolean(entry.parallel) }
+      group.entries.push(entry)
+      groups.set(key, group)
+    })
+
+  const workloads = new Map((users || [])
+    .filter(user => String(user.account_status || 'Active') === 'Active')
+    .map(user => {
+      const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Teacher'
+      return [name, {
+        name,
+        totalHours: 0,
+        units: 0,
+        daysTeaching: 0,
+        schedule: [],
+        avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=DDECE5&color=1B4332`,
+      }]
+    }))
+  groups.forEach(group => {
+    const first = group.entries[0]
+    const sectionCount = group.parallel ? Math.max(2, Number(first.parallelCount) || group.entries.length) : 1
+    const hasLab = group.entries.some(entry => entry.roomType === 'Comlab/Laboratory')
+    const meetingKeys = new Set(group.entries.map(entry => group.parallel
+      ? `${entry.day}|${entry.timeIn}|${entry.timeOut}`
+      : `${entry.day}|${entry.timeIn}|${entry.timeOut}|${entry.roomType || 'Lecture'}`))
+    const hours = Array.from(meetingKeys).reduce((sum, key) => {
+      const [, timeIn, timeOut] = key.split('|')
+      return sum + Math.max(0, minutesFromTime(timeOut) - minutesFromTime(timeIn)) / 60
+    }, 0)
+    const units = group.parallel
+      ? (sectionCount + 1) * (hasLab ? 2.5 : 1.5)
+      : (hasLab ? 5 : 3)
+    const current = workloads.get(first.teacher) || { name: first.teacher, totalHours: 0, units: 0, daysTeaching: 0, schedule: [] }
+    current.totalHours += hours
+    current.units += units
+    current.schedule.push(...group.entries.map(entry => ({
+      day: entry.day,
+      time: `${entry.timeIn}-${entry.timeOut}`,
+      duration: `${Math.max(0, minutesFromTime(entry.timeOut) - minutesFromTime(entry.timeIn)) / 60}h`,
+      subject: entry.subject,
+      section: [entry.year, entry.section].filter(Boolean).join(' - '),
+    })))
+    current.daysTeaching = new Set(current.schedule.map(entry => entry.day)).size
+    workloads.set(first.teacher, current)
+  })
+  return Array.from(workloads.values()).map(workload => ({
+    ...workload,
+    totalHours: Number(workload.totalHours.toFixed(1)),
+    units: Number(workload.units.toFixed(1)),
+    avatar: workload.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(workload.name)}&background=DDECE5&color=1B4332`,
+  }))
+}
+
+async function loadChartData() {
+  try {
+    const [termPayload, requestsPayload, usersPayload] = await Promise.all([
+      apiRequest('/academic-terms/published'),
+      apiRequest('/consultations/requests'),
+      apiRequest('/users?role=teacher'),
+    ])
+    const termId = termPayload.term?._id || termPayload.term?.id
+    publishedTermLabel.value = termPayload.term
+      ? `${termPayload.term.schoolYear || ''} · ${termPayload.term.semester || ''}`.trim()
+      : ''
+    const schedulesPayload = await apiRequest(termId ? `/schedules?academicTermId=${encodeURIComponent(termId)}` : '/schedules')
+    consultationDayCounts.value = chartDays.map(day => (requestsPayload.requests || []).filter(request =>
+      request.consultationDayOfWeek === day && !['CANCELLED', 'ARCHIVED'].includes(request.status)
+    ).length)
+    const teachersByEmployeeId = new Map((usersPayload.users || []).map(user => [
+      String(user.employeeId || '').trim(),
+      `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+    ]))
+    consultationRequests.value = (requestsPayload.requests || []).map(request => ({
+      ...request,
+      requestedTeacher: teachersByEmployeeId.get(String(request.employeeId || '').trim()) || '',
+    }))
+    liveTeacherWorkloads.value = calculateWorkloads(usersPayload.users || [], schedulesPayload.entries || [])
+    if (lineChartInstance || barChartInstance) {
+      createLineChart()
+      createBarChart()
+    }
+  } catch (error) {
+    console.error('Failed to load dashboard chart data:', error)
+  }
 }
 
 // Compact (5) vs full (7) bar chart datasets
@@ -793,9 +957,9 @@ function createLineChart() {
   lineChartInstance = new Chart(lineChartRef.value, {
     type: 'line',
     data: {
-      labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+      labels: chartDays,
       datasets: [{
-        data: [52, 43, 27, 47],
+        data: consultationDayCounts.value,
         borderColor: '#4b5259',
         backgroundColor: 'transparent',
         pointBackgroundColor: '#7d858d',
@@ -824,12 +988,14 @@ function createLineChart() {
           displayColors: false
         }
       },
+      onClick: (_event, elements) => {
+        if (elements.length) openConsultationDay(elements[0].index)
+      },
       scales: {
         x: { grid: { display: false }, ticks: { color: '#69727c', font: { size: 12 } } },
         y: {
           beginAtZero: true,
-          max: 80,
-          ticks: { stepSize: 20, color: '#69727c', font: { size: 12 } },
+          ticks: { color: '#69727c', font: { size: 12 } },
           grid: { color: 'rgba(83, 91, 100, 0.16)' }
         }
       }
@@ -837,29 +1003,48 @@ function createLineChart() {
   })
 }
 
+function compactTeacherLabel(name) {
+  if (!name) return 'Teacher'
+  const parts = String(name).trim().split(/\s+/)
+  if (parts.length <= 1) return parts[0] || 'Teacher'
+  const first = parts[0]
+  const lastInitial = parts.slice(1).map(part => part[0]).join('')
+  return `${first} ${lastInitial}.`
+}
+
 function createBarChart() {
   if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null }
   const expanded = expandedChart.value === 'bar'
+  const workloadItems = (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads)
+  const labels = workloadItems.map(teacher => teacher.name)
+  const yTickLabels = workloadItems.map(teacher => expanded ? teacher.name : compactTeacherLabel(teacher.name))
+
   barChartInstance = new Chart(barChartRef.value, {
     type: 'bar',
     data: {
-      labels: [...(expanded ? BAR_LABELS_FULL : BAR_LABELS_SHORT)],
+      labels,
       datasets: [{
-        data: [...(expanded ? BAR_DATA_FULL : BAR_DATA_SHORT)],
-        backgroundColor: '#596169',
-        borderRadius: 4,
-        borderSkipped: false
+        label: 'Teacher hours',
+        data: workloadItems.map(teacher => teacher.totalHours),
+        backgroundColor: workloadItems.map((_, index) => index % 2 === 0 ? '#7d8086' : '#e8b14a'),
+        borderRadius: 12,
+        borderSkipped: false,
+        borderWidth: 0,
+        barThickness: 24,
+        maxBarThickness: 28
       }]
     },
     options: {
+      indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { bottom: 16, left: 10, right: 12, top: 8 } },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
             title: (ctx) => ctx[0].label,
-            label: (ctx) => `Hours : ${ctx.parsed.y}`
+            label: (ctx) => `Hours: ${ctx.parsed.x}`
           },
           backgroundColor: '#30353a',
           titleColor: '#f4f5f5',
@@ -874,12 +1059,46 @@ function createBarChart() {
         if (elements.length) openWorkloadModal(elements[0].index)
       },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#69727c', font: { size: 11 } } },
-        y: {
+        x: {
           beginAtZero: true,
-          max: expanded ? 28 : 24,
-          ticks: { stepSize: 6, color: '#69727c', font: { size: 12 } },
-          grid: { color: 'rgba(83, 91, 100, 0.16)' }
+          max: 30,
+          grid: { color: 'rgba(83, 91, 100, 0.12)', lineWidth: 1 },
+          ticks: {
+            color: '#3e4548',
+            font: { size: 11, family: 'Segoe UI, sans-serif', weight: '600' },
+            stepSize: 10,
+            padding: 6,
+            callback: (value) => `${value}h`
+          },
+          border: { display: false },
+          title: { display: false }
+        },
+        y: {
+          grid: { display: false },
+          ticks: {
+            color: '#3e4548',
+            font: {
+              size: expanded ? 11 : 10,
+              family: 'Segoe UI, sans-serif',
+              weight: '600'
+            },
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0,
+            padding: expanded ? 10 : 8,
+            callback: (value, index) => yTickLabels[index] || ''
+          },
+          border: { display: false },
+          title: { display: false }
+        }
+      },
+      datasets: {
+        bar: {
+          borderRadius: 14,
+          borderSkipped: false,
+          barThickness: 22,
+          maxBarThickness: 30,
+          borderWidth: 0,
         }
       }
     }
@@ -888,6 +1107,7 @@ function createBarChart() {
 
 onMounted(() => {
   loadDashboardSummary()
+  loadChartData()
   loadTodayTeacherSchedules()
   loadNotifications()
   useNotifications.addNotificationListener(handleNotification)
@@ -896,17 +1116,27 @@ onMounted(() => {
   dashboardRealtimeTimer = window.setInterval(() => {
     currentDateTime.value = new Date()
     loadTodayTeacherSchedules({ quiet: true })
-  }, 60000)
+  }, 10000)
+  window.addEventListener('focus', refreshTodayTeacherSchedules)
+  document.addEventListener('visibilitychange', refreshTodayTeacherSchedules)
   // Start carousel auto-advance after initial load
   nextTick(() => startCarouselAutoAdvance())
 })
 
 onUnmounted(() => {
   if (dashboardRealtimeTimer) window.clearInterval(dashboardRealtimeTimer)
+  window.removeEventListener('focus', refreshTodayTeacherSchedules)
+  document.removeEventListener('visibilitychange', refreshTodayTeacherSchedules)
   useNotifications.removeNotificationListener(handleNotification)
   if (lineChartInstance) lineChartInstance.destroy()
   if (barChartInstance) barChartInstance.destroy()
 })
+
+function refreshTodayTeacherSchedules() {
+  if (document.visibilityState === 'hidden') return
+  currentDateTime.value = new Date()
+  loadTodayTeacherSchedules({ quiet: true })
+}
 
 function handleLogout() {
   logout()
@@ -1249,7 +1479,8 @@ function confirmLogout() {
 .today-teachers-header p span { margin-left: 7px; padding-left: 9px; border-left: 1px solid #ccd4d8; color: #89939a; }
 /* Table format styles */
 .today-schedule-table-wrap { 
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-radius: 16px;
   background: rgba(255,255,255,0.7);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
@@ -1257,7 +1488,7 @@ function confirmLogout() {
   animation: tableSlideIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   cursor: grab;
   user-select: none;
-  touch-action: pan-y;
+  touch-action: pan-x pan-y;
 }
 .today-schedule-table-wrap.dragging {
   cursor: grabbing;
@@ -1447,6 +1678,28 @@ function confirmLogout() {
 .schedule-entry.is-complete::before {
   background: #90a4ae;
 }
+.schedule-entry.is-lecture {
+  opacity: 1;
+  color: #5a3e00;
+  background: #e9c46a;
+  border-color: #d3aa4f;
+  box-shadow: 0 3px 10px rgba(211, 170, 79, .18), inset 0 1px 0 rgba(255,255,255,.42);
+}
+.schedule-entry.is-laboratory {
+  opacity: 1;
+  color: #fff;
+  background: #1f6b45;
+  border-color: #185638;
+  box-shadow: 0 3px 10px rgba(31, 107, 69, .2), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.schedule-entry.is-lecture::before,
+.schedule-entry.is-laboratory::before {
+  background: rgba(255,255,255,.55);
+}
+.schedule-entry.is-lecture .schedule-section,
+.schedule-entry.is-lecture .schedule-label { color: #5a3e00; }
+.schedule-entry.is-laboratory .schedule-section,
+.schedule-entry.is-laboratory .schedule-label { color: rgba(255,255,255,.88); }
 .schedule-entry:hover {
   transform: translateY(-4px);
   box-shadow: 0 10px 22px rgba(0,0,0,0.12);
@@ -1529,6 +1782,26 @@ function confirmLogout() {
   animation: labelPulse 1.5s ease-in-out infinite;
   opacity: 1;
 }
+.schedule-entry.is-lecture .schedule-time,
+.schedule-entry.is-lecture .schedule-time small,
+.schedule-entry.is-lecture .schedule-subject,
+.schedule-entry.is-lecture .schedule-section {
+  color: #4f3600;
+}
+.schedule-entry.is-laboratory .schedule-time,
+.schedule-entry.is-laboratory .schedule-time small,
+.schedule-entry.is-laboratory .schedule-subject,
+.schedule-entry.is-laboratory .schedule-section {
+  color: #fff;
+}
+.schedule-entry.is-lecture .schedule-label {
+  color: #4f3600;
+  background: rgba(255,255,255,.48);
+}
+.schedule-entry.is-laboratory .schedule-label {
+  color: #174c34;
+  background: rgba(255,255,255,.82);
+}
 @keyframes labelPulse {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
@@ -1559,22 +1832,29 @@ function confirmLogout() {
 .charts-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 32px;
   flex: 1;
   min-height: 0;
+  margin-top: 12px;
+  margin-bottom: 96px;
 }
 .chart-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 28px 32px 24px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(240,240,239,0.82) 100%);
+  border: 1px solid rgba(120, 127, 133, 0.12);
+  border-radius: 18px;
+  padding: 18px 18px 14px;
+  box-shadow: 0 10px 18px rgba(30, 36, 42, 0.04), inset 0 1px 0 rgba(255,255,255,0.7);
   display: flex;
   flex-direction: column;
-  min-height: 320px;
+  min-height: 380px;
+  min-width: 0;
+  overflow: hidden;
   transition: box-shadow 0.2s ease, opacity 0.2s ease;
+  margin-bottom: 0;
 }
 .chart-card.chart-expanded {
   grid-column: 1 / -1;
+  min-height: 500px;
 }
 .chart-card.chart-hidden {
   display: none;
@@ -1583,13 +1863,19 @@ function confirmLogout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   flex-shrink: 0;
+  padding: 2px 2px 0;
 }
 .chart-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111;
+  font-size: clamp(0.95rem, 1vw, 1.2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #2a2f34;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.45);
+  max-width: 100%;
+  white-space: normal;
 }
 .expand-btn {
   background: none;
@@ -1604,8 +1890,32 @@ function confirmLogout() {
 .chart-wrap {
   flex: 1;
   min-height: 0;
-  height: 260px;
+  height: 320px;
   position: relative;
+}
+.workload-chart-wrap {
+  width: 100%;
+  min-width: 0;
+  height: 330px;
+  overflow: hidden;
+  padding: 10px 12px 10px 8px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  border: 1px solid rgba(90,98,104,0.08);
+}
+.workload-chart-wrap::-webkit-scrollbar { display: none; }
+.workload-chart-wrap canvas {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  min-height: 290px;
+  flex: 1;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
 }
 
 /* Modal */
@@ -1622,10 +1932,11 @@ function confirmLogout() {
   background: #fff;
   border-radius: 20px;
   padding: 36px 36px 28px;
-  width: 560px;
-  max-width: 95vw;
+  width: min(1400px, 92vw);
+  max-width: 92vw;
   max-height: 90vh;
   overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
   box-shadow: 0 16px 48px rgba(0,0,0,0.18);
 }
@@ -1683,7 +1994,9 @@ function confirmLogout() {
 }
 .modal-schedule-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  max-width: 100%;
+  min-width: 0;
   gap: 14px;
   margin-bottom: 20px;
 }
@@ -1692,6 +2005,21 @@ function confirmLogout() {
   border-radius: 12px;
   padding: 14px 16px;
 }
+.modal-empty-schedule {
+  margin-bottom: 20px;
+  padding: 28px 18px;
+  border: 1px dashed #cbd2d6;
+  border-radius: 12px;
+  color: #69727c;
+  text-align: center;
+}
+.consultation-day-modal { max-width: 620px; }
+.consultation-day-list { display: flex; flex-direction: column; gap: 9px; max-height: 55vh; overflow-y: auto; }
+.consultation-day-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; border: 1px solid #e2e7e9; border-radius: 10px; background: #f8fafb; }
+.consultation-day-item-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.consultation-day-item-main strong { color: #202a31; font-size: .88rem; }
+.consultation-day-item-main span { color: #68757d; font-size: .76rem; }
+.consultation-status { flex-shrink: 0; padding: 4px 8px; border-radius: 999px; background: #e5eef8; color: #315f91; font-size: .64rem; font-weight: 700; text-transform: uppercase; }
 .modal-sched-top {
   display: flex;
   align-items: center;

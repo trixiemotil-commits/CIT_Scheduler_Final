@@ -150,7 +150,7 @@
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Employee Id</label>
-                <input v-model="editForm.employeeId" class="edit-input" type="text" inputmode="text" autocomplete="off" maxlength="11" placeholder="AU2025-00000" @input="formatEmployeeId" />
+                <input v-model="editForm.employeeId" class="edit-input" type="text" inputmode="text" autocomplete="off" maxlength="12" placeholder="AU2025-00000" @input="formatEmployeeId" />
               </div>
             </div>
           </div>
@@ -296,7 +296,10 @@ const editForm = ref({})
 const avatarInput = ref(null)
 
 function openEdit() {
-  editForm.value = { ...profile.value }
+  editForm.value = {
+    ...profile.value,
+    employeeId: normalizeEmployeeId(profile.value.employeeId),
+  }
   showEditModal.value = true
 }
 function closeEdit() {
@@ -310,6 +313,13 @@ function formatEmployeeId() {
     return
   }
   editForm.value.employeeId = `AU${digits.slice(0, 4)}${digits.length > 4 ? `-${digits.slice(4, 9)}` : ''}`
+}
+
+function normalizeEmployeeId(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 9)
+  if (!digits) return ''
+  const normalized = digits.length === 8 ? `${digits.slice(0, 4)}0${digits.slice(4)}` : digits
+  return `AU${normalized.slice(0, 4)}-${normalized.slice(4, 9)}`
 }
 
 async function handleAvatarChange(event) {
@@ -365,8 +375,8 @@ async function saveProfile() {
     Swal.fire({ icon: 'warning', title: 'Full name required', text: 'Enter both your first and last name.' })
     return
   }
-  if (editForm.value.employeeId && !/^AU\d{4}-\d{5}$/.test(editForm.value.employeeId)) {
-    Swal.fire({ icon: 'warning', title: 'Invalid employee ID', text: 'Use the format AU2025-00000.' })
+  if (editForm.value.employeeId && !/^AU\d{4}-\d{4,5}$/.test(editForm.value.employeeId)) {
+    Swal.fire({ icon: 'warning', title: 'Invalid employee ID', text: 'Use the format AU2025-0000 or AU2025-00000.' })
     return
   }
 

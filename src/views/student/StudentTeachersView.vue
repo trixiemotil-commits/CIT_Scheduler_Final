@@ -38,7 +38,7 @@
         <div v-for="t in visibleSubjectTeachers" :key="t.id" class="teacher-card">
           <div class="teacher-top">
             <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
-            <span v-if="t.status === 'On Leave'" class="status-badge" title="Teacher is on leave"></span>
+            <span v-if="t.status === 'Offline'" class="status-badge" title="Teacher is offline"></span>
             <div class="teacher-meta">
               <div class="teacher-name">{{ t.name }}</div>
               <div class="teacher-type-pill subject">Subject Teacher</div>
@@ -52,11 +52,11 @@
           <div class="teacher-footer">
             <span class="price">&nbsp;</span>
             <button
-              :class="['action-btn', t.available ? 'green' : 'disabled']"
-              :disabled="!t.available"
+              :class="['action-btn', t.available && (t.isSubjectTeacher ? t.hasConsultationSlots : true) ? 'green' : 'disabled']"
+              :disabled="!t.available || (t.isSubjectTeacher && !t.hasConsultationSlots)"
               @click="openRequest(t)"
             >
-              {{ t.available ? 'Book Consultation' : 'Request Consultation' }}
+              {{ t.isSubjectTeacher && !t.hasConsultationSlots && t.available ? 'No consultation hours' : (t.available ? 'Book Consultation' : 'Request Consultation') }}
             </button>
           </div>
         </div>
@@ -67,7 +67,7 @@
         <div v-for="t in visibleAvailableTeachers" :key="t.id" class="teacher-card">
           <div class="teacher-top">
             <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
-            <span v-if="t.status === 'On Leave'" class="status-badge" title="Teacher is on leave"></span>
+            <span v-if="t.status === 'Offline'" class="status-badge" title="Teacher is offline"></span>
             <div class="teacher-meta">
               <div class="teacher-name">{{ t.name }}</div>
               <div class="teacher-type-pill available">Available Teacher</div>
@@ -81,11 +81,11 @@
           <div class="teacher-footer">
             <span class="price">&nbsp;</span>
             <button
-              :class="['action-btn', t.available ? 'green' : 'disabled']"
-              :disabled="!t.available"
+              :class="['action-btn', t.available && (t.isSubjectTeacher ? t.hasConsultationSlots : true) ? 'green' : 'disabled']"
+              :disabled="!t.available || (t.isSubjectTeacher && !t.hasConsultationSlots)"
               @click="openRequest(t)"
             >
-              {{ t.available ? 'Book Consultation' : 'Request Consultation' }}
+              {{ t.isSubjectTeacher && !t.hasConsultationSlots && t.available ? 'No consultation hours' : (t.available ? 'Book Consultation' : 'Request Consultation') }}
             </button>
           </div>
         </div>
@@ -143,7 +143,7 @@
             </template>
             <template v-else>
               <input v-model="reqForm.date" class="field-input" type="date" :min="today" />
-              <input v-model="reqForm.time" class="field-input" type="time" />
+              <input v-model="reqForm.time" class="field-input" type="time" min="07:00" max="17:00" />
             </template>
           </div>
           <div class="field-group">
@@ -289,7 +289,11 @@ function normalizeTeacherStatus(statusOrObj) {
   if (statusOrObj && typeof statusOrObj === 'object') {
     const t = statusOrObj
     const account = String(t.account_status || '').trim()
-    if (account && account !== 'Active') return 'On Leave'
+    if (account && account !== 'Active') return 'Offline'
+
+    const resolvedStatus = String(t.status || '').trim().toLowerCase()
+    if (resolvedStatus === 'offline') return 'Offline'
+    if (resolvedStatus === 'on school' || resolvedStatus === 'in school') return 'In School'
 
     if (t.teacher_status_expires_at) {
       try {
@@ -303,13 +307,13 @@ function normalizeTeacherStatus(statusOrObj) {
     }
 
     const statusRaw = String(t.teacher_status || t.status || '').trim().toLowerCase()
-    if (statusRaw === 'on leave' || statusRaw === 'leave') return 'On Leave'
+    if (statusRaw === 'on leave' || statusRaw === 'leave') return 'Offline'
     return 'In School'
   }
 
   const normalized = String(statusOrObj || '').trim()
   const lower = normalized.toLowerCase()
-  if (lower === 'on leave' || lower === 'leave') return 'On Leave'
+  if (lower === 'on leave' || lower === 'leave' || lower === 'offline') return 'Offline'
   return 'In School'
 }
 
@@ -369,9 +373,9 @@ function mapTeacher(teacher) {
     ? [...new Set(studentSubjects.length ? studentSubjects : matchedSubjects)]
     : subjects
 
-  const isStatusAvailable = ['In School'].includes(resolvedStatus)
+  const isStatusAvailable = !['On Leave', 'Offline'].includes(resolvedStatus)
   const hasSlots = consultationSlots.length > 0
-  const isAvailable = hasSlots && teacherAvailability !== 'Unavailable' && isStatusAvailable
+  const isAvailable = hasSlots && teacherAvailability.toLowerCase() !== 'unavailable' && isStatusAvailable
 
   return {
     id: teacher.id,
@@ -381,7 +385,8 @@ function mapTeacher(teacher) {
     initials: initialsFor(teacher.name),
     color: colorForName(teacher.name),
     status: resolvedStatus,
-    available: subjectTeacherMatch ? hasSlots : isAvailable,
+    available: isStatusAvailable && teacherAvailability.toLowerCase() !== 'unavailable',
+    hasConsultationSlots: hasSlots,
     tags: resolvedSubjects.slice(0, 3),
     subjectList: resolvedSubjects,
     assignedYearSections,
@@ -444,7 +449,7 @@ const subjectTeachers = computed(() => {
 
 const availableTeachers = computed(() => {
   return teachers.value
-    .filter((t) => isAvailableTeacher(t) && matchesSearch(t) && !isSubjectTeacher(t))
+    .filter((t) => matchesSearch(t) && !isSubjectTeacher(t))
     .sort((a, b) => a.name.localeCompare(b.name))
 })
 
@@ -477,6 +482,7 @@ function statusClass(s) {
   return {
     'In School': 'pill-green',
     'On Leave': 'pill-red',
+    Offline: 'pill-gray',
   }[s] || 'pill-gray'
 }
 
@@ -578,6 +584,7 @@ function submitRequest() {
   const body = {
     teacherId: selectedTeacher.value.id,
     topic: reqForm.value.subject,
+    consultationType: selectedTeacher.value?.isSubjectTeacher ? 'subject' : 'available',
     notes,
   }
 
@@ -594,7 +601,13 @@ function submitRequest() {
   } else {
     if (!reqForm.value.date) { reqError.value = 'Please pick a consultation date.'; return }
     if (!reqForm.value.time) { reqError.value = 'Please pick a consultation time.'; return }
+    if (reqForm.value.time < '07:00' || reqForm.value.time > '17:00') {
+      reqError.value = 'Available-teacher consultations must be scheduled between 7:00 AM and 6:00 PM.'
+      return
+    }
 
+    // Available teachers accept free date/time requests; never attach an admin slot.
+    body.availabilityId = undefined
     body.date = reqForm.value.date
     body.time = to24Hour(reqForm.value.time)
     if (!body.time) { reqError.value = 'Selected consultation time is invalid.'; return }

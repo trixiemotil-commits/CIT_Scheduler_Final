@@ -380,8 +380,8 @@ async function updateMe(req, res) {
     }
 
     if (employeeId) {
-      if (!/^AU\d{4}-\d{5}$/.test(employeeId)) {
-        return res.status(400).json({ message: "Employee ID must use the format AU2025-00000." });
+      if (!/^AU\d{4}-\d{4,5}$/.test(employeeId)) {
+        return res.status(400).json({ message: "Employee ID must use the format AU2025-0000 or AU2025-00000." });
       }
       const idOwner = await User.findOne({ employeeId });
       if (idOwner && idOwner._id.toString() !== user._id.toString()) {
@@ -454,9 +454,12 @@ async function updateMe(req, res) {
 
     await user.save();
 
+    const teacherStatusChanged = isTeacher && String(prevTeacherStatus || '') !== String(user.teacher_status || '')
     await logActivity({
       actor: req.user,
-      action: `Updated profile details for ${user.firstName} ${user.lastName}`,
+      action: teacherStatusChanged
+        ? `Teacher ${user.firstName} ${user.lastName} is ${user.teacher_status}`
+        : `Updated profile details for ${user.firstName} ${user.lastName}`,
       path: req.originalUrl || "/api/auth/me",
       method: req.method,
       req,

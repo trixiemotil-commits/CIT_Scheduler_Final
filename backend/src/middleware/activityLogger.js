@@ -9,13 +9,17 @@ function describeActivity(method, path) {
   }
   if (path === "/api/auth/me") return "Updated their profile or status";
   if (path.includes("/consultations")) return "Updated consultation availability";
-  return `${method} ${path.replace("/api/", "")}`;
+  if (path.includes("/academic-terms")) return "Updated academic term details";
+  if (path.includes("/users")) return "Updated user details";
+  if (path.includes("/schedules")) return "Updated schedule details";
+  if (path.includes("/events")) return "Updated event details";
+  return "Updated system details";
 }
 
 function activityLogger(req, res, next) {
   res.on("finish", () => {
     const role = String(req.user?.role || "").toLowerCase();
-    if (!req.user || !["admin", "teacher", "student"].includes(role) || req.method === "GET" || res.statusCode >= 400 || req.originalUrl.startsWith("/api/activity-logs")) {
+    if (!req.user || !["admin", "teacher", "student"].includes(role) || req.method === "GET" || res.statusCode >= 400 || req.originalUrl.startsWith("/api/activity-logs") || req.activityLogWritten) {
       return;
     }
 
