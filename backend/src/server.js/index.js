@@ -33,6 +33,7 @@ app.use(cors({
     'https://deployed-cit-sched-git-main-iggyt0929-1567s-projects.vercel.app',
     'https://citscheduler.com',
 'https://www.citscheduler.com',
+'https://cit-scheduler-final-zo9k.vercel.app'
   ],
   credentials: true,
 }));
