@@ -39,8 +39,8 @@
 
 <script setup>
 import { getToken, getUser, saveMergedUser } from '@/auth.js'
-import { computed, onMounted, ref } from 'vue'
 import Swal from 'sweetalert2'
+import { computed, onMounted, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const user = ref(getUser() || {})

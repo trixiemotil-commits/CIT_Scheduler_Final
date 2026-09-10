@@ -278,10 +278,10 @@
 </template>
 
 <script setup>
-import { IonContent, IonPage } from '@ionic/vue'
 import StudentRefresher from '@/components/student/StudentRefresher.vue'
 import { useAutoRefresh } from '@/composables/useAutoRefresh.js'
 import { useStudentData } from '@/composables/useStudentData.js'
+import { IonContent, IonPage } from '@ionic/vue'
 import { computed, onMounted, ref } from 'vue'
 
 const { sessions, cancelSession, updateSession, isLoadingSessions, sessionsError, loadSessions } = useStudentData()
