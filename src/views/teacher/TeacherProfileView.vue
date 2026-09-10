@@ -2,6 +2,7 @@
   <div class="layout">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
     <aside class="sidebar teacher-sidebar">
+      <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
           <img :src="profile.avatar" alt="Teacher" class="avatar" />

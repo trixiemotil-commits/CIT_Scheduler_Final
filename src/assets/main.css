@@ -1043,6 +1043,53 @@ body,
   left: 29px;
 }
 
+.teacher-sidebar-collapsed .layout > .teacher-sidebar {
+  width: 82px !important;
+  min-width: 82px !important;
+  padding-inline: 12px !important;
+  overflow: visible !important;
+}
+
+.teacher-sidebar-collapsed .admin-sidebar-toggle {
+  left: 29px;
+}
+
+.teacher-sidebar-collapsed .teacher-sidebar .sidebar-profile {
+  display: flex !important;
+  justify-content: center !important;
+  padding: 8px 0 14px !important;
+}
+
+.teacher-sidebar-collapsed .teacher-sidebar .avatar-wrap {
+  width: 48px !important;
+  height: 48px !important;
+}
+
+.teacher-sidebar-collapsed .teacher-sidebar .sidebar-profile :is(.brand, .role, .email),
+.teacher-sidebar-collapsed .teacher-sidebar .nav-item > span:last-child,
+.teacher-sidebar-collapsed .teacher-sidebar .teacher-sidebar-status {
+  display: none !important;
+}
+
+.teacher-sidebar-collapsed .teacher-sidebar .nav-item {
+  min-height: 48px !important;
+  justify-content: center !important;
+  padding-inline: 0 !important;
+}
+
+.teacher-sidebar-collapsed .teacher-sidebar :is(.logout-btn, .role-switch-btn, .switch-role-btn) {
+  min-width: 48px !important;
+  padding-inline: 0 !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  font-size: 0 !important;
+}
+
+.teacher-sidebar-collapsed .teacher-sidebar :is(.logout-btn, .role-switch-btn, .switch-role-btn) svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
 .admin-sidebar-quick-menu {
   position: absolute;
   z-index: 1000;
@@ -1213,6 +1260,27 @@ body,
   }
 
   .admin-sidebar-quick-menu {
+    display: none !important;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .teacher-sidebar-collapsed .admin-sidebar-toggle {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .teacher-sidebar-collapsed .teacher-sidebar:has(.sidebar-profile:hover, .sidebar-profile:focus-within, .admin-sidebar-quick-menu:hover, .admin-sidebar-quick-menu:focus-within) .admin-sidebar-quick-menu {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .teacher-sidebar-collapsed .admin-sidebar-quick-menu {
     display: none !important;
   }
 }

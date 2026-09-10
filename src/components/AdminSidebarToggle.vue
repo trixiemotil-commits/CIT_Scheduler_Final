@@ -28,11 +28,13 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 
-const STORAGE_KEY = 'cit-admin-sidebar-collapsed'
+const isTeacherPage = window.location.pathname.startsWith('/teacher')
+const STORAGE_KEY = isTeacherPage ? 'cit-teacher-sidebar-collapsed' : 'cit-admin-sidebar-collapsed'
 const collapsed = ref(false)
 
 function applyState() {
-  document.documentElement.classList.toggle('admin-sidebar-collapsed', collapsed.value)
+  document.documentElement.classList.toggle('teacher-sidebar-collapsed', isTeacherPage && collapsed.value)
+  document.documentElement.classList.toggle('admin-sidebar-collapsed', !isTeacherPage && collapsed.value)
 }
 
 function toggle() {

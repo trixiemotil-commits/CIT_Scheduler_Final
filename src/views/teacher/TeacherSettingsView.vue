@@ -2,6 +2,7 @@
   <div class="layout">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
     <aside class="sidebar teacher-sidebar">
+      <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
           <img :src="user.avatar || 'https://i.pravatar.cc/100?img=47'" alt="Teacher" class="avatar" />
@@ -38,6 +39,7 @@
     <main class="main">
       <header class="main-header">
         <div>
+          <span class="page-eyebrow">Account</span>
           <h1 class="page-title">Settings</h1>
           <p class="page-sub">Manage your account settings and preferences</p>
         </div>
@@ -580,16 +582,34 @@ const faqs = [
   height: 100vh;
   box-sizing: border-box;
 }
-.main-header  { margin-bottom: 32px; }
-.page-title {
-  font-size: 2rem;
-  font-weight: 600;
-  color: #4b5563;
-  letter-spacing: -0.5px;
-  line-height: 1.2;
-  margin: 0 0 4px;
+.main-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 26px;
 }
-.page-sub { font-size: 0.95rem; color: #777; margin: 0; }
+.page-eyebrow {
+  display: block;
+  margin: 0 0 2px;
+  color: #6d7880;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.page-title {
+  margin: 0;
+  font-size: clamp(1.9rem, 2.5vw, 2.5rem);
+  font-weight: 700;
+  color: #2b3137;
+  letter-spacing: -0.05em;
+  line-height: 1.15;
+}
+.page-sub {
+  font-size: 0.92rem;
+  color: #6a7279;
+  margin: 6px 0 0;
+}
 
 /* ── Settings body ── */
 .settings-body { display: flex; flex-direction: column; gap: 24px; }

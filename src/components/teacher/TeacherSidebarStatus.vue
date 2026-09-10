@@ -223,45 +223,37 @@ onMounted(loadStatus)
 
 <style scoped>
 .teacher-sidebar-status {
-  /* grid-column: 1 / -1; */
   width: 100%;
-  margin: -10px 0 12px;
-  padding: 10px 0 12px;
-  /* border-top: 1px solid rgba(72, 78, 84, 0.17);
-  border-bottom: 1px solid rgba(72, 78, 84, 0.17);
-  box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.46),
-    0 1px rgba(255, 255, 255, 0.46); */
+  margin: 0 0 12px;
+  padding: 6px 0 0;
 }
 
 .sidebar-status-panel {
   width: 100%;
   margin-top: 0;
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  border-radius: 11px;
-  background: linear-gradient(145deg, rgba(245, 247, 247, 0.72), rgba(199, 204, 208, 0.58));
-  box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.76),
-    0 4px 10px rgba(42, 48, 54, 0.1);
+  padding: 12px 12px 10px;
+  border: 1px solid rgba(117, 123, 129, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(244, 246, 246, 0.86), rgba(221, 226, 228, 0.72));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.72);
   text-align: left;
 }
 
 .sidebar-status-panel + .sidebar-status-panel {
-  margin-top: 7px;
+  margin-top: 12px;
 }
 
 .sidebar-status-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 7px;
-  margin-bottom: 6px;
+  gap: 8px;
+  margin-bottom: 10px;
   color: #30353a;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
   text-transform: uppercase;
 }
 
@@ -279,18 +271,18 @@ onMounted(loadStatus)
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .sidebar-status-value,
 .sidebar-status-select {
-  min-height: 28px;
+  min-height: 36px;
   color: #30353a;
-  background: rgba(255, 255, 255, 0.74);
-  border: 1px solid rgba(116, 123, 129, 0.28);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(116, 123, 129, 0.24);
+  border-radius: 10px;
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
@@ -299,7 +291,7 @@ onMounted(loadStatus)
   min-width: 0;
   align-items: center;
   justify-content: flex-start;
-  padding: 0 9px;
+  padding: 0 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -307,23 +299,29 @@ onMounted(loadStatus)
 
 .sidebar-status-select {
   width: 100%;
-  height: 28px;
-  padding: 0 8px;
+  height: 36px;
+  padding: 0 12px;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #525a61 50%), linear-gradient(135deg, #525a61 50%, transparent 50%);
+  background-position: calc(100% - 16px) calc(50% - 2px), calc(100% - 11px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
 }
 
 .sidebar-status-button {
-  min-width: 74px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid #30353a;
-  border-radius: 8px;
-  background: linear-gradient(145deg, #424950, #23282e);
+  min-width: 90px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #2d3136;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #3d434a, #22262b);
   color: #fff;
   font: inherit;
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 800;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
 .sidebar-status-button:disabled {
@@ -335,10 +333,10 @@ onMounted(loadStatus)
 
 .sidebar-time-in,
 .sidebar-status-subtext {
-  margin-top: 5px;
-  color: #69727c;
-  font-size: 0.62rem;
-  line-height: 1.25;
+  margin-top: 8px;
+  color: #66707a;
+  font-size: 0.7rem;
+  line-height: 1.35;
 }
 
 .teacher-status-toast {

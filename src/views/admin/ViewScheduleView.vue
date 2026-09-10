@@ -2064,13 +2064,15 @@ function printSchedule() {
   padding: 7px 8px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
+  align-items: center;
   gap: 2px;
   box-sizing: border-box;
   overflow: hidden;
   cursor: default;
   border: 0;
   box-shadow: 0 3px 8px rgba(30,39,44,.14);
+  text-align: center;
 }
 .sched-entry-clickable {
   cursor: pointer;
@@ -2109,45 +2111,50 @@ function printSchedule() {
 }
 .entry-teacher {
   display: -webkit-box;
+  width: 100%;
   overflow: hidden;
   font-size: .72rem;
   font-weight: 800;
   line-height: 1.25;
   white-space: normal;
+  text-align: center;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 .entry-subject {
   display: -webkit-box;
+  width: 100%;
   overflow: hidden;
   font-size: .67rem;
   opacity: 0.92;
   line-height: 1.3;
   white-space: normal;
+  text-align: center;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 .entry-time-range {
+  width: 100%;
   font-size: .62rem; opacity: 0.82; font-style: normal; font-weight: 550; margin-top: 1px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
 }
 .entry-section-rows {
-  display: flex; flex-direction: column; gap: 2px;
+  display: flex; flex-direction: column; gap: 2px; align-items: center;
+  width: 100%;
   margin-top: 4px;
   border-top: 1px solid rgba(255,255,255,0.25);
   padding-top: 4px;
 }
 .entry-section-row {
-  display: flex; align-items: center; gap: 4px;
+  display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%;
 }
 .entry-section-badge {
-  font-size: 0.72rem; font-weight: 700;
+  font-size: 0.72rem; font-weight: 700; text-align: center;
   text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.9;
   background: rgba(255,255,255,0.24); padding: 2px 6px; border-radius: 5px;
 }
 .entry-room {
-  font-size: 0.72rem; opacity: 0.75;
-  text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56px;
+  font-size: 0.72rem; opacity: 0.75; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56px;
 }
 
 /* Entry colors */

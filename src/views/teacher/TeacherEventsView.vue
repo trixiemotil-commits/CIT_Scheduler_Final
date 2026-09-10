@@ -1,6 +1,7 @@
 <template>
   <div class="layout">
     <aside class="sidebar teacher-sidebar">
+      <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
           <img :src="user.avatar || 'https://i.pravatar.cc/100?img=47'" alt="Teacher" class="avatar" />
@@ -667,19 +668,29 @@ onMounted(loadEvents)
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 28px;
+  margin-bottom: 26px;
+}
+.page-eyebrow {
+  display: block;
+  margin: 0 0 2px;
+  color: #6d7880;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 .page-title {
-  font-size: 2rem;
-  font-weight: 600;
-  color: #4b5563;
-  letter-spacing: -0.5px;
-  line-height: 1.2;
+  margin: 0;
+  font-size: clamp(1.9rem, 2.5vw, 2.5rem);
+  font-weight: 700;
+  color: #2b3137;
+  letter-spacing: -0.05em;
+  line-height: 1.15;
 }
 .page-sub {
-  font-size: 0.95rem;
-  color: #777;
-  margin-top: 4px;
+  font-size: 0.92rem;
+  color: #6a7279;
+  margin: 6px 0 0;
 }
 
 /* Modal overlay */

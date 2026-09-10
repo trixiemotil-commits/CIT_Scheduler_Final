@@ -2,6 +2,7 @@
   <div class="layout">
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
     <aside class="sidebar teacher-sidebar">
+      <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
           <img :src="userAvatar" alt="Teacher" class="avatar" />
@@ -75,6 +76,7 @@
           <span><i class="legend-swatch legend-lecture" aria-hidden="true"></i>Lecture</span>
           <span><i class="legend-swatch legend-lab" aria-hidden="true"></i>Laboratory</span>
           <span><i class="legend-swatch legend-consultation" aria-hidden="true"></i>Consultation</span>
+          <span><i class="legend-swatch legend-main-campus" aria-hidden="true"></i>Main Campus</span>
           <span><i class="legend-swatch legend-free" aria-hidden="true"></i>Free time</span>
         </div>
 
@@ -101,13 +103,18 @@
                   <td
                     v-if="cell.type === 'start'"
                     :rowspan="cell.rowspan"
+                    :data-focus-key="buildClassFocusKey(cell.cls)"
                     :style="expandedDay === DAYS[ci] ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
                     :class="[
                       'td-class',
                       cell.cls.color === 'gray'
                         ? 'cell-gray'
-                        : (cell.cls.color === 'orange' || cell.cls.color === 'yellow' ? 'cell-yellow' : 'cell-green'),
-                      { 'col-expanded': expandedDay === DAYS[ci] }
+                        : cell.cls.color === 'orange'
+                          ? 'cell-orange'
+                          : cell.cls.color === 'yellow'
+                            ? 'cell-yellow'
+                            : 'cell-green',
+                      { 'col-expanded': expandedDay === DAYS[ci], 'is-focus': isFocusedClassCell(cell), 'is-focus-animate': isFocusedClassCell(cell) }
                     ]"
                     @click="toggleExpand(DAYS[ci])"
                   >
@@ -150,8 +157,9 @@
                   <td
                     v-else-if="cell.type === 'consult'"
                     :rowspan="cell.rowspan"
+                    :data-focus-key="buildConsultFocusKey(cell.consult)"
                     :style="expandedDay === DAYS[ci] ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
-                    :class="['td-class', 'cell-blue', { 'col-expanded': expandedDay === DAYS[ci] }]"
+                    :class="['td-class', 'cell-blue', { 'col-expanded': expandedDay === DAYS[ci], 'is-focus': isFocusedConsultCell(cell), 'is-focus-animate': isFocusedConsultCell(cell) }]"
                     @click="toggleExpand(DAYS[ci])"
                   >
                     <template v-if="expandedDay !== DAYS[ci]">
@@ -299,7 +307,7 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { timeOptions } from '@/composables/useSchedule.js'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -404,8 +412,9 @@ function isGreenComlabRoom(room) {
   return /(\b406\b|\b407\b|\b408\b|\b409\b|comlab|\bcl\b)/i.test(String(room || ''))
 }
 
-function scheduleColor(colorToken, _campus, room, subject, roomType) {
+function scheduleColor(colorToken, campus, room, subject, roomType) {
   if (/^(?:color-)?gray$/i.test(String(colorToken || '')) || /\blunch\b/i.test(String(subject || ''))) return 'gray'
+  if (campus === 'Main Campus' || /main campus/i.test(String(campus || '')) || /^(?:color-)?orange$/i.test(String(colorToken || ''))) return 'orange'
   if (roomType === 'Comlab/Laboratory') return 'green'
   if (roomType === 'Lecture') return 'yellow'
   if (isGreenComlabRoom(room)) return 'green'
@@ -758,6 +767,90 @@ const filteredClasses = computed(() =>
       : scheduleData.value.filter((c) => c.code === selectedSubject.value)
 )
 
+function normalizeScheduleFocusValue(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+function buildTimeFocusKey(value) {
+  const normalized = String(value || '').trim()
+  if (!normalized) return ''
+  return normalizeScheduleFocusValue(to24Hour(normalized))
+}
+
+function buildClassFocusKey(item) {
+  if (!item) return ''
+  return `${Boolean(item.isConsultation) ? 'consult' : 'class'}|${normalizeScheduleFocusValue(item.day)}|${buildTimeFocusKey(item.start || item.timeIn)}|${buildTimeFocusKey(item.end || item.timeOut)}|${Boolean(item.parallel)}`
+}
+
+function buildConsultFocusKey(item) {
+  if (!item) return ''
+  return `consult|${normalizeScheduleFocusValue(item.day)}|${buildTimeFocusKey(item.start)}|${buildTimeFocusKey(item.end)}|false`
+}
+
+const focusTarget = computed(() => {
+  const raw = route.query.focus
+  if (!raw || Array.isArray(raw)) return null
+
+  try {
+    return JSON.parse(decodeURIComponent(raw))
+  } catch (_error) {
+    return null
+  }
+})
+
+const focusedCellKey = ref('')
+
+function isFocusedClassCell(cell) {
+  return cell?.type === 'start' && buildClassFocusKey(cell.cls) === focusedCellKey.value
+}
+
+function isFocusedConsultCell(cell) {
+  return cell?.type === 'consult' && buildConsultFocusKey(cell.consult) === focusedCellKey.value
+}
+
+watch(
+  () => route.query.focus,
+  async () => {
+    const target = focusTarget.value
+    if (!target) {
+      focusedCellKey.value = ''
+      return
+    }
+
+    const targetKey = `${target.isConsultation ? 'consult' : 'class'}|${normalizeScheduleFocusValue(target.day)}|${buildTimeFocusKey(target.start)}|${buildTimeFocusKey(target.end || target.start)}|${Boolean(target.parallel)}`
+    focusedCellKey.value = targetKey
+
+    await nextTick()
+    const match = document.querySelector('[data-focus-key="' + targetKey + '"]')
+    if (match) {
+      const tableWrap = document.querySelector('.table-scroll')
+      if (tableWrap) {
+        const wrapperRect = tableWrap.getBoundingClientRect()
+        const matchRect = match.getBoundingClientRect()
+        const targetScrollTop = Math.max(
+          0,
+          tableWrap.scrollTop + (matchRect.top - wrapperRect.top) - (tableWrap.clientHeight * 0.35)
+        )
+        const targetScrollLeft = Math.max(
+          0,
+          tableWrap.scrollLeft + (matchRect.left - wrapperRect.left) - (tableWrap.clientWidth * 0.25)
+        )
+
+        tableWrap.scrollTo({
+          top: targetScrollTop,
+          left: targetScrollLeft,
+          behavior: 'smooth',
+        })
+      }
+
+      requestAnimationFrame(() => {
+        match.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+      })
+    }
+  },
+  { immediate: true }
+)
+
 const filteredConsultations = computed(() => {
   if (!selectedSubject.value) {
     return consultationData.value
@@ -974,11 +1067,11 @@ function confirmLogout() {
 }
 .page-title {
   margin: 0;
-  font-size: clamp(2.2rem, 3vw, 3.6rem);
+  font-size: clamp(1.9rem, 2.5vw, 2.5rem);
   font-weight: 700;
   color: #2f3740;
-  letter-spacing: -0.06em;
-  line-height: 1.06;
+  letter-spacing: -0.05em;
+  line-height: 1.15;
 }
 .page-sub {
   font-size: 0.95rem;
@@ -1124,13 +1217,16 @@ function confirmLogout() {
 .legend-lecture { background: #e9c46a; }
 .legend-lab { background: #1f6b45; }
 .legend-consultation { background: #4a90d9; }
+.legend-main-campus { background: #f0843d; }
 .legend-free { background: #7b5ea7; }
 
 /* ── Table ── */
 .table-scroll {
   width: 100%;
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: auto;
+  max-height: 72vh;
+  min-height: 420px;
   margin-top: 8px;
   position: relative;
   border-radius: 12px;
@@ -1287,6 +1383,36 @@ function confirmLogout() {
   min-width: 300px;
   max-width: 300px;
   padding: 14px 16px;
+}
+
+.td-class.is-focus,
+.td-class.is-focus-animate {
+  animation: schedule-focus-pop 0.7s ease-in-out 3;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.8), 0 0 0 6px rgba(56, 189, 248, 0.35);
+  border-color: rgba(255,255,255,0.9);
+}
+
+@keyframes schedule-focus-pop {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  25% {
+    transform: scale(1.04);
+    filter: brightness(1.08);
+  }
+  50% {
+    transform: scale(0.98);
+    filter: brightness(1.16);
+  }
+  75% {
+    transform: scale(1.03);
+    filter: brightness(1.08);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
 }
 
 /* ─ Cell Colors ─ */
