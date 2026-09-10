@@ -83,6 +83,7 @@ function toSafeUser(user) {
     teacher_status: statusExpired ? "On School" : user.teacher_status,
     teacher_availability: user.teacher_availability,
     teacher_time_in: user.teacher_time_in,
+    teacher_clocked_out: Boolean(user.teacher_clocked_out),
     teacher_status_expires_at: statusExpired ? null : user.teacher_status_expires_at,
     status: user.account_status,
     avatar: user.avatar,
@@ -365,6 +366,7 @@ async function updateMe(req, res) {
     const gender = normalizeString(req.body.gender);
     const teacherStatus = normalizeString(req.body.teacher_status);
     const teacherAvailability = normalizeString(req.body.teacher_availability);
+    const clockOut = req.body.clockOut === true;
     const recordTimeIn = req.body.recordTimeIn === true;
     const statusDurationMinutes = Number(req.body.statusDurationMinutes || 0);
     const userRoles = user.roles?.length ? user.roles : [user.role];
@@ -445,6 +447,12 @@ async function updateMe(req, res) {
       if (teacherStatus) user.teacher_status = teacherStatus;
       if (teacherAvailability) user.teacher_availability = teacherAvailability;
       if (recordTimeIn || teacherStatus === "On School") user.teacher_time_in = new Date();
+      if (clockOut) {
+        user.teacher_clocked_out = true;
+        user.teacher_time_in = null;
+      } else if (teacherStatus === "On School") {
+        user.teacher_clocked_out = false;
+      }
       if (teacherStatus) {
         user.teacher_status_expires_at = teacherStatus === "On Leave" && statusDurationMinutes
           ? new Date(Date.now() + (statusDurationMinutes * 60 * 1000))
@@ -494,21 +502,6 @@ async function updateMe(req, res) {
       }
     } catch (err) {
       console.warn('Failed to create teacher status notifications:', err.message)
-    }
-
-    if (isTeacher && String(prevTeacherStatus || '') !== String(user.teacher_status || '')) {
-      try {
-        await notifyActiveAdmins({
-          actorId: user._id,
-          type: 'teacher_status_admin',
-          title: 'Teacher status changed',
-          message: `${user.firstName || ''} ${user.lastName || ''} is now ${user.teacher_status}.`.trim(),
-          related: { teacherId: user._id.toString(), status: user.teacher_status },
-          route: '/admin/teachers',
-        })
-      } catch (notificationError) {
-        console.warn('Teacher update succeeded, but admin notification failed:', notificationError.message)
-      }
     }
 
     return res.status(200).json({ message: "Profile updated successfully.", user: toSafeUser(user) });

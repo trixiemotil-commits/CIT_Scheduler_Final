@@ -19,6 +19,7 @@
         <div class="group-label">{{ group.label }}</div>
         <div v-for="n in group.items" :key="n.id" class="notif-item" :class="{ unread: !n.read }" @click="n.read = true">
           <div class="notif-dot" :class="{ on: !n.read }"></div>
+          <img v-if="n.avatar" :src="n.avatar" class="notif-avatar" alt="" />
           <div class="notif-body">
             <div class="notif-title">{{ n.title }}</div>
             <div class="notif-desc">{{ n.desc }}</div>
@@ -63,6 +64,7 @@ async function loadNotifications() {
       id: n.id,
       title: n.title || n.type,
       desc: n.message || '',
+      avatar: n.data?.avatar || '',
       time: new Date(n.createdAt).toLocaleString(),
       group: (Date.now() - new Date(n.createdAt).getTime()) < (24*60*60*1000) ? 'TODAY' : 'EARLIER',
       read: Boolean(n.read),
@@ -81,6 +83,7 @@ function _onNotif(n) {
     id: n.id,
     title: n.title || n.type,
     desc: n.message || '',
+    avatar: n.data?.avatar || '',
     time: new Date(n.createdAt).toLocaleString(),
     group: (Date.now() - new Date(n.createdAt).getTime()) < (24*60*60*1000) ? 'TODAY' : 'EARLIER',
     read: Boolean(n.read),
@@ -176,6 +179,15 @@ async function markAll() {
   padding: 11px 14px;
   background: #fff;
   border-bottom: 1px solid #edf1f4;
+}
+
+.notif-avatar {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #dcebe4;
 }
 .notif-item.unread { background: #f7fcf9; }
 .notif-dot {

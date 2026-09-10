@@ -215,7 +215,25 @@ async function clockOut() {
   if (!result.isConfirmed) return
   teacherStatus.value = 'On Leave'
   teacherAvailability.value = 'Unavailable'
-  await saveStatus()
+  try {
+    const payload = await apiRequest('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify({
+        teacher_status: teacherStatus.value,
+        teacher_availability: teacherAvailability.value,
+        clockOut: true,
+      }),
+    })
+    const updatedUser = saveMergedUser(payload.user || {})
+    user.value = updatedUser
+    teacherStatus.value = updatedUser.teacher_status || teacherStatus.value
+    teacherAvailability.value = updatedUser.teacher_availability || teacherAvailability.value
+    teacherTimeIn.value = updatedUser.teacher_time_in || null
+    showMessage('Clocked out.')
+  } catch (err) {
+    showMessage(err.message || 'Unable to clock out.', true)
+    await loadStatus()
+  }
 }
 
 onMounted(loadStatus)

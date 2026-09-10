@@ -37,7 +37,10 @@
       </div>
       <div v-for="s in filteredSessions" :key="s.id" class="session-card">
         <div class="session-top">
-          <div class="session-avatar" :style="{ background: s.teacherColor }">{{ s.teacherInitials }}</div>
+          <div class="session-avatar" :style="{ background: s.teacherColor }">
+            <img v-if="s.teacherAvatar" :src="s.teacherAvatar" :alt="`${s.teacher} profile`" />
+            <span v-else>{{ s.teacherInitials }}</span>
+          </div>
           <div class="session-meta">
             <div class="session-subject">{{ s.subject }}</div>
             <div class="session-teacher">{{ s.teacher }}</div>
@@ -88,7 +91,10 @@
         <div class="modal-header"><span>Session Details</span><button class="modal-close" @click="showDetails = false">✕</button></div>
         <div class="modal-body" v-if="activeSession">
           <div class="detail-hero">
-            <div class="session-avatar-lg" :style="{ background: activeSession.teacherColor }">{{ activeSession.teacherInitials }}</div>
+            <div class="session-avatar-lg" :style="{ background: activeSession.teacherColor }">
+              <img v-if="activeSession.teacherAvatar" :src="activeSession.teacherAvatar" :alt="`${activeSession.teacher} profile`" />
+              <span v-else>{{ activeSession.teacherInitials }}</span>
+            </div>
             <div class="detail-main">
               <div class="detail-subject">{{ activeSession.subject }}</div>
               <div class="detail-teacher">{{ activeSession.teacher }}</div>
@@ -135,7 +141,10 @@
         <div class="modal-header"><span>Edit Session</span><button class="modal-close" @click="showEdit = false">✕</button></div>
         <div class="modal-body">
           <div class="teacher-pill" v-if="activeSession">
-            <div class="tp-avatar" :style="{ background: activeSession.teacherColor }">{{ activeSession.teacherInitials }}</div>
+            <div class="tp-avatar" :style="{ background: activeSession.teacherColor }">
+              <img v-if="activeSession.teacherAvatar" :src="activeSession.teacherAvatar" :alt="`${activeSession.teacher} profile`" />
+              <span v-else>{{ activeSession.teacherInitials }}</span>
+            </div>
             <div><div class="tp-name">{{ activeSession.subject }}</div><div class="tp-subj">{{ activeSession.teacher }}</div></div>
           </div>
           <div class="field-group">
@@ -198,7 +207,10 @@
         <div class="modal-header"><span>Reschedule Session</span><button class="modal-close" @click="showReschedule = false">✕</button></div>
         <div class="modal-body">
           <div class="teacher-pill" v-if="activeSession">
-            <div class="tp-avatar" :style="{ background: activeSession.teacherColor }">{{ activeSession.teacherInitials }}</div>
+            <div class="tp-avatar" :style="{ background: activeSession.teacherColor }">
+              <img v-if="activeSession.teacherAvatar" :src="activeSession.teacherAvatar" :alt="`${activeSession.teacher} profile`" />
+              <span v-else>{{ activeSession.teacherInitials }}</span>
+            </div>
             <div><div class="tp-name">{{ activeSession.subject }}</div><div class="tp-subj">{{ activeSession.teacher }}</div></div>
           </div>
           <div class="form-row-2">
@@ -231,7 +243,10 @@
         <div class="modal-header"><span>Leave a Review</span><button class="modal-close" @click="showReview = false">✕</button></div>
         <div class="modal-body">
           <div class="teacher-pill" v-if="activeSession">
-            <div class="tp-avatar" :style="{ background: activeSession.teacherColor }">{{ activeSession.teacherInitials }}</div>
+            <div class="tp-avatar" :style="{ background: activeSession.teacherColor }">
+              <img v-if="activeSession.teacherAvatar" :src="activeSession.teacherAvatar" :alt="`${activeSession.teacher} profile`" />
+              <span v-else>{{ activeSession.teacherInitials }}</span>
+            </div>
             <div><div class="tp-name">{{ activeSession.subject }}</div><div class="tp-subj">{{ activeSession.teacher }}</div></div>
           </div>
           <div class="field-group">
@@ -777,8 +792,11 @@ onMounted(() => {
   width: 42px; height: 42px; flex-shrink: 0;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-weight: 700; font-size: 0.95rem;
+  color: #fff; font-weight: 700; font-size: 0.95rem; overflow: hidden;
 }
+.session-avatar img,
+.session-avatar-lg img,
+.tp-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .session-meta { flex: 1; }
 .session-subject { font-weight: 700; font-size: 0.95rem; color: #111; }
 .session-teacher { font-size: 0.79rem; color: #66727c; margin: 2px 0 8px; }
@@ -968,7 +986,7 @@ onMounted(() => {
 .tp-avatar {
   width: 44px; height: 44px; border-radius: 50%; color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 1.1rem; flex-shrink: 0;
+  font-weight: 700; font-size: 1.1rem; flex-shrink: 0; overflow: hidden;
 }
 .tp-name { font-weight: 700; font-size: 0.9rem; color: #111; }
 .tp-subj { font-size: 0.75rem; color: #777; margin-top: 2px; }
@@ -981,7 +999,7 @@ onMounted(() => {
 .session-avatar-lg {
   width: 50px; height: 50px; border-radius: 50%; color: #fff; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 1.1rem;
+  font-weight: 700; font-size: 1.1rem; overflow: hidden;
 }
 .detail-main  { flex: 1; }
 .detail-subject { font-weight: 700; font-size: 0.95rem; color: #111; }

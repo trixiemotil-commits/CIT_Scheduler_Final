@@ -37,7 +37,10 @@
         <div class="section-title">Subject Teachers</div>
         <div v-for="t in visibleSubjectTeachers" :key="t.id" class="teacher-card">
           <div class="teacher-top">
-            <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
+            <div class="teacher-avatar" :style="{ background: t.color }">
+              <img v-if="t.avatar" :src="t.avatar" :alt="`${t.name} profile`" />
+              <span v-else>{{ t.initials }}</span>
+            </div>
             <span v-if="t.status === 'Offline'" class="status-badge" title="Teacher is offline"></span>
             <div class="teacher-meta">
               <div class="teacher-name">{{ t.name }}</div>
@@ -66,7 +69,10 @@
         <div class="section-title">Available Teachers</div>
         <div v-for="t in visibleAvailableTeachers" :key="t.id" class="teacher-card">
           <div class="teacher-top">
-            <div class="teacher-avatar" :style="{ background: t.color }">{{ t.initials }}</div>
+            <div class="teacher-avatar" :style="{ background: t.color }">
+              <img v-if="t.avatar" :src="t.avatar" :alt="`${t.name} profile`" />
+              <span v-else>{{ t.initials }}</span>
+            </div>
             <span v-if="t.status === 'Offline'" class="status-badge" title="Teacher is offline"></span>
             <div class="teacher-meta">
               <div class="teacher-name">{{ t.name }}</div>
@@ -105,7 +111,10 @@
         </div>
         <div class="modal-body">
           <div class="teacher-pill">
-            <div class="tp-avatar" :style="{ background: selectedTeacher?.color }">{{ selectedTeacher?.initials }}</div>
+            <div class="tp-avatar" :style="{ background: selectedTeacher?.color }">
+              <img v-if="selectedTeacher?.avatar" :src="selectedTeacher.avatar" :alt="`${selectedTeacher.name} profile`" />
+              <span v-else>{{ selectedTeacher?.initials }}</span>
+            </div>
             <div>
               <div class="tp-name">{{ selectedTeacher?.name }}</div>
               <div class="tp-subjects-clean">
@@ -169,7 +178,10 @@
         </div>
         <div class="modal-body">
           <div class="profile-hero">
-            <div class="profile-avatar-lg" :style="{ background: selectedTeacher?.color }">{{ selectedTeacher?.initials }}</div>
+            <div class="profile-avatar-lg" :style="{ background: selectedTeacher?.color }">
+              <img v-if="selectedTeacher?.avatar" :src="selectedTeacher.avatar" :alt="`${selectedTeacher.name} profile`" />
+              <span v-else>{{ selectedTeacher?.initials }}</span>
+            </div>
             <div class="profile-hero-name">{{ selectedTeacher?.name }}</div>
             <div class="profile-subjects-clean">
               <span v-for="subject in displayedSubjects(selectedTeacher)" :key="subject" class="subject-chip">{{ subject }}</span>
@@ -293,7 +305,17 @@ function normalizeTeacherStatus(statusOrObj) {
 
     const resolvedStatus = String(t.status || '').trim().toLowerCase()
     if (resolvedStatus === 'offline') return 'Offline'
+    if (
+      t.teacher_clocked_out
+      || (
+        String(t.teacher_status || '').toLowerCase() === 'on leave'
+        && (String(t.teacherAvailability || '').toLowerCase() === 'unavailable' || !t.teacher_time_in)
+      )
+    ) {
+      return 'Offline'
+    }
     if (resolvedStatus === 'on school' || resolvedStatus === 'in school') return 'In School'
+    if (resolvedStatus === 'on meeting') return 'On Meeting'
 
     if (t.teacher_status_expires_at) {
       try {
@@ -307,13 +329,15 @@ function normalizeTeacherStatus(statusOrObj) {
     }
 
     const statusRaw = String(t.teacher_status || t.status || '').trim().toLowerCase()
-    if (statusRaw === 'on leave' || statusRaw === 'leave') return 'Offline'
+    if (statusRaw === 'on meeting' || statusRaw === 'on-meeting') return 'On Meeting'
+    if (statusRaw === 'on leave' || statusRaw === 'leave') return 'On Leave'
     return 'In School'
   }
 
   const normalized = String(statusOrObj || '').trim()
   const lower = normalized.toLowerCase()
-  if (lower === 'on leave' || lower === 'leave' || lower === 'offline') return 'Offline'
+  if (lower === 'on leave' || lower === 'leave') return 'On Leave'
+  if (lower === 'offline') return 'Offline'
   return 'In School'
 }
 
@@ -381,6 +405,7 @@ function mapTeacher(teacher) {
     id: teacher.id,
     employeeId: teacher.employeeId,
     name: teacher.name,
+    avatar: teacher.avatar || '',
     subject: resolvedSubjects.length ? resolvedSubjects.join(', ') : 'No subject assigned',
     initials: initialsFor(teacher.name),
     color: colorForName(teacher.name),
@@ -402,7 +427,9 @@ async function loadTeachers(options = {}) {
     loadError.value = ''
   }
   try {
-    const payload = await apiRequest('/consultations/teachers')
+    const payload = await apiRequest(`/consultations/teachers?updatedAt=${Date.now()}`, {
+      cache: 'no-store',
+    })
     teachers.value = (payload.teachers || []).map(mapTeacher)
   } catch (error) {
     if (!silent) {
@@ -481,6 +508,7 @@ function hiddenSubjectCount(teacher) {
 function statusClass(s) {
   return {
     'In School': 'pill-green',
+    'On Meeting': 'pill-yellow',
     'On Leave': 'pill-red',
     Offline: 'pill-gray',
   }[s] || 'pill-gray'
@@ -713,7 +741,11 @@ onUnmounted(() => {
   width: 46px; height: 46px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 700; font-size: 1rem; flex-shrink: 0;
+  overflow: hidden;
 }
+.teacher-avatar img,
+.tp-avatar img,
+.profile-avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
 .teacher-meta { flex: 1; }
 .teacher-name    { font-weight: 700; font-size: 0.9rem; color: #111; }
 .teacher-subjects-clean {
@@ -746,6 +778,7 @@ onUnmounted(() => {
 }
 .pill-green  { background: #d8dcdf; color: #4f575f; }
 .pill-orange { background: #fff3e0; color: #b35e00; }
+.pill-yellow { background: #fff4cc; color: #9a6700; }
 .pill-red    { background: #ffeaea; color: #e63946; }
 .pill-gray   { background: #f0f0f0; color: #666; }
 
@@ -821,7 +854,7 @@ onUnmounted(() => {
 .tp-avatar {
   width: 44px; height: 44px; border-radius: 50%; color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 1.1rem; flex-shrink: 0;
+  font-weight: 700; font-size: 1.1rem; flex-shrink: 0; overflow: hidden;
 }
 .tp-name { font-weight: 700; font-size: 0.9rem; color: #111; }
 .tp-subjects-clean {
@@ -839,7 +872,7 @@ onUnmounted(() => {
 .profile-avatar-lg {
   width: 72px; height: 72px; border-radius: 50%; color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 1.6rem; margin-bottom: 8px;
+  font-weight: 700; font-size: 1.6rem; margin-bottom: 8px; overflow: hidden;
 }
 .profile-hero-name { font-weight: 700; font-size: 1rem; color: #111; }
 .profile-subjects-clean {

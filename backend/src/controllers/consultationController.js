@@ -158,6 +158,21 @@ async function resolveTeacherStatus(userDoc) {
     return "Offline";
   }
 
+  if (
+    userDoc.teacher_clocked_out
+    || (
+      userDoc.teacher_status === "On Leave"
+      && (userDoc.teacher_availability === "Unavailable" || !userDoc.teacher_time_in)
+    )
+  ) {
+    return "Offline";
+  }
+
+  const configuredStatus = String(userDoc.teacher_status || "").trim();
+  if (["On School", "On Meeting", "On Leave"].includes(configuredStatus)) {
+    return configuredStatus;
+  }
+
   const clockIn = userDoc.teacher_time_in ? new Date(userDoc.teacher_time_in) : null;
   const now = new Date();
   const clockedInToday = clockIn
@@ -428,7 +443,7 @@ async function listTeachersForStudents(req, res) {
       : { year: "", section: "" };
 
     const teacherUsers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
-      .select("role firstName lastName employeeId department account_status teacher_status teacher_time_in teacher_status_expires_at teacher_availability avatar")
+      .select("role roles firstName lastName employeeId department account_status teacher_status teacher_time_in teacher_clocked_out teacher_status_expires_at teacher_availability avatar")
       .lean();
 
     const teachers = await Promise.all(
@@ -493,6 +508,9 @@ async function listTeachersForStudents(req, res) {
           avatar: teacherUser.avatar || null,
           department: teacherUser.department || "",
           status,
+          teacher_status: teacherUser.teacher_status || "",
+          teacher_time_in: teacherUser.teacher_time_in || null,
+          teacher_clocked_out: Boolean(teacherUser.teacher_clocked_out),
           teacherAvailability: teacherUser.teacher_availability || "Available",
           available: canAcceptRequests,
           isSubjectTeacher,
@@ -684,18 +702,33 @@ async function createConsultationRequest(req, res) {
       notes: "Consultation request created.",
     });
 
-    // Subject teachers are already assigned to the student, so their requests are approved immediately.
+    // Notify the teacher for every new request, including subject requests that are auto-approved.
     try {
       await Notification.create({
-        recipientId: isSubjectTeacher ? req.user.id : teacherUser._id,
+        recipientId: teacherUser._id,
         actorId: req.user.id,
-        type: isSubjectTeacher ? 'consultation_status' : 'consultation_request',
-        title: isSubjectTeacher ? 'Consultation APPROVED' : 'New consultation request',
-        message: isSubjectTeacher
-          ? `Your consultation request (${requestDoc.subject}) was approved automatically.`
-          : `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}.`,
-        related: { consultationRequestId: requestDoc._id.toString(), ...(isSubjectTeacher ? { status: 'APPROVED' } : {}) },
+        type: 'consultation_request',
+        title: 'New consultation request',
+        message: `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}.`,
+        data: {
+          studentName: `${req.user.firstName || 'A student'} ${req.user.lastName || ''}`.trim(),
+          subject: requestDoc.subject,
+          consultationTime: `${consultationStartTime} - ${consultationEndTime}`,
+          avatar: req.user.avatar || null,
+        },
+        related: { consultationRequestId: requestDoc._id.toString() },
       })
+
+      if (isSubjectTeacher) {
+        await Notification.create({
+          recipientId: req.user.id,
+          actorId: req.user.id,
+          type: 'consultation_status',
+          title: 'Consultation APPROVED',
+          message: `Your consultation request (${requestDoc.subject}) was approved automatically.`,
+          related: { consultationRequestId: requestDoc._id.toString(), status: 'APPROVED' },
+        })
+      }
     } catch (err) {
       console.warn('Failed to create notification for teacher:', err.message)
     }

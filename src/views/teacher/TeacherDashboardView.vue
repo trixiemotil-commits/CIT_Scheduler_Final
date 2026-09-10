@@ -424,14 +424,16 @@ function notificationGroup(createdAt) {
 
 async function loadConsultationNotifications() {
   try {
-    const payload = await apiRequest('/notifications')
+    const payload = await apiRequest(`/notifications?updatedAt=${Date.now()}`, {
+      cache: 'no-store',
+    })
     const notifs = Array.isArray(payload.notifications) ? payload.notifications : []
     notifications.value = notifs.slice(0, 50).map(n => {
       return {
         id: n.id,
         avatar: n.data?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.title||'Notif')}&background=DDECE5&color=1B4332`,
-        studentName: n.data?.studentName || n.title || 'Notification',
-        subject: n.data?.subject || '',
+        studentName: n.data?.studentName || notificationStudentName(n),
+        subject: n.data?.subject || notificationSubject(n),
         consultationTime: n.data?.consultationTime || '',
         read: Boolean(n.read),
         group: notificationGroup(n.createdAt),
@@ -454,16 +456,29 @@ function _onNotif(n) {
     const item = {
       id: n.id,
       avatar: n.data?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.title||'Notif')}&background=DDECE5&color=1B4332`,
-      studentName: n.data?.studentName || n.title || 'Notification',
-      subject: n.data?.subject || '',
+      studentName: n.data?.studentName || notificationStudentName(n),
+      subject: n.data?.subject || notificationSubject(n),
       consultationTime: n.data?.consultationTime || '',
       read: Boolean(n.read),
       group: notificationGroup(n.createdAt),
       request: n,
     }
     notifications.value = [item, ...notifications.value].slice(0, 100)
+    loadConsultationNotifications()
     loadConsultationStats()
   } catch (_) {}
+}
+
+function notificationStudentName(notification) {
+  const message = String(notification?.message || '')
+  const match = message.match(/^(.+?) requested a consultation for /i)
+  return match?.[1]?.trim() || 'Student'
+}
+
+function notificationSubject(notification) {
+  const message = String(notification?.message || '')
+  const match = message.match(/requested a consultation for\s+(.+?)(?:\.|$)/i)
+  return match?.[1]?.trim() || 'consultation'
 }
 
 function markNotificationRead(notificationId) {

@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const { logActivity } = require("../utils/activityLogWriter");
-const { notifyActiveAdmins } = require("../utils/adminNotification");
+const { notifyActiveAdmins, notifyActiveStudents } = require("../utils/adminNotification");
 
 const ROLE_LABELS = {
   admin: "Admin",
@@ -55,6 +55,7 @@ function toClientUser(user) {
     teacher_status: user.teacher_status || (getUserRoles(user).includes("teacher") ? "On School" : ""),
     teacher_availability: user.teacher_availability || (getUserRoles(user).includes("teacher") ? "Available" : ""),
     teacher_time_in: user.teacher_time_in || null,
+    teacher_clocked_out: Boolean(user.teacher_clocked_out),
     substituteTeacher: user.substituteTeacher || "",
     substituteAssignments: user.substituteAssignments ? Object.fromEntries(user.substituteAssignments) : {},
     status: user.account_status || fallbackAccountStatus(user.role),
@@ -482,6 +483,7 @@ async function updateTeacherStatus(req, res) {
     }
 
     user.teacher_status = nextStatus;
+    user.teacher_clocked_out = false;
     await user.save();
 
     await logActivity({
@@ -491,6 +493,20 @@ async function updateTeacherStatus(req, res) {
       method: req.method,
       req,
     });
+
+    try {
+      const teacherName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+      await notifyActiveStudents({
+        actorId: req.user?.id,
+        type: "teacher_status",
+        title: `Teacher ${nextStatus}`,
+        message: `${teacherName} is now ${nextStatus}.`,
+        related: { teacherId: user._id.toString(), status: nextStatus },
+        route: "/student/teachers",
+      });
+    } catch (notificationError) {
+      console.warn("Teacher status updated, but student notification failed:", notificationError.message);
+    }
 
     return res.json({ message: "Teacher status updated.", user: toClientUser(user) });
   } catch (error) {

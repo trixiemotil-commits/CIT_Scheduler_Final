@@ -1,18 +1,61 @@
 const Notification = require('../models/Notification')
+const ConsultationRequest = require('../models/ConsultationRequest')
+const User = require('../models/User')
 
 async function listNotifications(req, res) {
   try {
     const filter = { recipientId: req.user.id }
-    const docs = await Notification.find(filter).sort({ createdAt: -1 }).limit(200).lean()
-    return res.json({ notifications: docs.map((d) => ({
+    const docs = await Notification.find(filter)
+      .populate('actorId', 'firstName lastName avatar')
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean()
+    const requestIds = docs
+      .map((doc) => doc.related?.consultationRequestId)
+      .filter(Boolean)
+    const requests = requestIds.length
+      ? await ConsultationRequest.find({ _id: { $in: requestIds } })
+        .populate('studentId', 'firstName lastName avatar')
+        .select('studentId employeeId subject consultationStartTime consultationEndTime')
+        .lean()
+      : []
+    const requestById = new Map(requests.map((request) => [String(request._id), request]))
+
+    return res.json({ notifications: await Promise.all(docs.map(async (d) => {
+      const request = requestById.get(String(d.related?.consultationRequestId))
+      const student = request?.studentId
+      const teacher = request?.employeeId
+        ? await User.findOne({ employeeId: request.employeeId }).select('firstName lastName avatar').lean()
+        : null
+      const actor = d.actorId && typeof d.actorId === 'object' ? d.actorId : null
+      const data = {
+        ...(d.data || {}),
+        ...(actor ? {
+          actorName: `${actor.firstName || ''} ${actor.lastName || ''}`.trim(),
+          avatar: actor.avatar || d.data?.avatar || null,
+        } : {}),
+        ...(student ? {
+          studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
+          subject: request.subject || '',
+          consultationTime: [request.consultationStartTime, request.consultationEndTime].filter(Boolean).join(' - '),
+          avatar: student.avatar || d.data?.avatar || null,
+        } : {}),
+        ...(teacher && d.type === 'consultation_status' ? {
+          teacherName: `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim(),
+          avatar: teacher.avatar || d.data?.avatar || null,
+        } : {}),
+      }
+
+      return {
       id: d._id.toString(),
       type: d.type,
       title: d.title,
       message: d.message,
       related: d.related || {},
-      data: d.data || {},
+      data,
       read: Boolean(d.read),
       createdAt: d.createdAt,
+      }
     })) })
   } catch (error) {
     console.error('listNotifications error:', error)

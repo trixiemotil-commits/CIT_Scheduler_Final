@@ -10,8 +10,37 @@ async function notifyActiveAdmins({ actorId, type, title, message, related = {},
 
   if (!admins.length) return 0
 
+  const actor = actorId
+    ? await User.findById(actorId).select('firstName lastName avatar').lean()
+    : null
+  const actorData = actor ? {
+    actorName: `${actor.firstName || ''} ${actor.lastName || ''}`.trim(),
+    avatar: actor.avatar || null,
+  } : {}
+
   await Notification.create(admins.map((admin) => ({
     recipientId: admin._id,
+    actorId: actorId || null,
+    type,
+    title,
+    message,
+    related,
+    data: { route, ...actorData },
+  })))
+
+  return admins.length
+}
+
+async function notifyActiveStudents({ actorId, type, title, message, related = {}, route = '/student/teachers' }) {
+  const students = await User.find({
+    account_status: 'Active',
+    $or: [{ role: 'student' }, { roles: 'student' }],
+  }).select('_id').lean()
+
+  if (!students.length) return 0
+
+  await Notification.create(students.map((student) => ({
+    recipientId: student._id,
     actorId: actorId || null,
     type,
     title,
@@ -20,7 +49,7 @@ async function notifyActiveAdmins({ actorId, type, title, message, related = {},
     data: { route },
   })))
 
-  return admins.length
+  return students.length
 }
 
-module.exports = { notifyActiveAdmins }
+module.exports = { notifyActiveAdmins, notifyActiveStudents }

@@ -115,6 +115,10 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    teacher_clocked_out: {
+      type: Boolean,
+      default: false,
+    },
     teacher_status_expires_at: {
       type: Date,
       default: null,

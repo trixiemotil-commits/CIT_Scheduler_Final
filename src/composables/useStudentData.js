@@ -95,6 +95,7 @@ function mapRequestToSession(requestDoc, teacherLookup, availabilityLookup) {
   const teacherMeta = availabilityMeta || fallbackMeta || null
 
   const teacher = teacherMeta?.name || requestDoc.employeeId || 'Teacher'
+  const teacherAvatar = teacherMeta?.avatar || ''
   const teacherColor = colorForName(teacher)
   const consultationSlots = Array.isArray(teacherMeta?.consultationSlots) ? teacherMeta.consultationSlots : []
   const matchedSlot = consultationSlots.find((slot) => String(slot.id) === String(requestDoc.availabilityId))
@@ -113,6 +114,7 @@ function mapRequestToSession(requestDoc, teacherLookup, availabilityLookup) {
     ticketNumber: requestDoc.ticketNumber || null,
     subject: requestDoc.subject || 'Consultation',
     teacher,
+    teacherAvatar,
     teacherInitials: initialsFor(teacher),
     teacherColor,
     status: requestDoc.availabilityId ? 'Approved' : mapStatusFromApi(requestDoc.status),
@@ -164,6 +166,7 @@ async function loadSessions(force = false, options = { includeArchived: false })
         .forEach((t) => {
           const meta = {
             name: t.name,
+            avatar: t.avatar || '',
             subjects: Array.isArray(t.subjects) ? t.subjects : [],
             consultationSlots: Array.isArray(t.consultationSlots) ? t.consultationSlots : [],
           }

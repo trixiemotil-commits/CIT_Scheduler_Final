@@ -166,6 +166,7 @@
                   <option value="In School">In School</option>
                   <option value="On Leave">On Leave</option>
                   <option value="On Meeting">On Meeting</option>
+                    <option value="Offline" disabled>Offline</option>
                 </select>
               </div>
 
@@ -433,6 +434,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import useNotifications from '@/composables/useNotifications'
 import Swal from 'sweetalert2'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -689,6 +691,14 @@ function mapTeacherFromApi(user) {
     ? user.designatedAreas
     : (user.department ? [user.department] : [])
 
+  const isClockedOut = Boolean(
+    user.teacher_clocked_out
+    || (
+      user.teacher_status === 'On Leave'
+      && (user.teacher_availability === 'Unavailable' || !user.teacher_time_in)
+    )
+  )
+
   return {
     id: user.id,
     firstName,
@@ -698,10 +708,13 @@ function mapTeacherFromApi(user) {
     college: user.department || 'College of Information Technology',
     email: user.email || '',
     avatar: user.avatar || `https://i.pravatar.cc/150?u=${encodeURIComponent(user.id || user.email || fullName)}`,
-    status: mapTeacherStatus(user.teacher_status),
+    status: isClockedOut ? 'Offline' : mapTeacherStatus(user.teacher_status),
     currentStatus: 'Offline',
     account_status: user.account_status || 'Active',
     teacher_status: user.teacher_status || 'On School',
+    teacher_availability: user.teacher_availability || 'Available',
+    teacher_time_in: user.teacher_time_in || null,
+    teacher_clocked_out: isClockedOut,
     employeeId: user.employeeId || '',
     studentId: user.studentId || '',
     phone: user.phone || '',
@@ -709,7 +722,7 @@ function mapTeacherFromApi(user) {
     designatedAreas,
     substituteTeacher: user.substituteTeacher || null,
     substituteAssignments: user.substituteAssignments || {},
-    _lastStatus: mapTeacherStatus(user.teacher_status),
+    _lastStatus: isClockedOut ? 'Offline' : mapTeacherStatus(user.teacher_status),
   }
 }
 
@@ -718,25 +731,11 @@ function isTeacherActive(teacher) {
 }
 
 function getActualTeacherStatus(teacher) {
-  const now = currentTime.value
-  const dayIndex = now.getDay()
-  const minutes = now.getHours() * 60 + now.getMinutes()
-  const withinWorkingWindow = minutes >= 7 * 60 && minutes < 21 * 60
-  if (!withinWorkingWindow || dayIndex === 0) return 'Offline'
-  if (teacher.status === 'On Leave') return 'On Leave'
-  if (teacher.status === 'On Meeting') return 'On Meeting'
-  if (teacher.designatedAreas.some(area => /main/i.test(String(area)))) return 'Off Campus'
-
-  const day = DAY_ORDER[dayIndex - 1]
-  const schedule = getScheduleForTeacher(teacher.name)
-  const isOnClass = schedule.some(entry =>
-    entry.day === day
-    && !isLunchBreakEntry(entry)
-    && (parseTimeToMinutes(entry.timeIn) ?? Infinity) <= minutes
-    && minutes < (parseTimeToMinutes(entry.timeOut) ?? -Infinity)
-  )
-  if (isOnClass) return 'On Class'
-  return 'Free Time'
+  if (
+    teacher.teacher_clocked_out
+    || (teacher.status === 'On Leave' && !teacher.teacher_time_in)
+  ) return 'Offline'
+  return teacher.status || 'In School'
 }
 
 function refreshActualStatuses() {
@@ -906,10 +905,12 @@ const updateTeacherStatus = async (teacher) => {
     if (response?.user) {
       const mapped = mapTeacherFromApi(response.user)
       Object.assign(teacher, mapped)
+      teacher.currentStatus = getActualTeacherStatus(teacher)
       return
     }
 
     teacher._lastStatus = teacher.status
+    teacher.currentStatus = getActualTeacherStatus(teacher)
   } catch (error) {
     teacher.status = previousStatus
     console.error('Failed to update teacher status:', error)
@@ -1132,6 +1133,12 @@ const addNewTeacher = async () => {
 let teacherRefreshInterval
 let statusClockInterval
 
+function onTeacherStatusNotification(notification) {
+  if (notification?.type === 'teacher_status' || notification?.type === 'teacher_status_admin') {
+    loadTeachersIfAllowed()
+  }
+}
+
 function refreshTeachersWhenVisible() {
   if (!document.hidden) loadTeachersIfAllowed()
 }
@@ -1144,6 +1151,7 @@ function loadTeachersIfAllowed() {
 
 onMounted(() => {
   loadTeachers()
+  useNotifications.addNotificationListener(onTeacherStatusNotification)
   teacherRefreshInterval = window.setInterval(loadTeachersIfAllowed, 15000)
   statusClockInterval = window.setInterval(() => {
     currentTime.value = new Date()
@@ -1154,6 +1162,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  useNotifications.removeNotificationListener(onTeacherStatusNotification)
   window.clearInterval(teacherRefreshInterval)
   window.clearInterval(statusClockInterval)
   window.removeEventListener('focus', loadTeachersIfAllowed)
@@ -1480,6 +1489,11 @@ onUnmounted(() => {
 
 .badge-in-school {
   background-color: #16a34a;
+  color: white;
+}
+
+.badge-offline {
+  background-color: #6b7280;
   color: white;
 }
 
