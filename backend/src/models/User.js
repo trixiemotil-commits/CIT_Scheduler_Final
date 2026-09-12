@@ -56,6 +56,26 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    loginOtpHash: {
+      type: String,
+      default: null,
+    },
+    loginOtpExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    loginOtpLastSentAt: {
+      type: Date,
+      default: null,
+    },
+    loginOtpAttempts: {
+      type: Number,
+      default: 0,
+    },
     role: {
       type: String,
       enum: ["admin", "teacher", "student"],

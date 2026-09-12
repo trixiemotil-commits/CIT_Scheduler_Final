@@ -48,7 +48,7 @@
       <div class="settings-body">
 
         <!-- ── Change Password ── -->
-        <div class="settings-card">
+        <div class="settings-card two-factor-card">
           <div class="settings-card-header">
             <div class="settings-card-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -152,6 +152,29 @@
               <button type="submit" class="update-pw-btn" :disabled="!otpSent">Update Password</button>
             </div>
           </form>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <div class="settings-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <h2 class="settings-card-title">Email verification on login</h2>
+            <div class="tfa-control">
+              <span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span>
+              <button type="button" class="toggle-switch" :class="{ 'toggle-switch--on': twoFactorEnabled }" :disabled="isSavingTwoFactor" :aria-pressed="twoFactorEnabled" :aria-label="twoFactorEnabled ? 'Disable email verification' : 'Enable email verification'" @click="toggleTwoFactor">
+                <span class="toggle-thumb"></span>
+              </button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-group">
+              <p class="otp-hint">Send a verification code to your PHINMA Gmail address whenever you log in.</p>
+              <input v-model="twoFactorPassword" type="password" class="settings-input" placeholder="Current password to confirm change" />
+              <div v-if="twoFactorError" class="settings-msg settings-msg--error">{{ twoFactorError }}</div>
+              <div v-if="twoFactorSuccess" class="settings-msg settings-msg--success">{{ twoFactorSuccess }}</div>
+            </div>
+          </div>
         </div>
 
 
@@ -348,6 +371,46 @@ const pwOtpRefs    = ref([])
 const otpSecondsRemaining = ref(0)
 let otpTimer = null
 const formattedOtpTime = computed(() => `0:${String(otpSecondsRemaining.value).padStart(2, '0')}`)
+const twoFactorEnabled = ref(Boolean(user.twoFactorEnabled))
+const twoFactorPassword = ref('')
+const twoFactorError = ref('')
+const twoFactorSuccess = ref('')
+const isSavingTwoFactor = ref(false)
+const showTFAModal = ref(false)
+const showDisableModal = ref(false)
+const tfaCode = ref(['', '', '', '', '', ''])
+const otpRefs = ref([])
+
+async function toggleTwoFactor() {
+  twoFactorError.value = ''
+  twoFactorSuccess.value = ''
+  const enabled = !twoFactorEnabled.value
+  if (!twoFactorPassword.value) {
+    twoFactorError.value = 'Enter your current password to confirm this change.'
+    return
+  }
+  isSavingTwoFactor.value = true
+  try {
+    const response = await apiRequest('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify({ twoFactorEnabled: enabled, currentPassword: twoFactorPassword.value }),
+    })
+    twoFactorEnabled.value = Boolean(response.user?.twoFactorEnabled)
+    twoFactorPassword.value = ''
+    twoFactorSuccess.value = enabled ? 'Email verification enabled.' : 'Email verification disabled.'
+  } catch (error) {
+    twoFactorError.value = error.message || 'Unable to update email verification.'
+  } finally {
+    isSavingTwoFactor.value = false
+  }
+}
+
+function confirmEnableTFA() {}
+function cancelTFA() { showTFAModal.value = false }
+function resendCode() {}
+function confirmDisableTFA() { showDisableModal.value = false }
+function onOtpInput() {}
+function onOtpBackspace() {}
 
 const maskedEmail = computed(() => {
   const email = user.email || 'teacher@gmail.com'
@@ -797,6 +860,18 @@ const faqs = [
 .update-pw-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 
 /* ── Toggle ── */
+.two-factor-card {
+  position: relative;
+  padding: 22px 28px 24px;
+}
+.two-factor-card .settings-card-header { width: 100%; margin-bottom: 16px; padding-right: 118px; }
+.two-factor-card .settings-card-header .tfa-control { position: absolute; top: 22px; right: 28px; margin-left: 0; transform: none; }
+.two-factor-card .tfa-control { display: flex; align-items: center; gap: 10px; }
+.two-factor-card .settings-row { align-items: flex-start; gap: 18px; }
+.two-factor-card .settings-group:first-child { flex: 1; max-width: 680px; }
+.two-factor-card .otp-hint { margin: 0 0 12px; color: var(--metal-muted); }
+.two-factor-card .settings-input { max-width: 420px; background: var(--metal-50); }
+.tfa-status { color: var(--metal-muted); font-size: 0.75rem; font-weight: 700; min-width: 52px; text-align: right; }
 .toggle-switch {
   position: relative;
   width: 50px;

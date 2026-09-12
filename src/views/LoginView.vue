@@ -132,6 +132,18 @@
       </section>
     </div>
 
+    <div v-if="twoFactorChallenge" class="role-modal-overlay" role="presentation">
+      <section class="role-modal" role="dialog" aria-modal="true" aria-labelledby="two-factor-title">
+        <img src="/branding/cit-college-seal.png" alt="" class="role-modal__seal" aria-hidden="true" />
+        <h2 id="two-factor-title" class="role-modal__title">Check your email</h2>
+        <p class="role-selection__intro">Enter the 6-digit code sent to {{ twoFactorChallenge.maskedEmail }}.</p>
+        <input v-model="twoFactorCode" class="input-field" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" @input="twoFactorCode = twoFactorCode.replace(/\D/g, '')" />
+        <div v-if="loginError" class="error-msg role-modal__error">{{ loginError }}</div>
+        <button type="button" class="submit-btn" :disabled="twoFactorCode.length !== 6" @click="confirmTwoFactor">Verify code</button>
+        <button type="button" class="role-modal__cancel" @click="cancelTwoFactor">Use another account</button>
+      </section>
+    </div>
+
     <!-- Role choice for accounts that are both administrators and teachers -->
     <div
       v-if="showRoleSelection"
@@ -215,7 +227,7 @@
 </template>
 
 <script setup>
-import { login, logout, register, selectRole } from '@/auth.js'
+import { login, logout, register, selectRole, verifyLoginOtp } from '@/auth.js'
 import { Capacitor } from '@capacitor/core'
 import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
@@ -308,6 +320,8 @@ const loginError = ref('')
 const availableRoles = ref([])
 const isSelectingRole = ref(false)
 const showRoleSelection = ref(false)
+const twoFactorChallenge = ref(null)
+const twoFactorCode = ref('')
 const loginAlert = ref(null)
 const signUpError = ref('')
 const signUpSuccess = ref('')
@@ -665,6 +679,11 @@ async function handleLogin() {
       isMobileApp ? { question: loginMathChallenge.value.question.replace(' =', ''), answer: Number(loginMathAnswer.value) } : null,
       signIn.remember
     )
+    if (payload?.requiresTwoFactor) {
+      twoFactorChallenge.value = payload
+      twoFactorCode.value = ''
+      return
+    }
     const user = payload?.user
     const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
     const normalizedRoles = roles.map(role => String(role).toLowerCase())
@@ -685,6 +704,30 @@ async function handleLogin() {
     try { resetRecaptcha(signinWidgetId) } catch (_) {}
     if (isMobileApp) resetMathChallenges()
   }
+}
+
+async function confirmTwoFactor() {
+  loginError.value = ''
+  try {
+    const payload = await verifyLoginOtp(twoFactorChallenge.value.challengeToken, twoFactorCode.value, signIn.remember)
+    twoFactorChallenge.value = null
+    const roles = Array.isArray(payload.user?.roles) && payload.user.roles.length ? payload.user.roles : [payload.user?.role].filter(Boolean)
+    const normalizedRoles = roles.map(role => String(role).toLowerCase())
+    if (normalizedRoles.includes('admin') && normalizedRoles.includes('teacher')) {
+      availableRoles.value = ['admin', 'teacher']
+      showRoleSelection.value = true
+      return
+    }
+    router.push(routeByRole(payload.user.role))
+  } catch (error) {
+    loginError.value = error.message || 'Unable to verify the code.'
+  }
+}
+
+function cancelTwoFactor() {
+  twoFactorChallenge.value = null
+  twoFactorCode.value = ''
+  signIn.password = ''
 }
 
 function roleLabel(role) {

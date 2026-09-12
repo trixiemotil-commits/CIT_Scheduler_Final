@@ -89,9 +89,23 @@ export async function login(email, password, recaptchaToken = null, mathChalleng
     body.recaptchaToken = recaptchaToken
   }
 
-  const payload = validateAuthPayload(await request('/auth/login', {
+  const response = await request('/auth/login', {
     method: 'POST',
     body: JSON.stringify(body)
+  })
+
+  if (response.requiresTwoFactor) return response
+
+  const payload = validateAuthPayload(response)
+
+  saveSession(payload, remember)
+  return payload
+}
+
+export async function verifyLoginOtp(challengeToken, otp, remember = false) {
+  const payload = validateAuthPayload(await request('/auth/login/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify({ challengeToken, otp })
   }))
 
   saveSession(payload, remember)

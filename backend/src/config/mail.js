@@ -40,4 +40,40 @@ async function sendPasswordOtpEmail({ to, code }) {
   });
 }
 
-module.exports = { sendPasswordOtpEmail };
+async function sendLoginOtpEmail({ to, code }) {
+  const transporter = getMailTransporter();
+  if (!transporter) {
+    const error = new Error("Email delivery is not configured. Set SMTP_SERVICE, SMTP_USER, and SMTP_PASS in backend/.env.");
+    error.code = "MAIL_NOT_CONFIGURED";
+    throw error;
+  }
+
+  await transporter.verify();
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to,
+    subject: "CIT Scheduler login verification code",
+    text: `Your CIT Scheduler login verification code is ${code}. It expires in 5 minutes. If you did not try to log in, you can safely ignore this email.`,
+  });
+}
+
+async function sendTwoFactorEnabledEmail({ to }) {
+  const transporter = getMailTransporter();
+  if (!transporter) {
+    const error = new Error("Email delivery is not configured. Set SMTP_SERVICE, SMTP_USER, and SMTP_PASS in backend/.env.");
+    error.code = "MAIL_NOT_CONFIGURED";
+    throw error;
+  }
+
+  await transporter.verify();
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to,
+    subject: "CIT Scheduler email verification enabled",
+    text: "Email verification is now enabled for your CIT Scheduler account. A verification code will be sent to this address each time you log in. If you did not make this change, contact your administrator.",
+  });
+}
+
+module.exports = { sendPasswordOtpEmail, sendLoginOtpEmail, sendTwoFactorEnabledEmail };

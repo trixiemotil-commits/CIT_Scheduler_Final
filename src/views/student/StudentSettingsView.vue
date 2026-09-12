@@ -60,6 +60,17 @@
 
 
 
+    <div class="section-card twofa-card two-factor-card">
+      <div class="section-title twofa-title-row">
+        <span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Email verification on login</span>
+        <div class="tfa-control"><span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span><button type="button" class="toggle-switch" :class="{ 'toggle-switch--on': twoFactorEnabled }" :disabled="isSavingTwoFactor" :aria-pressed="twoFactorEnabled" :aria-label="twoFactorEnabled ? 'Disable email verification' : 'Enable email verification'" @click="toggleTwoFactor"><span class="toggle-thumb"></span></button></div>
+      </div>
+      <p class="twofa-msg">Send a verification code to your PHINMA Gmail address whenever you log in.</p>
+      <input v-model="twoFactorPassword" class="field-input" type="password" placeholder="Current password to confirm change" />
+      <div v-if="twoFactorError" class="msg msg-err">{{ twoFactorError }}</div>
+      <div v-if="twoFactorSuccess" class="msg">{{ twoFactorSuccess }}</div>
+    </div>
+
     <div v-if="showSuccessModal" class="modal-overlay" @click.self="showSuccessModal = false">
       <div class="success-modal">
         <div class="success-icon-wrap">
@@ -80,7 +91,7 @@
 
 <script setup>
 import { IonContent, IonPage } from '@ionic/vue'
-import { getUser } from '@/auth.js'
+import { getToken, getUser, saveMergedUser } from '@/auth.js'
 import { computed, ref } from 'vue'
 
 const user = getUser() || { name: 'Anna Cooper', email: 'anna.cooper@student.edu' }
@@ -93,6 +104,39 @@ const showConfirm = ref(false)
 const pwError = ref('')
 const pwSuccess = ref('')
 const showSuccessModal = ref(false)
+const twoFactorEnabled = ref(Boolean(user.twoFactorEnabled))
+const twoFactorPassword = ref('')
+const twoFactorError = ref('')
+const twoFactorSuccess = ref('')
+const isSavingTwoFactor = ref(false)
+
+async function toggleTwoFactor() {
+  twoFactorError.value = ''
+  twoFactorSuccess.value = ''
+  const enabled = !twoFactorEnabled.value
+  if (!twoFactorPassword.value) {
+    twoFactorError.value = 'Enter your current password to confirm this change.'
+    return
+  }
+  isSavingTwoFactor.value = true
+  try {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/auth/me`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify({ twoFactorEnabled: enabled, currentPassword: twoFactorPassword.value }),
+    })
+    const body = await response.json()
+    if (!response.ok) throw new Error(body.message || 'Unable to update email verification.')
+    twoFactorEnabled.value = Boolean(body.user?.twoFactorEnabled)
+    saveMergedUser(body.user)
+    twoFactorPassword.value = ''
+    twoFactorSuccess.value = enabled ? 'Email verification enabled.' : 'Email verification disabled.'
+  } catch (error) {
+    twoFactorError.value = error.message
+  } finally {
+    isSavingTwoFactor.value = false
+  }
+}
 
 
 function handleUpdatePassword() {
@@ -267,6 +311,40 @@ function handleUpdatePassword() {
   padding: 10px;
   line-height: 1.45;
 }
+.two-factor-card { position: relative; padding: 16px; }
+.twofa-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.twofa-title-row > span { display: inline-flex; align-items: center; gap: 8px; }
+.twofa-title-row .tfa-control { position: absolute; top: 16px; right: 16px; display: flex; align-items: center; gap: 8px; }
+.two-factor-card .section-title { margin-bottom: 6px; }
+.two-factor-card .twofa-msg { margin: 0 0 12px; color: #687078; background: transparent; padding: 0; }
+.two-factor-card .field-input { margin-bottom: 12px; }
+.tfa-control { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tfa-status { color: #687078; font-size: 0.75rem; font-weight: 700; }
+.twofa-card .toggle-switch {
+  position: relative;
+  display: block;
+  width: 50px;
+  height: 27px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 20px;
+  background: #c7cdd3;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.twofa-card .toggle-switch--on { background: #4b5563; }
+.twofa-card .toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+.twofa-card .toggle-switch--on .toggle-thumb { transform: translateX(23px); }
 .msg-on { background: #f8fafc; color: #4b5563; border: 1px solid #4b5563; }
 .msg-off { background: #fff1f1; color: #e14d56; border: 1px solid #f3c3c7; }
 

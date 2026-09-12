@@ -2,7 +2,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const { sendPasswordOtpEmail } = require("../config/mail");
+const { sendPasswordOtpEmail, sendLoginOtpEmail, sendTwoFactorEnabledEmail } = require("../config/mail");
 const ConsultationRequest = require('../models/ConsultationRequest')
 const Notification = require('../models/Notification')
 const { logActivity } = require("../utils/activityLogWriter");
@@ -42,6 +42,8 @@ const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).
 const PASSWORD_OTP_LIFETIME_MS = 60 * 1000;
 const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
 const PASSWORD_OTP_MAX_ATTEMPTS = 5;
+const LOGIN_OTP_LIFETIME_MS = 5 * 60 * 1000;
+const LOGIN_OTP_MAX_ATTEMPTS = 5;
 
 function getUserRoles(user) {
   const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role];
@@ -87,6 +89,7 @@ function toSafeUser(user) {
     teacher_status_expires_at: statusExpired ? null : user.teacher_status_expires_at,
     status: user.account_status,
     avatar: user.avatar,
+    twoFactorEnabled: Boolean(user.twoFactorEnabled),
     name: `${user.firstName} ${user.lastName}`.trim(),
   };
 }
@@ -104,6 +107,13 @@ function clearPasswordOtp(user) {
   user.passwordOtpExpiresAt = null;
   user.passwordOtpLastSentAt = null;
   user.passwordOtpAttempts = 0;
+}
+
+function clearLoginOtp(user) {
+  user.loginOtpHash = null;
+  user.loginOtpExpiresAt = null;
+  user.loginOtpLastSentAt = null;
+  user.loginOtpAttempts = 0;
 }
 
 function maskEmail(email) {
@@ -285,6 +295,42 @@ async function login(req, res) {
     }
 
     const roles = getUserRoles(user);
+
+    if (user.twoFactorEnabled) {
+      const now = new Date();
+      const code = crypto.randomInt(100000, 1000000).toString();
+      user.loginOtpHash = hashOtp(code);
+      user.loginOtpExpiresAt = new Date(now.getTime() + LOGIN_OTP_LIFETIME_MS);
+      user.loginOtpLastSentAt = now;
+      user.loginOtpAttempts = 0;
+
+      try {
+        await user.save();
+        await sendLoginOtpEmail({ to: user.email, code });
+      } catch (mailError) {
+        clearLoginOtp(user);
+        await user.save();
+        console.error("Login OTP email failed:", mailError.message);
+        if (mailError.code === "MAIL_NOT_CONFIGURED") {
+          return res.status(503).json({ message: mailError.message });
+        }
+        return res.status(503).json({ message: "Unable to send the login verification code. Please try again later." });
+      }
+
+      const challengeToken = jwt.sign(
+        { id: user._id.toString(), email: user.email, purpose: "login-2fa" },
+        process.env.JWT_SECRET,
+        { expiresIn: "5m" }
+      );
+
+      return res.status(200).json({
+        message: `Verification code sent to ${maskEmail(user.email)}.`,
+        requiresTwoFactor: true,
+        challengeToken,
+        maskedEmail: maskEmail(user.email),
+      });
+    }
+
     const token = signToken(user, user.role);
 
     return res.status(200).json({
@@ -294,6 +340,61 @@ async function login(req, res) {
     });
   } catch (error) {
     return res.status(500).json({ message: "Login failed.", error: error.message });
+  }
+}
+
+async function verifyLoginOtp(req, res) {
+  try {
+    const { challengeToken, otp } = req.body || {};
+    if (!challengeToken || !/^\d{6}$/.test(String(otp || ""))) {
+      return res.status(400).json({ message: "Enter the 6-digit verification code sent to your email." });
+    }
+
+    let challenge;
+    try {
+      challenge = jwt.verify(challengeToken, process.env.JWT_SECRET);
+    } catch (_error) {
+      return res.status(401).json({ message: "This login verification request has expired. Please log in again." });
+    }
+
+    if (challenge.purpose !== "login-2fa") {
+      return res.status(401).json({ message: "Invalid login verification request." });
+    }
+
+    const user = await User.findById(challenge.id);
+    if (!user || user.email !== challenge.email || !user.twoFactorEnabled) {
+      return res.status(401).json({ message: "Invalid login verification request." });
+    }
+
+    if (!user.loginOtpHash || !user.loginOtpExpiresAt || user.loginOtpExpiresAt < new Date()) {
+      clearLoginOtp(user);
+      await user.save();
+      return res.status(400).json({ message: "This verification code has expired. Please log in again." });
+    }
+
+    const enteredHash = hashOtp(String(otp));
+    const otpMatches = crypto.timingSafeEqual(Buffer.from(enteredHash, "hex"), Buffer.from(user.loginOtpHash, "hex"));
+    if (!otpMatches) {
+      user.loginOtpAttempts += 1;
+      if (user.loginOtpAttempts >= LOGIN_OTP_MAX_ATTEMPTS) {
+        clearLoginOtp(user);
+        await user.save();
+        return res.status(429).json({ message: "Too many incorrect codes. Please log in again." });
+      }
+      await user.save();
+      return res.status(401).json({ message: "The verification code is incorrect." });
+    }
+
+    clearLoginOtp(user);
+    await user.save();
+    const roles = getUserRoles(user);
+    return res.status(200).json({
+      message: "Login successful.",
+      token: signToken(user, user.role),
+      user: { ...toSafeUser(user), role: user.role, roles },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to verify the login code.", error: error.message });
   }
 }
 
@@ -352,6 +453,21 @@ async function updateMe(req, res) {
 
     if (!user) {
       return res.status(404).json({ message: "User not found." });
+    }
+
+    const changingTwoFactor = typeof req.body.twoFactorEnabled === "boolean"
+      && req.body.twoFactorEnabled !== Boolean(user.twoFactorEnabled);
+    const requestedTwoFactorEnabled = req.body.twoFactorEnabled === true;
+
+    if (changingTwoFactor) {
+      if (!req.body.currentPassword) {
+        return res.status(400).json({ message: "Current password is required to change two-factor authentication." });
+      }
+      const passwordMatches = await bcrypt.compare(String(req.body.currentPassword), user.passwordHash);
+      if (!passwordMatches) {
+        return res.status(401).json({ message: "Current password is incorrect." });
+      }
+      user.twoFactorEnabled = req.body.twoFactorEnabled;
     }
 
     const firstName = normalizeString(req.body.firstName) || user.firstName;
@@ -461,6 +577,20 @@ async function updateMe(req, res) {
     }
 
     await user.save();
+
+    if (changingTwoFactor && requestedTwoFactorEnabled) {
+      try {
+        await sendTwoFactorEnabledEmail({ to: user.email });
+      } catch (mailError) {
+        user.twoFactorEnabled = false;
+        await user.save();
+        console.error("2FA enable email failed:", mailError.message);
+        if (mailError.code === "MAIL_NOT_CONFIGURED") {
+          return res.status(503).json({ message: mailError.message });
+        }
+        return res.status(503).json({ message: "2FA was not enabled because the confirmation email could not be sent. Please try again later." });
+      }
+    }
 
     const teacherStatusChanged = isTeacher && String(prevTeacherStatus || '') !== String(user.teacher_status || '')
     await logActivity({
@@ -743,6 +873,7 @@ async function changePassword(req, res) {
 module.exports = {
   register,
   login,
+  verifyLoginOtp,
   selectRole,
   me,
   updateMe,
