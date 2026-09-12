@@ -90,8 +90,8 @@
 </template>
 
 <script setup>
-import { IonContent, IonPage } from '@ionic/vue'
 import { getToken, getUser, saveMergedUser } from '@/auth.js'
+import { IonContent, IonPage } from '@ionic/vue'
 import { computed, ref } from 'vue'
 
 const user = getUser() || { name: 'Anna Cooper', email: 'anna.cooper@student.edu' }
