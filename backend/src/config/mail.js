@@ -76,4 +76,46 @@ async function sendTwoFactorEnabledEmail({ to }) {
   });
 }
 
-module.exports = { sendPasswordOtpEmail, sendLoginOtpEmail, sendTwoFactorEnabledEmail };
+async function sendConsultationApprovedEmail({ to, studentName, subject, consultationDate, startTime, endTime }) {
+  const transporter = getMailTransporter();
+  if (!transporter) {
+    const error = new Error("Email delivery is not configured. Set SMTP_SERVICE (for example, Gmail), SMTP_USER, and SMTP_PASS in backend/.env.");
+    error.code = "MAIL_NOT_CONFIGURED";
+    throw error;
+  }
+
+  await transporter.verify();
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to,
+    subject: "CIT Scheduler consultation approved",
+    text: `Hello ${studentName || "Student"},\n\nYour consultation request${subject ? ` for ${subject}` : ""} has been approved.\n\nDate: ${consultationDate || "To be confirmed"}\nTime: ${startTime || "To be confirmed"}${endTime ? ` - ${endTime}` : ""}\n\nPlease log in to CIT Scheduler for more details.`,
+  });
+}
+
+async function sendAccountApprovedEmail({ to, firstName }) {
+  const transporter = getMailTransporter();
+  if (!transporter) {
+    const error = new Error("Email delivery is not configured. Set SMTP_SERVICE (for example, Gmail), SMTP_USER, and SMTP_PASS in backend/.env.");
+    error.code = "MAIL_NOT_CONFIGURED";
+    throw error;
+  }
+
+  await transporter.verify();
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to,
+    subject: "CIT Scheduler account approved",
+    text: `Hello ${firstName || "Student"},\n\nYour CIT Scheduler account has been approved by an administrator. You can now log in using your registered email address and password.`,
+  });
+}
+
+module.exports = {
+  sendPasswordOtpEmail,
+  sendLoginOtpEmail,
+  sendTwoFactorEnabledEmail,
+  sendConsultationApprovedEmail,
+  sendAccountApprovedEmail,
+};

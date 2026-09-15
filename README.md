@@ -150,6 +150,21 @@ Set these in `backend/.env` for local development. Do NOT commit production secr
 - `SMTP_SERVICE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` — SMTP settings for email delivery.
 - `RECAPTCHA_SECRET` — Google reCAPTCHA secret (production).
 
+### Email notifications
+
+The backend sends email notifications when:
+
+- A student logs in with email verification enabled (login OTP).
+- A student changes or resets their password (password OTP).
+- A newly registered account is approved by an administrator, including bulk approval.
+- A student's consultation request is approved, including consultations that are approved automatically for the student's subject teacher.
+
+Consultation approval emails are sent to the student's registered email address. SMTP must be configured in `backend/.env`; otherwise, the consultation is still approved and an email delivery warning is logged by the backend.
+
+### Login security
+
+After 5 incorrect password attempts for the same account, the account is temporarily locked for 1 minute. The lockout is stored in MongoDB and applies across browsers and devices. A successful login resets the failed-attempt counter.
+
 ## Useful commands
 
 - `npm run dev` — start frontend (Vite) in root.
@@ -178,6 +193,13 @@ npm install --save-dev concurrently
   - Verify `MONGODB_URI` and network access (Atlas IP whitelist, credentials).
 
 - Backend exits on startup with connection errors: ensure MongoDB is reachable and credentials are correct.
+- Approval email not received:
+  - Confirm `SMTP_SERVICE` or `SMTP_HOST` is configured.
+  - Confirm `SMTP_USER`, `SMTP_PASS`, and optionally `SMTP_FROM` are set in `backend/.env`.
+  - Restart the backend after changing environment variables.
+- Account locked after incorrect passwords:
+  - Wait 1 minute before trying again.
+  - The lockout is triggered after 5 incorrect password attempts and is cleared automatically after the timer expires.
 
 ## Production
 

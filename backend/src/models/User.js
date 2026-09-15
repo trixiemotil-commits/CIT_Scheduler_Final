@@ -40,6 +40,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    loginLockedUntil: {
+      type: Date,
+      default: null,
+    },
     passwordOtpHash: {
       type: String,
       default: null,

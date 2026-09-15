@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins, notifyActiveStudents } = require("../utils/adminNotification");
+const { sendAccountApprovedEmail } = require("../config/mail");
 
 const ROLE_LABELS = {
   admin: "Admin",
@@ -437,8 +438,17 @@ async function updateUserStatus(req, res) {
       return res.status(404).json({ message: "User not found." });
     }
 
+    const previousStatus = user.account_status;
     user.account_status = nextStatus;
     await user.save();
+
+    if (previousStatus === "Pending" && nextStatus === "Active" && user.email) {
+      try {
+        await sendAccountApprovedEmail({ to: user.email, firstName: user.firstName });
+      } catch (emailError) {
+        console.warn("User approved, but approval email failed:", emailError.message);
+      }
+    }
 
     await logActivity({
       actor: req.user,
@@ -517,10 +527,21 @@ async function updateTeacherStatus(req, res) {
 
 async function approveAllPendingUsers(req, res) {
   try {
+    const pendingUsers = await User.find({ account_status: "Pending" })
+      .select("email firstName")
+      .lean();
     const result = await User.updateMany(
       { account_status: "Pending" },
       { $set: { account_status: "Active" } }
     );
+
+    try {
+      await Promise.all(pendingUsers
+        .filter((user) => user.email)
+        .map((user) => sendAccountApprovedEmail({ to: user.email, firstName: user.firstName })));
+    } catch (emailError) {
+      console.warn("Pending users approved, but one or more approval emails failed:", emailError.message);
+    }
 
     await logActivity({
       actor: req.user,

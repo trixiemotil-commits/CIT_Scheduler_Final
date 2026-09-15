@@ -44,6 +44,8 @@ const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
 const PASSWORD_OTP_MAX_ATTEMPTS = 5;
 const LOGIN_OTP_LIFETIME_MS = 5 * 60 * 1000;
 const LOGIN_OTP_MAX_ATTEMPTS = 5;
+const LOGIN_MAX_FAILED_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 60 * 1000;
 
 function getUserRoles(user) {
   const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role];
@@ -284,10 +286,38 @@ async function login(req, res) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
+    const now = new Date();
+    if (user.loginLockedUntil && user.loginLockedUntil > now) {
+      const remainingMinutes = Math.ceil((user.loginLockedUntil.getTime() - now.getTime()) / 60000);
+      return res.status(429).json({
+        message: `Too many incorrect password attempts. Please try again in ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}.`,
+      });
+    }
+
+    if (user.loginLockedUntil && user.loginLockedUntil <= now) {
+      user.failedLoginAttempts = 0;
+      user.loginLockedUntil = null;
+    }
+
     const isMatch = await bcrypt.compare(password, user.passwordHash);
 
     if (!isMatch) {
+      user.failedLoginAttempts = Number(user.failedLoginAttempts || 0) + 1;
+      if (user.failedLoginAttempts >= LOGIN_MAX_FAILED_ATTEMPTS) {
+        user.loginLockedUntil = new Date(now.getTime() + LOGIN_LOCKOUT_MS);
+        await user.save();
+        return res.status(429).json({
+          message: "Too many incorrect password attempts. Your account is locked for 1 minute.",
+        });
+      }
+      await user.save();
       return res.status(401).json({ message: "Invalid email or password." });
+    }
+
+    if (user.failedLoginAttempts || user.loginLockedUntil) {
+      user.failedLoginAttempts = 0;
+      user.loginLockedUntil = null;
+      await user.save();
     }
 
     if (user.account_status !== "Active") {

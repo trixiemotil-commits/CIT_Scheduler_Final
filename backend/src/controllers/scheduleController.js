@@ -1007,19 +1007,29 @@ function getCurrentDayName() {
   return WEEK_DAYS[new Date().getDay()] || "Monday";
 }
 
+function getDashboardDayName(value) {
+  const normalized = normalizeString(value);
+  return DAY_VALUES.includes(normalized) ? normalized : getCurrentDayName();
+}
+
 async function getAdminDashboardSummary(req, res) {
   try {
+    const publishedAcademicTermId = await getActiveAcademicTermReference();
+    const dashboardDay = getDashboardDayName(req.query?.day);
+    const scheduleTermFilter = publishedAcademicTermId
+      ? { academicTermId: publishedAcademicTermId }
+      : { _id: { $exists: false } };
+
     const [availableTeachers, totalRooms, classesToday, activeConsultations] = await Promise.all([
       User.countDocuments({
         $and: [
           { $or: [{ role: "teacher" }, { roles: "teacher" }] },
+          { $nor: [{ role: "admin" }, { roles: "admin" }] },
         ],
-        $or: [
-          { teacher_status: "On School" },
-          { teacher_status: { $exists: false } },
-        ],
+        teacher_status: "On School",
       }),
       ScheduleEntry.aggregate([
+        { $match: scheduleTermFilter },
         {
           $project: {
             rooms: {
@@ -1041,14 +1051,41 @@ async function getAdminDashboardSummary(req, res) {
         { $group: { _id: "$rooms" } },
         { $count: "rooms" },
       ]).then((results) => (results[0]?.rooms || 0)),
-      ScheduleEntry.countDocuments({ day: getCurrentDayName() }),
-      ConsultationRequest.countDocuments({ status: { $in: ["PENDING", "APPROVED", "RESCHED"] } }),
+      ScheduleEntry.countDocuments({
+        ...scheduleTermFilter,
+        day: dashboardDay,
+        entryType: "class",
+        teacher: { $exists: true, $nin: ["", "CIT Faculty"] },
+      }),
+      publishedAcademicTermId
+        ? ConsultationRequest.aggregate([
+          {
+            $match: {
+              status: { $in: ["PENDING", "APPROVED", "RESCHED"] },
+              availabilityId: { $ne: null },
+            },
+          },
+          {
+            $lookup: {
+              from: ConsultationAvailability.collection.name,
+              localField: "availabilityId",
+              foreignField: "_id",
+              as: "availability",
+            },
+          },
+          { $unwind: "$availability" },
+          { $match: { "availability.academicTermId": publishedAcademicTermId } },
+          { $count: "consultations" },
+        ]).then((results) => (results[0]?.consultations || 0))
+        : Promise.resolve(0),
     ]);
 
     // Debug log to help diagnose missing data in admin dashboard
     console.debug('getAdminDashboardSummary:', {
       requester: req.user ? { id: req.user.id, role: req.user.role } : null,
       availableTeachers,
+      publishedAcademicTermId,
+      dashboardDay,
       totalRooms,
       classesToday,
       activeConsultations,

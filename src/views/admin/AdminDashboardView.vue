@@ -186,7 +186,7 @@
         <!-- Consultation Trends -->
         <div class="chart-card" :class="{ 'chart-expanded': expandedChart === 'line', 'chart-hidden': expandedChart === 'bar' }">
           <div class="chart-header">
-            <span class="chart-title">Consultation Trends</span>
+            <span class="chart-title">Consultation Trends · Weekly</span>
             <button class="expand-btn" @click="toggleExpand('line')">
               <svg v-if="expandedChart === 'line'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
@@ -632,7 +632,8 @@ const stats = ref([
 
 async function loadDashboardSummary() {
   try {
-    const payload = await apiRequest('/schedules/dashboard-summary')
+    const dashboardDay = encodeURIComponent(todayName.value)
+    const payload = await apiRequest(`/schedules/dashboard-summary?day=${dashboardDay}`)
     stats.value[0].value = payload.availableTeachers
     stats.value[1].value = payload.availableRooms
     stats.value[2].value = payload.classesToday
@@ -815,15 +816,47 @@ function openWorkloadModal(index) {
 }
 
 function openConsultationDay(index) {
-  selectedConsultationDay.value = chartDays[index] || ''
-  selectedConsultationDayRequests.value = consultationRequests.value.filter(request =>
-    request.consultationDayOfWeek === selectedConsultationDay.value
-    && !['CANCELLED', 'ARCHIVED'].includes(request.status)
-  )
+  const week = chartWeeks.value[index]
+  selectedConsultationDay.value = week?.label || ''
+  selectedConsultationDayRequests.value = consultationRequests.value.filter(request => {
+    const requestDate = parseRequestDate(request)
+    return requestDate >= week?.start && requestDate < week?.end
+      && !['CANCELLED', 'ARCHIVED'].includes(request.status)
+  })
   showConsultationDayModal.value = true
 }
 
-const chartDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+function parseRequestDate(request) {
+  const value = request?.requestDate || request?.createdAt || request?.consultationDate
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function startOfWeek(date) {
+  const start = new Date(date)
+  start.setHours(0, 0, 0, 0)
+  const day = start.getDay()
+  const daysFromMonday = day === 0 ? 6 : day - 1
+  start.setDate(start.getDate() - daysFromMonday)
+  return start
+}
+
+function formatWeekLabel(start, end) {
+  const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const endLabel = new Date(end.getTime() - 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${startLabel}–${endLabel}`
+}
+
+const chartWeeks = computed(() => {
+  const currentWeek = startOfWeek(currentDateTime.value)
+  return Array.from({ length: 6 }, (_, index) => {
+    const start = new Date(currentWeek)
+    start.setDate(start.getDate() - (5 - index) * 7)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 7)
+    return { start, end, label: formatWeekLabel(start, end) }
+  })
+})
 
 function minutesFromTime(value) {
   const match = String(value || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
@@ -908,9 +941,11 @@ async function loadChartData() {
       ? `${termPayload.term.schoolYear || ''} · ${termPayload.term.semester || ''}`.trim()
       : ''
     const schedulesPayload = await apiRequest(termId ? `/schedules?academicTermId=${encodeURIComponent(termId)}` : '/schedules')
-    consultationDayCounts.value = chartDays.map(day => (requestsPayload.requests || []).filter(request =>
-      request.consultationDayOfWeek === day && !['CANCELLED', 'ARCHIVED'].includes(request.status)
-    ).length)
+    consultationDayCounts.value = chartWeeks.value.map(week => (requestsPayload.requests || []).filter(request => {
+      const requestDate = parseRequestDate(request)
+      return requestDate >= week.start && requestDate < week.end
+        && !['CANCELLED', 'ARCHIVED'].includes(request.status)
+    }).length)
     const teachersByEmployeeId = new Map((usersPayload.users || []).map(user => [
       String(user.employeeId || '').trim(),
       `${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -957,7 +992,7 @@ function createLineChart() {
   lineChartInstance = new Chart(lineChartRef.value, {
     type: 'line',
     data: {
-      labels: chartDays,
+      labels: chartWeeks.value.map(week => week.label),
       datasets: [{
         data: consultationDayCounts.value,
         borderColor: '#4b5259',

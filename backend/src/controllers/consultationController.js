@@ -9,6 +9,7 @@ const AcademicTerm = require("../models/AcademicTerm");
 const Event = require("../models/Event");
 const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins } = require("../utils/adminNotification");
+const { sendConsultationApprovedEmail } = require("../config/mail");
 
 const MAX_WEEKLY_MINUTES = 240; // 4 hours
 const AVAILABLE_TEACHER_START_MINUTES = 7 * 60;
@@ -269,6 +270,23 @@ async function autoApproveEligibleSubjectRequest(requestDoc) {
     { _id: requestDoc._id, status: 'PENDING' },
     { $set: { status: 'APPROVED' } }
   );
+
+  try {
+    const student = await User.findById(requestDoc.studentId).select("email firstName lastName").lean();
+    if (student?.email) {
+      await sendConsultationApprovedEmail({
+        to: student.email,
+        studentName: `${student.firstName || ""} ${student.lastName || ""}`.trim(),
+        subject: requestDoc.subject,
+        consultationDate: requestDoc.consultationDate?.toISOString?.().slice(0, 10),
+        startTime: requestDoc.consultationStartTime,
+        endTime: requestDoc.consultationEndTime,
+      });
+    }
+  } catch (error) {
+    console.warn("Failed to send consultation approval email:", error.message);
+  }
+
   return true;
 }
 
@@ -771,6 +789,24 @@ async function createConsultationRequest(req, res) {
       console.warn('Failed to create notification for teacher:', err.message)
     }
 
+    if (isSubjectTeacher) {
+      try {
+        const student = await User.findById(req.user.id).select("email firstName lastName").lean();
+        if (student?.email) {
+          await sendConsultationApprovedEmail({
+            to: student.email,
+            studentName: `${student.firstName || ""} ${student.lastName || ""}`.trim(),
+            subject: requestDoc.subject,
+            consultationDate: requestDoc.consultationDate?.toISOString?.().slice(0, 10),
+            startTime: requestDoc.consultationStartTime,
+            endTime: requestDoc.consultationEndTime,
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to send consultation approval email:', err.message)
+      }
+    }
+
     try {
       await notifyActiveAdmins({
         actorId: req.user.id,
@@ -1039,6 +1075,7 @@ async function updateConsultationRequestStatus(req, res) {
       return res.status(404).json({ message: "Consultation request not found." });
     }
 
+    const previousStatus = String(requestDoc.status || "").toUpperCase();
     const actorRole = req.user?.role;
     if (actorRole === "student") {
       if (String(requestDoc.studentId) !== String(req.user.id)) {
@@ -1119,6 +1156,24 @@ async function updateConsultationRequestStatus(req, res) {
       }
     } catch (err) {
       console.warn('Failed to create notification for student:', err.message)
+    }
+
+    if (nextStatus === 'APPROVED' && previousStatus !== 'APPROVED') {
+      try {
+        const student = await User.findById(requestDoc.studentId).select("email firstName lastName").lean();
+        if (student?.email) {
+          await sendConsultationApprovedEmail({
+            to: student.email,
+            studentName: `${student.firstName || ""} ${student.lastName || ""}`.trim(),
+            subject: requestDoc.subject,
+            consultationDate: requestDoc.consultationDate?.toISOString?.().slice(0, 10),
+            startTime: requestDoc.consultationStartTime,
+            endTime: requestDoc.consultationEndTime,
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to send consultation approval email:', err.message)
+      }
     }
 
     try {
