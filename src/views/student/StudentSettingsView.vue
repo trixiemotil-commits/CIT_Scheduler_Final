@@ -71,6 +71,41 @@
       <div v-if="twoFactorSuccess" class="msg">{{ twoFactorSuccess }}</div>
     </div>
 
+    <div class="section-card faq-card">
+      <div class="section-title">FAQs</div>
+      <div class="faq-list">
+        <details class="faq-item" open>
+          <summary>Is this a settings issue or a system issue?</summary>
+          <ul class="faq-bullets">
+            <li>If the problem is on the student settings page itself, it is usually a personal account setting.</li>
+            <li>If login, API, or email problems happen, it is usually a backend or system configuration issue.</li>
+          </ul>
+        </details>
+        <details class="faq-item">
+          <summary>How do I change my password?</summary>
+          <ul class="faq-bullets">
+            <li>Open Settings and type your current password.</li>
+            <li>Enter the new password and confirm it.</li>
+            <li>Follow the OTP if the system asks for verification.</li>
+          </ul>
+        </details>
+        <details class="faq-item">
+          <summary>How does email verification work?</summary>
+          <ul class="faq-bullets">
+            <li>Toggle Email verification on login to enable or disable it.</li>
+            <li>Once enabled, a code will be sent to your email each time you log in.</li>
+          </ul>
+        </details>
+        <details class="faq-item">
+          <summary>How do I find my schedule?</summary>
+          <ul class="faq-bullets">
+            <li>Use the student dashboard and schedule pages from the main navigation.</li>
+            <li>Settings is only for account preferences and security.</li>
+          </ul>
+        </details>
+      </div>
+    </div>
+
     <div v-if="showSuccessModal" class="modal-overlay" @click.self="showSuccessModal = false">
       <div class="success-modal">
         <div class="success-icon-wrap">
@@ -234,7 +269,35 @@ function handleUpdatePassword() {
   border: 1px solid #e4e7eb;
   padding: 14px;
 }
-.section-title { font-weight: 700; color: #262b30; margin-bottom: 12px; font-size: 1rem; }
+.section-title { font-weight: 700; color: #262b30; margin-bottom: 12px; font-size: 1.08rem; }
+
+.faq-card { margin-top: 12px; }
+.faq-list { display: flex; flex-direction: column; gap: 10px; }
+.faq-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  padding: 12px 14px;
+}
+.faq-item summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #1f2937;
+  list-style: none;
+  font-size: 1rem;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-bullets {
+  margin: 10px 0 0;
+  padding-left: 1.1rem;
+  color: #4b5563;
+  line-height: 1.6;
+  font-size: 0.92rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .pw-form { display: flex; flex-direction: column; gap: 10px; }
 .field-group { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: 0.8rem; color: #606a75; font-weight: 600; }

@@ -44,8 +44,17 @@ const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
 const PASSWORD_OTP_MAX_ATTEMPTS = 5;
 const LOGIN_OTP_LIFETIME_MS = 5 * 60 * 1000;
 const LOGIN_OTP_MAX_ATTEMPTS = 5;
-const LOGIN_MAX_FAILED_ATTEMPTS = 5;
-const LOGIN_LOCKOUT_MS = 60 * 1000;
+const LOGIN_LOCKOUT_SEQUENCE_MS = [
+  60 * 1000,
+  5 * 60 * 1000,
+  30 * 60 * 1000,
+];
+const ADMIN_CONTACT_EMAIL = "citscheduler@gmail.com";
+const LOGIN_LOCKOUT_PERMANENT_LEVEL = LOGIN_LOCKOUT_SEQUENCE_MS.length + 1;
+
+function getLoginLockoutDuration(lockoutLevel = 0) {
+  return LOGIN_LOCKOUT_SEQUENCE_MS[Math.min(Number(lockoutLevel) || 0, LOGIN_LOCKOUT_SEQUENCE_MS.length - 1)] ?? LOGIN_LOCKOUT_SEQUENCE_MS[LOGIN_LOCKOUT_SEQUENCE_MS.length - 1];
+}
 
 function getUserRoles(user) {
   const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role];
@@ -288,6 +297,13 @@ async function login(req, res) {
 
     const now = new Date();
     if (user.loginLockedUntil && user.loginLockedUntil > now) {
+      const lockoutLevel = Number(user.loginLockoutLevel || 0);
+      if (lockoutLevel >= LOGIN_LOCKOUT_PERMANENT_LEVEL) {
+        return res.status(429).json({
+          message: `Too many incorrect password attempts. Your account has been permanently locked. Please contact the administrator at ${ADMIN_CONTACT_EMAIL}.`,
+        });
+      }
+
       const remainingMinutes = Math.ceil((user.loginLockedUntil.getTime() - now.getTime()) / 60000);
       return res.status(429).json({
         message: `Too many incorrect password attempts. Please try again in ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}.`,
@@ -302,21 +318,35 @@ async function login(req, res) {
     const isMatch = await bcrypt.compare(password, user.passwordHash);
 
     if (!isMatch) {
-      user.failedLoginAttempts = Number(user.failedLoginAttempts || 0) + 1;
-      if (user.failedLoginAttempts >= LOGIN_MAX_FAILED_ATTEMPTS) {
-        user.loginLockedUntil = new Date(now.getTime() + LOGIN_LOCKOUT_MS);
+      const currentLockoutLevel = Number(user.loginLockoutLevel || 0);
+      const nextLockoutLevel = currentLockoutLevel + 1;
+
+      if (nextLockoutLevel >= LOGIN_LOCKOUT_PERMANENT_LEVEL) {
+        user.loginLockoutLevel = LOGIN_LOCKOUT_PERMANENT_LEVEL;
+        user.loginLockedUntil = new Date("2100-01-01T00:00:00.000Z");
+        user.failedLoginAttempts = 0;
         await user.save();
         return res.status(429).json({
-          message: "Too many incorrect password attempts. Your account is locked for 1 minute.",
+          message: `Too many incorrect password attempts. Your account has been permanently locked. Please contact the administrator at ${ADMIN_CONTACT_EMAIL}.`,
         });
       }
+
+      const durationMs = getLoginLockoutDuration(currentLockoutLevel);
+      user.failedLoginAttempts = 0;
+      user.loginLockoutLevel = nextLockoutLevel;
+      user.loginLockedUntil = new Date(now.getTime() + durationMs);
       await user.save();
-      return res.status(401).json({ message: "Invalid email or password." });
+
+      const readableDuration = durationMs >= 30 * 60 * 1000 ? "30 minutes" : durationMs >= 5 * 60 * 1000 ? "5 minutes" : "1 minute";
+      return res.status(429).json({
+        message: `Too many incorrect password attempts. Your account is locked for ${readableDuration}.`,
+      });
     }
 
-    if (user.failedLoginAttempts || user.loginLockedUntil) {
+    if (user.failedLoginAttempts || user.loginLockedUntil || user.loginLockoutLevel) {
       user.failedLoginAttempts = 0;
       user.loginLockedUntil = null;
+      user.loginLockoutLevel = 0;
       await user.save();
     }
 

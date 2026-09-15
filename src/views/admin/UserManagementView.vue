@@ -271,6 +271,10 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                         Archive
                       </button>
+                      <button v-if="user.isLoginLocked" class="um-btn um-btn--unlock" @click="unlockUser(user)" title="Unlock login">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/><circle cx="12" cy="16" r="1"/></svg>
+                        Unlock
+                      </button>
                     </div>
                     <div v-if="user.status === 'Pending'" class="um-actions-row">
                       <button class="um-btn um-btn--approve" @click="approveUser(user)" title="Approve">
@@ -876,6 +880,9 @@ function mapUserForUi(user) {
     employeeId: user.employeeId || '',
     yearLevel: user.yearLevel || '',
     section: user.section || '',
+    isLoginLocked: Boolean(user.isLoginLocked),
+    loginLockoutLevel: Number(user.loginLockoutLevel || 0),
+    loginLockedUntil: user.loginLockedUntil || null,
   }
 }
 
@@ -1157,6 +1164,16 @@ async function updateUserStatus(user, status) {
     body: JSON.stringify({ status })
   })
   await fetchUsers()
+}
+
+async function unlockUser(user) {
+  try {
+    await apiRequest(`/users/${user.id}/unlock`, { method: 'PATCH' })
+    toastMessage.value = `${user.name}'s account has been unlocked.`
+    await fetchUsers()
+  } catch (error) {
+    loadError.value = error.message || 'Failed to unlock user account.'
+  }
 }
 
 async function approveUser(user) {
@@ -1886,6 +1903,8 @@ function confirmRestoreUser() {
 .um-btn--deny:hover { background: #fecaca; }
 .um-btn--archive { background: #fff7ed; color: #b45309; }
 .um-btn--archive:hover { background: #fde68a; }
+.um-btn--unlock { background: #e7f7f0; color: #177245; }
+.um-btn--unlock:hover { background: #c9f0dc; }
 .um-btn--restore { background: #f3f4f6; color: #4f575f; }
 .um-btn--restore:hover { background: #d1fae5; }
 

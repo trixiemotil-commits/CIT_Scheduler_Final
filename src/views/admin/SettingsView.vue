@@ -184,7 +184,14 @@
                 ><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div v-show="openFaq === i" class="faq-answer">
-                {{ faq.a }}
+                <template v-if="Array.isArray(faq.a)">
+                  <ul class="faq-bullets">
+                    <li v-for="(item, idx) in faq.a" :key="idx">{{ item }}</li>
+                  </ul>
+                </template>
+                <template v-else>
+                  {{ faq.a }}
+                </template>
               </div>
             </div>
           </div>
@@ -437,21 +444,42 @@ onUnmounted(clearOtpTimer)
 const openFaq = ref(null)
 const faqs = [
   {
-    q: 'How do I update my profile information?',
-    a: 'You can update your profile information by navigating to your account settings. Click on your avatar or name in the sidebar to access profile options, then update the fields you want to change and save.'
-  },
-
-  {
-    q: 'What should I do if I forgot my password?',
-    a: 'On the login page, click the "Forgot Password?" link. Enter your registered email address and follow the instructions sent to your inbox to reset your password.'
+    q: 'Is this a settings issue or a system issue?',
+    a: [
+      'If the problem is on the admin, teacher, or student settings page itself, it is usually an account or role setting.',
+      'If the problem is login failure, API errors, database connection, or email delivery, it is a system configuration issue and should be checked in the backend environment settings.'
+    ]
   },
   {
-    q: 'Who can access admin portal?',
-    a: 'Only users with an Admin role can access the admin portal. Teacher and Student accounts are limited to their respective portals and do not have admin privileges.'
+    q: 'How do I change my password in Settings?',
+    a: [
+      'Open Settings and go to Change Password.',
+      'Enter your current password, the OTP sent to your email, and your new password.',
+      'Click Update Password to save the change.'
+    ]
   },
   {
-    q: 'How do I add or remove a user?',
-    a: 'Go to Manage Users in the sidebar. Use the "Add User" button to register a new account, or use the Delete action on any row to remove an existing user. You can also edit roles and status from the same page.'
+    q: 'How does email verification on login work?',
+    a: [
+      'Go to Settings and toggle Email verification on login.',
+      'Confirm with your current password, then a code will be sent to your email on each login.',
+      'This is an account security setting and depends on the backend email configuration.'
+    ]
+  },
+  {
+    q: 'How do I switch roles or log out?',
+    a: [
+      'Use the role switch button in the sidebar if your account has access to multiple roles.',
+      'To log out, click Logout in the sidebar and confirm the prompt.',
+      'These are page-level actions, not backend configuration changes.'
+    ]
+  },
+  {
+    q: 'Who can access the admin portal?',
+    a: [
+      'Only users with the Admin role can access the admin portal.',
+      'Teacher and Student accounts can use their own portals and settings pages, but they do not have admin privileges.'
+    ]
   },
 ]
 </script>
@@ -870,15 +898,15 @@ const faqs = [
   margin-bottom: 16px;
 }
 .faq-header-icon {
-  width: 38px; height: 38px;
-  border-radius: 10px;
+  width: 40px; height: 40px;
+  border-radius: 12px;
   background: #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .faq-title {
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #111;
   margin: 0;
@@ -887,18 +915,18 @@ const faqs = [
 .faq-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 .faq-item {
   background: #fff;
   border: 1.5px solid #ececec;
   border-radius: 12px;
   overflow: hidden;
-  transition: border-color 0.18s, box-shadow 0.18s;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.15s;
 }
 .faq-item--open {
-  border-color: #bdc2c6;
-  box-shadow: 0 2px 10px rgba(48, 53, 58,0.07);
+  border-color: #bfc6cb;
+  box-shadow: 0 4px 14px rgba(48, 53, 58,0.08);
 }
 .faq-question {
   display: flex;
@@ -906,12 +934,12 @@ const faqs = [
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  background: none;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
   border: none;
-  padding: 16px 20px;
+  padding: 18px 20px;
   font-family: inherit;
-  font-size: 0.92rem;
-  font-weight: 500;
+  font-size: 1.03rem;
+  font-weight: 600;
   color: #222;
   text-align: left;
   cursor: pointer;
@@ -920,7 +948,7 @@ const faqs = [
 .faq-question:hover { background: #f4f5f5; }
 .faq-chevron {
   flex-shrink: 0;
-  color: #aaa;
+  color: #888;
   transition: transform 0.22s;
 }
 .faq-chevron--open {
@@ -929,10 +957,21 @@ const faqs = [
 }
 .faq-answer {
   padding: 0 20px 18px;
-  font-size: 0.875rem;
-  color: #666;
+  font-size: 0.98rem;
+  color: #4a4f57;
   line-height: 1.7;
   border-top: 1px solid #f0f0f0;
+}
+.faq-bullets {
+  margin: 12px 0 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  line-height: 1.6;
+}
+.faq-bullets li {
+  color: #4a4f57;
 }
 
 /* ── Modal overlay ── */

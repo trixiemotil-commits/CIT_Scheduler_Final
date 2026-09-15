@@ -66,6 +66,9 @@ function toClientUser(user) {
     designatedAreas: Array.isArray(user.designatedAreas) ? user.designatedAreas : [],
     yearLevel: user.yearLevel || "",
     section: user.section || "",
+    isLoginLocked: Boolean(user.loginLockedUntil && user.loginLockedUntil > new Date()),
+    loginLockoutLevel: Number(user.loginLockoutLevel || 0),
+    loginLockedUntil: user.loginLockedUntil || null,
     dateAdded: user.createdAt,
   };
 }
@@ -482,6 +485,34 @@ async function updateUserStatus(req, res) {
   }
 }
 
+async function unlockUser(req, res) {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    user.failedLoginAttempts = 0;
+    user.loginLockoutLevel = 0;
+    user.loginLockedUntil = null;
+    await user.save();
+
+    await logActivity({
+      actor: req.user,
+      action: `Unlocked user ${user.firstName} ${user.lastName}`,
+      path: req.originalUrl || `/api/users/${id}/unlock`,
+      method: req.method,
+      req,
+    });
+
+    return res.json({ message: "User account unlocked.", user: toClientUser(user) });
+  } catch (error) {
+    console.error("Failed to unlock user:", error);
+    return res.status(500).json({ message: "Failed to unlock user account.", error: error.message });
+  }
+}
+
 async function updateTeacherStatus(req, res) {
   try {
     const { id } = req.params;
@@ -580,6 +611,7 @@ module.exports = {
   createUser,
   updateUser,
   updateUserStatus,
+  unlockUser,
   updateTeacherStatus,
   approveAllPendingUsers,
 };

@@ -163,7 +163,14 @@ Consultation approval emails are sent to the student's registered email address.
 
 ### Login security
 
-After 5 incorrect password attempts for the same account, the account is temporarily locked for 1 minute. The lockout is stored in MongoDB and applies across browsers and devices. A successful login resets the failed-attempt counter.
+The login lockout escalates after repeated failed attempts:
+
+- 1st lockout: 1 minute
+- 2nd lockout: 5 minutes
+- 3rd lockout: 30 minutes
+- final lockout: permanent until an administrator unlocks the account
+
+After repeated incorrect password attempts, the account is locked and the user is told to contact the administrator at `citscheduler@gmail.com`. The lockout is stored in MongoDB and applies across browsers and devices. A successful login resets the failed-attempt counter and clears the lockout state.
 
 ## Useful commands
 
@@ -198,8 +205,9 @@ npm install --save-dev concurrently
   - Confirm `SMTP_USER`, `SMTP_PASS`, and optionally `SMTP_FROM` are set in `backend/.env`.
   - Restart the backend after changing environment variables.
 - Account locked after incorrect passwords:
-  - Wait 1 minute before trying again.
-  - The lockout is triggered after 5 incorrect password attempts and is cleared automatically after the timer expires.
+  - The first block lasts 1 minute, then escalates to 5 minutes, then 30 minutes.
+  - After repeated failures, the account is permanently locked and the user should contact the administrator at `citscheduler@gmail.com`.
+  - A successful login clears the failed-attempt counter and lockout state.
 
 ## Production
 
