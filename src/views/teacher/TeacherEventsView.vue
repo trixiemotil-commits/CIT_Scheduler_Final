@@ -50,22 +50,24 @@
         <div class="events-section-header">
           <div>
             <h2 class="events-section-title">Events overview</h2>
-            <p class="events-section-sub">{{ activeEvents.length }} active event{{ activeEvents.length === 1 ? '' : 's' }} shown</p>
+            <p class="events-section-sub">{{ eventsTab === 'active' ? activeEvents.length : endedEvents.length }} {{ eventsTab === 'active' ? 'active' : 'ended' }} event{{ (eventsTab === 'active' ? activeEvents.length : endedEvents.length) === 1 ? '' : 's' }} shown</p>
           </div>
           <div class="event-summary-counts">
             <span class="event-summary-count event-summary-count--active"><b>{{ activeEvents.length }}</b><small>Active</small></span>
+            <span class="event-summary-count"><b>{{ endedEvents.length }}</b><small>Ended</small></span>
           </div>
         </div>
 
         <div class="events-topbar">
           <div class="events-tabs">
-            <button class="ev-tab active">Active Events <span class="ev-tab-count">{{ activeEvents.length }}</span></button>
+            <button :class="['ev-tab', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active Events <span class="ev-tab-count">{{ activeEvents.length }}</span></button>
+            <button :class="['ev-tab', { active: eventsTab === 'ended' }]" @click="eventsTab = 'ended'">Ended <span class="ev-tab-count">{{ endedEvents.length }}</span></button>
           </div>
         </div>
 
       <!-- Events Grid -->
       <div class="events-grid">
-        <div v-for="ev in activeEvents" :key="ev.id" class="event-card event-card--clickable" @click="openViewEvent(ev)">
+        <div v-for="ev in displayedEvents" :key="ev.id" :class="['event-card', 'event-card--clickable', { 'event-card--ended': eventsTab === 'ended' }]" @click="openViewEvent(ev)">
             <div v-if="ev.image" class="event-card-img-wrap">
               <img :src="ev.image" class="event-card-img" alt="" />
             </div>
@@ -73,7 +75,7 @@
               <span>{{ eventInitials(ev.title) }}</span><small>CIT SCHEDULER EVENT</small>
             </div>
             <div class="event-card-head">
-              <span class="event-badge event-badge--active">Active</span>
+              <span :class="['event-badge', eventsTab === 'ended' ? 'event-badge--ended' : 'event-badge--active']">{{ eventsTab === 'ended' ? 'Event Ended' : 'Active' }}</span>
             </div>
             <div class="event-card-title">{{ ev.title }}</div>
             <div class="event-card-desc">{{ ev.description }}</div>
@@ -92,9 +94,9 @@
               </span>
             </div>
         </div>
-        <div v-if="!activeEvents.length" class="events-empty">
+        <div v-if="!displayedEvents.length" class="events-empty">
           <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span>No active events have been posted.</span>
+          <span>{{ eventsTab === 'active' ? 'No active events have been posted.' : 'No ended events yet.' }}</span>
         </div>
       </div>
       </section>
@@ -107,9 +109,9 @@
           <div class="ev-view-hero" :style="viewEvent.image ? `background-image:url('${viewEvent.image}')` : eventCoverStyle(viewEvent)">
             <div class="ev-view-hero-overlay"></div>
             <div class="ev-view-hero-content">
-              <span :class="['ev-view-badge', viewEvent.status === 'active' ? 'ev-view-badge--active' : 'ev-view-badge--archived']">
-                <svg v-if="viewEvent.status === 'active'" width="9" height="9" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
-                {{ viewEvent.status === 'active' ? 'Active' : 'Archived' }}
+              <span :class="['ev-view-badge', isEventEnded(viewEvent) ? 'ev-view-badge--ended' : (viewEvent.status === 'active' ? 'ev-view-badge--active' : 'ev-view-badge--archived')]">
+                <svg v-if="!isEventEnded(viewEvent) && viewEvent.status === 'active'" width="9" height="9" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+                {{ isEventEnded(viewEvent) ? 'Event Ended' : (viewEvent.status === 'active' ? 'Active' : 'Archived') }}
               </span>
               <h2 class="ev-view-title">{{ viewEvent.title }}</h2>
             </div>
@@ -329,7 +331,7 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { eventCoverStyle, eventInitials } from '@/utils/eventCover.js'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 // v-click-outside directive
@@ -435,7 +437,19 @@ function confirmTime() {
 }
 
 const events = ref([])
-const activeEvents = computed(() => events.value.filter(e => e.status === 'active'))
+const eventsTab = ref('active')
+const now = ref(new Date())
+const activeEvents = computed(() => events.value.filter(e => e.status === 'active' && !isEventEnded(e)))
+const endedEvents = computed(() => events.value.filter(e => e.status === 'active' && isEventEnded(e)))
+const displayedEvents = computed(() => eventsTab.value === 'ended' ? endedEvents.value : activeEvents.value)
+
+function isEventEnded(event) {
+  if (!event?.date || !event?.endTime) return false
+  const end = new Date(`${event.date}T${event.endTime}`)
+  return !Number.isNaN(end.getTime()) && now.value.getTime() >= end.getTime()
+}
+
+const eventClock = window.setInterval(() => { now.value = new Date() }, 30000)
 
 async function eventRequest(path = '', options = {}) {
   const token = getToken()
@@ -559,6 +573,7 @@ function openViewEvent(ev) {
 }
 
 onMounted(loadEvents)
+onBeforeUnmount(() => window.clearInterval(eventClock))
 </script>
 
 <style scoped>
@@ -1065,6 +1080,7 @@ onMounted(loadEvents)
   backdrop-filter: blur(4px);
 }
 .ev-view-badge--active   { background: rgba(83, 91, 100,0.88); color: #fff; }
+.ev-view-badge--ended    { background: rgba(88, 96, 103, 0.9); color: #fff; }
 .ev-view-badge--archived { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
 .ev-view-title {
   font-size: 1.6rem;

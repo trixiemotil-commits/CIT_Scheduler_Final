@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const ACCOUNT_STATUS_VALUES = ["Pending", "Active", "Inactive", "Denied", "Archived"];
-const TEACHER_STATUS_VALUES = ["On School", "On Meeting", "On Leave"];
+const TEACHER_STATUS_VALUES = ["On School", "On Meeting", "On Leave", "On Event"];
 const TEACHER_AVAILABILITY_VALUES = ["Available", "Unavailable"];
 const YEAR_LEVEL_VALUES = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 

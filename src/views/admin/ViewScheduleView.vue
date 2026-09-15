@@ -225,6 +225,55 @@
         </div>
       </template>
 
+      <!-- ── BY STUDENT GROUP ── -->
+      <template v-else-if="viewMode === 'student'">
+        <div class="schedule-card">
+          <div class="sched-topbar">
+            <button class="schedule-back-btn" aria-label="Back to student section selection" title="Back to student section selection" @click="returnToScheduleSelection">&larr;</button>
+            <div class="sched-topbar-left">
+              <span class="sched-context-label">Schedule for</span>
+              <h2 class="sched-grid-title">{{ selectedStudentYear }} · {{ selectedStudentSection }}</h2>
+              <p class="sched-grid-sub">Student group · Read-only view</p>
+            </div>
+            <div class="sched-topbar-right">
+              <div class="schedule-legend" aria-label="Schedule color legend">
+                <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
+                <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
+                <span><i class="legend-swatch legend-swatch--faculty"></i>CIT Faculty</span>
+                <span><i class="legend-swatch legend-swatch--lunch"></i>Lunch</span>
+              </div>
+              <button class="icon-btn" title="Print" @click="printSchedule">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              </button>
+            </div>
+          </div>
+          <div v-if="loading" class="loading-state">Loading schedule…</div>
+          <div v-else-if="studentHasNoEntries" class="empty-state"><p>No schedules found for <strong>{{ selectedStudentYear }} · {{ selectedStudentSection }}</strong>.</p></div>
+          <div v-else class="sched-grid-wrap">
+            <table class="sched-grid">
+              <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day">{{ day }}</th></tr></thead>
+              <tbody>
+                <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
+                  <td class="td-time">{{ slot }}</td>
+                  <template v-for="day in days" :key="day">
+                    <td v-if="!isSpannedStudentCell(slot, day)" :rowspan="getEntriesForStudentCell(slot, day).length ? getRoomRowspan(getEntriesForStudentCell(slot, day)[0]) : 1" class="td-cell" :class="{ 'has-entry': getEntriesForStudentCell(slot, day).length, 'free-time-cell': !getEntriesForStudentCell(slot, day).length }">
+                      <template v-if="getEntriesForStudentCell(slot, day).length">
+                        <div class="sched-entry sched-entry-clickable" :class="getEntriesForStudentCell(slot, day)[0].color" role="button" tabindex="0" @click="openScheduleDetails(getEntriesForStudentCell(slot, day))" @keydown.enter.space.prevent="openScheduleDetails(getEntriesForStudentCell(slot, day))">
+                          <div class="entry-teacher">{{ getEntriesForStudentCell(slot, day)[0].subject }}</div>
+                          <div class="entry-subject">{{ getEntriesForStudentCell(slot, day)[0].teacher }}</div>
+                          <div class="entry-section-row"><span class="entry-room">{{ getEntriesForStudentCell(slot, day)[0].room || 'Room not assigned' }}</span></div>
+                        </div>
+                      </template>
+                      <span v-else class="free-time-label">Free time</span>
+                    </td>
+                  </template>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+
       <!-- ── BY TEACHER ── -->
       <template v-else-if="viewMode === 'teacher'">
         <!-- Step 1: Teacher selection -->
@@ -657,7 +706,7 @@ const availableFloors = computed(() => floors
 
 const initialViewRouteMode = ['room', 'teacher'].includes(String(route.query.mode || ''))
   ? String(route.query.mode)
-  : null
+  : String(route.query.mode || '') === 'student' ? 'student' : null
 const selectedFloor = ref(null)
 const selectedRoom  = ref(initialViewRouteMode === 'room' ? (String(route.query.room || '') || null) : null)
 if (selectedRoom.value) {
@@ -671,6 +720,8 @@ const roomSearchQuery = ref('')
 
 /* ── View Mode ── */
 const viewMode         = ref(initialViewRouteMode)   // null | 'room' | 'teacher'
+const selectedStudentYear = ref(initialViewRouteMode === 'student' ? (String(route.query.year || '') || '') : '')
+const selectedStudentSection = ref(initialViewRouteMode === 'student' ? (String(route.query.section || '') || '') : '')
 const selectedTeacher  = ref(initialViewRouteMode === 'teacher' ? (String(route.query.teacher || '') || null) : null)
 const selectedTeacherId = ref(null)
 const teacherList      = ref([])
@@ -688,6 +739,8 @@ function resetAll() {
   selectedFloor.value   = null
   selectedRoom.value    = null
   selectedTeacher.value = null
+  selectedStudentYear.value = ''
+  selectedStudentSection.value = ''
 }
 
 function chooseRoomFromFloor(floorLabel, room) {
@@ -698,7 +751,7 @@ function chooseRoomFromFloor(floorLabel, room) {
 function returnToScheduleSelection() {
   const termId = getTermId(selectedTerm.value) || String(route.query.academicTermId || '').trim()
   const mode = viewMode.value || String(route.query.mode || '').trim()
-  if (termId && ['room', 'teacher'].includes(mode)) {
+  if (termId && ['room', 'teacher', 'student'].includes(mode)) {
     router.push({
       path: '/admin/academic-terms',
       query: {
@@ -706,6 +759,7 @@ function returnToScheduleSelection() {
         action: 'view',
         mode,
         source: viewSource.value === 'current' ? 'current' : 'academic',
+        ...(mode === 'student' ? { year: selectedStudentYear.value } : {}),
       },
     })
     return
@@ -716,6 +770,17 @@ function returnToScheduleSelection() {
   } else if (viewMode.value === 'teacher') {
     selectedTeacher.value = null
     selectedTeacherId.value = null
+  } else if (viewMode.value === 'student') {
+    router.push({
+      path: '/admin/academic-terms',
+      query: {
+        term: getSelectedTermId(),
+        action: 'view',
+        mode: 'student',
+        source: viewSource.value === 'current' ? 'current' : 'academic',
+        year: selectedStudentYear.value,
+      },
+    })
   }
 }
 
@@ -775,6 +840,10 @@ async function applyRouteContext() {
     await loadTeachers()
     selectedTeacher.value = String(route.query.teacher || '') || null
     selectedTeacherId.value = teacherList.value.find(teacher => teacher.name === selectedTeacher.value)?.id || null
+  } else if (requestedMode === 'student') {
+    viewMode.value = 'student'
+    selectedStudentYear.value = String(route.query.year || '')
+    selectedStudentSection.value = String(route.query.section || '')
   }
 }
 
@@ -870,6 +939,30 @@ function getEntriesForTeacherCell(rowSlot, day) {
   return [{ ...matchedEntry, _key: sectionMatch[0] }]
 }
 
+function getEntriesForStudentCell(rowSlot, day) {
+  const rowStart = parseTime(rowSlot)
+  const rowEnd = rowStart + 30
+  return Object.entries(entries)
+    .filter(([, entry]) => {
+      if (entry.day !== day) return false
+      if (String(entry.year || '').trim() !== selectedStudentYear.value) return false
+      if (String(entry.section || '').trim() !== selectedStudentSection.value) return false
+      const start = parseTime(entry.timeIn)
+      return start >= rowStart && start < rowEnd
+    })
+    .map(([key, entry]) => ({ ...entry, _key: key }))
+}
+
+function isSpannedStudentCell(slot, day) {
+  const slotIndex = timeSlots30.indexOf(slot)
+  if (slotIndex <= 0) return false
+  for (let index = 0; index < slotIndex; index += 1) {
+    const previous = getEntriesForStudentCell(timeSlots30[index], day)
+    if (previous.length && index + getRoomRowspan(previous[0]) > slotIndex) return true
+  }
+  return false
+}
+
 function isSpannedTeacherCell(slot, day) {
   const slotIndex = timeSlots30.indexOf(slot)
   if (slotIndex <= 0) return false
@@ -925,6 +1018,14 @@ function consultEntryStyle(rowSlot, consult) {
 const teacherHasNoEntries = computed(() => {
   if (!selectedTeacher.value) return false
   return !Object.values(entries).some(v => v.teacher === selectedTeacher.value)
+})
+
+const studentHasNoEntries = computed(() => {
+  if (viewMode.value !== 'student') return false
+  return !Object.values(entries).some((entry) => (
+    String(entry.year || '').trim() === selectedStudentYear.value
+    && String(entry.section || '').trim() === selectedStudentSection.value
+  ))
 })
 
 const currentFloorRooms = computed(

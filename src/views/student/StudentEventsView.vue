@@ -18,6 +18,7 @@
 
           <div class="events-tabs-mobile">
             <button :class="['tab-btn', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active</button>
+             <button :class="['tab-btn', { active: eventsTab === 'ended' }]" @click="eventsTab = 'ended'">Ended</button>
           </div>
 
           <div class="events-grid">
@@ -67,11 +68,11 @@
 
             <template v-else>
               <p v-if="eventsLoading">Loading events…</p>
-              <p v-else-if="!archivedEvents.length">No archived events.</p>
+              <p v-else-if="!endedEvents.length">No ended events.</p>
               <article
-                v-for="ev in archivedEvents"
+                v-for="ev in endedEvents"
                 :key="ev.id"
-                class="event-card event-card--archived"
+                class="event-card event-card--ended"
                 @click="openViewEvent(ev)"
               >
                 <img v-if="ev.image" :src="ev.image" class="event-card-cover-image" alt="" />
@@ -79,7 +80,7 @@
                   <span>{{ eventInitials(ev.title) }}</span><small>CIT SCHEDULER EVENT</small>
                 </div>
                 <div class="event-card-head">
-                  <span class="event-badge event-badge--archived">Archived</span>
+                  <span class="event-badge event-badge--ended">Event Ended</span>
                   <div v-if="false" class="event-card-actions">
                     <button class="ec-btn ec-btn--restore" @click.stop="archiveEvent(ev)">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.47"/></svg>
@@ -206,7 +207,7 @@ import { getToken } from '@/auth.js'
 import StudentRefresher from '@/components/student/StudentRefresher.vue'
 import { eventCoverStyle, eventInitials } from '@/utils/eventCover.js'
 import { IonContent, IonPage } from '@ionic/vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -215,6 +216,7 @@ const events = ref([])
 const eventsLoading = ref(false)
 const eventsError = ref('')
 const eventsTab = ref('active')
+const now = ref(new Date())
 
 const showViewModal = ref(false)
 const viewEvent = ref(null)
@@ -240,8 +242,16 @@ const todayDate = (() => {
 })()
 
 // Computed
-const activeEvents = computed(() => events.value.filter(e => e.status === 'active'))
-const archivedEvents = computed(() => events.value.filter(e => e.status === 'archived'))
+const activeEvents = computed(() => events.value.filter(e => e.status === 'active' && !isEventEnded(e)))
+const endedEvents = computed(() => events.value.filter(e => e.status === 'active' && isEventEnded(e)))
+
+function isEventEnded(event) {
+  if (!event?.date || !event?.endTime) return false
+  const end = new Date(`${event.date}T${event.endTime}`)
+  return !Number.isNaN(end.getTime()) && now.value.getTime() >= end.getTime()
+}
+
+const eventClock = window.setInterval(() => { now.value = new Date() }, 30000)
 
 // Formatting
 function formatDisplayDate(date) {
@@ -361,6 +371,7 @@ async function deleteEvent(ev) {
 }
 
 onMounted(loadEvents)
+onBeforeUnmount(() => window.clearInterval(eventClock))
 </script>
 
 <style scoped>

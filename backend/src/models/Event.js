@@ -40,6 +40,11 @@ const eventSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    studentYearLevels: {
+      type: [String],
+      enum: ["1st Year", "2nd Year", "3rd Year", "4th Year"],
+      default: [],
+    },
     status: {
       type: String,
       enum: ["active", "archived"],

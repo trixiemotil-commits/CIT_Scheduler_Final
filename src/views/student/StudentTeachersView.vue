@@ -305,6 +305,7 @@ function normalizeTeacherStatus(statusOrObj) {
 
     const resolvedStatus = String(t.status || '').trim().toLowerCase()
     if (resolvedStatus === 'offline') return 'Offline'
+    if (resolvedStatus === 'on event') return 'On Event'
     if (
       t.teacher_clocked_out
       || (
@@ -329,6 +330,7 @@ function normalizeTeacherStatus(statusOrObj) {
     }
 
     const statusRaw = String(t.teacher_status || t.status || '').trim().toLowerCase()
+    if (statusRaw === 'on event' || statusRaw === 'on-event') return 'On Event'
     if (statusRaw === 'on meeting' || statusRaw === 'on-meeting') return 'On Meeting'
     if (statusRaw === 'on leave' || statusRaw === 'leave') return 'On Leave'
     return 'In School'
@@ -338,6 +340,7 @@ function normalizeTeacherStatus(statusOrObj) {
   const lower = normalized.toLowerCase()
   if (lower === 'on leave' || lower === 'leave') return 'On Leave'
   if (lower === 'offline') return 'Offline'
+  if (lower === 'on event' || lower === 'on-event') return 'On Event'
   return 'In School'
 }
 
@@ -397,7 +400,7 @@ function mapTeacher(teacher) {
     ? [...new Set(studentSubjects.length ? studentSubjects : matchedSubjects)]
     : subjects
 
-  const isStatusAvailable = !['On Leave', 'Offline'].includes(resolvedStatus)
+  const isStatusAvailable = !['On Leave', 'Offline', 'On Event'].includes(resolvedStatus)
   const hasSlots = consultationSlots.length > 0
   const isAvailable = hasSlots && teacherAvailability.toLowerCase() !== 'unavailable' && isStatusAvailable
 
@@ -509,6 +512,7 @@ function statusClass(s) {
   return {
     'In School': 'pill-green',
     'On Meeting': 'pill-yellow',
+    'On Event': 'pill-blue',
     'On Leave': 'pill-red',
     Offline: 'pill-gray',
   }[s] || 'pill-gray'
@@ -779,6 +783,7 @@ onUnmounted(() => {
 .pill-green  { background: #d8dcdf; color: #4f575f; }
 .pill-orange { background: #fff3e0; color: #b35e00; }
 .pill-yellow { background: #fff4cc; color: #9a6700; }
+.pill-blue   { background: #e1efff; color: #2563a8; }
 .pill-red    { background: #ffeaea; color: #e63946; }
 .pill-gray   { background: #f0f0f0; color: #666; }
 

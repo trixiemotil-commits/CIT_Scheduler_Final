@@ -1345,13 +1345,20 @@ const teacherSelectOptions = computed(() => [
 
 function returnToTermWorkspace() {
   const term = String(route.query.academicTermId || '').trim()
-  router.push({
-    path: '/admin/academic-terms',
+  const mode = ['student', 'room', 'teacher'].includes(String(route.query.mode || ''))
+    ? String(route.query.mode)
+    : 'teacher'
+  router.replace({
+    name: 'admin-academic-terms',
     query: {
       ...(term ? { term } : {}),
       action: 'add',
-      mode: route.query.mode === 'room' ? 'room' : 'teacher',
+      mode,
       source: route.query.source === 'current' ? 'current' : 'academic',
+      ...(route.query.year ? { year: route.query.year } : {}),
+      ...(mode !== 'student' && route.query.section ? { section: route.query.section } : {}),
+      ...(route.query.teacher ? { teacher: route.query.teacher } : {}),
+      ...(route.query.room ? { room: route.query.room } : {}),
     },
   })
 }

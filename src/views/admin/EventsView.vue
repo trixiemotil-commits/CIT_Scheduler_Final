@@ -344,7 +344,7 @@
           </div>
 
           <!-- Form body -->
-          <form @submit.prevent="saveEvent" class="event-form">
+          <form ref="eventFormElement" @submit.prevent="saveEvent" class="event-form">
 
             <!-- Title -->
             <div class="form-group">
@@ -419,6 +419,18 @@
               <span class="teacher-picker-help">Select the teachers who will attend this event.</span>
             </div>
 
+            <!-- Students involved -->
+            <div class="form-group">
+              <label class="form-label">Students Involved <span class="form-optional">(optional)</span></label>
+              <div class="year-level-picker">
+                <label v-for="yearLevel in eventYearLevels" :key="yearLevel" class="year-level-option">
+                  <input v-model="eventForm.studentYearLevels" type="checkbox" :value="yearLevel" />
+                  <span>{{ yearLevel }}</span>
+                </label>
+              </div>
+              <span class="teacher-picker-help">Select the year levels that should attend this event. Leave all unchecked for all students.</span>
+            </div>
+
             <!-- Image upload -->
             <div class="form-group">
               <label class="form-label">Event Image</label>
@@ -486,7 +498,7 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import SystemClockPicker from '@/components/SystemClockPicker.vue'
 import SystemDatePicker from '@/components/SystemDatePicker.vue'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 // v-click-outside directive
@@ -549,7 +561,9 @@ function confirmLogout() {
 const showEventModal = ref(false)
 const editingEvent   = ref(null)
 const eventsTab      = ref('active')
-const eventForm      = ref({ title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [] })
+const eventForm      = ref({ title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [], studentYearLevels: [] })
+const eventFormElement = ref(null)
+const eventYearLevels = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 const imagePreview   = ref('')
 const imgInput       = ref(null)
 const eventTeachers = ref([])
@@ -644,10 +658,13 @@ async function loadEventTeachers() {
     const payload = await response.json()
     if (!response.ok) throw new Error(payload.message || 'Unable to load teachers.')
 
-    eventTeachers.value = (Array.isArray(payload.users) ? payload.users : []).filter((teacher) => String(teacher.account_status || 'Active') === 'Active').map((teacher) => {
+    eventTeachers.value = (Array.isArray(payload.users) ? payload.users : [])
+      .filter((teacher) => String(teacher.account_status || 'Active') === 'Active')
+      .filter((teacher) => String(teacher.teacher_status || '').trim() === 'On School')
+      .map((teacher) => {
       const name = `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || teacher.name || teacher.email || 'Teacher'
       return { id: teacher.id, name, initials: name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() }
-    })
+      })
   } catch (_error) {
     eventTeachers.value = []
   }
@@ -715,7 +732,7 @@ function toggleVisibleTeachers() {
 
 function openAddEvent() {
   editingEvent.value = null
-  eventForm.value = { title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [] }
+  eventForm.value = { title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [], studentYearLevels: [] }
   imagePreview.value = ''
   showTimePicker.value = false
   showTeacherPicker.value = false
@@ -724,11 +741,12 @@ function openAddEvent() {
   syncPickerToTime('')
   if (imgInput.value) imgInput.value.value = ''
   showEventModal.value = true
+  nextTick(() => { eventFormElement.value?.scrollTo({ top: 0 }) })
 }
 
 function openEditEvent(ev) {
   editingEvent.value = ev
-  eventForm.value = { title: ev.title, description: ev.description, date: ev.date, time: ev.time, endTime: ev.endTime || '', location: ev.location, image: ev.image || '', teacherIds: [...(ev.teacherIds || [])] }
+  eventForm.value = { title: ev.title, description: ev.description, date: ev.date, time: ev.time, endTime: ev.endTime || '', location: ev.location, image: ev.image || '', teacherIds: [...(ev.teacherIds || [])], studentYearLevels: [...(ev.studentYearLevels || [])] }
   imagePreview.value = ev.image || ''
   showTimePicker.value = false
   showTeacherPicker.value = false
@@ -737,6 +755,7 @@ function openEditEvent(ev) {
   syncPickerToTime(ev.time || '')
   if (imgInput.value) imgInput.value.value = ''
   showEventModal.value = true
+  nextTick(() => { eventFormElement.value?.scrollTo({ top: 0 }) })
 }
 
 function handleImageUpload(e) {
@@ -967,6 +986,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
   z-index: 1000;
 }
 
@@ -1485,6 +1507,10 @@ onMounted(() => {
 .teacher-picker-option { display: flex; align-items: center; gap: 9px; padding: 8px 4px; color: #333; font-size: 0.84rem; cursor: pointer; }
 .teacher-picker-option:hover { background: #f2f8f4; }
 .teacher-picker-option input, .teacher-picker-all input { accent-color: #1b4332; }
+.year-level-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.year-level-option { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #e4e7e9; border-radius: 7px; color: #42514a; font-size: 0.82rem; cursor: pointer; }
+.year-level-option:hover { border-color: #74a98e; background: #f2f8f4; }
+.year-level-option input { accent-color: #1b4332; }
 .teacher-picker-avatar { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #dcefe4; color: #1b4332; font-size: 0.66rem; font-weight: 700; }
 .teacher-picker-empty { margin: 14px 4px; color: #8b9490; text-align: center; font-size: 0.8rem; }
 .teacher-picker-help { color: #8b9490; font-size: 0.74rem; }
@@ -2118,40 +2144,50 @@ onMounted(() => {
 .event-modal-box {
   display: flex;
   flex-direction: column;
-  width: min(600px, 94vw);
-  max-height: min(780px, 90vh);
+  width: min(680px, 92vw);
+  height: min(720px, calc(100vh - 32px));
+  max-height: calc(100vh - 32px);
+  margin: 0 auto;
+  box-sizing: border-box;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  background: #ffffff;
+  border: 1px solid #d7e3dd;
+  border-radius: 16px;
+  background: #fbfdfc;
+  box-shadow: 0 24px 70px rgba(27, 67, 50, .22);
+}
+
+.event-modal-box .event-form {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .ev-modal-banner {
   flex: 0 0 auto;
-  padding: 22px 28px 20px;
-  border-bottom: 1px solid #e5eaf0;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid #2b5c49;
   border-radius: 14px 14px 0 0;
-  background: #ffffff;
+  background: #1b4332;
 }
 
 .ev-modal-banner-icon {
   width: 48px;
   height: 48px;
   border-radius: 13px;
-  background: #eef2f4;
-  color: #475569;
+  background: rgba(255,255,255,.14);
+  color: #ffffff;
 }
 
 .ev-modal-banner-title {
-  color: #202a34;
-  font-size: 1.35rem;
+  color: #ffffff;
+  font-size: 1.2rem;
   font-weight: 800;
   letter-spacing: -.035em;
 }
 
 .ev-modal-banner-sub {
-  color: #66727e;
-  font-size: .84rem;
+  color: rgba(255,255,255,.72);
+  font-size: .78rem;
 }
 
 .ev-modal-close {
@@ -2159,29 +2195,46 @@ onMounted(() => {
   right: 20px;
   width: 38px;
   height: 38px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255,255,255,.25);
   border-radius: 8px;
-  background: #ffffff;
-  color: #475569;
+  background: rgba(255,255,255,.12);
+  color: #ffffff;
 }
 
 .ev-modal-close:hover {
-  border-color: #cbd5e1;
-  background: #f8fafc;
-  color: #111827;
+  border-color: rgba(255,255,255,.45);
+  background: rgba(255,255,255,.22);
+  color: #ffffff;
 }
 
 .event-form {
   flex: 1 1 auto;
-  gap: 14px;
-  padding: 22px 28px 0;
+  gap: 12px;
+  padding: 16px 24px 0;
   overflow-y: auto;
-  background: #ffffff;
+  scrollbar-width: thin;
+  scrollbar-color: #9bb9a8 transparent;
+  background: #fbfdfc;
 }
+
+.event-form::-webkit-scrollbar { width: 7px; }
+.event-form::-webkit-scrollbar-thumb { background: #9bb9a8; border-radius: 10px; }
+.event-form::-webkit-scrollbar-track { background: transparent; }
 
 .form-row {
   gap: 14px;
 }
+
+.event-form .form-label { font-size: .7rem; color: #3f5f50; letter-spacing: .55px; }
+.event-form .form-input,
+.event-form .teacher-picker-trigger,
+.event-form .time-display { font-size: .82rem; }
+.event-form .form-textarea { min-height: 64px; }
+.event-form .teacher-picker-help { font-size: .68rem; }
+.event-form .year-level-option { padding: 8px 10px; font-size: .76rem; }
+.event-form .form-input:focus,
+.event-form .teacher-picker-trigger:focus,
+.event-form .time-display:focus { border-color: #5b9275; box-shadow: 0 0 0 3px rgba(91,146,117,.12); }
 
 .teacher-picker-trigger {
   color: #475569;
@@ -2618,9 +2671,11 @@ onMounted(() => {
 
 .ev-submit-btn { min-width: 140px; justify-content: center; background: linear-gradient(145deg, #5c6771, #343e47); border: 1px solid #3e4d58; box-shadow: 0 6px 12px rgba(45,55,63,.18); }
 .ev-submit-btn:hover { opacity: 1; background: linear-gradient(145deg, #687580, #3d4852); }
+.ev-submit-btn { background: linear-gradient(145deg, #7b858c, #3f4a52); border-color: #39454d; box-shadow: 0 6px 14px rgba(54,65,73,.24); }
+.ev-submit-btn:hover { background: linear-gradient(145deg, #89939a, #4a565e); }
 
 @media (max-width: 720px) {
-  .event-modal-box { max-height: 94vh; overflow-y: auto; }
+  .event-modal-box { width: min(94vw, 680px); height: calc(100vh - 32px); max-height: calc(100vh - 32px); }
   .ev-modal-banner { padding-inline: 18px; }
   .event-form { padding: 16px 18px 14px; }
 }

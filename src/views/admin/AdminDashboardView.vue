@@ -128,7 +128,7 @@
             <p>{{ todayDateLabel }} <span>Updated {{ currentTimeLabel }}</span></p>
           </div>
           <div class="today-carousel-controls" v-if="todayTeachers.length > teachersPerSlide">
-            <span>Showing {{ teachersPerSlide }} of {{ todayTeachers.length }} teachers • Continuous carousel</span>
+            <span><i></i> Showing {{ teachersPerSlide }} of {{ todayTeachers.length }} teachers · Repeats from beginning</span>
           </div>
         </div>
 
@@ -150,7 +150,7 @@
           <table class="today-schedule-table" :class="{ 'carousel-table': shouldAnimateTodaySchedule }">
             <thead>
               <tr>
-                <th v-for="teacher in visibleTodayTeachers" :key="teacher.name" class="teacher-col-header">
+                <th v-for="(teacher, teacherIndex) in visibleTodayTeachers" :key="`${teacher.name}-${teacherIndex}`" :class="['teacher-col-header', { 'carousel-start-column': shouldAnimateTodaySchedule && teacherIndex % todayTeachers.length === 0 }]">
                   <img :src="teacher.avatar" :alt="teacher.name" class="teacher-header-avatar" />
                   <div class="teacher-header-info">
                     <span class="teacher-header-name">{{ teacher.name }}</span>
@@ -161,7 +161,7 @@
             </thead>
             <tbody>
               <tr v-for="(rowIndex) in getMaxScheduleLength(visibleTodayTeachers)" :key="`row-${rowIndex}`" class="schedule-row">
-                <td v-for="teacher in visibleTodayTeachers" :key="`${teacher.name}-${rowIndex}`" class="schedule-cell">
+                <td v-for="(teacher, teacherIndex) in visibleTodayTeachers" :key="`${teacher.name}-${rowIndex}-${teacherIndex}`" :class="['schedule-cell', { 'carousel-start-column': shouldAnimateTodaySchedule && teacherIndex % todayTeachers.length === 0 }]">
                   <div v-if="teacher.schedule[rowIndex - 1]" :class="['schedule-entry', getTodayEntryState(teacher.schedule[rowIndex - 1]), getTodayEntryColor(teacher.schedule[rowIndex - 1])]">
                     <time class="schedule-time">{{ teacher.schedule[rowIndex - 1].timeIn }}<small>{{ teacher.schedule[rowIndex - 1].timeOut }}</small></time>
                     <div class="schedule-details">
@@ -1477,6 +1477,27 @@ function confirmLogout() {
 .today-teachers-header h2 { margin: 0; color: #202a31; font-size: 1.35rem; letter-spacing: -.025em; line-height: 1.35; }
 .today-teachers-header p { margin: 5px 0 0; color: #63717a; font-size: .8rem; }
 .today-teachers-header p span { margin-left: 7px; padding-left: 9px; border-left: 1px solid #ccd4d8; color: #89939a; }
+.today-carousel-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid #c5cdd1;
+  border-radius: 9px;
+  background: rgba(255,255,255,.58);
+  color: #66727a;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.today-carousel-controls i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #59656d;
+  box-shadow: 0 0 0 3px rgba(89,101,109,.12);
+}
 /* Table format styles */
 .today-schedule-table-wrap { 
   overflow-x: auto;
@@ -1492,6 +1513,24 @@ function confirmLogout() {
 }
 .today-schedule-table-wrap.dragging {
   cursor: grabbing;
+}
+.carousel-start-column {
+  border-left: 3px solid #59656d !important;
+}
+.teacher-col-header.carousel-start-column::before {
+  content: 'SCHEDULE START';
+  position: absolute;
+  top: 7px;
+  left: 8px;
+  padding: 3px 5px;
+  border: 1px solid #aeb8bd;
+  border-radius: 4px;
+  background: #59656d;
+  color: #fff;
+  font-size: .54rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  line-height: 1;
 }
 @keyframes tableSlideIn {
   from {

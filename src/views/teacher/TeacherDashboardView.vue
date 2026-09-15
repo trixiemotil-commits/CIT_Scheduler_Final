@@ -76,7 +76,7 @@
                   <ul class="notif-list">
                     <li v-for="n in unreadNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></span>
+                      <span class="notif-text"><template v-if="n.type === 'new_event'"><strong>{{ n.eventTitle }}</strong><small>{{ n.eventMessage }}</small></template><template v-else><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></template></span>
                       <span class="notif-read-status unread">Unread</span>
                       <span class="notif-unread-dot"></span>
                     </li>
@@ -91,7 +91,7 @@
                   <ul class="notif-list">
                     <li v-for="n in readNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></span>
+                      <span class="notif-text"><template v-if="n.type === 'new_event'"><strong>{{ n.eventTitle }}</strong><small>{{ n.eventMessage }}</small></template><template v-else><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></template></span>
                       <span class="notif-read-status read">Read</span>
                     </li>
                   </ul>
@@ -106,7 +106,7 @@
                   <ul class="notif-list">
                     <li v-for="n in newNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></span>
+                      <span class="notif-text"><template v-if="n.type === 'new_event'"><strong>{{ n.eventTitle }}</strong><small>{{ n.eventMessage }}</small></template><template v-else><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></template></span>
                       <span :class="['notif-read-status', n.read ? 'read' : 'unread']">{{ n.read ? 'Read' : 'Unread' }}</span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
                     </li>
@@ -117,7 +117,7 @@
                   <ul class="notif-list">
                     <li v-for="n in todayNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></span>
+                      <span class="notif-text"><template v-if="n.type === 'new_event'"><strong>{{ n.eventTitle }}</strong><small>{{ n.eventMessage }}</small></template><template v-else><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></template></span>
                       <span :class="['notif-read-status', n.read ? 'read' : 'unread']">{{ n.read ? 'Read' : 'Unread' }}</span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
                     </li>
@@ -431,7 +431,10 @@ async function loadConsultationNotifications() {
     notifications.value = notifs.slice(0, 50).map(n => {
       return {
         id: n.id,
+        type: n.type,
         avatar: n.data?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.title||'Notif')}&background=DDECE5&color=1B4332`,
+        eventTitle: n.type === 'new_event' ? (n.title || 'New event assigned') : '',
+        eventMessage: n.type === 'new_event' ? (n.message || 'View the event details.') : '',
         studentName: n.data?.studentName || notificationStudentName(n),
         subject: n.data?.subject || notificationSubject(n),
         consultationTime: n.data?.consultationTime || '',
@@ -455,7 +458,10 @@ function _onNotif(n) {
     if (!n || !n.id) return
     const item = {
       id: n.id,
+      type: n.type,
       avatar: n.data?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.title||'Notif')}&background=DDECE5&color=1B4332`,
+      eventTitle: n.type === 'new_event' ? (n.title || 'New event assigned') : '',
+      eventMessage: n.type === 'new_event' ? (n.message || 'View the event details.') : '',
       studentName: n.data?.studentName || notificationStudentName(n),
       subject: n.data?.subject || notificationSubject(n),
       consultationTime: n.data?.consultationTime || '',
@@ -494,7 +500,7 @@ function markNotificationRead(notificationId) {
 function openNotification(notification) {
   markNotificationRead(notification.id)
   showNotif.value = false
-  router.push('/teacher/consultation')
+  router.push(notification.type === 'new_event' ? '/teacher/events' : '/teacher/consultation')
 }
 
 function parseDashboardTimeTo24Hour(rawValue) {
