@@ -44,17 +44,13 @@ const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
 const PASSWORD_OTP_MAX_ATTEMPTS = 5;
 const LOGIN_OTP_LIFETIME_MS = 5 * 60 * 1000;
 const LOGIN_OTP_MAX_ATTEMPTS = 5;
-const LOGIN_LOCKOUT_SEQUENCE_MS = [
+const LOGIN_LOCKOUT_THRESHOLDS = [5, 3, 2];
+const LOGIN_LOCKOUT_DURATIONS_MS = [
   60 * 1000,
   5 * 60 * 1000,
-  30 * 60 * 1000,
 ];
 const ADMIN_CONTACT_EMAIL = "citscheduler@gmail.com";
-const LOGIN_LOCKOUT_PERMANENT_LEVEL = LOGIN_LOCKOUT_SEQUENCE_MS.length + 1;
-
-function getLoginLockoutDuration(lockoutLevel = 0) {
-  return LOGIN_LOCKOUT_SEQUENCE_MS[Math.min(Number(lockoutLevel) || 0, LOGIN_LOCKOUT_SEQUENCE_MS.length - 1)] ?? LOGIN_LOCKOUT_SEQUENCE_MS[LOGIN_LOCKOUT_SEQUENCE_MS.length - 1];
-}
+const LOGIN_LOCKOUT_PERMANENT_LEVEL = LOGIN_LOCKOUT_THRESHOLDS.length;
 
 function getUserRoles(user) {
   const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role];
@@ -319,9 +315,16 @@ async function login(req, res) {
 
     if (!isMatch) {
       const currentLockoutLevel = Number(user.loginLockoutLevel || 0);
-      const nextLockoutLevel = currentLockoutLevel + 1;
+      const failedLoginAttempts = Number(user.failedLoginAttempts || 0) + 1;
+      const attemptsRequired = LOGIN_LOCKOUT_THRESHOLDS[Math.min(currentLockoutLevel, LOGIN_LOCKOUT_THRESHOLDS.length - 1)];
 
-      if (nextLockoutLevel >= LOGIN_LOCKOUT_PERMANENT_LEVEL) {
+      if (failedLoginAttempts < attemptsRequired) {
+        user.failedLoginAttempts = failedLoginAttempts;
+        await user.save();
+        return res.status(401).json({ message: "Invalid email or password." });
+      }
+
+      if (currentLockoutLevel >= LOGIN_LOCKOUT_PERMANENT_LEVEL - 1) {
         user.loginLockoutLevel = LOGIN_LOCKOUT_PERMANENT_LEVEL;
         user.loginLockedUntil = new Date("2100-01-01T00:00:00.000Z");
         user.failedLoginAttempts = 0;
@@ -331,13 +334,13 @@ async function login(req, res) {
         });
       }
 
-      const durationMs = getLoginLockoutDuration(currentLockoutLevel);
+      const durationMs = LOGIN_LOCKOUT_DURATIONS_MS[currentLockoutLevel];
       user.failedLoginAttempts = 0;
-      user.loginLockoutLevel = nextLockoutLevel;
+      user.loginLockoutLevel = currentLockoutLevel + 1;
       user.loginLockedUntil = new Date(now.getTime() + durationMs);
       await user.save();
 
-      const readableDuration = durationMs >= 30 * 60 * 1000 ? "30 minutes" : durationMs >= 5 * 60 * 1000 ? "5 minutes" : "1 minute";
+      const readableDuration = currentLockoutLevel === 0 ? "1 minute" : "5 minutes";
       return res.status(429).json({
         message: `Too many incorrect password attempts. Your account is locked for ${readableDuration}.`,
       });

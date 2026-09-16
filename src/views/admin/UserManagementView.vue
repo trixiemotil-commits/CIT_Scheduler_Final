@@ -257,6 +257,10 @@
                   <span class="um-status-dot"></span>
                   {{ user.status }}
                 </span>
+                <span v-if="user.isLoginLocked" class="um-login-lock-badge" :title="loginLockDescription(user)">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  {{ loginLockLabel(user) }}
+                </span>
               </td>
               <td class="um-date">{{ user.dateAdded }}</td>
               <td>
@@ -903,6 +907,21 @@ function statusClass(status) {
   return 'um-status--inactive'
 }
 
+function loginLockLabel(user) {
+  return Number(user.loginLockoutLevel || 0) >= 3 ? 'Permanently locked' : 'Login locked'
+}
+
+function loginLockDescription(user) {
+  if (Number(user.loginLockoutLevel || 0) >= 3) {
+    return 'This account is permanently locked. Unlock it to restore login access.'
+  }
+  const lockedUntil = user.loginLockedUntil ? new Date(user.loginLockedUntil) : null
+  if (lockedUntil && !Number.isNaN(lockedUntil.getTime())) {
+    return `Login locked until ${lockedUntil.toLocaleString()}.`
+  }
+  return 'This account is locked from login attempts.'
+}
+
 async function apiRequest(path, options = {}) {
   const token = getToken()
   if (!token) {
@@ -1191,7 +1210,7 @@ async function updateUserStatus(user, status) {
 async function unlockUser(user) {
   try {
     await apiRequest(`/users/${user.id}/unlock`, { method: 'PATCH' })
-    toastMessage.value = `${user.name}'s account has been unlocked.`
+    showToast(`${user.name}'s account has been unlocked.`)
     await fetchUsers()
   } catch (error) {
     loadError.value = error.message || 'Failed to unlock user account.'
@@ -1884,6 +1903,18 @@ function confirmRestoreUser() {
   border-radius: 50%;
   background: currentColor;
   flex-shrink: 0;
+}
+.um-login-lock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  padding: 4px 9px;
+  border-radius: 14px;
+  background: #fff1e6;
+  color: #b54708;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .um-actions {

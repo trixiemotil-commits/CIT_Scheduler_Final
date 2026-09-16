@@ -362,6 +362,15 @@ const loginMathChallenge = ref({ question: '', answer: 0 })
 const signUpMathChallenge = ref({ question: '', answer: 0 })
 const tronCanvas = ref(null)
 let disposeTronBackground = null
+const REMEMBERED_LOGIN_EMAIL_KEY = 'cit_remembered_login_email'
+
+function saveRememberedLogin(email, remember) {
+  if (remember) {
+    localStorage.setItem(REMEMBERED_LOGIN_EMAIL_KEY, String(email || '').trim().toLowerCase())
+  } else {
+    localStorage.removeItem(REMEMBERED_LOGIN_EMAIL_KEY)
+  }
+}
 
 function resetTwoFactorDigits() {
   twoFactorDigits.value = ['', '', '', '', '', '']
@@ -674,7 +683,8 @@ function resetMathChallenges() {
   loginMathAnswer.value = ''
   signUpMathAnswer.value = ''
 }
-const signIn = reactive({ email: '', password: '', remember: false, showPw: false })
+const rememberedLoginEmail = localStorage.getItem(REMEMBERED_LOGIN_EMAIL_KEY) || ''
+const signIn = reactive({ email: rememberedLoginEmail, password: '', remember: Boolean(rememberedLoginEmail), showPw: false })
 const signUp = reactive({ firstName: '', lastName: '', studentId: '', email: '', password: '', confirmPassword: '', showPw: false, showConfirmPw: false })
 
 const signUpPasswordChecks = computed(() => {
@@ -735,6 +745,7 @@ async function handleLogin() {
       isMobileApp ? { question: loginMathChallenge.value.question.replace(' =', ''), answer: Number(loginMathAnswer.value) } : null,
       signIn.remember
     )
+    saveRememberedLogin(signIn.email, signIn.remember)
     if (payload?.requiresTwoFactor) {
       twoFactorChallenge.value = payload
       resetTwoFactorDigits()
