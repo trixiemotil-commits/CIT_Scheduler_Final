@@ -25,7 +25,6 @@
             <template v-if="eventsTab === 'active'">
               <p v-if="eventsLoading">Loading events…</p>
               <p v-else-if="eventsError">{{ eventsError }}</p>
-              <p v-else-if="!activeEvents.length">No active events. Click + to create one.</p>
               <article
                 v-for="ev in activeEvents"
                 :key="ev.id"

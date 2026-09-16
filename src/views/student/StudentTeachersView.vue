@@ -41,13 +41,21 @@
               <img v-if="t.avatar" :src="t.avatar" :alt="`${t.name} profile`" />
               <span v-else>{{ t.initials }}</span>
             </div>
-            <span v-if="t.status === 'Offline'" class="status-badge" title="Teacher is offline"></span>
             <div class="teacher-meta">
               <div class="teacher-name">{{ t.name }}</div>
               <div class="teacher-type-pill subject">Subject Teacher</div>
               <div class="teacher-subjects-clean">
                 <span v-for="subject in displayedSubjects(t)" :key="subject" class="subject-chip">{{ subject }}</span>
                 <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
+              </div>
+              <div v-if="t.status === 'In School' && t.consultationSlots.length" class="consultation-hours">
+                <div class="hours-label">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                  Consultation hours
+                </div>
+                <div class="hours-list">
+                  <span v-for="slot in t.consultationSlots" :key="slot.id" class="hours-chip">{{ formatSlotLabel(slot) }}</span>
+                </div>
               </div>
             </div>
             <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
@@ -73,7 +81,6 @@
               <img v-if="t.avatar" :src="t.avatar" :alt="`${t.name} profile`" />
               <span v-else>{{ t.initials }}</span>
             </div>
-            <span v-if="t.status === 'Offline'" class="status-badge" title="Teacher is offline"></span>
             <div class="teacher-meta">
               <div class="teacher-name">{{ t.name }}</div>
               <div class="teacher-type-pill available">Available Teacher</div>
@@ -479,7 +486,7 @@ const subjectTeachers = computed(() => {
 
 const availableTeachers = computed(() => {
   return teachers.value
-    .filter((t) => matchesSearch(t) && !isSubjectTeacher(t))
+    .filter((t) => matchesSearch(t) && !isSubjectTeacher(t) && t.status === 'In School')
     .sort((a, b) => a.name.localeCompare(b.name))
 })
 
@@ -700,32 +707,34 @@ onUnmounted(() => {
 
 /* Search */
 .search-wrap {
-  position: relative; margin: 14px 16px 0;
+  position: relative; margin: 15px 16px 0;
 }
 .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); }
 .search-input {
   width: 100%; box-sizing: border-box;
+  height: 44px;
   padding: 11px 14px 11px 36px;
-  border: 1.5px solid #e5e7eb;
+  border: 1px solid #dfe3e6;
   border-radius: 10px; font-size: 0.87rem;
-  background: #fff; outline: none; font-family: inherit;
+  background: rgba(255, 255, 255, 0.96); outline: none; font-family: inherit;
+  box-shadow: 0 4px 12px rgba(45, 50, 55, 0.07);
 }
-.search-input:focus { border-color: #6b7280; }
+.search-input:focus { border-color: #7d8992; box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.12); }
 
 /* Filters */
-.filter-row { display: flex; gap: 8px; padding: 12px 18px 0; overflow-x: auto; scrollbar-width: none; }
+.filter-row { display: flex; gap: 8px; padding: 12px 18px 1px; overflow-x: auto; scrollbar-width: none; }
 .filter-row::-webkit-scrollbar { display: none; }
 .filter-chip {
-  white-space: nowrap; padding: 6px 14px;
+  white-space: nowrap; min-height: 34px; padding: 6px 14px;
   background: #fff; border: 1.5px solid #e5e7eb;
-  border-radius: 20px; font-size: 0.8rem; font-weight: 500;
+  border-radius: 10px; font-size: 0.78rem; font-weight: 600;
   cursor: pointer; font-family: inherit; color: #555;
   transition: all 0.15s;
 }
-.filter-chip.active { background: #4b5563; color: #fff; border-color: #4b5563; }
+.filter-chip.active { background: linear-gradient(145deg, #535d66, #30363c); color: #fff; border-color: #424b53; box-shadow: 0 4px 10px rgba(48, 54, 60, 0.2); }
 
 /* Teacher cards */
-.teacher-list { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 0; }
+.teacher-list { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 16px; }
 .empty-state-card {
   background: #fff;
   border-radius: 12px;
@@ -739,10 +748,10 @@ onUnmounted(() => {
   border-color: #f3c3ca;
   background: #fff4f5;
 }
-.teacher-card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
-.teacher-top  { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+.teacher-card { background: rgba(255, 255, 255, 0.96); border: 1px solid rgba(91, 99, 106, 0.14); border-radius: 15px; padding: 15px; box-shadow: 0 7px 16px rgba(38, 44, 49, 0.09), inset 0 1px rgba(255, 255, 255, 0.9); }
+.teacher-top  { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 13px; }
 .teacher-avatar {
-  width: 46px; height: 46px; border-radius: 50%;
+  width: 46px; height: 46px; border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 700; font-size: 1rem; flex-shrink: 0;
   overflow: hidden;
@@ -751,9 +760,12 @@ onUnmounted(() => {
 .tp-avatar img,
 .profile-avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
 .teacher-meta { flex: 1; }
-.teacher-name    { font-weight: 700; font-size: 0.9rem; color: #111; }
+.teacher-name    { font-weight: 800; font-size: 0.88rem; line-height: 1.25; color: #252a2f; }
+.teacher-type-pill { display: inline-flex; margin-top: 4px; padding: 3px 7px; border-radius: 6px; font-size: 0.66rem; font-weight: 700; line-height: 1.1; }
+.teacher-type-pill.subject { background: #e8eef8; color: #3d618d; }
+.teacher-type-pill.available { background: #e5f1e9; color: #34704d; }
 .teacher-subjects-clean {
-  margin-top: 6px;
+  margin-top: 7px;
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
@@ -761,50 +773,84 @@ onUnmounted(() => {
 .subject-chip {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #edf0f1;
-  border: 1px solid #d5d9dc;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #f0f2f3;
+  border: 1px solid #dce0e3;
   color: #4b5259;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 .subject-chip.more {
   background: #f5f6f8;
   border-color: #e2e6ea;
   color: #586572;
 }
+.consultation-hours {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid #d9e7de;
+  border-radius: 10px;
+  background: #f3faf5;
+}
+.hours-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #34704d;
+  font-size: 0.68rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.hours-label svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hours-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.hours-chip {
+  display: inline-flex;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: #fff;
+  border: 1px solid #cfe0d5;
+  color: #496154;
+  font-size: 0.64rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
 .status-pill {
-  font-size: 0.7rem; font-weight: 600;
-  padding: 3px 10px; border-radius: 20px;
+  font-size: 0.68rem; font-weight: 700;
+  padding: 5px 9px; border-radius: 8px;
   white-space: nowrap; flex-shrink: 0;
 }
-.pill-green  { background: #d8dcdf; color: #4f575f; }
+.pill-green  { background: #e0f2e7; color: #287344; }
 .pill-orange { background: #fff3e0; color: #b35e00; }
 .pill-yellow { background: #fff4cc; color: #9a6700; }
 .pill-blue   { background: #e1efff; color: #2563a8; }
 .pill-red    { background: #ffeaea; color: #e63946; }
 .pill-gray   { background: #f0f0f0; color: #666; }
 
-.teacher-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.teacher-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding-top: 1px; border-top: 1px solid #edf0f1; }
 .price { font-size: 0.82rem; font-weight: 600; color: #4b5563; min-width: 12px; }
 .action-btn {
-  padding: 9px 14px; border-radius: 8px;
+  min-height: 38px; padding: 9px 14px; border-radius: 9px;
   border: none; font-family: inherit;
   font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
 }
 .action-btn:active { opacity: 0.8; }
-.action-btn.green   { background: #4b5563; color: #fff; }
+.action-btn.green   { background: linear-gradient(145deg, #535d66, #30363c); color: #fff; box-shadow: 0 4px 10px rgba(48, 54, 60, 0.18); }
 .action-btn.disabled {
-  background: #7b8794;
-  color: #fff;
+  background: #edf0f1;
+  color: #7b858d;
+  border: 1px solid #d9dee1;
   cursor: not-allowed;
-}
-
-.status-badge {
-  width: 10px; height: 10px; border-radius: 50%; background: #e63946; display: inline-block;
-  margin-left: 8px; margin-top: 6px; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(230,57,70,0.12);
 }
 
 /* ── Modals ── */

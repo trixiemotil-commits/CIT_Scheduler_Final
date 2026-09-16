@@ -16,10 +16,11 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 const isSwitching = ref(false)
 const user = getUser() || {}
-const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role]
+const roles = (Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role])
+  .map(role => String(role || '').trim().toLowerCase())
 const targetRole = computed(() => {
   if (!roles.includes('admin') || !roles.includes('teacher')) return ''
-  return user.role === 'admin' ? 'teacher' : 'admin'
+  return String(user.role || '').trim().toLowerCase() === 'admin' ? 'teacher' : 'admin'
 })
 const roleLabel = computed(() => targetRole.value === 'admin' ? 'Admin' : 'Teacher')
 

@@ -174,7 +174,7 @@
           </div>
           <div v-else class="sched-grid-wrap">
             <table class="sched-grid">
-              <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day">{{ day }}</th></tr></thead>
+              <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day" :class="{ 'current-day-header': day === highlightedTeacherDay }">{{ day }}</th></tr></thead>
               <tbody>
                 <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
                   <td class="td-time">{{ slot }}</td>
@@ -355,7 +355,8 @@
                     :class="{
                       'has-entry': getEntriesForTeacherCell(slot, day).length,
                       'consult-cell': !getEntriesForTeacherCell(slot, day).length && !!getConsultationForTeacherCell(slot, day),
-                      'free-time-cell': !getEntriesForTeacherCell(slot, day).length && !getConsultationForTeacherCell(slot, day)
+                      'free-time-cell': !getEntriesForTeacherCell(slot, day).length && !getConsultationForTeacherCell(slot, day),
+                      'current-day-cell': day === highlightedTeacherDay
                     }"
                   >
                       <template v-if="getEntriesForTeacherCell(slot, day).length">
@@ -732,6 +733,11 @@ const filteredTeacherList = computed(() => {
   const query = teacherSearchQuery.value.trim().toLowerCase()
   if (!query) return teacherList.value
   return teacherList.value.filter(teacher => teacher.name.toLowerCase().includes(query))
+})
+const highlightedTeacherDay = computed(() => {
+  if (viewMode.value !== 'teacher' || route.query.source !== 'current') return ''
+  const day = String(route.query.highlightDay || '')
+  return days.includes(day) ? day : ''
 })
 
 function resetAll() {
@@ -2089,6 +2095,22 @@ function printSchedule() {
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   text-shadow: 0 1px rgba(0, 0, 0, 0.22);
 }
+.sched-grid th.current-day-header {
+  position: sticky;
+  background: #424c55;
+  box-shadow: none;
+}
+.sched-grid th.current-day-header::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  inset: -2px -1px -1px;
+  border: 2px solid #8f9aa2;
+  border-bottom-color: #aeb7bd;
+  box-shadow: 0 0 10px rgba(43, 53, 61, .34), inset 0 0 7px rgba(255,255,255,.18);
+  animation: currentDayFramePulse 1.05s ease-in-out .25s 3 both;
+}
 .sched-grid thead th:first-child {
   border-radius: 12px 0 0;
 }
@@ -2141,6 +2163,38 @@ function printSchedule() {
   position: relative;
   background: #fff;
   transition: background 0.15s ease;
+}
+.td-cell.current-day-cell {
+  box-shadow: none;
+}
+.td-cell.current-day-cell::after {
+  content: '';
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  top: -2px;
+  right: -1px;
+  bottom: -2px;
+  left: -1px;
+  border-left: 2px solid #8f9aa2;
+  border-right: 2px solid #8f9aa2;
+  box-shadow: inset 1px 0 rgba(255,255,255,.48), inset -1px 0 rgba(255,255,255,.48), 0 0 7px rgba(49, 60, 68, .18);
+  animation: currentDayFramePulse 1.05s ease-in-out .25s 3 both;
+}
+.sched-grid tbody tr:last-child .td-cell.current-day-cell {
+  box-shadow: none;
+}
+.sched-grid tbody tr:last-child .td-cell.current-day-cell::after { border-bottom: 2px solid #8f9aa2; }
+.td-cell.current-day-cell .sched-entry {
+  animation: currentDayEntryPulse 1.05s ease-in-out .25s 3 both;
+}
+@keyframes currentDayFramePulse {
+  0%, 100% { border-color: #8f9aa2; opacity: 1; box-shadow: inset 1px 0 rgba(255,255,255,.48), inset -1px 0 rgba(255,255,255,.48), 0 0 7px rgba(49, 60, 68, .18); }
+  50% { border-color: #d2d9dd; opacity: 1; box-shadow: inset 1px 0 rgba(255,255,255,.8), inset -1px 0 rgba(255,255,255,.8), 0 0 18px rgba(54, 66, 74, .48); }
+}
+@keyframes currentDayEntryPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 3px 8px rgba(30,39,44,.14); }
+  50% { transform: scale(1.012); box-shadow: 0 0 0 2px rgba(202, 211, 216, .85), 0 8px 18px rgba(45, 55, 63, .25); }
 }
 .td-cell.has-entry { padding: 0; }
 .time-row:hover .td-time {

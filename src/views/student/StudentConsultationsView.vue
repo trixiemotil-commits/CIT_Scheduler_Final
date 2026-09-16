@@ -24,15 +24,15 @@
     <!-- Sessions -->
     <div class="sessions-list">
       <div v-if="isLoadingSessions" class="empty-state">
-        <div class="empty-icon">⏳</div>
+        <div class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
         <div>Loading sessions...</div>
       </div>
       <div v-else-if="sessionsError" class="empty-state">
-        <div class="empty-icon">⚠️</div>
+        <div class="empty-icon error-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v4M12 16h.01"/></svg></div>
         <div>{{ sessionsError }}</div>
       </div>
       <div v-else-if="filteredSessions.length === 0" class="empty-state">
-        <div class="empty-icon">📋</div>
+        <div class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5h6M8.5 10h7M8.5 14h7M8.5 18h4"/></svg></div>
         <div>No sessions found.</div>
       </div>
       <div v-for="s in filteredSessions" :key="s.id" class="session-card">
@@ -45,9 +45,9 @@
             <div class="session-subject">{{ s.subject }}</div>
             <div class="session-teacher">{{ s.teacher }}</div>
             <div class="session-info-row">
-              <span class="info-chip">📅 {{ formatWeekday(s.date) }}, {{ formatDate(s.date) }}</span>
-              <span class="info-chip">🕐 {{ formatTimeRange(s.timeStart, s.timeEnd) }}</span>
-              <span class="info-chip" v-if="s.status === 'Approved' && s.ticketNumber">🎟 {{ s.ticketNumber }}</span>
+              <span class="info-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>{{ formatWeekday(s.date) }}, {{ formatDate(s.date) }}</span>
+              <span class="info-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{{ formatTimeRange(s.timeStart, s.timeEnd) }}</span>
+              <span class="info-chip" v-if="s.status === 'Approved' && s.ticketNumber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v12H5zM8 9h8M8 12h5M8 15h7"/></svg>{{ s.ticketNumber }}</span>
             </div>
             <div v-if="s.status === 'Approved' && s.queuePosition" class="queue-row">
               <span :class="['queue-chip', { 'queue-next': s.isNextInQueue }]">
@@ -61,7 +61,7 @@
 
         <!-- Reschedule reason -->
         <div v-if="s.status === 'Reschedule' && s.reason" class="rejection-msg">
-          ✖ {{ s.reason }}
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg>{{ s.reason }}
         </div>
 
         <!-- Actions -->
@@ -309,9 +309,9 @@ const filteredSessions = computed(() =>
 function pillClass(s) {
   return {
     Approved: 'pill-green',
-    Pending: 'pill-orange',
+    Pending: 'pill-blue',
     Reschedule: 'pill-red',
-    Completed: 'pill-gray',
+    Completed: 'pill-yellow',
     Cancelled: 'pill-red',
     Archived: 'pill-gray',
   }[s] || 'pill-gray'
@@ -778,13 +778,23 @@ onMounted(() => {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   text-align: center; color: #9ba3ab; font-size: 0.9rem; padding: 54px 0;
 }
-.empty-icon { font-size: 2.5rem; }
+.empty-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  color: #697680;
+  background: #e8ecee;
+}
+.empty-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.empty-icon.error-icon { color: #d34b58; background: #ffedf0; }
 .session-card {
   background: #fff;
   border-radius: 16px;
-  border: 1px solid #e8ece9;
-  padding: 16px;
-  box-shadow: 0 10px 22px rgba(16, 24, 40, 0.05);
+  border: 1px solid rgba(91, 99, 106, 0.14);
+  padding: 15px;
+  box-shadow: 0 8px 18px rgba(38, 44, 49, 0.09), inset 0 1px rgba(255, 255, 255, 0.9);
 }
 
 .session-top  { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
@@ -798,18 +808,22 @@ onMounted(() => {
 .session-avatar-lg img,
 .tp-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .session-meta { flex: 1; }
-.session-subject { font-weight: 700; font-size: 0.95rem; color: #111; }
+.session-subject { font-weight: 800; font-size: 0.92rem; line-height: 1.35; color: #252a2f; }
 .session-teacher { font-size: 0.79rem; color: #66727c; margin: 2px 0 8px; }
 .session-info-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 0.73rem;
   color: #6b7280;
   background: #eef0f1;
   border: 1px solid #d9dde0;
-  padding: 3px 8px;
+  padding: 4px 8px;
   border-radius: 999px;
   font-weight: 600;
 }
+.info-chip svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .queue-row { margin-top: 6px; }
 .queue-chip {
   display: inline-flex;
@@ -838,17 +852,22 @@ onMounted(() => {
   font-size: 0.71rem; font-weight: 700;
   padding: 4px 11px; border-radius: 999px; white-space: nowrap; flex-shrink: 0;
 }
-.pill-green  { background: #d8dcdf; color: #4f575f; }
-.pill-orange { background: #fff3e0; color: #b35e00; }
+.pill-green  { background: #e0f2e7; color: #287344; }
+.pill-blue   { background: #e1efff; color: #2563a8; }
+.pill-yellow { background: #fff4cc; color: #9a6700; }
 .pill-red    { background: #ffeaea; color: #e63946; }
 .pill-gray   { background: #f0f0f0; color: #666; }
 
 .rejection-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
   background: #fff1f2; color: #c0392b;
   border: 1px solid #ffd8dd;
   font-size: 0.8rem; padding: 9px 12px;
   border-radius: 10px; margin-bottom: 10px;
 }
+.rejection-msg svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .session-actions { display: flex; gap: 8px; }
 .act-btn {

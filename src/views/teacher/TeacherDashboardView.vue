@@ -1748,7 +1748,7 @@ function confirmLogout() {
 }
 
 /* ── Today's Class ── */
-.today-class { flex: 1; display: flex; flex-direction: column; }
+.today-class { flex: 1; display: flex; flex-direction: column; padding-top: 4px; }
 .today-class-header {
   display: flex;
   align-items: center;
@@ -1759,7 +1759,7 @@ function confirmLogout() {
 }
 .today-class-title {
   font-size: clamp(1.35rem, 1.8vw, 1.7rem);
-  font-weight: 700;
+  font-weight: 800;
   color: #212a30;
   margin: 0;
   letter-spacing: -0.03em;
@@ -1788,7 +1788,7 @@ function confirmLogout() {
   background: linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(244,246,247,0.96) 100%);
   border: 1px solid #dde3e6;
   border-radius: 18px;
-  padding: 20px;
+  padding: 22px;
   box-shadow: 0 12px 26px rgba(36, 43, 47, 0.08), inset 0 1px 0 rgba(255,255,255,0.9);
 }
 .carousel-topbar {
@@ -1820,22 +1820,23 @@ function confirmLogout() {
   opacity: 0.5;
 }
 .carousel-day-badge {
-  padding: 9px 16px;
-  border-radius: 10px;
-  background: #1f2937;
+  padding: 10px 20px;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #4f5a64, #293139);
   color: #fff;
   font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: 0.01em;
-  min-width: 200px;
+  min-width: 220px;
   text-align: center;
   box-shadow: inset 0 1px rgba(255,255,255,0.12);
 }
 .carousel-content {
   min-height: 260px;
-  border-radius: 12px;
-  background: #f9fafb;
-  padding: 16px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f4f6f7, #e9edef);
+  border: 1px solid #e1e5e8;
+  padding: 18px;
 }
 .carousel-state {
   display: flex;
@@ -1854,12 +1855,12 @@ function confirmLogout() {
   display: grid;
   grid-template-columns: minmax(150px, 170px) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 16px;
-  padding: 14px 16px;
-  border-radius: 12px;
+  gap: 18px;
+  padding: 15px 16px;
+  border-radius: 13px;
   background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,249,250,0.98) 100%);
   border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 4px 12px rgba(38, 44, 49, 0.07), inset 0 1px rgba(255, 255, 255, 0.9);
   transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 .class-item:hover {
@@ -1873,24 +1874,26 @@ function confirmLogout() {
   justify-content: flex-start;
   gap: 7px;
   white-space: nowrap;
-  color: #374151;
-  font-size: 0.86rem;
-  font-weight: 600;
+  color: #35424c;
+  font-size: 0.84rem;
+  font-weight: 700;
   min-width: 150px;
   padding: 9px 12px;
   border-radius: 9px;
-  background: #f3f4f6;
-  border: 1px solid #e8ebee;
+  background: #eef1f3;
+  border: 1px solid #dfe4e7;
 }
+.class-time-badge svg { color: #65737e; flex-shrink: 0; }
 .class-details {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-direction: column;
   min-width: 0;
   gap: 10px;
 }
 .class-subject {
   color: #1f2937;
-  font-weight: 600;
+  font-weight: 800;
   font-size: 0.96rem;
   margin: 0;
   letter-spacing: -0.01em;
@@ -1899,7 +1902,7 @@ function confirmLogout() {
 .class-section {
   color: #5f6974;
   font-size: 0.8rem;
-  margin: 0;
+  margin: -5px 0 0;
   font-weight: 500;
   line-height: 1.3;
 }
@@ -1908,7 +1911,7 @@ function confirmLogout() {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 14px;
+  padding: 8px 13px;
   border-radius: 10px;
   background: linear-gradient(180deg, #eaf4ff 0%, #dfeeff 100%);
   border: 1px solid #bfdaf8;
@@ -1992,16 +1995,19 @@ function confirmLogout() {
     gap: 10px 14px;
   }
   .class-item {
-    flex-wrap: wrap;
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
   .class-time-badge {
     min-width: 0;
     width: 100%;
     justify-content: center;
   }
+  .class-details { gap: 7px; }
   .class-meta {
     width: 100%;
     justify-content: flex-start;
+    margin-left: 0;
   }
 }
 

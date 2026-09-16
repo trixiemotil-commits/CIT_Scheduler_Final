@@ -499,6 +499,7 @@ async function listTeachersForStudents(req, res) {
     const teacherUsers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
       .select("role roles firstName lastName employeeId department account_status teacher_status teacher_time_in teacher_clocked_out teacher_status_expires_at teacher_availability avatar")
       .lean();
+    const activeAcademicTermId = await getActiveAcademicTermReference();
     const { activeEventTeacherIds, allTeachersOnEvent } = await getActiveEventTeacherContext();
 
     const teachers = await Promise.all(
@@ -511,12 +512,18 @@ async function listTeachersForStudents(req, res) {
 
         const [availabilitySlots, scheduleEntries, status] = await Promise.all([
           ConsultationAvailability.find({
-            $or: [
-              { employeeId: { $in: lookupKeys } },
-              { teacher: fullName },
+            $and: [
+              {
+                $or: [
+                  { employeeId: { $in: lookupKeys } },
+                  { teacher: fullName },
+                ],
+              },
+              activeAcademicTermId
+                ? { academicTermId: activeAcademicTermId }
+                : { academicTermId: null },
             ],
           })
-            .sort({ dayOfWeek: 1, startTime: 1 })
             .lean(),
           ScheduleEntry.find({ teacher: fullName })
             .select("subject year section")
@@ -581,12 +588,17 @@ async function listTeachersForStudents(req, res) {
             const [subject, year, section] = triple.split("||");
             return { subject, year, section };
           }),
-          consultationSlots: availabilitySlots.map((slot) => ({
+          consultationSlots: availabilitySlots
+            .sort((a, b) => {
+              const dayOrder = DAYS.indexOf(a.dayOfWeek) - DAYS.indexOf(b.dayOfWeek);
+              return dayOrder || (parseTimeToMinutes(a.startTime) || 0) - (parseTimeToMinutes(b.startTime) || 0);
+            })
+            .map((slot) => ({
             id: slot._id.toString(),
             dayOfWeek: slot.dayOfWeek,
             startTime: slot.startTime,
             endTime: slot.endTime,
-          })),
+            })),
         };
       })
     );

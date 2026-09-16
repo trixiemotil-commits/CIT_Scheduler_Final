@@ -26,7 +26,8 @@ function clearSession() {
 }
 
 function getRoles(user) {
-  return Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
+  const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
+  return [...new Set(roles.map(role => String(role).trim().toLowerCase()).filter(Boolean))]
 }
 
 function validateAuthPayload(payload) {
@@ -175,6 +176,8 @@ export function saveMergedUser(freshUser) {
     role: roleExists ? currentRole : freshUser.role,
     roles,
   }
+
+  mergedUser.role = String(mergedUser.role || roles[0] || '').trim().toLowerCase()
 
   activeStorage().setItem('cit_user', JSON.stringify(mergedUser))
   return mergedUser

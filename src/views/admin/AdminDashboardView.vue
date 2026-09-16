@@ -128,7 +128,7 @@
             <p>{{ todayDateLabel }} <span>Updated {{ currentTimeLabel }}</span></p>
           </div>
           <div class="today-carousel-controls" v-if="todayTeachers.length > teachersPerSlide">
-            <span><i></i> Showing {{ teachersPerSlide }} of {{ todayTeachers.length }} teachers · Repeats from beginning</span>
+            <span><i></i> {{ carouselAutoStopped ? `Showing ${carouselPageStart + 1}–${carouselPageEnd} of ${todayTeachers.length} teachers` : 'Auto-sliding schedule · swipe to pause' }}</span>
           </div>
         </div>
 
@@ -140,40 +140,50 @@
           v-else-if="todayTeachers.length"
           ref="todayScheduleWrap"
           class="today-schedule-table-wrap"
-          :class="{ 'carousel-enabled': shouldAnimateTodaySchedule, 'dragging': isCarouselDragging }"
-          @pointerdown="beginCarouselSwipe"
-          @pointermove="onCarouselSwipe"
-          @pointerup="endCarouselSwipe"
-          @pointerleave="endCarouselSwipe"
-          @pointercancel="endCarouselSwipe"
+          :class="{ 'carousel-enabled': shouldAnimateTodaySchedule && !carouselAutoStopped }"
+          @pointerdown="beginCarouselGesture"
+          @pointermove="moveCarouselGesture"
+          @pointerup="endCarouselGesture"
+          @pointercancel="cancelCarouselGesture"
+          @wheel="handleCarouselWheel"
         >
-          <table class="today-schedule-table" :class="{ 'carousel-table': shouldAnimateTodaySchedule }">
-            <thead>
-              <tr>
-                <th v-for="(teacher, teacherIndex) in visibleTodayTeachers" :key="`${teacher.name}-${teacherIndex}`" :class="['teacher-col-header', { 'carousel-start-column': shouldAnimateTodaySchedule && teacherIndex % todayTeachers.length === 0 }]">
-                  <img :src="teacher.avatar" :alt="teacher.name" class="teacher-header-avatar" />
-                  <div class="teacher-header-info">
-                    <span class="teacher-header-name">{{ teacher.name }}</span>
-                    <span :class="['teacher-header-status', teacher.currentStatus.className]">{{ teacher.currentStatus.label }}</span>
+          <div
+            class="today-schedule-track"
+            :class="{ 'carousel-table': shouldAnimateTodaySchedule && !carouselAutoStopped }"
+            :style="{ '--teacher-columns': visibleTodayTeachers.length }"
+          >
+            <section v-for="(teacher, teacherIndex) in visibleTodayTeachers" :key="`${teacher.name}-${teacherIndex}`" class="teacher-schedule-column">
+              <header class="teacher-col-header">
+                <img :src="teacher.avatar" :alt="teacher.name" class="teacher-header-avatar" />
+                <div class="teacher-header-info">
+                  <span class="teacher-header-name">{{ teacher.name }}</span>
+                  <span :class="['teacher-header-status', teacher.currentStatus.className]">{{ teacher.currentStatus.label }}</span>
+                </div>
+              </header>
+              <div class="teacher-schedule-list">
+                <div v-for="(entry, entryIndex) in teacher.featuredSchedule" :key="`${teacher.name}-${entryIndex}`" :class="['schedule-entry', getTodayEntryState(entry), getTodayEntryColor(entry)]">
+                  <time class="schedule-time">{{ entry.timeIn }}<small>{{ entry.timeOut }}</small></time>
+                  <div class="schedule-details">
+                    <strong class="schedule-subject">{{ entry.subject }}</strong>
+                    <span class="schedule-section">{{ [entry.section, entry.room].filter(Boolean).join(' · ') || 'Class details unavailable' }}</span>
                   </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(rowIndex) in getMaxScheduleLength(visibleTodayTeachers)" :key="`row-${rowIndex}`" class="schedule-row">
-                <td v-for="(teacher, teacherIndex) in visibleTodayTeachers" :key="`${teacher.name}-${rowIndex}-${teacherIndex}`" :class="['schedule-cell', { 'carousel-start-column': shouldAnimateTodaySchedule && teacherIndex % todayTeachers.length === 0 }]">
-                  <div v-if="teacher.schedule[rowIndex - 1]" :class="['schedule-entry', getTodayEntryState(teacher.schedule[rowIndex - 1]), getTodayEntryColor(teacher.schedule[rowIndex - 1])]">
-                    <time class="schedule-time">{{ teacher.schedule[rowIndex - 1].timeIn }}<small>{{ teacher.schedule[rowIndex - 1].timeOut }}</small></time>
-                    <div class="schedule-details">
-                      <strong class="schedule-subject">{{ teacher.schedule[rowIndex - 1].subject }}</strong>
-                      <span class="schedule-section">{{ [teacher.schedule[rowIndex - 1].section, teacher.schedule[rowIndex - 1].room].filter(Boolean).join(' · ') || 'Class details unavailable' }}</span>
-                    </div>
-                    <em class="schedule-label">{{ getTodayEntryLabel(teacher.schedule[rowIndex - 1]) }}</em>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                  <em class="schedule-label">{{ getTodayEntryLabel(entry) }}</em>
+                </div>
+                <button
+                  v-if="teacher.hasMoreSchedules"
+                  type="button"
+                  class="view-more-schedules-btn"
+                  @pointerdown.stop
+                  @pointerup.stop
+                  @click.stop="openTeacherCurrentTermSchedule(teacher)"
+                >
+                  View more
+                  <span aria-hidden="true">→</span>
+                </button>
+                <div v-else class="no-more-classes">No more classes today</div>
+              </div>
+            </section>
+          </div>
         </div>
         <div v-else class="today-teachers-empty">
           <span>No classes scheduled today</span>
@@ -383,13 +393,15 @@ const todayScheduleEntries = ref([])
 const teacherDirectory = ref([])
 const todayScheduleLoading = ref(true)
 const currentDateTime = ref(new Date())
-const carouselAnimating = ref(true)
-const teachersPerSlide = 4
+const teachersPerSlide = computed(() => todayTeachers.value.length <= 5
+  ? Math.max(1, todayTeachers.value.length)
+  : Math.ceil(todayTeachers.value.length / 2))
 const todayScheduleWrap = ref(null)
-const isCarouselDragging = ref(false)
-const carouselDragStartX = ref(0)
-const carouselDragStartOffset = ref(0)
-const carouselDragOffset = ref(0)
+const todayCarouselPage = ref(0)
+const carouselAutoStopped = ref(false)
+const carouselGestureStartX = ref(0)
+const carouselGestureCurrentX = ref(0)
+const carouselWheelLocked = ref(false)
 let dashboardRealtimeTimer = null
 
 const todayName = computed(() => currentDateTime.value.toLocaleDateString('en-US', { weekday: 'long' }))
@@ -401,7 +413,7 @@ const currentTimeLabel = computed(() => currentDateTime.value.toLocaleTimeString
 }))
 
 function normalizeName(value) {
-  return String(value || '').trim().toLowerCase()
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 function timeToMinutes(value) {
@@ -415,12 +427,17 @@ function timeToMinutes(value) {
   return hour * 60 + minute
 }
 
-function teacherAvatar(name) {
-  const match = teacherDirectory.value.find((teacher) => {
+function teacherProfile(name) {
+  const target = normalizeName(name)
+  return teacherDirectory.value.find((teacher) => {
     const fullName = teacher.name || `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim()
-    return normalizeName(fullName) === normalizeName(name)
-  })
-  return match?.avatar || `https://i.pravatar.cc/120?u=${encodeURIComponent(name)}`
+    return normalizeName(fullName) === target
+  }) || null
+}
+
+function teacherAvatar(name) {
+  const profile = teacherProfile(name)
+  return profile?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=DDECE5&color=1B4332`
 }
 
 function getTodayEntryState(entry) {
@@ -443,6 +460,29 @@ function getTodayEntryColor(entry) {
   return /laboratory|lab/i.test(String(entry?.roomType || '')) ? 'is-laboratory' : 'is-lecture'
 }
 
+function getFeaturedTodaySchedule(schedule) {
+  const now = currentDateTime.value.getHours() * 60 + currentDateTime.value.getMinutes()
+  return schedule.find(entry => now >= timeToMinutes(entry.timeIn) && now < timeToMinutes(entry.timeOut))
+    || schedule.find(entry => timeToMinutes(entry.timeIn) > now)
+    || schedule.at(-1)
+}
+
+function openTeacherCurrentTermSchedule(teacher) {
+  // This cache is maintained by the Current Term Schedule sidebar link. The
+  // schedule page will also resolve the published term itself if it is absent.
+  const termId = String(sessionStorage.getItem('cit-published-term-id') || '')
+  router.push({
+    path: '/admin/schedule/view',
+    query: {
+      ...(termId ? { academicTermId: termId } : {}),
+        mode: 'teacher',
+        teacher: teacher.name,
+        source: 'current',
+        highlightDay: todayName.value,
+      },
+  }).catch((error) => console.error('Unable to open the teacher schedule:', error))
+}
+
 const todayTeachers = computed(() => {
   const grouped = new Map()
   todayScheduleEntries.value
@@ -452,13 +492,23 @@ const todayTeachers = computed(() => {
     .filter((entry) => normalizeName(entry.teacher) !== 'cit faculty')
     .forEach((entry) => {
       const key = normalizeName(entry.teacher)
-      if (!grouped.has(key)) grouped.set(key, { name: entry.teacher, avatar: teacherAvatar(entry.teacher), schedule: [] })
+      if (!grouped.has(key)) {
+        const profile = teacherProfile(entry.teacher)
+        grouped.set(key, {
+          name: profile?.name || entry.teacher,
+          avatar: profile?.avatar || teacherAvatar(entry.teacher),
+          schedule: [],
+        })
+      }
       grouped.get(key).schedule.push(entry)
     })
 
   const now = currentDateTime.value.getHours() * 60 + currentDateTime.value.getMinutes()
   return [...grouped.values()].map((teacher) => {
     teacher.schedule.sort((a, b) => timeToMinutes(a.timeIn) - timeToMinutes(b.timeIn))
+    const featuredEntry = getFeaturedTodaySchedule(teacher.schedule)
+    teacher.featuredSchedule = featuredEntry ? [featuredEntry] : []
+    teacher.hasMoreSchedules = teacher.schedule.length > teacher.featuredSchedule.length
     const current = teacher.schedule.find((entry) => now >= timeToMinutes(entry.timeIn) && now < timeToMinutes(entry.timeOut))
     const next = teacher.schedule.find((entry) => timeToMinutes(entry.timeIn) > now)
     teacher.currentStatus = current
@@ -476,79 +526,81 @@ const todayTeachers = computed(() => {
   })
 })
 
-const todayTeacherMaxIndex = computed(() => todayTeachers.value.length)
-const shouldAnimateTodaySchedule = computed(() => todayTeachers.value.length > 3)
-// Create a duplicated list for a smooth infinite carousel without visible breaks
+const shouldAnimateTodaySchedule = computed(() => todayTeachers.value.length > teachersPerSlide.value)
 const infiniteTeachers = computed(() => {
   const teachers = todayTeachers.value
-  if (!shouldAnimateTodaySchedule.value || teachers.length <= 3) return teachers
-  return [...teachers, ...teachers, ...teachers]
+  return shouldAnimateTodaySchedule.value ? [...teachers, ...teachers, ...teachers] : teachers
 })
-const visibleTodayTeachers = computed(() => infiniteTeachers.value)
 const todayCarouselPages = computed(() => Array.from(
-  { length: Math.ceil(todayTeachers.value.length / teachersPerSlide) },
-  (_, index) => ({ index, start: index * teachersPerSlide })
+  { length: Math.ceil(todayTeachers.value.length / teachersPerSlide.value) },
+  (_, index) => ({ index, start: index * teachersPerSlide.value })
 ))
+const visibleTodayTeachers = computed(() => carouselAutoStopped.value
+  ? todayTeachers.value.slice(
+    todayCarouselPage.value * teachersPerSlide.value,
+    (todayCarouselPage.value + 1) * teachersPerSlide.value,
+  )
+  : infiniteTeachers.value)
+const carouselPageStart = computed(() => todayCarouselPage.value * teachersPerSlide.value)
+const carouselPageEnd = computed(() => Math.min(carouselPageStart.value + visibleTodayTeachers.value.length, todayTeachers.value.length))
 
 function previousTodayTeachers() {
-  // Placeholder - carousel is fully automatic via CSS
+  if (!todayCarouselPages.value.length) return
+  carouselAutoStopped.value = true
+  todayCarouselPage.value = (todayCarouselPage.value + todayCarouselPages.value.length - 1) % todayCarouselPages.value.length
 }
 
 function nextTodayTeachers() {
-  // Placeholder - carousel is fully automatic via CSS
+  if (!todayCarouselPages.value.length) return
+  carouselAutoStopped.value = true
+  todayCarouselPage.value = (todayCarouselPage.value + 1) % todayCarouselPages.value.length
 }
 
-function beginCarouselSwipe(event) {
+function beginCarouselGesture(event) {
+  carouselGestureStartX.value = event.clientX || 0
+  carouselGestureCurrentX.value = carouselGestureStartX.value
+  event.currentTarget?.setPointerCapture?.(event.pointerId)
+}
+
+function moveCarouselGesture(event) {
+  carouselGestureCurrentX.value = event.clientX || carouselGestureCurrentX.value
+}
+
+function endCarouselGesture(event) {
+  event.currentTarget?.releasePointerCapture?.(event.pointerId)
   if (!shouldAnimateTodaySchedule.value) return
-  const table = todayScheduleWrap.value?.querySelector('.today-schedule-table')
-  if (!table) return
 
-  isCarouselDragging.value = true
-  carouselDragStartX.value = event.clientX
-  carouselDragStartOffset.value = carouselDragOffset.value
-  table.style.transition = 'transform 0.12s linear'
+  const endX = event.clientX || carouselGestureCurrentX.value
+  const distance = endX - carouselGestureStartX.value
+  if (Math.abs(distance) < 40) return
+
+  if (distance < 0) nextTodayTeachers()
+  else previousTodayTeachers()
+  carouselGestureStartX.value = 0
+  carouselGestureCurrentX.value = 0
 }
 
-function onCarouselSwipe(event) {
-  if (!isCarouselDragging.value) return
-
-  const deltaX = event.clientX - carouselDragStartX.value
-  const nextOffset = carouselDragStartOffset.value + deltaX
-  carouselDragOffset.value = Math.max(-220, Math.min(220, nextOffset))
-
-  const table = todayScheduleWrap.value?.querySelector('.today-schedule-table')
-  if (!table) return
-
-  table.style.setProperty('--drag-shift', `${carouselDragOffset.value}px`)
+function cancelCarouselGesture(event) {
+  event.currentTarget?.releasePointerCapture?.(event.pointerId)
+  carouselGestureStartX.value = 0
+  carouselGestureCurrentX.value = 0
 }
 
-function endCarouselSwipe() {
-  if (!isCarouselDragging.value) return
+function handleCarouselWheel(event) {
+  if (!shouldAnimateTodaySchedule.value || carouselWheelLocked.value) return
 
-  isCarouselDragging.value = false
-  const table = todayScheduleWrap.value?.querySelector('.today-schedule-table')
-  if (!table) return
+  const horizontalDistance = Math.abs(event.deltaX) >= Math.abs(event.deltaY)
+    ? event.deltaX
+    : 0
+  if (Math.abs(horizontalDistance) < 20) return
 
-  const deltaX = carouselDragOffset.value
-  const direction = deltaX < 0 ? -1 : 1
-  const distance = Math.abs(deltaX)
-  const momentumBoost = distance > 30 ? Math.min(90, distance * 0.4) : 0
-  const finalOffset = direction * momentumBoost
-
-  table.style.transition = 'transform 0.45s ease'
-  carouselDragOffset.value = finalOffset
-  table.style.setProperty('--drag-shift', `${finalOffset}px`)
-
+  event.preventDefault()
+  carouselWheelLocked.value = true
+  if (horizontalDistance > 0) nextTodayTeachers()
+  else previousTodayTeachers()
   window.setTimeout(() => {
-    carouselDragOffset.value = 0
-    table.style.setProperty('--drag-shift', '0px')
-    table.style.transition = ''
+    carouselWheelLocked.value = false
   }, 450)
-}
-
-function startCarouselAutoAdvance() {
-  // Animation is handled purely by CSS @keyframes
-  // This function is kept for compatibility
 }
 
 function getMaxScheduleLength(teachers) {
@@ -1154,8 +1206,6 @@ onMounted(() => {
   }, 10000)
   window.addEventListener('focus', refreshTodayTeacherSchedules)
   document.addEventListener('visibilitychange', refreshTodayTeacherSchedules)
-  // Start carousel auto-advance after initial load
-  nextTick(() => startCarouselAutoAdvance())
 })
 
 onUnmounted(() => {
@@ -1535,37 +1585,15 @@ function confirmLogout() {
 }
 /* Table format styles */
 .today-schedule-table-wrap { 
-  overflow-x: auto;
+  overflow: hidden;
   overflow-y: hidden;
   border-radius: 16px;
   background: rgba(255,255,255,0.7);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
   position: relative;
   animation: tableSlideIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  cursor: grab;
   user-select: none;
-  touch-action: pan-x pan-y;
-}
-.today-schedule-table-wrap.dragging {
-  cursor: grabbing;
-}
-.carousel-start-column {
-  border-left: 3px solid #59656d !important;
-}
-.teacher-col-header.carousel-start-column::before {
-  content: 'SCHEDULE START';
-  position: absolute;
-  top: 7px;
-  left: 8px;
-  padding: 3px 5px;
-  border: 1px solid #aeb8bd;
-  border-radius: 4px;
-  background: #59656d;
-  color: #fff;
-  font-size: .54rem;
-  font-weight: 800;
-  letter-spacing: .08em;
-  line-height: 1;
+  touch-action: pan-y;
 }
 @keyframes tableSlideIn {
   from {
@@ -1578,7 +1606,6 @@ function confirmLogout() {
   }
 }
 .today-schedule-table {
-  --drag-shift: 0px;
   width: max-content;
   min-width: 100%;
   border-collapse: separate;
@@ -1586,24 +1613,63 @@ function confirmLogout() {
   table-layout: fixed;
   background: #fff;
   animation: none;
-  will-change: transform;
 }
-.carousel-enabled .today-schedule-table {
+.carousel-enabled .today-schedule-track {
+  min-width: 0;
   animation: infiniteCarousel 34s linear infinite;
 }
 @keyframes infiniteCarousel {
-  0% {
-    transform: translateX(var(--drag-shift, 0px));
-  }
-  100% {
-    transform: translateX(calc(var(--drag-shift, 0px) - 50%));
-  }
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-33.333%); }
+}
+.today-schedule-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 240px;
+  width: max-content;
+  min-width: 100%;
+  align-items: start;
+  background: transparent;
+}
+.today-schedule-track:not(.carousel-table) {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(var(--teacher-columns), minmax(0, 1fr));
+  grid-auto-flow: initial;
+  grid-auto-columns: auto;
+}
+.teacher-schedule-column {
+  min-width: 240px;
+  width: 240px;
+  border-right: 1px solid #e8ecf0;
+  background: transparent;
+}
+.teacher-schedule-column:last-child { border-right: none; }
+.today-schedule-track:not(.carousel-table) .teacher-schedule-column {
+  min-width: 0;
+  width: auto;
+}
+.today-schedule-track:not(.carousel-table) .teacher-col-header {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  padding-inline: clamp(8px, 1.5vw, 18px);
+}
+.today-schedule-track:not(.carousel-table) .teacher-header-avatar {
+  width: clamp(48px, 5vw, 64px);
+  height: clamp(48px, 5vw, 64px);
+}
+.today-schedule-track:not(.carousel-table) .teacher-schedule-list {
+  padding-inline: clamp(6px, 1vw, 12px);
+}
+.today-schedule-track:not(.carousel-table) .schedule-entry {
+  padding-inline: clamp(8px, 1vw, 12px);
 }
 .teacher-col-header { 
   padding: 22px 18px 20px;
   text-align: center;
   border-bottom: 3px solid #e1e6e9;
-  border-right: 1px solid #e8ecf0;
+  border-right: none;
   background: linear-gradient(180deg, #fbfcfd 0%, #f3f5f7 100%);
   position: relative;
   min-width: 240px;
@@ -1677,6 +1743,56 @@ function confirmLogout() {
   background: #eceff1;
   box-shadow: 0 2px 6px rgba(144,164,174,0.12);
 }
+.teacher-schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 12px 18px;
+  border-top: 1px solid #e1e6e9;
+}
+.no-more-classes,
+.view-more-schedules-btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 2px 6px 0;
+  padding: 8px 6px;
+  border: 1px dashed #d8dfe3;
+  border-radius: 8px;
+  color: #a0a9b0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-align: center;
+}
+.view-more-schedules-btn {
+  width: 100%;
+  align-self: stretch;
+  margin: 2px 6px 0;
+  padding: 6px 9px;
+  cursor: pointer;
+  color: #496c5a;
+  border-style: solid;
+  border-color: #a9c5b4;
+  background: #f7fbf8;
+  font-family: inherit;
+  font-size: .64rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.view-more-schedules-btn:hover,
+.view-more-schedules-btn:focus-visible {
+  border-color: #5d9273;
+  background: #e5f2e9;
+  box-shadow: 0 3px 9px rgba(45, 100, 70, .14);
+  outline: none;
+  transform: translateY(-1px);
+}
+.view-more-schedules-btn span { font-size: .74rem; line-height: 1; }
 .schedule-row {
   border-bottom: 1px solid #e8ecf0;
   transition: background 0.15s ease;
@@ -1725,7 +1841,9 @@ function confirmLogout() {
 .schedule-entry.is-current { 
   background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
   border-color: #4caf50;
-  box-shadow: 0 3px 10px rgba(76,175,80,0.12), inset 0 1px 0 rgba(255,255,255,0.5);
+  border-width: 2px;
+  box-shadow: 0 6px 18px rgba(76,175,80,0.25), 0 0 0 3px rgba(76,175,80,0.1), inset 0 1px 0 rgba(255,255,255,0.5);
+  transform: translateY(-2px);
 }
 .schedule-entry.is-current::before {
   background: #4caf50;

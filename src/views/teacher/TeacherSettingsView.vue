@@ -57,8 +57,7 @@
           </div>
 
           <form class="settings-form" @submit.prevent="handleUpdatePassword">
-            <!-- Step 1: Current password + Send OTP -->
-            <div class="settings-row settings-row--otp">
+            <div class="settings-row">
               <div class="settings-group">
                 <label class="settings-label">Current Password</label>
                 <div class="pw-input-wrap">
@@ -75,42 +74,28 @@
                   </button>
                 </div>
               </div>
-              <div class="settings-group settings-group--btn" style="padding-top: 22px;">
-                <button
-                  v-if="!otpSent"
-                  type="button"
-                  class="send-otp-btn"
-                  @click="sendOtp"
-                >Send OTP</button>
-                <div v-else class="otp-sent-badge">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  OTP sent
-                  <button type="button" class="resend-text-btn" @click="resetOtp">Resend</button>
+              <div class="settings-group">
+                <label class="settings-label">OTP</label>
+                <div class="otp-entry-wrap">
+                  <input
+                    v-model="otpInputValue"
+                    class="settings-input"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    placeholder="_ _ _ _ _ _"
+                    maxlength="6"
+                    :disabled="!otpSent"
+                  />
+                  <button type="button" class="send-otp-btn" @click="otpSent ? resetOtp() : sendOtp">
+                    {{ otpSent ? 'Resend' : 'Send OTP' }}
+                  </button>
                 </div>
+                <span v-if="otpSent" class="otp-expiry">Expires in {{ formattedOtpTime }}.</span>
               </div>
             </div>
 
-            <!-- Step 2: OTP + new passwords (shown after OTP is sent) -->
             <template v-if="otpSent">
-              <div class="settings-group">
-                <label class="settings-label">Enter OTP <span class="otp-hint">Sent to {{ maskedEmail }}</span></label>
-                <span class="otp-hint">Expires in {{ formattedOtpTime }}</span>
-                <div class="otp-boxes-inline">
-                  <input
-                    v-for="(_, i) in pwOtpCode"
-                    :key="i"
-                    :ref="el => { if (el) pwOtpRefs[i] = el }"
-                    v-model="pwOtpCode[i]"
-                    class="otp-box-sm"
-                    type="text"
-                    maxlength="1"
-                    inputmode="numeric"
-                    @input="onPwOtpInput(i)"
-                    @keydown.backspace="onPwOtpBackspace(i)"
-                  />
-                </div>
-              </div>
-
               <div class="settings-row">
                 <div class="settings-group">
                   <label class="settings-label">New Password</label>
@@ -149,7 +134,7 @@
             <div v-if="pwSuccess" class="settings-msg settings-msg--success">{{ pwSuccess }}</div>
 
             <div class="settings-form-footer">
-              <button type="submit" class="update-pw-btn" :disabled="!otpSent">Update Password</button>
+              <button type="submit" class="update-pw-btn">Update Password</button>
             </div>
           </form>
         </div>
@@ -375,6 +360,13 @@ const pwSuccess    = ref('')
 const otpSent      = ref(false)
 const pwOtpCode    = ref(['', '', '', '', '', ''])
 const pwOtpRefs    = ref([])
+const otpInputValue = computed({
+  get: () => pwOtpCode.value.join(''),
+  set: (value) => {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 6)
+    pwOtpCode.value = Array.from({ length: 6 }, (_, index) => digits[index] || '')
+  },
+})
 const otpSecondsRemaining = ref(0)
 let otpTimer = null
 const formattedOtpTime = computed(() => `0:${String(otpSecondsRemaining.value).padStart(2, '0')}`)
@@ -740,10 +732,10 @@ const faqs = [
 .settings-card-sub   { font-size: 0.82rem; color: #888; margin: 3px 0 0; }
 
 /* ── Form ── */
-.settings-form  { display: flex; flex-direction: column; gap: 18px; }
-.settings-row            { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.settings-row--otp       { grid-template-columns: 1fr auto; align-items: end; }
-.settings-group          { display: flex; flex-direction: column; gap: 7px; }
+.settings-form  { display: flex; flex-direction: column; gap: 34px; }
+.settings-row            { display: grid; grid-template-columns: repeat(2, minmax(0, 350px)); justify-content: center; gap: 40px 48px; }
+.settings-row--otp       { grid-template-columns: repeat(2, minmax(0, 350px)); align-items: end; }
+.settings-group          { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .settings-group--btn     { justify-content: flex-end; }
 .settings-label { font-size: 0.82rem; font-weight: 600; color: #555; }
 
@@ -754,6 +746,7 @@ const faqs = [
   background: #fff;
   border: 1.5px solid #dde2e8;
   border-radius: 8px;
+  min-height: 44px;
   padding: 10px 14px;
   outline: none;
   width: 100%;
@@ -766,21 +759,28 @@ const faqs = [
 }
 
 /* eye toggle */
-.pw-input-wrap { position: relative; display: flex; align-items: center; }
-.pw-input-wrap .settings-input { padding-right: 42px; }
+.pw-input-wrap { position: relative; display: flex; align-items: center; width: min(100%, 350px); }
+.pw-input-wrap .settings-input { width: 100%; padding-right: 54px; }
 .pw-eye {
   position: absolute;
-  right: 12px;
+  top: 50%;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  transform: translateY(-50%);
   background: none;
   border: none;
   cursor: pointer;
-  color: #aaa;
+  color: #7b8794;
   display: flex;
   align-items: center;
+  justify-content: center;
   padding: 0;
-  transition: color 0.15s;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
 }
-.pw-eye:hover { color: #4b5563; }
+.pw-eye svg { width: 20px; height: 20px; }
+.pw-eye:hover { color: #4b5563; background: #f1f3f5; }
 
 /* Send OTP button */
 .send-otp-btn {
@@ -788,17 +788,38 @@ const faqs = [
   font-size: 0.82rem;
   font-weight: 600;
   white-space: nowrap;
-  width: fit-content;
+  width: 180px;
+  min-height: 44px;
   background: linear-gradient(135deg, #4b5563, #6b7280);
   color: #fff;
   border: none;
   border-radius: 8px;
-  padding: 10px 20px;
+  padding: 10px 16px;
   cursor: pointer;
   transition: opacity 0.15s;
   box-shadow: 0 2px 6px rgba(48, 53, 58,0.2);
 }
 .send-otp-btn:hover { opacity: 0.85; }
+.otp-entry-wrap {
+  display: flex;
+  align-items: stretch;
+  width: min(100%, 350px);
+  min-height: 44px;
+}
+.otp-entry-wrap .settings-input {
+  min-width: 0;
+  flex: 1;
+  border-radius: 8px 0 0 8px;
+  border-right: none;
+}
+.otp-entry-wrap .send-otp-btn {
+  width: 110px;
+  min-width: 110px;
+  padding: 10px 8px;
+  border-radius: 0 8px 8px 0;
+  box-shadow: none;
+}
+.otp-expiry { color: #b45309; font-size: 0.75rem; font-weight: 500; }
 
 /* OTP sent badge */
 .otp-sent-badge {
@@ -871,19 +892,24 @@ const faqs = [
 /* Update button */
 .settings-form-footer { display: flex; justify-content: center; padding-top: 4px; }
 .update-pw-btn {
-  background: #4b5563;
+  min-width: 180px;
+  min-height: 44px;
+  background: linear-gradient(145deg, #56616c, #3b444d);
   color: #fff;
   border: none;
   font-family: inherit;
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 12px 48px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 10px 20px;
   border-radius: 10px;
   cursor: pointer;
-  transition: background 0.18s, opacity 0.18s;
-  box-shadow: 0 4px 14px rgba(48, 53, 58,0.2);
+  transition: background 0.18s, transform 0.18s, opacity 0.18s;
+  box-shadow: 0 5px 12px rgba(48, 53, 58, 0.2);
 }
-.update-pw-btn:hover:not(:disabled) { background: #6b7280; }
+.update-pw-btn:hover:not(:disabled) {
+  background: linear-gradient(145deg, #65717d, #46515c);
+  transform: translateY(-1px);
+}
 .update-pw-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 
 /* ── Toggle ── */
@@ -894,7 +920,7 @@ const faqs = [
 .two-factor-card .settings-card-header { width: 100%; margin-bottom: 16px; padding-right: 118px; }
 .two-factor-card .settings-card-header .tfa-control { position: absolute; top: 22px; right: 28px; margin-left: 0; transform: none; }
 .two-factor-card .tfa-control { display: flex; align-items: center; gap: 10px; }
-.two-factor-card .settings-row { align-items: flex-start; gap: 18px; }
+.two-factor-card .settings-row { align-items: flex-start; gap: 40px 48px; }
 .two-factor-card .settings-group:first-child { flex: 1; max-width: 680px; }
 .two-factor-card .otp-hint { margin: 0 0 12px; color: var(--metal-muted); }
 .two-factor-card .settings-input { max-width: 420px; background: var(--metal-50); }

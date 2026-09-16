@@ -49,8 +49,9 @@
     <main class="main">
       <header class="main-header">
         <div>
+          <span class="settings-eyebrow">Account &amp; security</span>
           <h1 class="page-title">Settings</h1>
-          <p class="page-sub">Manage your account settings and preferences</p>
+          <p class="page-sub">Manage account access, password security, and sign-in preferences.</p>
         </div>
       </header>
 
@@ -62,11 +63,17 @@
             <div class="settings-card-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </div>
-            <h2 class="settings-card-title">Change Password</h2>
+            <div>
+              <h2 class="settings-card-title">Change Password</h2>
+              <p class="settings-card-sub">Use your current password and a one-time code to secure this change.</p>
+            </div>
           </div>
 
-          <form class="settings-form" @submit.prevent="handleUpdatePassword">
-            <div class="settings-row">
+          <form class="settings-form" @submit.prevent="passwordStep === 1 ? advancePasswordStep() : handleUpdatePassword()">
+            <div v-if="passwordStep === 1" class="settings-step-label"><span>Step 1 of 2</span> Verify your identity</div>
+            <div v-else class="settings-step-label"><span>Step 2 of 2</span> Choose a new password</div>
+
+            <div v-if="passwordStep === 1" class="settings-row">
               <div class="settings-group">
                 <label class="settings-label">Current Password</label>
                 <div class="pw-input-wrap">
@@ -92,7 +99,7 @@
               </div>
             </div>
 
-            <div class="settings-row">
+            <div v-else class="settings-row">
               <div class="settings-group">
                 <label class="settings-label">New Password</label>
                 <div class="pw-input-wrap">
@@ -129,17 +136,22 @@
             <div v-if="pwSuccess" class="settings-msg settings-msg--success">{{ pwSuccess }}</div>
 
             <div class="settings-form-footer">
-              <button type="submit" class="update-pw-btn" :disabled="isUpdatingPassword">{{ isUpdatingPassword ? 'Updating...' : 'Update Password' }}</button>
+              <button v-if="passwordStep === 2" type="button" class="password-back-btn" @click="passwordStep = 1">Back</button>
+              <button v-if="passwordStep === 1" type="button" class="update-pw-btn" @click="advancePasswordStep">Continue</button>
+              <button v-else type="submit" class="update-pw-btn" :disabled="isUpdatingPassword">{{ isUpdatingPassword ? 'Updating...' : 'Update Password' }}</button>
             </div>
           </form>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card verification-card">
           <div class="settings-card-header">
             <div class="settings-card-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </div>
-            <h2 class="settings-card-title">Email verification on login</h2>
+            <div>
+              <h2 class="settings-card-title">Email verification on login</h2>
+              <p class="settings-card-sub">Add a one-time verification step whenever you sign in.</p>
+            </div>
             <div class="tfa-control">
               <span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span>
               <button type="button" class="toggle-switch" :class="{ 'toggle-switch--on': twoFactorEnabled }" :disabled="isSavingTwoFactor" :aria-pressed="twoFactorEnabled" :aria-label="twoFactorEnabled ? 'Disable email verification' : 'Enable email verification'" @click="toggleTwoFactor">
@@ -308,6 +320,7 @@ function confirmLogout() {
 
 /* ── Change Password ── */
 const passwordForm = ref({ current: '', otp: '', newPw: '', confirmPw: '' })
+const passwordStep = ref(1)
 const showCurrent  = ref(false)
 const showNew      = ref(false)
 const showConfirm  = ref(false)
@@ -395,6 +408,20 @@ async function sendOtp() {
   }
 }
 
+function advancePasswordStep() {
+  pwError.value = ''
+  pwSuccess.value = ''
+  if (!passwordForm.value.current || !passwordForm.value.otp) {
+    pwError.value = 'Enter your current password and the OTP to continue.'
+    return
+  }
+  if (!/^\d{6}$/.test(passwordForm.value.otp)) {
+    pwError.value = 'Enter the 6-digit OTP sent to your email.'
+    return
+  }
+  passwordStep.value = 2
+}
+
 async function handleUpdatePassword() {
   pwError.value   = ''
   pwSuccess.value = ''
@@ -427,6 +454,7 @@ async function handleUpdatePassword() {
     })
     pwSuccess.value = response.message
     passwordForm.value = { current: '', otp: '', newPw: '', confirmPw: '' }
+    passwordStep.value = 1
     otpSent.value = false
     clearOtpTimer()
   } catch (error) {
@@ -492,7 +520,7 @@ const faqs = [
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background: #f5f6f8;
+  background: radial-gradient(circle at 82% 8%, #f8fafb 0, #e7ebee 34%, #d8dde1 100%);
   font-family: 'Poppins', sans-serif;
 }
 
@@ -580,7 +608,7 @@ const faqs = [
 /* ── Main ── */
 .main {
   flex: 1;
-  padding: 40px 44px 32px;
+  padding: 38px 58px 48px;
   overflow-y: auto;
   min-width: 0;
   display: flex;
@@ -591,41 +619,54 @@ const faqs = [
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 32px;
+  margin-bottom: 26px;
+}
+.settings-eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: #697780;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
 }
 .page-title {
-  font-size: 2rem;
-  font-weight: 600;
-  color: #4b5563;
-  letter-spacing: -0.5px;
+  font-size: 2.15rem;
+  font-weight: 700;
+  color: #27323a;
+  letter-spacing: -.04em;
   line-height: 1.2;
 }
 .page-sub {
-  font-size: 0.95rem;
-  color: #777;
-  margin-top: 4px;
+  font-size: .9rem;
+  color: #6d7981;
+  margin-top: 6px;
 }
 
 /* ── Settings body ── */
 .settings-body {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
+  max-width: 1180px;
   width: 100%;
 }
 
 /* ── Card ── */
 .settings-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 28px 32px 30px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(235,239,242,.9));
+  border: 1px solid rgba(133, 145, 153, .42);
+  border-radius: 18px;
+  padding: 25px 30px 28px;
+  box-shadow: inset 0 1px rgba(255,255,255,.92), 0 12px 30px rgba(47, 58, 66, .1);
 }
 .settings-card-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 13px;
+  margin-bottom: 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(129, 140, 148, .25);
 }
 .settings-card-header--between {
   justify-content: space-between;
@@ -639,51 +680,81 @@ const faqs = [
 .settings-card-icon {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  background: #f3f4f6;
+  border: 1px solid #aab4ba;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #f9fafb, #dce2e5);
+  box-shadow: inset 0 1px #fff, 0 3px 8px rgba(58, 70, 78, .12);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 .settings-card-title {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: #111;
+  color: #263139;
   margin: 0;
   line-height: 1.3;
 }
 .settings-card-sub {
-  font-size: 0.82rem;
-  color: #888;
-  margin: 3px 0 0;
+  font-size: .75rem;
+  color: #738089;
+  margin: 4px 0 0;
+  line-height: 1.45;
 }
 
 /* ── Form ── */
-.settings-form { display: flex; flex-direction: column; gap: 18px; }
-.settings-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.settings-group { display: flex; flex-direction: column; gap: 7px; }
-.settings-label {
-  font-size: 0.82rem;
+.settings-form { display: flex; flex-direction: column; gap: 24px; max-width: 920px; }
+.settings-step-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #66747d;
+  font-size: .76rem;
   font-weight: 600;
-  color: #555;
+}
+.settings-step-label span {
+  padding: 4px 8px;
+  border: 1px solid #aab5bb;
+  border-radius: 999px;
+  background: #eef1f3;
+  color: #4a5962;
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.settings-row  {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-content: start;
+  gap: 22px 28px;
+}
+.settings-group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.settings-label {
+  font-size: .75rem;
+  font-weight: 700;
+  color: #4d5a63;
   letter-spacing: 0.1px;
 }
 .settings-input {
+  box-sizing: border-box;
   font-family: inherit;
   font-size: 0.9rem;
   color: #111;
-  background: #fff;
-  border: 1.5px solid #dde2e8;
-  border-radius: 8px;
-  padding: 10px 14px;
+  background: rgba(255,255,255,.82);
+  border: 1px solid #acb7be;
+  border-radius: 9px;
+  min-height: 42px;
+  padding: 9px 13px;
+  box-shadow: inset 0 1px 2px rgba(42, 52, 58, .08), 0 1px rgba(255,255,255,.8);
   outline: none;
   width: 100%;
   transition: border-color 0.18s, box-shadow 0.18s;
 }
 .settings-input:focus {
-  border-color: #6b7280;
-  box-shadow: 0 0 0 3px rgba(83, 91, 100,0.09);
+  border-color: #687780;
+  box-shadow: 0 0 0 3px rgba(90, 105, 114,.13), inset 0 1px 2px rgba(42, 52, 58, .06);
 }
 
 /* password eye toggle */
@@ -691,29 +762,47 @@ const faqs = [
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
-.pw-input-wrap .settings-input { padding-right: 42px; }
+.pw-input-wrap .settings-input {
+  width: 100%;
+  max-width: none;
+  padding-right: 48px;
+}
 .pw-eye {
   position: absolute;
-  right: 12px;
+  top: 50%;
+  right: 6px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  transform: translateY(-50%);
   background: none;
   border: none;
   cursor: pointer;
-  color: #aaa;
+  color: #7b8794;
   display: flex;
   align-items: center;
+  justify-content: center;
   padding: 0;
-  transition: color 0.15s;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
 }
-.pw-eye:hover { color: #4b5563; }
+.pw-eye svg { width: 18px; height: 18px; }
+.pw-eye:hover { color: #4b5563; background: #f1f3f5; }
+.pw-eye:focus-visible { outline: 2px solid #7b8794; outline-offset: 1px; }
 
 /* OTP row */
 .otp-wrap {
   display: flex;
   align-items: stretch;
+  width: 100%;
+  min-height: 42px;
   gap: 0;
 }
 .otp-wrap .settings-input {
+  min-width: 0;
+  flex: 1;
   border-radius: 8px 0 0 8px;
   border-right: none;
 }
@@ -722,16 +811,16 @@ const faqs = [
   font-size: 0.78rem;
   font-weight: 600;
   white-space: nowrap;
-  background: #f0f0f0;
-  color: #444;
-  border: 1.5px solid #dde2e8;
+  background: linear-gradient(145deg, #66737c, #46525b);
+  color: #fff;
+  border: 1px solid #46525b;
   border-left: none;
   border-radius: 0 8px 8px 0;
-  padding: 0 16px;
+  padding: 0 12px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.otp-btn:hover { background: #4b5563; color: #fff; }
+.otp-btn:hover { background: linear-gradient(145deg, #77848d, #535f68); color: #fff; }
 .otp-btn:disabled,
 .update-pw-btn:disabled { cursor: not-allowed; opacity: 0.65; }
 .otp-expiry { font-size: 0.75rem; color: #b45309; font-weight: 500; }
@@ -749,23 +838,46 @@ const faqs = [
 /* Update button */
 .settings-form-footer {
   display: flex;
-  justify-content: center;
-  padding-top: 4px;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 2px;
 }
 .update-pw-btn {
-  background: #4b5563;
+  min-width: 168px;
+  min-height: 42px;
+  background: linear-gradient(145deg, #67757e, #3f4b54);
   color: #fff;
   border: none;
   font-family: inherit;
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 12px 48px;
-  border-radius: 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 10px 20px;
+  border: 1px solid #3c4850;
+  border-radius: 9px;
   cursor: pointer;
-  transition: background 0.18s;
-  box-shadow: 0 4px 14px rgba(48, 53, 58,0.2);
+  transition: background 0.18s, transform 0.18s, box-shadow 0.18s;
+  box-shadow: inset 0 1px rgba(255,255,255,.2), 0 5px 12px rgba(48, 53, 58, .2);
 }
-.update-pw-btn:hover { background: #6b7280; }
+.update-pw-btn:hover:not(:disabled) {
+  background: linear-gradient(145deg, #65717d, #46515c);
+  transform: translateY(-1px);
+  box-shadow: 0 7px 16px rgba(48, 53, 58, 0.24);
+}
+.password-back-btn {
+  min-height: 42px;
+  padding: 9px 16px;
+  border: 1px solid #aab5bb;
+  border-radius: 9px;
+  background: rgba(255,255,255,.64);
+  color: #53616a;
+  font-family: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease;
+}
+.password-back-btn:hover { background: #edf1f3; border-color: #7f8d95; }
 
 /* ── Disable 2FA SweetAlert ── */
 .swal-overlay {
@@ -839,30 +951,39 @@ const faqs = [
 /* ── Toggle Switch ── */
 .two-factor-card {
   position: relative;
-  padding: 22px 28px 24px;
+  padding: 25px 30px 28px;
 }
-.two-factor-card .settings-card-header { width: 100%; margin-bottom: 16px; padding-right: 118px; }
-.two-factor-card .settings-card-header .tfa-control { position: absolute; top: 22px; right: 28px; margin-left: 0; transform: none; }
+.two-factor-card .settings-card-header { width: 100%; margin-bottom: 20px; padding-right: 118px; }
+.two-factor-card .settings-card-header .tfa-control { position: absolute; top: 30px; right: 30px; margin-left: 0; transform: none; }
 .two-factor-card .tfa-control { display: flex; align-items: center; gap: 10px; }
-.two-factor-card .settings-row { align-items: flex-start; gap: 18px; }
+.two-factor-card .settings-row { align-items: flex-start; gap: 22px 28px; }
 .two-factor-card .settings-group:first-child { flex: 1; max-width: 680px; }
 .two-factor-card .tfa-note { margin: 0 0 12px; padding: 0; background: transparent; color: var(--metal-muted); }
-.two-factor-card .settings-input { max-width: 420px; background: var(--metal-50); }
+.two-factor-card .settings-input { max-width: 420px; background: rgba(255,255,255,.82); }
+.verification-card .settings-row { grid-template-columns: minmax(0, 520px); }
+.verification-card .settings-card-header { margin-bottom: 18px; }
+.verification-card .tfa-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  padding-left: 20px;
+}
 .tfa-status { color: var(--metal-muted); font-size: 0.75rem; font-weight: 700; min-width: 52px; text-align: right; }
 .toggle-switch {
   position: relative;
   width: 50px;
   height: 27px;
   border-radius: 20px;
-  background: #ccc;
-  border: none;
+  background: #aeb7bd;
+  border: 1px solid #89959d;
   cursor: pointer;
   transition: background 0.25s;
   flex-shrink: 0;
   padding: 0;
   outline: none;
 }
-.toggle-switch--on { background: #4b5563; }
+.toggle-switch--on { background: #56636c; }
 .toggle-thumb {
   position: absolute;
   top: 3px;
@@ -882,15 +1003,16 @@ const faqs = [
   gap: 8px;
   margin-top: 18px;
   padding: 12px 16px;
-  background: #f3f4f6;
-  border-radius: 10px;
-  font-size: 0.84rem;
-  color: #4f575f;
+  background: rgba(221, 226, 229, .68);
+  border: 1px solid rgba(144, 155, 162, .36);
+  border-radius: 9px;
+  font-size: .78rem;
+  color: #53616a;
   line-height: 1.55;
 }
 
 /* ── FAQ Section ── */
-.settings-faq-section { display: flex; flex-direction: column; gap: 0; }
+.settings-faq-section { display: flex; flex-direction: column; gap: 0; padding: 4px 0 0; }
 .faq-header {
   display: flex;
   align-items: center;
@@ -900,7 +1022,8 @@ const faqs = [
 .faq-header-icon {
   width: 40px; height: 40px;
   border-radius: 12px;
-  background: #f3f4f6;
+  background: linear-gradient(145deg, #f9fafb, #dce2e5);
+  border: 1px solid #aab4ba;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -908,7 +1031,7 @@ const faqs = [
 .faq-title {
   font-size: 1.35rem;
   font-weight: 700;
-  color: #111;
+  color: #2b363e;
   margin: 0;
 }
 
@@ -918,15 +1041,15 @@ const faqs = [
   gap: 12px;
 }
 .faq-item {
-  background: #fff;
-  border: 1.5px solid #ececec;
+  background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(231,235,238,.88));
+  border: 1px solid rgba(135, 146, 154, .38);
   border-radius: 12px;
   overflow: hidden;
   transition: border-color 0.18s, box-shadow 0.18s, transform 0.15s;
 }
 .faq-item--open {
-  border-color: #bfc6cb;
-  box-shadow: 0 4px 14px rgba(48, 53, 58,0.08);
+  border-color: #8e9aa2;
+  box-shadow: 0 7px 18px rgba(48, 53, 58,.1);
 }
 .faq-question {
   display: flex;
@@ -934,18 +1057,18 @@ const faqs = [
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  background: transparent;
   border: none;
-  padding: 18px 20px;
+  padding: 15px 18px;
   font-family: inherit;
-  font-size: 1.03rem;
+  font-size: .9rem;
   font-weight: 600;
-  color: #222;
+  color: #364149;
   text-align: left;
   cursor: pointer;
   transition: background 0.15s;
 }
-.faq-question:hover { background: #f4f5f5; }
+.faq-question:hover { background: rgba(224, 229, 232, .52); }
 .faq-chevron {
   flex-shrink: 0;
   color: #888;

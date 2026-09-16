@@ -381,7 +381,6 @@ watch(
         openWorkspace(requestedTerm, action)
         const requestedMode = String(route.query.mode || '')
         if (['teacher', 'room', 'student'].includes(requestedMode)) chooseWorkspaceMode(requestedMode)
-        else if (route.query.source === 'current') chooseWorkspaceMode('student')
       }
   }
 )
@@ -436,7 +435,6 @@ async function loadPage() {
       openWorkspace(requestedTerm, String(route.query.action))
       const requestedMode = String(route.query.mode || '')
       if (['teacher', 'room', 'student'].includes(requestedMode)) await chooseWorkspaceMode(requestedMode)
-      else if (route.query.source === 'current') await chooseWorkspaceMode('student')
     }
   } catch (error) {
     await Swal.fire({ icon: 'error', title: 'Unable to load terms', text: error.message })
