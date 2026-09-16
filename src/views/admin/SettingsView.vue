@@ -70,10 +70,10 @@
           </div>
 
           <form class="settings-form" @submit.prevent="passwordStep === 1 ? advancePasswordStep() : handleUpdatePassword()">
-            <div v-if="passwordStep === 1" class="settings-step-label"><span>Step 1 of 2</span> Verify your identity</div>
-            <div v-else class="settings-step-label"><span>Step 2 of 2</span> Choose a new password</div>
+            <div v-if="passwordStep === 1" class="settings-step-label"><span>Step 1 of 2</span></div>
+            <div v-else class="settings-step-label"><span>Step 2 of 2</span></div>
 
-            <div v-if="passwordStep === 1" class="settings-row">
+            <div v-if="passwordStep === 1" class="settings-row settings-row--identity">
               <div class="settings-group">
                 <label class="settings-label">Current Password</label>
                 <div class="pw-input-wrap">
@@ -90,10 +90,28 @@
                 </div>
               </div>
               <div class="settings-group">
-                <label class="settings-label">OTP</label>
+                <label class="settings-label">6-Digit OTP</label>
                 <div class="otp-wrap">
-                  <input v-model="passwordForm.otp" type="text" inputmode="numeric" autocomplete="one-time-code" class="settings-input" placeholder="_ _ _ _ _ _" maxlength="6" @input="passwordForm.otp = passwordForm.otp.replace(/\D/g, '')" />
-                  <button type="button" class="otp-btn" :disabled="isSendingOtp || otpSecondsRemaining > 0" @click="sendOtp">{{ isSendingOtp ? 'Sending...' : otpSecondsRemaining > 0 ? `Expires in ${formattedOtpTime}` : 'Send OTP' }}</button>
+                  <div class="otp-boxes" role="group" aria-label="Six-digit one-time password">
+                    <input
+                      v-for="(_, index) in otpDigits"
+                      :key="index"
+                      :ref="element => { if (element) otpInputRefs[index] = element }"
+                      v-model="otpDigits[index]"
+                      class="otp-digit"
+                      type="text"
+                      inputmode="numeric"
+                      maxlength="1"
+                      :aria-label="`OTP digit ${index + 1}`"
+                      @input="updateOtpDigit(index, $event)"
+                      @keydown.backspace="handleOtpBackspace(index, $event)"
+                      @paste.prevent="handleOtpPaste"
+                    />
+                  </div>
+                  <button type="button" class="otp-btn" :disabled="isSendingOtp || otpSecondsRemaining > 0" @click="sendOtp">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                    <span>{{ isSendingOtp ? 'Sending...' : otpSecondsRemaining > 0 ? `Expires in ${formattedOtpTime}` : 'Send OTP' }}</span>
+                  </button>
                 </div>
                 <span v-if="otpSent" class="otp-expiry">Code expires in {{ formattedOtpTime }}.</span>
               </div>
@@ -132,9 +150,6 @@
               </div>
             </div>
 
-            <div v-if="pwError"   class="settings-msg settings-msg--error">{{ pwError }}</div>
-            <div v-if="pwSuccess" class="settings-msg settings-msg--success">{{ pwSuccess }}</div>
-
             <div class="settings-form-footer">
               <button v-if="passwordStep === 2" type="button" class="password-back-btn" @click="passwordStep = 1">Back</button>
               <button v-if="passwordStep === 1" type="button" class="update-pw-btn" @click="advancePasswordStep">Continue</button>
@@ -146,11 +161,10 @@
         <div class="settings-card verification-card">
           <div class="settings-card-header">
             <div class="settings-card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
             </div>
             <div>
               <h2 class="settings-card-title">Email verification on login</h2>
-              <p class="settings-card-sub">Add a one-time verification step whenever you sign in.</p>
             </div>
             <div class="tfa-control">
               <span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span>
@@ -159,13 +173,25 @@
               </button>
             </div>
           </div>
-          <div class="settings-row">
-            <div class="settings-group">
-              <p class="tfa-note">Send a verification code to your PHINMA Gmail address whenever you log in.</p>
-              <input v-model="twoFactorPassword" type="password" class="settings-input" placeholder="Current password to confirm change" />
-              <div v-if="twoFactorError" class="settings-msg settings-msg--error">{{ twoFactorError }}</div>
-              <div v-if="twoFactorSuccess" class="settings-msg settings-msg--success">{{ twoFactorSuccess }}</div>
+          <p class="settings-card-sub verification-card-sub">Add a one-time verification step whenever you sign in.</p>
+          <div class="verification-content">
+            <div class="verification-intro">
+              <span class="verification-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+                Secure sign-in
+              </span>
+              <p class="verification-description">A one-time code will be sent to your PHINMA Gmail address whenever you log in.</p>
             </div>
+            <label class="settings-label verification-password-label" for="two-factor-password">Confirm with your current password</label>
+            <div class="verification-password-wrap">
+              <svg class="verification-password-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input id="two-factor-password" v-model="twoFactorPassword" :type="showTwoFactorPassword ? 'text' : 'password'" class="settings-input" placeholder="Enter current password" />
+              <button type="button" class="pw-eye" :aria-label="showTwoFactorPassword ? 'Hide current password' : 'Show current password'" @click="showTwoFactorPassword = !showTwoFactorPassword">
+                <svg v-if="!showTwoFactorPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <p class="verification-help">Your password is used only to confirm this security setting.</p>
           </div>
         </div>
 
@@ -238,9 +264,10 @@
 </template>
 
 <script setup>
-import { getToken, getUser, logout } from '@/auth.js'
+import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
 import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import Swal from 'sweetalert2'
 
 const router = useRouter()
 const route  = useRoute()
@@ -324,26 +351,83 @@ const passwordStep = ref(1)
 const showCurrent  = ref(false)
 const showNew      = ref(false)
 const showConfirm  = ref(false)
-const pwError      = ref('')
-const pwSuccess    = ref('')
 const otpSent      = ref(false)
 const isSendingOtp = ref(false)
 const isUpdatingPassword = ref(false)
 const otpSecondsRemaining = ref(0)
+const otpDigits = ref(['', '', '', '', '', ''])
+const otpInputRefs = []
 let otpTimer = null
 const formattedOtpTime = computed(() => `0:${String(otpSecondsRemaining.value).padStart(2, '0')}`)
 const twoFactorEnabled = ref(Boolean(user.twoFactorEnabled))
 const twoFactorPassword = ref('')
-const twoFactorError = ref('')
-const twoFactorSuccess = ref('')
+const showTwoFactorPassword = ref(false)
 const isSavingTwoFactor = ref(false)
 
+function showSettingsAlert(icon, title, text) {
+  const symbol = icon === 'success'
+    ? '<path d="m7.5 12.5 3 3 6-7"/>'
+    : '<path d="m8 8 8 8M16 8l-8 8"/>'
+  return Swal.fire({
+    iconHtml: `<span class="settings-alert-symbol settings-alert-symbol--${icon}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${symbol}</svg></span>`,
+    title,
+    text,
+    confirmButtonColor: '#4b5563',
+    buttonsStyling: false,
+    customClass: {
+      popup: `settings-alert-popup settings-alert-popup--${icon}`,
+      icon: 'settings-alert-icon',
+      title: 'settings-alert-title',
+      htmlContainer: 'settings-alert-text',
+      confirmButton: 'settings-alert-confirm',
+    },
+  })
+}
+
+function showSettingsError(message) {
+  return showSettingsAlert('error', 'Unable to continue', message)
+}
+
+function showSettingsSuccess(message) {
+  return showSettingsAlert('success', 'Success', message)
+}
+
+function syncOtpValue() {
+  passwordForm.value.otp = otpDigits.value.join('')
+}
+
+function resetOtpDigits() {
+  otpDigits.value = ['', '', '', '', '', '']
+  passwordForm.value.otp = ''
+}
+
+function updateOtpDigit(index, event) {
+  const digit = String(event.target.value || '').replace(/\D/g, '').slice(-1)
+  otpDigits.value[index] = digit
+  syncOtpValue()
+  if (digit && index < otpDigits.value.length - 1) otpInputRefs[index + 1]?.focus()
+}
+
+function handleOtpBackspace(index, event) {
+  if (!otpDigits.value[index] && index > 0) {
+    event.preventDefault()
+    otpDigits.value[index - 1] = ''
+    syncOtpValue()
+    otpInputRefs[index - 1]?.focus()
+  }
+}
+
+function handleOtpPaste(event) {
+  const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, otpDigits.value.length)
+  pasted.split('').forEach((digit, index) => { otpDigits.value[index] = digit })
+  syncOtpValue()
+  otpInputRefs[Math.min(pasted.length, otpDigits.value.length - 1)]?.focus()
+}
+
 async function toggleTwoFactor() {
-  twoFactorError.value = ''
-  twoFactorSuccess.value = ''
   const enabled = !twoFactorEnabled.value
   if (!twoFactorPassword.value) {
-    twoFactorError.value = 'Enter your current password to confirm this change.'
+    showSettingsError('Enter your current password to confirm this change.')
     return
   }
   isSavingTwoFactor.value = true
@@ -352,11 +436,12 @@ async function toggleTwoFactor() {
       method: 'PUT',
       body: JSON.stringify({ twoFactorEnabled: enabled, currentPassword: twoFactorPassword.value }),
     })
-    twoFactorEnabled.value = Boolean(response.user?.twoFactorEnabled)
+    const updatedUser = response.user ? saveMergedUser(response.user) : null
+    twoFactorEnabled.value = Boolean(updatedUser?.twoFactorEnabled ?? response.user?.twoFactorEnabled)
     twoFactorPassword.value = ''
-    twoFactorSuccess.value = enabled ? 'Email verification enabled.' : 'Email verification disabled.'
+    showSettingsSuccess(enabled ? 'Email verification enabled.' : 'Email verification disabled.')
   } catch (error) {
-    twoFactorError.value = error.message || 'Unable to update email verification.'
+    showSettingsError(error.message || 'Unable to update email verification.')
   } finally {
     isSavingTwoFactor.value = false
   }
@@ -376,69 +461,62 @@ function startOtpTimer() {
     if (otpSecondsRemaining.value <= 0) {
       clearOtpTimer()
       otpSent.value = false
-      passwordForm.value.otp = ''
-      pwError.value = 'OTP expired. Send a new code to continue.'
+      resetOtpDigits()
+      showSettingsError('OTP expired. Send a new code to continue.')
     }
   }, 1000)
 }
 
 async function sendOtp() {
   if (!passwordForm.value.current) {
-    pwError.value   = 'Please enter your current password first.'
-    pwSuccess.value = ''
+    showSettingsError('Please enter your current password first.')
     return
   }
 
-  pwError.value = ''
-  pwSuccess.value = ''
   isSendingOtp.value = true
   try {
     const response = await apiRequest('/auth/request-password-otp', {
       method: 'POST',
       body: JSON.stringify({ currentPassword: passwordForm.value.current }),
     })
-    passwordForm.value.otp = ''
+    resetOtpDigits()
     otpSent.value = true
     startOtpTimer()
-    pwSuccess.value = response.message
+    showSettingsSuccess(response.message)
   } catch (error) {
-    pwError.value = error.message || 'Unable to send the OTP.'
+    showSettingsError(error.message || 'Unable to send the OTP.')
   } finally {
     isSendingOtp.value = false
   }
 }
 
 function advancePasswordStep() {
-  pwError.value = ''
-  pwSuccess.value = ''
   if (!passwordForm.value.current || !passwordForm.value.otp) {
-    pwError.value = 'Enter your current password and the OTP to continue.'
+    showSettingsError('Enter your current password and the OTP to continue.')
     return
   }
   if (!/^\d{6}$/.test(passwordForm.value.otp)) {
-    pwError.value = 'Enter the 6-digit OTP sent to your email.'
+    showSettingsError('Enter the 6-digit OTP sent to your email.')
     return
   }
   passwordStep.value = 2
 }
 
 async function handleUpdatePassword() {
-  pwError.value   = ''
-  pwSuccess.value = ''
   if (!passwordForm.value.current || !passwordForm.value.otp || !passwordForm.value.newPw || !passwordForm.value.confirmPw) {
-    pwError.value = 'Please fill in all password fields and the OTP.'
+    showSettingsError('Please fill in all password fields and the OTP.')
     return
   }
   if (!/^\d{6}$/.test(passwordForm.value.otp)) {
-    pwError.value = 'Enter the 6-digit OTP sent to your email.'
+    showSettingsError('Enter the 6-digit OTP sent to your email.')
     return
   }
   if (passwordForm.value.newPw !== passwordForm.value.confirmPw) {
-    pwError.value = 'New passwords do not match.'
+    showSettingsError('New passwords do not match.')
     return
   }
   if (passwordForm.value.newPw.length < 8) {
-    pwError.value = 'New password must be at least 8 characters.'
+    showSettingsError('New password must be at least 8 characters.')
     return
   }
 
@@ -452,13 +530,14 @@ async function handleUpdatePassword() {
         newPassword: passwordForm.value.newPw,
       }),
     })
-    pwSuccess.value = response.message
+    showSettingsSuccess(response.message)
     passwordForm.value = { current: '', otp: '', newPw: '', confirmPw: '' }
+    resetOtpDigits()
     passwordStep.value = 1
     otpSent.value = false
     clearOtpTimer()
   } catch (error) {
-    pwError.value = error.message || 'Unable to update password.'
+    showSettingsError(error.message || 'Unable to update password.')
   } finally {
     isUpdatingPassword.value = false
   }
@@ -623,7 +702,7 @@ const faqs = [
 }
 .settings-eyebrow {
   display: block;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
   color: #697780;
   font-size: .68rem;
   font-weight: 800;
@@ -631,6 +710,7 @@ const faqs = [
   text-transform: uppercase;
 }
 .page-title {
+  margin: 0;
   font-size: 2.15rem;
   font-weight: 700;
   color: #27323a;
@@ -645,8 +725,8 @@ const faqs = [
 
 /* ── Settings body ── */
 .settings-body {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 18px;
   max-width: 1180px;
   width: 100%;
@@ -654,6 +734,9 @@ const faqs = [
 
 /* ── Card ── */
 .settings-card {
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
   background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(235,239,242,.9));
   border: 1px solid rgba(133, 145, 153, .42);
   border-radius: 18px;
@@ -708,12 +791,14 @@ const faqs = [
 .settings-step-label {
   display: flex;
   align-items: center;
-  gap: 9px;
+  justify-content: space-between;
+  gap: 18px;
   color: #66747d;
   font-size: .76rem;
   font-weight: 600;
 }
-.settings-step-label span {
+.settings-step-label > span:not(.settings-step-description) {
+  margin-left: auto;
   padding: 4px 8px;
   border: 1px solid #aab5bb;
   border-radius: 999px;
@@ -724,11 +809,28 @@ const faqs = [
   letter-spacing: .04em;
   text-transform: uppercase;
 }
+.settings-step-description { order: 1; }
+.settings-step-label > span:not(.settings-step-description) { order: 2; }
 .settings-row  {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   justify-content: start;
   gap: 22px 28px;
+}
+.settings-row--identity {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.settings-row--identity .settings-group {
+  width: 100%;
+}
+.settings-row--identity .pw-input-wrap,
+.settings-row--identity .pw-input-wrap .settings-input {
+  width: 100% !important;
+  max-width: none !important;
+}
+.settings-step-label + .settings-row {
+  margin-top: -16px;
 }
 .settings-group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .settings-label {
@@ -772,7 +874,7 @@ const faqs = [
 .pw-eye {
   position: absolute;
   top: 50%;
-  right: 6px;
+  right: 8px;
   z-index: 2;
   width: 32px;
   height: 32px;
@@ -795,35 +897,85 @@ const faqs = [
 /* OTP row */
 .otp-wrap {
   display: flex;
+  flex-direction: row;
   align-items: stretch;
   width: 100%;
-  min-height: 42px;
-  gap: 0;
+  gap: 10px;
 }
-.otp-wrap .settings-input {
+.otp-boxes {
+  flex: 0 1 287px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 42px));
+  gap: 7px;
+  width: min(100%, 287px);
+}
+.otp-digit {
+  box-sizing: border-box;
+  width: 100%;
   min-width: 0;
-  flex: 1;
-  border-radius: 8px 0 0 8px;
-  border-right: none;
+  height: 42px;
+  border: 1px solid #aab7be;
+  border-radius: 10px;
+  background: rgba(255,255,255,.9);
+  color: #35434b;
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  box-shadow: inset 0 1px 2px rgba(42, 52, 58, .08), 0 1px rgba(255,255,255,.8);
+  transition: border-color .18s, box-shadow .18s, background .18s;
 }
+.otp-digit:focus {
+  border-color: #687780;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(90, 105, 114, .13), inset 0 1px 2px rgba(42, 52, 58, .06);
+}
+.otp-digit:not(:placeholder-shown) {
+  border-color: #7d8b93;
+  background: #f7f9fa;
+}
+.otp-digit::placeholder { color: transparent; }
 .otp-btn {
+  flex: 1 1 auto;
+  min-height: 42px;
+  min-width: 112px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-family: inherit;
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
-  background: linear-gradient(145deg, #66737c, #46525b);
+  background: linear-gradient(145deg, #87949c 0%, #5c6a74 48%, #46535c 100%);
   color: #fff;
-  border: 1px solid #46525b;
-  border-left: none;
-  border-radius: 0 8px 8px 0;
+  border: 1px solid #3f4c55;
+  border-radius: 10px;
   padding: 0 12px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  box-shadow: inset 0 1px rgba(255,255,255,.28), 0 4px 10px rgba(48, 53, 58, .16);
+  transition: background 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
 }
-.otp-btn:hover { background: linear-gradient(145deg, #77848d, #535f68); color: #fff; }
+.otp-btn svg { flex: 0 0 auto; }
+.otp-btn:hover { background: linear-gradient(145deg, #9aa6ad 0%, #687780 48%, #52616b 100%); color: #fff; transform: translateY(-1px); box-shadow: inset 0 1px rgba(255,255,255,.34), 0 6px 14px rgba(48, 53, 58, .22); }
 .otp-btn:disabled,
 .update-pw-btn:disabled { cursor: not-allowed; opacity: 0.65; }
-.otp-expiry { font-size: 0.75rem; color: #b45309; font-weight: 500; }
+.otp-expiry {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 1px;
+  padding: 4px 8px;
+  border: 1px solid #e6c98d;
+  border-radius: 999px;
+  background: #fff8e8;
+  color: #9a6811;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
 
 /* Messages */
 .settings-msg {
@@ -840,7 +992,7 @@ const faqs = [
   display: flex;
   align-items: center;
   gap: 10px;
-  justify-content: flex-end;
+  justify-content: center;
   padding-top: 2px;
 }
 .update-pw-btn {
@@ -954,14 +1106,18 @@ const faqs = [
   padding: 25px 30px 28px;
 }
 .two-factor-card .settings-card-header { width: 100%; margin-bottom: 20px; padding-right: 118px; }
-.two-factor-card .settings-card-header .tfa-control { position: absolute; top: 30px; right: 30px; margin-left: 0; transform: none; }
+.two-factor-card .settings-card-header .tfa-control { position: absolute; top: 30px; right: 20px; margin-left: 0; transform: none; }
 .two-factor-card .tfa-control { display: flex; align-items: center; gap: 10px; }
+.two-factor-card .settings-card-header .tfa-control { flex-direction: column; gap: 4px; }
 .two-factor-card .settings-row { align-items: flex-start; gap: 22px 28px; }
 .two-factor-card .settings-group:first-child { flex: 1; max-width: 680px; }
 .two-factor-card .tfa-note { margin: 0 0 12px; padding: 0; background: transparent; color: var(--metal-muted); }
 .two-factor-card .settings-input { max-width: 420px; background: rgba(255,255,255,.82); }
 .verification-card .settings-row { grid-template-columns: minmax(0, 520px); }
+.verification-card { position: relative; }
 .verification-card .settings-card-header { margin-bottom: 18px; }
+.verification-card .settings-card-header { padding-right: 118px; }
+.verification-card .settings-card-header .tfa-control { position: absolute; top: 30px; right: 20px; }
 .verification-card .tfa-control {
   display: flex;
   align-items: center;
@@ -969,7 +1125,92 @@ const faqs = [
   margin-left: auto;
   padding-left: 20px;
 }
-.tfa-status { color: var(--metal-muted); font-size: 0.75rem; font-weight: 700; min-width: 52px; text-align: right; }
+.verification-card {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(145deg, rgba(250,252,253,.98), rgba(224,230,233,.94));
+}
+.verification-card .settings-card-header {
+  align-items: flex-start;
+  min-height: 58px;
+  padding-bottom: 20px;
+}
+.verification-card .settings-card-header > div:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.verification-card-sub {
+  margin: -8px 0 18px;
+  max-width: none;
+  color: #738089;
+  font-size: .75rem;
+  line-height: 1.45;
+}
+.verification-card .settings-card-icon {
+  color: #4b5563;
+  border-color: #aab4ba;
+  background: linear-gradient(145deg, #f9fafb, #dce2e5);
+}
+.verification-card .settings-card-title { max-width: 210px; }
+.verification-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.verification-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 13px 14px;
+  border: 1px solid rgba(112, 137, 123, .25);
+  border-radius: 12px;
+  background: rgba(240, 248, 243, .7);
+}
+.verification-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  color: #37614b;
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.verification-description {
+  margin: 0;
+  color: #5f7067;
+  font-size: .74rem;
+  line-height: 1.55;
+}
+.verification-password-label { margin-top: 3px; }
+.verification-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.verification-password-wrap .settings-input {
+  padding-right: 48px;
+  padding-left: 40px;
+  background: rgba(255,255,255,.9);
+}
+.verification-password-wrap .pw-eye { right: 8px; }
+.verification-password-icon {
+  position: absolute;
+  left: 14px;
+  z-index: 1;
+  color: #7a8982;
+  pointer-events: none;
+}
+.verification-help {
+  margin: 0;
+  color: #89958f;
+  font-size: .67rem;
+  line-height: 1.4;
+}
+.settings-faq-section { grid-column: 1 / -1; }
+.tfa-status { color: var(--metal-muted); font-size: 0.75rem; font-weight: 700; min-width: 0; text-align: center; order: 2; }
 .toggle-switch {
   position: relative;
   width: 50px;
@@ -983,7 +1224,11 @@ const faqs = [
   padding: 0;
   outline: none;
 }
-.toggle-switch--on { background: #56636c; }
+.toggle-switch--on {
+  background: linear-gradient(145deg, #78a889, #4e8062);
+  border-color: #47745a;
+  box-shadow: inset 0 1px rgba(255,255,255,.28), 0 3px 9px rgba(57, 105, 75, .22);
+}
 .toggle-thumb {
   position: absolute;
   top: 3px;
@@ -996,6 +1241,117 @@ const faqs = [
   transition: transform 0.25s;
 }
 .toggle-switch--on .toggle-thumb { transform: translateX(23px); }
+
+/* ── Settings feedback popups ── */
+:global(.settings-alert-popup) {
+  width: min(420px, calc(100vw - 32px)) !important;
+  gap: 0 !important;
+  padding: 22px 26px 20px !important;
+  border: 1px solid rgba(142, 153, 160, .38) !important;
+  border-radius: 20px !important;
+  background: linear-gradient(145deg, #fbfcfc, #e6eaec) !important;
+  box-shadow: 0 24px 70px rgba(35, 43, 49, .28), inset 0 1px rgba(255,255,255,.95) !important;
+}
+:global(.settings-alert-popup .settings-alert-icon) {
+  width: 54px !important;
+  height: 54px !important;
+  margin: 0 auto 9px !important;
+  border: 0 !important;
+  color: #ef7378 !important;
+}
+:global(.settings-alert-symbol) {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+}
+:global(.settings-alert-symbol svg) {
+  display: block;
+  width: 29px;
+  height: 29px;
+}
+:global(.settings-alert-symbol i) {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: 28px;
+  height: 3px;
+  border-radius: 3px;
+  background: currentColor;
+}
+:global(.settings-alert-symbol--error i:first-child) {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+:global(.settings-alert-symbol--error i:last-child) {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+:global(.settings-alert-symbol--success) {
+  color: #4e8b6a;
+}
+:global(.settings-alert-symbol--success i:first-child) {
+  top: 27px;
+  left: 14px;
+  width: 12px;
+  transform-origin: left center;
+  transform: rotate(45deg);
+}
+:global(.settings-alert-symbol--success i:last-child) {
+  top: 35px;
+  left: 22px;
+  width: 21px;
+  transform-origin: left center;
+  transform: rotate(-45deg);
+}
+:global(.settings-alert-popup .settings-alert-title) {
+  margin: 0 !important;
+  color: #263139 !important;
+  font-size: 1.28rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -.02em !important;
+}
+:global(.settings-alert-popup .settings-alert-text) {
+  margin: 5px auto 0 !important;
+  color: #66737b !important;
+  font-size: .82rem !important;
+  line-height: 1.55 !important;
+}
+:global(.settings-alert-popup .settings-alert-confirm) {
+  min-width: 108px !important;
+  margin: 14px auto 0 !important;
+  padding: 8px 20px !important;
+  border: 1px solid #3f4b54 !important;
+  border-radius: 9px !important;
+  background: linear-gradient(145deg, #687780, #3f4b54) !important;
+  color: #fff !important;
+  font-family: inherit !important;
+  font-size: .78rem !important;
+  font-weight: 700 !important;
+  box-shadow: 0 5px 12px rgba(48, 53, 58, .2) !important;
+}
+:global(.settings-alert-popup .settings-alert-confirm:hover) {
+  background: linear-gradient(145deg, #75838b, #4a5861) !important;
+}
+:global(.settings-alert-popup--success) {
+  border-top: 3px solid #5a9b78 !important;
+}
+:global(.settings-alert-popup--success .settings-alert-title) {
+  color: #315b45 !important;
+}
+:global(.settings-alert-popup--success .settings-alert-confirm) {
+  border-color: #477b60 !important;
+  background: linear-gradient(145deg, #659879, #477b60) !important;
+}
+:global(.settings-alert-popup--success .settings-alert-confirm:hover) {
+  background: linear-gradient(145deg, #74a988, #548a6c) !important;
+}
+:global(.settings-alert-popup--error) {
+  border-top: 3px solid #e4777d !important;
+}
 
 .tfa-note {
   display: flex;
@@ -1175,7 +1531,13 @@ const faqs = [
 
 /* ── Responsive ── */
 @media (max-width: 800px) {
+  .settings-body { grid-template-columns: 1fr; }
   .settings-row { grid-template-columns: 1fr; }
   .main { padding: 24px 18px 32px; }
+}
+@media (max-width: 520px) {
+  .otp-wrap { flex-direction: column; }
+  .otp-boxes { width: 100%; }
+  .otp-btn { width: 100%; }
 }
 </style>

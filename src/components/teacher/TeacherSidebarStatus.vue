@@ -242,18 +242,18 @@ onMounted(loadStatus)
 <style scoped>
 .teacher-sidebar-status {
   width: 100%;
-  margin: 0 0 12px;
-  padding: 6px 0 0;
+  margin: 0 0 14px;
+  padding: 8px 0 0;
 }
 
 .sidebar-status-panel {
   width: 100%;
   margin-top: 0;
-  padding: 12px 12px 10px;
-  border: 1px solid rgba(117, 123, 129, 0.22);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(244, 246, 246, 0.86), rgba(221, 226, 228, 0.72));
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.72);
+  padding: 14px 12px 12px;
+  border: 1px solid rgba(255, 255, 255, .62);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(250,251,251,.96), rgba(211,216,219,.88));
+  box-shadow: inset 0 1px rgba(255,255,255,.92), 0 8px 18px rgba(49, 57, 63, .12);
   text-align: left;
 }
 
@@ -266,9 +266,9 @@ onMounted(loadStatus)
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   color: #30353a;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   line-height: 1.1;
@@ -276,9 +276,10 @@ onMounted(loadStatus)
 }
 
 .sidebar-status-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(64,145,108,.12);
 }
 
 .sidebar-status-dot.is-in-school { background: #40916c; }
@@ -294,14 +295,15 @@ onMounted(loadStatus)
 
 .sidebar-status-value,
 .sidebar-status-select {
-  min-height: 36px;
+  min-height: 40px;
   color: #30353a;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(116, 123, 129, 0.24);
-  border-radius: 10px;
+  background: rgba(255,255,255,.78);
+  border: 1px solid #b7c0c5;
+  border-radius: 11px;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
+  box-shadow: inset 0 1px rgba(255,255,255,.88), 0 2px 5px rgba(52,60,66,.08);
 }
 
 .sidebar-status-value {
@@ -328,19 +330,21 @@ onMounted(loadStatus)
 }
 
 .sidebar-status-button {
-  min-width: 90px;
-  height: 36px;
+  min-width: 92px;
+  height: 40px;
   padding: 0 12px;
-  border: 1px solid #2d3136;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #3d434a, #22262b);
+  border: 1px solid #30373d;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #59636b, #303940);
   color: #fff;
   font: inherit;
   font-size: 0.72rem;
   font-weight: 800;
   cursor: pointer;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 4px 9px rgba(38,45,50,.2);
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
 }
+.sidebar-status-button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: inset 0 1px rgba(255,255,255,.22), 0 6px 13px rgba(38,45,50,.24); }
 
 .sidebar-status-button:disabled {
   cursor: not-allowed;
@@ -351,9 +355,9 @@ onMounted(loadStatus)
 
 .sidebar-time-in,
 .sidebar-status-subtext {
-  margin-top: 8px;
+  margin-top: 10px;
   color: #66707a;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   line-height: 1.35;
 }
 

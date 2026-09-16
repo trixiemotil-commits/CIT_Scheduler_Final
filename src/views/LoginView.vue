@@ -56,6 +56,10 @@
 
       <!-- ── Sign Up Form ── -->
       <form v-else class="form" @submit.prevent="handleSignUp">
+        <div class="student-signup-note" role="note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v6M12 7h.01"/></svg>
+          <span>Student registration only</span>
+        </div>
         <!-- First / Last Name -->
         <div class="name-row">
           <div class="input-wrapper">
@@ -133,13 +137,31 @@
     </div>
 
     <div v-if="twoFactorChallenge" class="role-modal-overlay" role="presentation">
-      <section class="role-modal" role="dialog" aria-modal="true" aria-labelledby="two-factor-title">
-        <img src="/branding/cit-college-seal.png" alt="" class="role-modal__seal" aria-hidden="true" />
+      <section class="role-modal two-factor-modal" role="dialog" aria-modal="true" aria-labelledby="two-factor-title">
+        <div class="two-factor-modal__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
+        </div>
         <h2 id="two-factor-title" class="role-modal__title">Check your email</h2>
         <p class="role-selection__intro">Enter the 6-digit code sent to {{ twoFactorChallenge.maskedEmail }}.</p>
-        <input v-model="twoFactorCode" class="input-field" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" @input="twoFactorCode = twoFactorCode.replace(/\D/g, '')" />
+        <div class="login-otp-boxes" role="group" aria-label="Six-digit login verification code">
+          <input
+            v-for="(_, index) in twoFactorDigits"
+            :key="index"
+            :ref="element => { if (element) twoFactorInputRefs[index] = element }"
+            v-model="twoFactorDigits[index]"
+            class="login-otp-digit"
+            type="text"
+            inputmode="numeric"
+            maxlength="1"
+            autocomplete="one-time-code"
+            :aria-label="`Verification code digit ${index + 1}`"
+            @input="updateTwoFactorDigit(index, $event)"
+            @keydown.backspace="handleTwoFactorBackspace(index, $event)"
+            @paste.prevent="handleTwoFactorPaste"
+          />
+        </div>
         <div v-if="loginError" class="error-msg role-modal__error">{{ loginError }}</div>
-        <button type="button" class="submit-btn" :disabled="twoFactorCode.length !== 6" @click="confirmTwoFactor">Verify code</button>
+        <button type="button" class="submit-btn two-factor-modal__submit" :disabled="twoFactorCode.length !== 6" @click="confirmTwoFactor">Verify code</button>
         <button type="button" class="role-modal__cancel" @click="cancelTwoFactor">Use another account</button>
       </section>
     </div>
@@ -322,6 +344,8 @@ const isSelectingRole = ref(false)
 const showRoleSelection = ref(false)
 const twoFactorChallenge = ref(null)
 const twoFactorCode = ref('')
+const twoFactorDigits = ref(['', '', '', '', '', ''])
+const twoFactorInputRefs = []
 const loginAlert = ref(null)
 const signUpError = ref('')
 const signUpSuccess = ref('')
@@ -338,6 +362,38 @@ const loginMathChallenge = ref({ question: '', answer: 0 })
 const signUpMathChallenge = ref({ question: '', answer: 0 })
 const tronCanvas = ref(null)
 let disposeTronBackground = null
+
+function resetTwoFactorDigits() {
+  twoFactorDigits.value = ['', '', '', '', '', '']
+  twoFactorCode.value = ''
+}
+
+function syncTwoFactorCode() {
+  twoFactorCode.value = twoFactorDigits.value.join('')
+}
+
+function updateTwoFactorDigit(index, event) {
+  const digit = String(event.target.value || '').replace(/\D/g, '').slice(-1)
+  twoFactorDigits.value[index] = digit
+  syncTwoFactorCode()
+  if (digit && index < twoFactorDigits.value.length - 1) twoFactorInputRefs[index + 1]?.focus()
+}
+
+function handleTwoFactorBackspace(index, event) {
+  if (!twoFactorDigits.value[index] && index > 0) {
+    event.preventDefault()
+    twoFactorDigits.value[index - 1] = ''
+    syncTwoFactorCode()
+    twoFactorInputRefs[index - 1]?.focus()
+  }
+}
+
+function handleTwoFactorPaste(event) {
+  const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+  pasted.split('').forEach((digit, index) => { twoFactorDigits.value[index] = digit })
+  syncTwoFactorCode()
+  twoFactorInputRefs[Math.min(pasted.length, 5)]?.focus()
+}
 
 function initialiseTronBackground() {
   const canvas = tronCanvas.value
@@ -681,7 +737,7 @@ async function handleLogin() {
     )
     if (payload?.requiresTwoFactor) {
       twoFactorChallenge.value = payload
-      twoFactorCode.value = ''
+      resetTwoFactorDigits()
       return
     }
     const user = payload?.user
@@ -726,7 +782,7 @@ async function confirmTwoFactor() {
 
 function cancelTwoFactor() {
   twoFactorChallenge.value = null
-  twoFactorCode.value = ''
+  resetTwoFactorDigits()
   signIn.password = ''
 }
 
@@ -1292,6 +1348,97 @@ watch(activeTab, (val) => {
 }
 .role-modal__cancel:hover:not(:disabled) { color: #252c34; text-decoration: underline; }
 .role-modal__cancel:disabled { opacity: .6; cursor: wait; }
+.two-factor-modal {
+  width: min(100%, 390px);
+  padding: 28px 26px 22px;
+  border-color: rgba(255,255,255,.78);
+  background: linear-gradient(145deg, #fbfcfc 0%, #e3e8eb 100%);
+  box-shadow: 0 26px 70px rgba(15, 22, 28, .34), inset 0 1px rgba(255,255,255,.95);
+}
+.two-factor-modal__icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 12px;
+  border: 1px solid #aab7be;
+  border-radius: 16px;
+  color: #4b5962;
+  background: linear-gradient(145deg, #f9fafb, #d8dfe3);
+  box-shadow: inset 0 1px #fff, 0 7px 15px rgba(48,58,66,.16);
+}
+.two-factor-modal__icon svg { width: 29px; height: 29px; }
+.two-factor-modal .role-modal__title { margin-bottom: 6px; }
+.two-factor-modal .role-selection__intro { max-width: 290px; margin-inline: auto; font-size: .82rem; }
+.login-otp-boxes {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+  margin: 18px 0 12px;
+}
+.login-otp-digit {
+  box-sizing: border-box;
+  width: 100%;
+  height: 48px;
+  border: 1px solid #aab7be;
+  border-radius: 11px;
+  background: rgba(255,255,255,.9);
+  color: #35434b;
+  font-family: inherit;
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-align: center;
+  outline: none;
+  box-shadow: inset 0 1px 2px rgba(42,52,58,.08), 0 1px rgba(255,255,255,.8);
+  transition: border-color .18s, box-shadow .18s, background .18s;
+}
+.login-otp-digit:focus {
+  border-color: #687780;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(90,105,114,.14), inset 0 1px 2px rgba(42,52,58,.06);
+}
+.two-factor-modal__submit {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 2px;
+  background: linear-gradient(145deg, #687780, #3f4c55);
+  box-shadow: inset 0 1px rgba(255,255,255,.2), 0 6px 14px rgba(48,53,58,.2);
+}
+.two-factor-modal__submit:hover:not(:disabled) { background: linear-gradient(145deg, #78868e, #4a5861); }
+.two-factor-modal__submit:disabled { opacity: .5; cursor: not-allowed; }
+.student-signup-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5da;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #f5f7f8, #e3e8ea);
+  color: #5f6d76;
+  font-size: .75rem;
+  font-weight: 700;
+  box-shadow: inset 0 1px rgba(255,255,255,.85);
+}
+.student-signup-note svg { flex: 0 0 auto; color: #687780; }
+/* Compact student registration layout */
+.card.card--wide {
+  max-width: 500px;
+  padding: 26px 32px 22px;
+  gap: 12px;
+}
+.card.card--wide .login-brand { gap: 12px; margin-bottom: 0; }
+.card.card--wide .login-brand__seal-wrap { width: 74px; height: 74px; flex-basis: 74px; }
+.card.card--wide .login-brand__seal { width: 65px; height: 65px; }
+.card.card--wide .title { font-size: 1.8rem; }
+.card.card--wide .tab-btn { padding: 8px 0; }
+.card.card--wide .form { gap: 8px; }
+.card.card--wide .input-field { padding-top: 11px; padding-bottom: 11px; }
+.card.card--wide .student-signup-note { padding: 8px 10px; font-size: .7rem; }
+.card.card--wide .password-requirements { gap: 4px; margin-top: -1px; }
+.card.card--wide .password-requirements li { font-size: .74rem; }
+.card.card--wide .row-end { margin-top: -1px; }
+.card.card--wide .captcha-wrap { margin: 0; }
+.card.card--wide .submit-btn { padding: 12px; margin-top: 0; }
 @keyframes role-overlay-in { from { opacity: 0; } }
 @keyframes role-modal-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 

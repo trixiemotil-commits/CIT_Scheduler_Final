@@ -62,7 +62,11 @@
           <!-- Notification Dropdown -->
           <div v-if="showNotif" class="notif-panel">
             <div class="notif-panel-header">
-              <span class="notif-panel-title">Notifications</span>
+              <div>
+                <span class="notif-panel-kicker">Activity center</span>
+                <span class="notif-panel-title">Notifications</span>
+              </div>
+              <span v-if="unreadNotifs.length" class="notif-count">{{ unreadNotifs.length }} unread</span>
             </div>
             <div class="notif-tabs">
               <button :class="['notif-tab', { active: notifTab === 'all' }]" @click="notifTab = 'all'">All</button>
@@ -81,7 +85,7 @@
                   <ul class="notif-list">
                     <li v-for="n in newNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><strong>{{ n.title }}</strong><small>{{ n.message }}</small></span>
+                      <span class="notif-text"><strong>{{ n.title }}</strong><small>{{ n.message }}</small><time>{{ n.timeLabel }}</time></span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
                     </li>
                   </ul>
@@ -93,13 +97,24 @@
                   <ul class="notif-list">
                     <li v-for="n in todayNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><strong>{{ n.title }}</strong><small>{{ n.message }}</small></span>
+                      <span class="notif-text"><strong>{{ n.title }}</strong><small>{{ n.message }}</small><time>{{ n.timeLabel }}</time></span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
                     </li>
                   </ul>
                 </template>
 
-                <div v-if="!newNotifs.length && !todayNotifs.length" class="notif-empty">No notifications</div>
+                <template v-if="earlierNotifs.length">
+                  <div class="notif-section-label">Earlier</div>
+                  <ul class="notif-list">
+                    <li v-for="n in earlierNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
+                      <img :src="n.avatar" class="notif-avatar" alt="" />
+                      <span class="notif-text"><strong>{{ n.title }}</strong><small>{{ n.message }}</small><time>{{ n.timeLabel }}</time></span>
+                      <span v-if="!n.read" class="notif-unread-dot"></span>
+                    </li>
+                  </ul>
+                </template>
+
+                <div v-if="!newNotifs.length && !todayNotifs.length && !earlierNotifs.length" class="notif-empty">No notifications</div>
               </template>
             </div>
           </div>
@@ -708,11 +723,24 @@ const visibleNotifs = computed(() =>
 const unreadNotifs = computed(() => notifications.value.filter(n => !n.read))
 const newNotifs   = computed(() => visibleNotifs.value.filter(n => n.group === 'new'))
 const todayNotifs = computed(() => visibleNotifs.value.filter(n => n.group === 'today'))
+const earlierNotifs = computed(() => visibleNotifs.value.filter(n => n.group === 'earlier'))
 
 function notificationGroup(createdAt) {
   const created = new Date(createdAt)
   if (Number.isNaN(created.getTime())) return 'today'
-  return Date.now() - created.getTime() < 24 * 60 * 60 * 1000 ? 'new' : 'today'
+  const now = new Date()
+  const isSameDay = created.toDateString() === now.toDateString()
+  return Date.now() - created.getTime() < 24 * 60 * 60 * 1000 ? 'new' : (isSameDay ? 'today' : 'earlier')
+}
+
+function notificationTimeLabel(createdAt) {
+  const created = new Date(createdAt)
+  if (Number.isNaN(created.getTime())) return 'Just now'
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - created.getTime()) / 60000))
+  if (elapsedMinutes < 1) return 'Just now'
+  if (elapsedMinutes < 60) return `${elapsedMinutes}m ago`
+  if (elapsedMinutes < 1440) return `${Math.floor(elapsedMinutes / 60)}h ago`
+  return created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function normalizeNotification(notification) {
@@ -720,9 +748,11 @@ function normalizeNotification(notification) {
     id: notification.id,
     title: notification.title || notification.type || 'Notification',
     message: notification.message || 'You have a new notification.',
-    avatar: notification.data?.avatar || user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.title || 'Notification')}&background=E8A020&color=30353A`,
+    actorName: notification.data?.actorName || '',
+    avatar: notification.data?.avatar || user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.data?.actorName || notification.title || 'Notification')}&background=DDE2E5&color=30353A`,
     read: Boolean(notification.read),
     group: notificationGroup(notification.createdAt),
+    timeLabel: notificationTimeLabel(notification.createdAt),
     route: notification.data?.route || '/admin/activity-logs',
   }
 }
@@ -1419,59 +1449,81 @@ function confirmLogout() {
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
-  width: 540px;
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+  width: min(430px, calc(100vw - 32px));
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(250,251,251,.98), rgba(218,223,226,.96));
+  box-shadow: 0 18px 42px rgba(35,43,49,.24), inset 0 1px rgba(255,255,255,.95);
   z-index: 999;
   overflow: hidden;
 }
 .notif-panel-header {
-  padding: 20px 20px 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid rgba(119,130,138,.2);
 }
+.notif-panel-header > div { display: flex; flex-direction: column; gap: 3px; }
+.notif-panel-kicker { color: #71808a; font-size: .62rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .notif-panel-title {
-  font-size: 1.15rem;
+  color: #263139;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.notif-count {
+  padding: 4px 8px;
+  border: 1px solid #b4bec3;
+  border-radius: 999px;
+  color: #596871;
+  background: rgba(255,255,255,.55);
+  font-size: .64rem;
   font-weight: 700;
-  color: #111;
+  white-space: nowrap;
 }
 .notif-tabs {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px 0;
+  padding: 12px 18px 8px;
 }
 .notif-tab {
-  background: none;
-  border: none;
+  background: transparent;
+  border: 1px solid transparent;
   font-family: inherit;
   font-size: 0.88rem;
   font-weight: 500;
   color: #888;
   cursor: pointer;
-  padding: 5px 14px;
-  border-radius: 20px;
+  padding: 6px 11px;
+  border-radius: 8px;
   transition: background 0.18s, color 0.18s;
 }
 .notif-tab.active {
-  background: #30353a;
+  border-color: #3f4c55;
+  background: linear-gradient(145deg, #687780, #3f4c55);
   color: #fff;
+  box-shadow: 0 3px 8px rgba(48,53,58,.16);
 }
 .notif-see-all {
   margin-left: auto;
   font-size: 0.82rem;
-  color: #888;
+  color: #66747d;
   cursor: pointer;
   text-decoration: underline;
 }
 .notif-see-all:hover { color: #30353a; }
 .notif-section-label {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #333;
-  padding: 12px 20px 6px;
+  color: #596871;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  padding: 12px 18px 6px;
 }
 .notif-list-wrap {
-  max-height: 340px;
+  max-height: 390px;
   overflow-y: auto;
   padding-bottom: 8px;
 }
@@ -1489,30 +1541,40 @@ function confirmLogout() {
 .notif-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
+  gap: 11px;
+  padding: 11px 18px;
+  border-top: 1px solid rgba(126,136,143,.12);
   transition: background 0.15s;
   cursor: pointer;
 }
-.notif-item:hover { background: #f4f5f5; }
+.notif-item:hover { background: rgba(255,255,255,.48); }
 .notif-avatar {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.85);
   object-fit: cover;
+  box-shadow: 0 3px 8px rgba(46,55,62,.14);
   flex-shrink: 0;
 }
 .notif-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   flex: 1;
-  font-size: 0.85rem;
-  color: #333;
-  line-height: 1.45;
+  min-width: 0;
+  color: #53616a;
+  line-height: 1.35;
 }
+.notif-text strong { overflow: hidden; color: #263139; font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
+.notif-text small { overflow: hidden; font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.notif-text time { color: #8a969d; font-size: .62rem; font-weight: 600; }
 .notif-unread-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #626a72;
+  background: #e8a020;
+  box-shadow: 0 0 0 3px rgba(232,160,32,.14);
   flex-shrink: 0;
 }
 

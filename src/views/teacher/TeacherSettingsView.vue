@@ -39,9 +39,9 @@
     <main class="main">
       <header class="main-header">
         <div>
-          <span class="page-eyebrow">Account</span>
+          <span class="page-eyebrow">Account &amp; security</span>
           <h1 class="page-title">Settings</h1>
-          <p class="page-sub">Manage your account settings and preferences</p>
+          <p class="page-sub">Manage account access, password security, and sign-in preferences.</p>
         </div>
       </header>
 
@@ -53,11 +53,15 @@
             <div class="settings-card-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </div>
-            <h2 class="settings-card-title">Change Password</h2>
+            <div>
+              <h2 class="settings-card-title">Change Password</h2>
+              <p class="settings-card-sub">Use your current password and a one-time code to secure this change.</p>
+            </div>
           </div>
 
           <form class="settings-form" @submit.prevent="handleUpdatePassword">
-            <div class="settings-row">
+            <div class="settings-step-label"><span>{{ otpSent ? 'Step 2 of 2' : 'Step 1 of 2' }}</span></div>
+            <div class="settings-row settings-row--identity">
               <div class="settings-group">
                 <label class="settings-label">Current Password</label>
                 <div class="pw-input-wrap">
@@ -75,20 +79,26 @@
                 </div>
               </div>
               <div class="settings-group">
-                <label class="settings-label">OTP</label>
+                <label class="settings-label">6-Digit OTP</label>
                 <div class="otp-entry-wrap">
-                  <input
-                    v-model="otpInputValue"
-                    class="settings-input"
-                    type="text"
-                    inputmode="numeric"
-                    autocomplete="one-time-code"
-                    placeholder="_ _ _ _ _ _"
-                    maxlength="6"
-                    :disabled="!otpSent"
-                  />
+                  <div class="otp-boxes" role="group" aria-label="Six-digit one-time password">
+                    <input
+                      v-for="(_, index) in pwOtpCode"
+                      :key="index"
+                      :ref="element => { if (element) pwOtpRefs[index] = element }"
+                      v-model="pwOtpCode[index]"
+                      class="otp-digit"
+                      type="text"
+                      inputmode="numeric"
+                      maxlength="1"
+                      :aria-label="`OTP digit ${index + 1}`"
+                      @input="onPwOtpInput(index)"
+                      @keydown.backspace="onPwOtpBackspace(index)"
+                    />
+                  </div>
                   <button type="button" class="send-otp-btn" @click="otpSent ? resetOtp() : sendOtp">
-                    {{ otpSent ? 'Resend' : 'Send OTP' }}
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                    <span>{{ otpSent ? 'Resend OTP' : 'Send OTP' }}</span>
                   </button>
                 </div>
                 <span v-if="otpSent" class="otp-expiry">Expires in {{ formattedOtpTime }}.</span>
@@ -134,17 +144,19 @@
             <div v-if="pwSuccess" class="settings-msg settings-msg--success">{{ pwSuccess }}</div>
 
             <div class="settings-form-footer">
-              <button type="submit" class="update-pw-btn">Update Password</button>
+              <button type="submit" class="update-pw-btn">{{ otpSent ? 'Update Password' : 'Continue' }}</button>
             </div>
           </form>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card verification-card">
           <div class="settings-card-header">
             <div class="settings-card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
             </div>
-            <h2 class="settings-card-title">Email verification on login</h2>
+            <div>
+              <h2 class="settings-card-title">Email verification on login</h2>
+            </div>
             <div class="tfa-control">
               <span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span>
               <button type="button" class="toggle-switch" :class="{ 'toggle-switch--on': twoFactorEnabled }" :disabled="isSavingTwoFactor" :aria-pressed="twoFactorEnabled" :aria-label="twoFactorEnabled ? 'Disable email verification' : 'Enable email verification'" @click="toggleTwoFactor">
@@ -152,13 +164,22 @@
               </button>
             </div>
           </div>
-          <div class="settings-row">
-            <div class="settings-group">
-              <p class="otp-hint">Send a verification code to your PHINMA Gmail address whenever you log in.</p>
-              <input v-model="twoFactorPassword" type="password" class="settings-input" placeholder="Current password to confirm change" />
-              <div v-if="twoFactorError" class="settings-msg settings-msg--error">{{ twoFactorError }}</div>
-              <div v-if="twoFactorSuccess" class="settings-msg settings-msg--success">{{ twoFactorSuccess }}</div>
+          <p class="settings-card-sub verification-card-sub">Add a one-time verification step whenever you sign in.</p>
+          <div class="verification-content">
+            <div class="verification-intro">
+              <span class="verification-badge">Secure sign-in</span>
+              <p class="verification-description">A one-time code will be sent to your PHINMA Gmail address whenever you log in.</p>
             </div>
+            <label class="settings-label verification-password-label" for="teacher-two-factor-password">Confirm with your current password</label>
+            <div class="verification-password-wrap">
+              <input id="teacher-two-factor-password" v-model="twoFactorPassword" :type="showTwoFactorPassword ? 'text' : 'password'" class="settings-input" placeholder="Enter current password" />
+              <button type="button" class="pw-eye" :aria-label="showTwoFactorPassword ? 'Hide current password' : 'Show current password'" @click="showTwoFactorPassword = !showTwoFactorPassword">
+                <svg v-if="!showTwoFactorPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <div v-if="twoFactorError" class="settings-msg settings-msg--error">{{ twoFactorError }}</div>
+            <div v-if="twoFactorSuccess" class="settings-msg settings-msg--success">{{ twoFactorSuccess }}</div>
           </div>
         </div>
 
@@ -372,6 +393,7 @@ let otpTimer = null
 const formattedOtpTime = computed(() => `0:${String(otpSecondsRemaining.value).padStart(2, '0')}`)
 const twoFactorEnabled = ref(Boolean(user.twoFactorEnabled))
 const twoFactorPassword = ref('')
+const showTwoFactorPassword = ref(false)
 const twoFactorError = ref('')
 const twoFactorSuccess = ref('')
 const isSavingTwoFactor = ref(false)
@@ -1227,8 +1249,142 @@ const faqs = [
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+/* ── Admin settings visual parity ── */
+.settings-body {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: stretch;
+  gap: 18px;
+  width: 100%;
+}
+.settings-card {
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(235,239,242,.9));
+  border: 1px solid rgba(133, 145, 153, .42);
+  border-radius: 18px;
+  padding: 25px 30px 28px;
+  box-shadow: inset 0 1px rgba(255,255,255,.92), 0 12px 30px rgba(47, 58, 66, .1);
+}
+.settings-card-header {
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(129, 140, 148, .25);
+}
+.settings-card-icon {
+  border: 1px solid #aab4ba;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #f9fafb, #dce2e5);
+  box-shadow: inset 0 1px #fff, 0 3px 8px rgba(58, 70, 78, .12);
+}
+.settings-card-title {
+  color: #263139;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+.settings-card-sub { color: #738089; font-size: .75rem; line-height: 1.45; }
+.settings-form { gap: 12px; max-width: none; }
+.settings-step-label {
+  display: flex;
+  justify-content: flex-end;
+  color: #66747d;
+  font-size: .76rem;
+  font-weight: 600;
+}
+.settings-step-label span {
+  padding: 4px 8px;
+  border: 1px solid #aab5bb;
+  border-radius: 999px;
+  background: #eef1f3;
+  color: #4a5962;
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.settings-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 28px; justify-content: start; }
+.settings-row--identity,
+.two-factor-card .settings-row--identity { grid-template-columns: minmax(0, 1fr); row-gap: 8px; }
+.settings-row--identity .settings-group,
+.settings-row--identity .pw-input-wrap { width: 100%; max-width: none; }
+.settings-row--identity .pw-input-wrap .settings-input { max-width: none; }
+.settings-step-label + .settings-row { margin-top: -10px; }
+.settings-input { background: rgba(255,255,255,.82); border-color: #acb7be; }
+.otp-entry-wrap { display: flex; align-items: stretch; gap: 10px; width: 100%; }
+.otp-boxes { display: grid; grid-template-columns: repeat(6, minmax(0, 42px)); gap: 7px; width: min(100%, 287px); }
+.otp-digit {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  border: 1px solid #aab7be;
+  border-radius: 10px;
+  background: rgba(255,255,255,.9);
+  color: #35434b;
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  box-shadow: inset 0 1px 2px rgba(42, 52, 58, .08), 0 1px rgba(255,255,255,.8);
+}
+.otp-digit:focus { border-color: #687780; box-shadow: 0 0 0 3px rgba(90, 105, 114, .13); }
+.send-otp-btn {
+  flex: 1 1 auto;
+  width: auto;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #3f4c55;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #87949c 0%, #5c6a74 48%, #46535c 100%);
+  box-shadow: inset 0 1px rgba(255,255,255,.28), 0 4px 10px rgba(48, 53, 58, .16);
+}
+.send-otp-btn svg { flex: 0 0 auto; }
+.settings-form-footer { justify-content: center; }
+.two-factor-card { position: relative; }
+.two-factor-card .settings-card-header { width: 100%; padding-right: 118px; }
+.two-factor-card .settings-card-header .tfa-control { position: absolute; top: 30px; right: 30px; margin-left: 0; }
+.two-factor-card .tfa-control { display: flex; align-items: center; gap: 10px; }
+.toggle-switch { border: 1px solid #89959d; background: #aeb7bd; }
+.toggle-switch--on { background: linear-gradient(145deg, #78a889, #4e8062); border-color: #47745a; box-shadow: inset 0 1px rgba(255,255,255,.28), 0 3px 9px rgba(57, 105, 75, .22); }
+.verification-card { position: relative; display: flex; flex-direction: column; }
+.verification-card .settings-card-header { align-items: flex-start; min-height: 52px; margin-bottom: 14px; padding-bottom: 12px; padding-right: 118px; }
+.verification-card .settings-card-header .tfa-control {
+  position: absolute;
+  top: 22px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.verification-card .tfa-status { min-width: 0; text-align: center; order: 2; }
+.verification-card .settings-card-icon { color: #4b5563; }
+.verification-card-sub { margin: -8px 0 18px; max-width: none; }
+.verification-content { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.verification-intro { padding: 13px 14px; border: 1px solid rgba(112, 137, 123, .25); border-radius: 12px; background: rgba(240, 248, 243, .7); }
+.verification-badge { color: #37614b; font-size: .65rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.verification-description { margin: 9px 0 0; color: #5f7067; font-size: .74rem; line-height: 1.55; }
+.verification-password-wrap { position: relative; display: flex; align-items: center; width: 100%; }
+.verification-password-wrap .settings-input { padding-right: 48px; max-width: none; }
+.verification-password-wrap .pw-eye { right: 8px; }
+.verification-help { margin: 0; color: #89958f; font-size: .67rem; line-height: 1.4; }
+.settings-faq-section { grid-column: 1 / -1; }
+
 @media (max-width: 800px) {
+  .settings-body { grid-template-columns: 1fr; }
   .settings-row { grid-template-columns: 1fr; }
   .main { padding: 24px 18px 32px; }
+}
+@media (max-width: 520px) {
+  .otp-entry-wrap { flex-direction: column; }
+  .otp-boxes,
+  .send-otp-btn { width: 100%; }
 }
 </style>

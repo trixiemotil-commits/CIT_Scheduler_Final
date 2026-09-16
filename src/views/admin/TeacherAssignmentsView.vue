@@ -241,7 +241,7 @@
             <div>
               <span class="modal-eyebrow">Faculty record</span>
               <h2 id="add-teacher-title" class="modal-title">Add New Teacher</h2>
-              <p class="modal-sub">Create a teacher profile and assign their designated teaching areas.</p>
+              <p class="modal-sub">Fill in the details to create a new teacher account.</p>
             </div>
             <button type="button" class="modal-close-btn" aria-label="Close add teacher modal" @click="showAddModal = false">
               ×
@@ -280,68 +280,69 @@
 
             <!-- Form Fields -->
             <div class="modal-form">
-              <label class="modal-field">
-                <span>Teacher name</span>
-                <input v-model="newTeacherName" type="text" placeholder="Enter teacher's name" class="modal-input" />
-              </label>
-              <label class="modal-field">
-                <span>Email address</span>
-                <div class="modal-email-input-wrap">
-                  <input
-                    v-model="newTeacherEmail"
-                    type="text"
-                    placeholder="Enter teacher's email"
-                    class="modal-input modal-email-input"
-                  />
-                  <span class="modal-email-suffix">.au@phinmaed.com</span>
-                </div>
-              </label>
-              
-              <!-- Multiple Designated Areas Custom Dropdown -->
-              <div class="modal-areas-group">
-                <label class="modal-areas-label">Designated areas</label>
-                <div class="modal-custom-dropdown" v-click-outside="() => showAreasDropdown = false">
-                  <button type="button" class="modal-dropdown-btn" @click="showAreasDropdown = !showAreasDropdown">
-                    <span v-if="newTeacherAreas.length === 0" class="modal-dropdown-placeholder">Select designated areas</span>
-                    <span v-else class="modal-dropdown-selected">
-                      {{ newTeacherAreas.length }} area{{ newTeacherAreas.length === 1 ? '' : 's' }} selected
-                    </span>
-                    <svg class="modal-dropdown-icon" :class="{ open: showAreasDropdown }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                  </button>
-                  
-                  <div v-if="showAreasDropdown" class="modal-dropdown-menu">
-                    <label v-for="area in ['Data Structure', 'Database', 'OOP', 'Web Development', 'Mobile Dev', 'UI/UX', 'Algorithms', 'Software Engineering']" :key="area" class="modal-dropdown-option">
-                      <input
-                        type="checkbox"
-                        :value="area"
-                        :checked="newTeacherAreas.includes(area)"
-                        @change="(e) => {
-                          if (e.target.checked) {
-                            newTeacherAreas.push(area)
-                          } else {
-                            newTeacherAreas.splice(newTeacherAreas.indexOf(area), 1)
-                          }
-                        }"
-                        class="modal-dropdown-checkbox"
-                      />
-                      <span class="modal-dropdown-label">{{ area }}</span>
-                    </label>
-                  </div>
-                </div>
-                <div v-if="newTeacherAreas.length" class="modal-selected-areas">
-                  <span v-for="area in newTeacherAreas" :key="area">{{ area }}</span>
-                </div>
+              <div class="teacher-form-row">
+                <label class="modal-field">
+                  <span>First name <b>*</b></span>
+                  <input v-model="newTeacherFirstName" type="text" placeholder="e.g. Juan" class="modal-input" required />
+                </label>
+                <label class="modal-field">
+                  <span>Last name <b>*</b></span>
+                  <input v-model="newTeacherLastName" type="text" placeholder="e.g. Dela Cruz" class="modal-input" required />
+                </label>
               </div>
+              <div class="teacher-form-row">
+                <label class="modal-field">
+                  <span>PHINMA email <b>*</b></span>
+                  <div class="modal-email-input-wrap">
+                    <input v-model="newTeacherEmail" type="text" placeholder="juan.delacruz" class="modal-input modal-email-input" required />
+                    <span class="modal-email-suffix">.au@phinmaed.com</span>
+                  </div>
+                </label>
+                <label class="modal-field">
+                  <span>Employee ID <b>*</b></span>
+                  <input v-model="newTeacherEmployeeId" type="text" inputmode="text" maxlength="12" placeholder="AU2025-00000" class="modal-input" required />
+                </label>
+              </div>
+              <div class="teacher-form-row">
+                <label class="modal-field">
+                  <span>Password <b>*</b></span>
+                  <div class="teacher-password-wrap">
+                    <input v-model="newTeacherPassword" :type="showTeacherPassword ? 'text' : 'password'" placeholder="Min. 8 characters" class="modal-input" required />
+                    <button type="button" class="teacher-password-toggle" :aria-label="showTeacherPassword ? 'Hide password' : 'Show password'" @click="showTeacherPassword = !showTeacherPassword">
+                      <svg v-if="!showTeacherPassword" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                      <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><path d="m4 4 16 16"/></svg>
+                    </button>
+                  </div>
+                </label>
+                <label class="modal-field">
+                  <span>Confirm password <b>*</b></span>
+                  <div class="teacher-password-wrap">
+                    <input v-model="newTeacherConfirmPassword" :type="showTeacherConfirmPassword ? 'text' : 'password'" placeholder="Re-enter password" class="modal-input" required />
+                    <button type="button" class="teacher-password-toggle" :aria-label="showTeacherConfirmPassword ? 'Hide confirm password' : 'Show confirm password'" @click="showTeacherConfirmPassword = !showTeacherConfirmPassword">
+                      <svg v-if="!showTeacherConfirmPassword" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                      <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><path d="m4 4 16 16"/></svg>
+                    </button>
+                  </div>
+                </label>
+              </div>
+              <label class="modal-field">
+                <span>Current admin password <b>*</b></span>
+                <div class="teacher-password-wrap">
+                  <input v-model="newTeacherCurrentPassword" :type="showTeacherAdminPassword ? 'text' : 'password'" placeholder="Enter your current password to confirm" class="modal-input" required />
+                  <button type="button" class="teacher-password-toggle" :aria-label="showTeacherAdminPassword ? 'Hide current admin password' : 'Show current admin password'" @click="showTeacherAdminPassword = !showTeacherAdminPassword">
+                    <svg v-if="!showTeacherAdminPassword" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                    <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><path d="m4 4 16 16"/></svg>
+                  </button>
+                </div>
+              </label>
             </div>
           </div>
 
           <!-- Actions -->
           <div class="modal-actions">
-            <button class="modal-cancel-btn" @click="showAddModal = false">Cancel</button>
             <button class="modal-add-btn" :disabled="isSavingNewTeacher" @click="addNewTeacher">
-              {{ isSavingNewTeacher ? 'Saving…' : 'Add' }}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              <span>{{ isSavingNewTeacher ? 'Saving…' : 'Add teacher' }}</span>
             </button>
           </div>
         </div>
@@ -449,10 +450,16 @@ const showLogoutModal = ref(false)
 const showAddModal = ref(false)
 const coverageTeacher = ref(null)
 const coverageSnapshot = ref({})
-const showAreasDropdown = ref(false)
-const newTeacherName = ref('')
+const newTeacherFirstName = ref('')
+const newTeacherLastName = ref('')
 const newTeacherEmail = ref('')
-const newTeacherAreas = ref([])
+const newTeacherEmployeeId = ref('')
+const newTeacherPassword = ref('')
+const newTeacherConfirmPassword = ref('')
+const newTeacherCurrentPassword = ref('')
+const showTeacherPassword = ref(false)
+const showTeacherConfirmPassword = ref(false)
+const showTeacherAdminPassword = ref(false)
 const previewImage = ref('')
 const TEACHER_EMAIL_SUFFIX = '.au@phinmaed.com'
 const fileInput = ref(null)
@@ -1055,49 +1062,48 @@ const getTeacherEmailLocalPart = () => {
     .replace(/@.*$/, '')
 }
 
-const splitTeacherName = (name) => {
-  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
-  if (!parts.length) return { firstName: '', lastName: '' }
-  if (parts.length === 1) return { firstName: parts[0], lastName: 'Teacher' }
-  return {
-    firstName: parts[0],
-    lastName: parts.slice(1).join(' '),
-  }
-}
-
-const buildDefaultTeacherPassword = (emailLocalPart) => {
-  const safeLocal = String(emailLocalPart || 'teacher').replace(/[^a-z0-9]/gi, '')
-  return `${safeLocal || 'Teacher'}Teacher@2026`
-}
-
 const resetAddTeacherForm = () => {
-  newTeacherName.value = ''
+  newTeacherFirstName.value = ''
+  newTeacherLastName.value = ''
   newTeacherEmail.value = ''
-  newTeacherAreas.value = []
+  newTeacherEmployeeId.value = ''
+  newTeacherPassword.value = ''
+  newTeacherConfirmPassword.value = ''
+  newTeacherCurrentPassword.value = ''
+  showTeacherPassword.value = false
+  showTeacherConfirmPassword.value = false
+  showTeacherAdminPassword.value = false
   previewImage.value = ''
-  showAreasDropdown.value = false
 }
 
 const addNewTeacher = async () => {
   const emailLocalPart = getTeacherEmailLocalPart()
-  const { firstName, lastName } = splitTeacherName(newTeacherName.value)
 
-  if (!firstName || !lastName || !emailLocalPart || newTeacherAreas.value.length === 0) {
-    alert('Please fill in all fields and select at least one designated area')
+  if (!newTeacherFirstName.value.trim() || !newTeacherLastName.value.trim() || !emailLocalPart || !newTeacherEmployeeId.value.trim() || !newTeacherPassword.value || !newTeacherConfirmPassword.value || !newTeacherCurrentPassword.value) {
+    alert('Please fill in all required fields.')
+    return
+  }
+  if (newTeacherPassword.value !== newTeacherConfirmPassword.value) {
+    alert('Passwords do not match.')
+    return
+  }
+  if (newTeacherPassword.value.length < 8) {
+    alert('Password must be at least 8 characters long.')
     return
   }
 
   const payload = {
-    firstName,
-    lastName,
+    firstName: newTeacherFirstName.value.trim(),
+    lastName: newTeacherLastName.value.trim(),
     email: `${emailLocalPart}${TEACHER_EMAIL_SUFFIX}`.toLowerCase(),
     role: 'teacher',
     roles: ['teacher'],
-    password: buildDefaultTeacherPassword(emailLocalPart),
+    password: newTeacherPassword.value,
+    currentPassword: newTeacherCurrentPassword.value,
+    employeeId: newTeacherEmployeeId.value.trim(),
     account_status: 'Active',
     teacher_status: 'On School',
     avatar: previewImage.value || null,
-    designatedAreas: [...newTeacherAreas.value],
   }
 
   isSavingNewTeacher.value = true
@@ -2301,10 +2307,6 @@ onUnmounted(() => {
   gap: 6px;
 }
 
-.modal-add-btn::before {
-  content: '+ ';
-}
-
 .modal-add-btn:hover {
   background: #1f2937;
 }
@@ -2571,5 +2573,85 @@ onUnmounted(() => {
   .teachers-section { padding: 12px 16px 12px; }
   .page-title { font-size: 1.25rem; }
   .modal-box { width: 98vw; }
+}
+
+/* ── Add Teacher modal: match Add User modal ── */
+.add-teacher-modal {
+  width: min(840px, calc(100vw - 44px));
+  max-height: calc(100vh - 58px);
+  overflow: hidden;
+  border: 1px solid #d5dde1;
+  border-radius: 18px;
+  background: #f7f9fa;
+  box-shadow: 0 28px 80px rgba(18,24,30,.34);
+}
+.add-teacher-modal .modal-header {
+  min-height: 96px;
+  padding: 20px 30px;
+  border-bottom: 1px solid #d7dfe3;
+  border-radius: 18px 18px 0 0;
+  background: linear-gradient(145deg, #f8fafb, #e4e8ea);
+}
+.add-teacher-modal .modal-eyebrow { color: #71808a; }
+.add-teacher-modal .modal-title { color: #202830; font-size: 1.26rem; }
+.add-teacher-modal .modal-sub { color: #68747d; font-size: .84rem; }
+.add-teacher-modal .modal-close-btn { border-color: #cbd5da; border-radius: 9px; background: #fff; color: #3f4d57; }
+.add-teacher-modal-body { grid-template-columns: 190px minmax(0, 1fr); background: #f7f9fa; }
+.add-teacher-modal .modal-avatar-section { padding: 24px 18px; border-right-color: #dce3e7; background: #eef2f4; }
+.add-teacher-modal .modal-avatar-placeholder { width: 94px; height: 94px; border-color: #b7c4cc; background: #fff; }
+.add-teacher-modal .modal-avatar-copy strong { color: #33414b; font-size: .78rem; }
+.add-teacher-modal .modal-avatar-copy span { color: #7c8992; font-size: .67rem; }
+.add-teacher-modal .modal-form { gap: 13px; padding: 22px 30px 24px; background: #f7f9fa; }
+.add-teacher-modal .teacher-form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; }
+.add-teacher-modal .modal-field > span,
+.add-teacher-modal .modal-areas-label { color: #5f6973; font-size: .7rem; font-weight: 900; letter-spacing: .045em; }
+.add-teacher-modal .modal-field > span b { color: #dc5b5b; font-weight: 900; }
+.teacher-password-wrap { position: relative; display: flex; align-items: center; }
+.teacher-password-wrap .modal-input { width: 100%; padding-right: 46px; }
+.teacher-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #7b8794;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.teacher-password-toggle:hover { color: #4b5563; background: #eef2f4; }
+.teacher-password-toggle:focus-visible { outline: 2px solid #7b8794; outline-offset: 1px; }
+.teacher-password-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.add-teacher-modal .modal-input,
+.add-teacher-modal .modal-dropdown-btn { min-height: 42px; padding: 9px 13px; border-color: #dce3e8; border-radius: 11px; background: #fff !important; color: #26313b; box-shadow: inset 0 1px 2px rgba(68,80,91,.04) !important; }
+.add-teacher-modal .modal-input:focus,
+.add-teacher-modal .modal-dropdown-btn:focus,
+.add-teacher-modal .modal-email-input-wrap:focus-within { border-color: #6b7884; box-shadow: 0 0 0 3px rgba(100,113,126,.12) !important; }
+.add-teacher-modal .modal-email-input-wrap { min-height: 42px; border-color: #dce3e8; border-radius: 11px; background: #fff; }
+.add-teacher-modal .modal-email-suffix { background: #eef2f4; color: #68747d; }
+.add-teacher-modal .modal-selected-areas span { border-color: #d3dde2; border-radius: 7px; background: #fff; color: #53616a; }
+.add-teacher-modal .modal-actions { margin: 0; padding: 14px 30px 18px; border-top-color: #dce3e7; border-radius: 0 0 18px 18px; background: #f7f9fa; }
+.add-teacher-modal .modal-cancel-btn,
+.add-teacher-modal .modal-add-btn { min-height: 42px; border-radius: 10px; font-weight: 800; }
+.add-teacher-modal .modal-cancel-btn { min-width: 112px; border-color: #dbe3e8; color: #4f5b66; background: #fff; }
+.add-teacher-modal .modal-add-btn { min-width: 145px; background: linear-gradient(145deg, #5d6873, #343e48); box-shadow: 0 8px 18px rgba(48,57,66,.18), inset 0 1px rgba(255,255,255,.18); }
+.add-teacher-modal .modal-add-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.add-teacher-modal .modal-add-btn svg { flex: 0 0 auto; }
+.add-teacher-modal .modal-add-btn:hover { background: linear-gradient(145deg, #6d7983, #414d58); }
+
+@media (max-width: 760px) {
+  .add-teacher-modal { width: calc(100vw - 28px); max-height: calc(100vh - 28px); }
+  .add-teacher-modal .modal-header { padding: 18px 22px; }
+  .add-teacher-modal-body { grid-template-columns: 1fr; }
+  .add-teacher-modal .modal-avatar-section { flex-direction: row; justify-content: flex-start; padding: 16px 22px; border-right: 0; border-bottom: 1px solid #dce3e7; }
+  .add-teacher-modal .modal-avatar-placeholder { width: 64px; height: 64px; }
+  .add-teacher-modal .modal-form { padding: 20px 22px; }
+  .add-teacher-modal .teacher-form-row { grid-template-columns: 1fr; }
+  .add-teacher-modal .modal-actions { padding: 14px 22px 18px; }
 }
 </style>

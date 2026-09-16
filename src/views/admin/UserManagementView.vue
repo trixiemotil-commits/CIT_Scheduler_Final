@@ -364,7 +364,10 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">PHINMA Email <span class="form-required">*</span></label>
-              <input v-model="userForm.email" class="form-input" type="email" placeholder="juan.delacruz.au@phinmaed.com" required />
+              <div class="user-email-input-wrap">
+                <input v-model="userEmailLocalPart" class="form-input user-email-local-input" type="text" placeholder="juan.delacruz" autocomplete="email" required />
+                <span class="user-email-suffix">.au@phinmaed.com</span>
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label">{{ isTeacherRole ? 'Employee ID' : 'School ID Number' }} <span class="form-required">*</span></label>
@@ -453,7 +456,13 @@
           <div class="form-row form-row--single">
             <div class="form-group">
               <label class="form-label">Current Admin Password <span class="form-required">*</span></label>
-              <input v-model="userForm.currentPassword" class="form-input" type="password" :placeholder="editingUser ? 'Enter your password to confirm changes' : 'Enter your current password to confirm'" required />
+              <div class="password-input-wrap">
+                <input v-model="userForm.currentPassword" class="form-input" :type="showCurrentAdminPassword ? 'text' : 'password'" :placeholder="editingUser ? 'Enter your password to confirm changes' : 'Enter your current password to confirm'" required />
+                <button type="button" class="password-toggle" :aria-label="showCurrentAdminPassword ? 'Hide current admin password' : 'Show current admin password'" @click="showCurrentAdminPassword = !showCurrentAdminPassword">
+                  <svg v-if="showCurrentAdminPassword" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><path d="m4 4 16 16"/></svg>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1004,6 +1013,16 @@ function formatSchoolId(event) {
 }
 
 const isTeacherRole = computed(() => ['Admin', 'Teacher', 'Admin & Teacher'].includes(userForm.value.role))
+const userEmailLocalPart = computed({
+  get() {
+    return String(userForm.value.email || '')
+      .replace(/\.au@phinmaed\.com$/i, '')
+      .replace(/@.*$/, '')
+  },
+  set(value) {
+    userForm.value.email = `${String(value || '').trim().replace(/\s+/g, '')}.au@phinmaed.com`
+  },
+})
 
 function handleRoleChange() {
   userForm.value.schoolId = ''
@@ -1056,6 +1075,7 @@ const showUserModal   = ref(false)
 const editingUser     = ref(null)
 const showAddPassword = ref(false)
 const showConfirmPassword = ref(false)
+const showCurrentAdminPassword = ref(false)
 const formError       = ref('')
 const showRegisterConfirm = ref(false)
 const showApproveAllConfirm = ref(false)
@@ -1070,6 +1090,7 @@ function openAddUser() {
   userForm.value        = emptyForm()
   showAddPassword.value = false
   showConfirmPassword.value = false
+  showCurrentAdminPassword.value = false
   showUserModal.value   = true
 }
 
@@ -1091,6 +1112,7 @@ function openEditUser(user) {
   }
   showAddPassword.value = false
   showConfirmPassword.value = false
+  showCurrentAdminPassword.value = false
   showUserModal.value = true
 }
 
@@ -2842,6 +2864,10 @@ function confirmRestoreUser() {
 .reg-section-line { background: #d6dfe3; }
 .form-input { background: #fff; box-shadow: none; }
 .form-input:focus { box-shadow: 0 0 0 3px rgba(100,116,139,.1); }
+.user-email-input-wrap { display: flex; align-items: stretch; min-height: 42px; overflow: hidden; border: 1px solid #dce3e8; border-radius: 11px; background: #fff; box-shadow: inset 0 1px 2px rgba(68,80,91,.04); }
+.user-email-input-wrap:focus-within { border-color: #6b7884; box-shadow: 0 0 0 3px rgba(100,113,126,.12); }
+.user-email-local-input { min-width: 0; flex: 1; border: 0 !important; border-radius: 0; box-shadow: none !important; }
+.user-email-suffix { display: inline-flex; align-items: center; padding: 0 14px; border-left: 1px solid #dce3e8; background: #eef2f4; color: #68747d; font-size: .88rem; font-weight: 800; white-space: nowrap; }
 .form-actions {
   margin: 0 -30px;
   padding: 14px 30px 18px;
@@ -2853,6 +2879,26 @@ function confirmRestoreUser() {
 .um-submit-btn { min-height: 40px; border-radius: 10px; }
 .um-submit-btn { background: #44515d; box-shadow: none; }
 .um-submit-btn:hover { background: #35424d; }
+
+/* Keep the register modal surfaces inside one clean rounded shell. */
+.modal-overlay {
+  background: rgba(31,35,39,.58);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.um-modal-box--wide {
+  overflow: hidden;
+  border-radius: 18px;
+  clip-path: inset(0 round 18px);
+}
+.um-modal-box--wide .um-form {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #aeb8be transparent;
+}
+.um-modal-box--wide .form-actions {
+  border-radius: 0 0 18px 18px;
+}
 
 @media (max-width: 640px) {
   .page-title-main { font-size: 2.15rem; }
