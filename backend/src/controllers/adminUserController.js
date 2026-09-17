@@ -443,6 +443,9 @@ async function updateUserStatus(req, res) {
 
     const previousStatus = user.account_status;
     user.account_status = nextStatus;
+    if (previousStatus !== nextStatus) {
+      user.sessionVersion = Number(user.sessionVersion || 0) + 1;
+    }
     await user.save();
 
     if (previousStatus === "Pending" && nextStatus === "Active" && user.email) {

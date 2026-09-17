@@ -1467,11 +1467,18 @@ function openArchiveUser(user) {
   showArchiveModal.value = true
 }
 
-function confirmArchiveUser() {
-  const u = users.value.find(u => u.id === archiveTarget.value.id)
-  if (u) u.status = 'Archived'
-  showArchiveModal.value = false
-  showToast('User archived successfully.')
+async function confirmArchiveUser() {
+  if (!archiveTarget.value) return
+
+  const user = archiveTarget.value
+  try {
+    await updateUserStatus(user, 'Archived')
+    showArchiveModal.value = false
+    archiveTarget.value = null
+    showToast('User archived successfully.')
+  } catch (error) {
+    loadError.value = error.message || 'Failed to archive user.'
+  }
 }
 
 /* ── Restore User ── */
