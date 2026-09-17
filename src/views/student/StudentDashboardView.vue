@@ -21,36 +21,56 @@
     <!-- Stats Grid -->
     <div class="stats-grid">
       <div class="stat-card green">
-        <div class="stat-label">Approved</div>
-        <div class="stat-num">{{ stats.approved }}</div>
-        <div class="stat-desc">sessions approved</div>
+        <div class="stat-label">In School</div>
+        <div class="stat-num">{{ teacherStats.inSchool }}</div>
+        <div class="stat-desc">teachers on campus</div>
       </div>
       <div class="stat-card red">
-        <div class="stat-label">Reschedule</div>
-        <div class="stat-num">{{ stats.reschedule }}</div>
-        <div class="stat-desc">needs reschedule</div>
+        <div class="stat-label">On Leave</div>
+        <div class="stat-num">{{ teacherStats.onLeave }}</div>
+        <div class="stat-desc">teachers on leave</div>
       </div>
       <div class="stat-card blue">
-        <div class="stat-label">Pending</div>
-        <div class="stat-num">{{ stats.pending }}</div>
-        <div class="stat-desc">awaiting response</div>
+        <div class="stat-label">Available Teacher</div>
+        <div class="stat-num">{{ teacherStats.available }}</div>
+        <div class="stat-desc">ready for consultation</div>
       </div>
       <div class="stat-card orange">
-        <div class="stat-label">Completed</div>
-        <div class="stat-num">{{ stats.completed }}</div>
-        <div class="stat-desc">all time</div>
+        <div class="stat-label">Not Available</div>
+        <div class="stat-num">{{ teacherStats.notAvailable }}</div>
+        <div class="stat-desc">not accepting requests</div>
       </div>
     </div>
 
     <!-- Recent Consultations -->
     <div class="section-card">
-      <div class="section-title">Recent Consultations</div>
+      <div class="consultations-heading">
+        <div class="section-title">Recent Consultations</div>
+        <div class="consultation-counts" aria-label="Consultation status counts">
+          <div class="consultation-count-card count-approved">
+            <span>Approved</span>
+            <strong>{{ consultationStatusCounts.approved }}</strong>
+          </div>
+          <div class="consultation-count-card count-pending">
+            <span>Pending</span>
+            <strong>{{ consultationStatusCounts.pending }}</strong>
+          </div>
+          <div class="consultation-count-card count-reschedule">
+            <span>Reschedule</span>
+            <strong>{{ consultationStatusCounts.reschedule }}</strong>
+          </div>
+          <div class="consultation-count-card count-completed">
+            <span>Completed</span>
+            <strong>{{ consultationStatusCounts.completed }}</strong>
+          </div>
+        </div>
+      </div>
       <div v-for="c in recentConsultations" :key="c.id" class="consult-row">
         <div class="consult-info">
           <div class="consult-name">{{ c.subject }}</div>
           <div class="consult-teacher">{{ c.teacher }} · {{ formatDate(c.date) }}</div>
         </div>
-        <span :class="['badge', badgeClass(c.status)]">{{ c.status }}</span>
+        <span :class="['consult-status-card', badgeClass(c.status)]">{{ displayStatus(c.status) }}</span>
       </div>
     </div>
 
@@ -86,14 +106,49 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 const user     = getUser() || { name: 'Anna Cooper', email: 'student@gmail.com' }
 const initials = computed(() => user.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'A')
 
-const { sessions, stats, loadSessions } = useStudentData()
-const { refresh: refreshDashboard } = useAutoRefresh(() => loadSessions(true))
+const { sessions, loadSessions } = useStudentData()
+const teachers = ref([])
+
+const teacherStats = computed(() => {
+  const list = teachers.value
+  return {
+    inSchool: list.filter((teacher) => teacher.status === 'In School').length,
+    onLeave: list.filter((teacher) => teacher.status === 'On Leave' || teacher.teacher_status === 'On Leave').length,
+    available: list.filter((teacher) => teacher.available === true).length,
+    notAvailable: list.filter((teacher) => teacher.available !== true).length,
+  }
+})
+
+async function loadTeachers() {
+  try {
+    const payload = await apiRequest(`/consultations/teachers?updatedAt=${Date.now()}`, { cache: 'no-store' })
+    teachers.value = Array.isArray(payload.teachers) ? payload.teachers : []
+  } catch (_error) {
+    teachers.value = []
+  }
+}
+
+async function refreshDashboard() {
+  await Promise.all([loadSessions(true), loadTeachers()])
+}
 
 const recentConsultations = computed(() => sessions.value.slice(0, 4))
+const consultationStatusCounts = computed(() => {
+  const counts = { approved: 0, pending: 0, reschedule: 0, completed: 0 }
+  sessions.value.forEach((session) => {
+    const status = displayStatus(session.status)
+    if (status === 'Approved') counts.approved += 1
+    else if (status === 'Pending') counts.pending += 1
+    else if (status === 'Reschedule') counts.reschedule += 1
+    else if (status === 'Completed') counts.completed += 1
+  })
+  return counts
+})
 
 onMounted(() => {
   loadNotifications()
   loadRecentEvents()
+  loadTeachers()
   useNotifications.addNotificationListener(handleNotification)
 })
 
@@ -161,15 +216,22 @@ async function loadRecentEvents() {
   }
 }
 
+function displayStatus(status) {
+  const normalized = String(status || '').trim().toLowerCase()
+  if (normalized === 'cancelled' || normalized === 'resched' || normalized === 'rescheduled') return 'Reschedule'
+  if (normalized === 'approved') return 'Approved'
+  if (normalized === 'pending') return 'Pending'
+  if (normalized === 'completed' || normalized === 'done') return 'Completed'
+  return status || 'Pending'
+}
+
 function badgeClass(status) {
   return {
     Approved: 'badge-green',
     Pending: 'badge-orange',
     Reschedule: 'badge-red',
     Completed: 'badge-gray',
-    Cancelled: 'badge-red',
-    Done: 'badge-gray',
-  }[status] || 'badge-gray'
+  }[displayStatus(status)] || 'badge-gray'
 }
 
 function formatDate(dateStr) {
@@ -290,6 +352,37 @@ function formatDate(dateStr) {
   box-shadow: 0 6px 16px rgba(45, 50, 55, 0.1), inset 0 1px rgba(255, 255, 255, 0.9);
 }
 .section-title { font-weight: 800; font-size: 0.91rem; margin-bottom: 9px; color: #30353a; }
+.consultations-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.consultations-heading .section-title { margin: 5px 0 0; }
+.consultation-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(52px, 1fr));
+  gap: 5px;
+  width: 142px;
+  flex-shrink: 0;
+}
+.consultation-count-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  font-size: 0.56rem;
+  font-weight: 700;
+}
+.consultation-count-card strong { font-size: 0.76rem; color: #252a2f; }
+.count-approved { background: #e1eee6; color: #397051; }
+.count-pending { background: #fff3e0; color: #b35e00; }
+.count-reschedule { background: #ffeaea; color: #e63946; }
+.count-completed { background: #f0f0f0; color: #666; }
 
 /* Consult rows */
 .consult-row {
@@ -306,7 +399,9 @@ function formatDate(dateStr) {
 .consult-teacher { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.7rem; color: #858d94; margin-top: 3px; }
 
 /* Badges */
-.badge {
+.consult-status-card {
+  min-width: 72px;
+  text-align: center;
   font-size: 0.7rem; font-weight: 600;
   padding: 4px 9px; border-radius: 7px;
   white-space: nowrap;

@@ -169,8 +169,10 @@
           <div v-if="reqError" class="msg-err">{{ reqError }}</div>
         </div>
         <div class="modal-footer">
-          <button class="modal-cancel" @click="showReqModal = false">Cancel</button>
-          <button class="modal-submit" @click="submitRequest">Send Request</button>
+          <button class="modal-cancel" :disabled="isSubmittingRequest" @click="showReqModal = false">Cancel</button>
+          <button class="modal-submit" :disabled="isSubmittingRequest" @click="submitRequest">
+            {{ isSubmittingRequest ? 'Sending...' : 'Send Request' }}
+          </button>
         </div>
       </div>
     </div>
@@ -531,6 +533,7 @@ const showProfileModal = ref(false)
 const selectedTeacher  = ref(null)
 const toastMsg         = ref('')
 const reqError         = ref('')
+const isSubmittingRequest = ref(false)
 const today = new Date().toISOString().split('T')[0]
 const reqForm          = ref({ subject: '', reason: CONSULTATION_REASONS[0], availabilityId: '', date: '', time: '', description: '' })
 
@@ -608,7 +611,9 @@ function requestFromProfile() {
   openRequest(selectedTeacher.value)
 }
 
-function submitRequest() {
+async function submitRequest() {
+  if (isSubmittingRequest.value) return
+
   reqError.value = ''
   if (!reqForm.value.subject) { reqError.value = 'Please select a subject.'; return }
   if (!reqForm.value.reason) { reqError.value = 'Please select a reason.'; return }
@@ -652,19 +657,21 @@ function submitRequest() {
     if (!body.time) { reqError.value = 'Selected consultation time is invalid.'; return }
   }
 
-  apiRequest('/consultations/requests', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  })
-    .then(() => {
-      showReqModal.value = false
-      showToast(`Request sent to ${selectedTeacher.value.name}.`)
-      notifyStudentDataChanged('consultation-created')
-      return loadTeachers()
+  isSubmittingRequest.value = true
+  try {
+    await apiRequest('/consultations/requests', {
+      method: 'POST',
+      body: JSON.stringify(body),
     })
-    .catch((error) => {
-      reqError.value = error.message || 'Failed to send request.'
-    })
+    showReqModal.value = false
+    showToast(`Request sent to ${selectedTeacher.value.name}.`)
+    notifyStudentDataChanged('consultation-created')
+    await loadTeachers()
+  } catch (error) {
+    reqError.value = error.message || 'Failed to send request.'
+  } finally {
+    isSubmittingRequest.value = false
+  }
 }
 
 function showToast(msg) {
