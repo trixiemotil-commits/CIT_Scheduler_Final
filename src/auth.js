@@ -1,4 +1,13 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const configuredApiBase = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '')
+const API_BASE = configuredApiBase || '/api'
+const isProductionBuild = Boolean(import.meta.env.PROD)
+
+function getApiConfigurationError() {
+  if (isProductionBuild && !configuredApiBase) {
+    return new Error('The production API is not configured. Set VITE_API_BASE_URL in Vercel to your Render backend URL ending in /api, then redeploy.')
+  }
+  return null
+}
 
 function sessionStorageFor(remember = false) {
   return remember ? localStorage : sessionStorage
@@ -53,6 +62,9 @@ function validateAuthPayload(payload) {
 }
 
 async function request(path, options = {}) {
+  const configurationError = getApiConfigurationError()
+  if (configurationError) throw configurationError
+
   let response
   try {
     response = await fetch(`${API_BASE}${path}`, {

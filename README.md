@@ -39,6 +39,18 @@ npm run dev:all
 
 This runs the frontend (`vite`) and the backend (`node src/server.js/index.js`) concurrently using `npx concurrently`.
 
+## Production deployment
+
+Deploy the frontend to Vercel and the backend to Render. In Vercel, add this environment variable before building:
+
+```env
+VITE_API_BASE_URL=https://your-render-service.onrender.com/api
+```
+
+After changing it, redeploy Vercel. In Render, configure `MONGODB_URI`, `JWT_SECRET`, `RECAPTCHA_SECRET`, `SMTP_HOST` or `SMTP_SERVICE`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and `NODE_ENV=production`.
+
+For Gmail login verification, use an App Password for `SMTP_PASS`. The frontend cannot complete a two-factor login until the Render backend can send the OTP email.
+
 Alternative: run in separate terminals
 
 ```bash
