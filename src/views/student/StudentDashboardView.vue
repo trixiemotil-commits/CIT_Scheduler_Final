@@ -97,7 +97,6 @@
 <script setup>
 import { getToken, getUser } from '@/auth.js'
 import StudentRefresher from '@/components/student/StudentRefresher.vue'
-import { useAutoRefresh } from '@/composables/useAutoRefresh.js'
 import useNotifications from '@/composables/useNotifications.js'
 import { useStudentData } from '@/composables/useStudentData.js'
 import { IonContent, IonPage } from '@ionic/vue'
