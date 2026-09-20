@@ -50,8 +50,8 @@
           <h1 class="page-title">Admin Dashboard</h1>
           <p class="page-sub">Manage schedules, rooms, and teacher assignments</p>
         </div>
-        <div class="notif-wrap" v-click-outside="() => showNotif = false">
-          <button class="notif-btn" @click="showNotif = !showNotif">
+        <div class="notif-wrap" v-click-outside="() => { showNotif = false; selectedNotification = null }">
+          <button class="notif-btn" @click="toggleNotifications">
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -83,7 +83,7 @@
                 <template v-if="newNotifs.length">
                   <div class="notif-section-label">New</div>
                   <ul class="notif-list">
-                    <li v-for="n in newNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
+                    <li v-for="n in newNotifs" :key="n.id" class="notif-item" :class="{ selected: selectedNotification?.id === n.id }" @click="openNotification(n, $event)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
                       <span class="notif-text"><strong>{{ n.title }}</strong><small>{{ n.message }}</small><time>{{ n.timeLabel }}</time></span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
@@ -95,7 +95,7 @@
                 <template v-if="todayNotifs.length">
                   <div class="notif-section-label">Today</div>
                   <ul class="notif-list">
-                    <li v-for="n in todayNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
+                    <li v-for="n in todayNotifs" :key="n.id" class="notif-item" :class="{ selected: selectedNotification?.id === n.id }" @click="openNotification(n, $event)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
                       <span class="notif-text"><strong>{{ n.title }}</strong><small>{{ n.message }}</small><time>{{ n.timeLabel }}</time></span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
@@ -106,7 +106,7 @@
                 <template v-if="earlierNotifs.length">
                   <div class="notif-section-label">Earlier</div>
                   <ul class="notif-list">
-                    <li v-for="n in earlierNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
+                    <li v-for="n in earlierNotifs" :key="n.id" class="notif-item" :class="{ selected: selectedNotification?.id === n.id }" @click="openNotification(n, $event)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
                       <span class="notif-text"><strong>{{ n.title }}</strong><small>{{ n.message }}</small><time>{{ n.timeLabel }}</time></span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
@@ -118,6 +118,29 @@
               </template>
             </div>
           </div>
+
+          <section v-if="showNotif && selectedNotification" class="notification-preview" :style="notificationPreviewStyle" role="dialog" aria-label="Notification details">
+            <button type="button" class="notification-preview-close" aria-label="Close notification details" @click="selectedNotification = null">×</button>
+            <span class="notification-preview-kicker">Notification details</span>
+            <div class="notification-preview-heading">
+              <img :src="selectedNotification.avatar" class="notification-preview-avatar" alt="" />
+              <div>
+                <h2>{{ selectedNotification.title }}</h2>
+                <time>{{ selectedNotification.timeLabel }}</time>
+              </div>
+            </div>
+            <p class="notification-preview-message">{{ selectedNotification.message }}</p>
+            <dl class="notification-preview-meta">
+              <div>
+                <dt>From</dt>
+                <dd>{{ selectedNotification.actorName || 'System notification' }}</dd>
+              </div>
+              <div v-if="selectedNotification.related?.status">
+                <dt>Status</dt>
+                <dd>{{ selectedNotification.related.status }}</dd>
+              </div>
+            </dl>
+          </section>
         </div>
       </header>
 
@@ -715,6 +738,8 @@ const showNotif = ref(false)
 const notifTab = ref('all')
 const notifications = ref([])
 const notificationsLoading = ref(false)
+const selectedNotification = ref(null)
+const notificationPreviewStyle = ref({})
 const visibleNotifs = computed(() =>
   notifTab.value === 'unread' ? notifications.value.filter(n => !n.read)
     : notifTab.value === 'read' ? notifications.value.filter(n => n.read)
@@ -743,18 +768,33 @@ function notificationTimeLabel(createdAt) {
   return created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+function notificationRoute(notification) {
+  const route = notification.data?.route
+  const isGenericConsultationRoute = route === '/admin/dashboard'
+    && String(notification.type || '').startsWith('consultation_')
+  return isGenericConsultationRoute ? null : (route || null)
+}
+
 function normalizeNotification(notification) {
   return {
     id: notification.id,
+    type: notification.type || 'info',
     title: notification.title || notification.type || 'Notification',
     message: notification.message || 'You have a new notification.',
     actorName: notification.data?.actorName || '',
     avatar: notification.data?.avatar || user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.data?.actorName || notification.title || 'Notification')}&background=DDE2E5&color=30353A`,
     read: Boolean(notification.read),
+    related: notification.related || {},
     group: notificationGroup(notification.createdAt),
     timeLabel: notificationTimeLabel(notification.createdAt),
-    route: notification.data?.route || '/admin/activity-logs',
+    route: notificationRoute(notification),
   }
+}
+
+function toggleNotifications() {
+  showNotif.value = !showNotif.value
+  if (!showNotif.value) selectedNotification.value = null
+  if (showNotif.value) loadNotifications()
 }
 
 async function loadNotifications() {
@@ -794,10 +834,25 @@ async function markAllNotificationsRead() {
   }
 }
 
-function openNotification(notification) {
+function openNotification(notification, event) {
   markNotificationRead(notification.id)
-  showNotif.value = false
-  router.push(notification.route)
+  if (notification.route) {
+    selectedNotification.value = null
+    showNotif.value = false
+    router.push(notification.route)
+    return
+  }
+  const clickedRow = event?.currentTarget
+  if (clickedRow?.getBoundingClientRect) {
+    const rowBounds = clickedRow.getBoundingClientRect()
+    const previewHeight = 290
+    notificationPreviewStyle.value = {
+      top: `${Math.min(Math.max(12, rowBounds.top), Math.max(12, window.innerHeight - previewHeight))}px`,
+      left: `${Math.max(12, rowBounds.left - 330 - 14)}px`,
+    }
+  }
+  showNotif.value = true
+  selectedNotification.value = { ...notification, read: true }
 }
 
 /* ── Charts ── */
@@ -1083,7 +1138,7 @@ function createLineChart() {
         pointRadius: 4,
         pointHoverRadius: 6,
         tension: 0.45,
-        borderWidth: 2.5
+        borderWidth: 2
       }]
     },
     options: {
@@ -1129,6 +1184,12 @@ function compactTeacherLabel(name) {
   return `${first} ${lastInitial}.`
 }
 
+function workloadBarColor(hours) {
+  if (hours >= 20) return '#46535c'
+  if (hours >= 10) return '#68737b'
+  return '#aeb7bc'
+}
+
 function createBarChart() {
   if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null }
   const expanded = expandedChart.value === 'bar'
@@ -1143,12 +1204,12 @@ function createBarChart() {
       datasets: [{
         label: 'Teacher hours',
         data: workloadItems.map(teacher => teacher.totalHours),
-        backgroundColor: workloadItems.map((_, index) => index % 2 === 0 ? '#7d8086' : '#e8b14a'),
+        backgroundColor: workloadItems.map(teacher => workloadBarColor(teacher.totalHours)),
         borderRadius: 12,
         borderSkipped: false,
         borderWidth: 0,
-        barThickness: 24,
-        maxBarThickness: 28
+        barThickness: 18,
+        maxBarThickness: 22
       }]
     },
     options: {
@@ -1179,7 +1240,7 @@ function createBarChart() {
         x: {
           beginAtZero: true,
           max: 30,
-          grid: { color: 'rgba(83, 91, 100, 0.12)', lineWidth: 1 },
+          grid: { color: 'rgba(83, 91, 100, 0.12)', lineWidth: 0.5 },
           ticks: {
             color: '#3e4548',
             font: { size: 11, family: 'Segoe UI, sans-serif', weight: '600' },
@@ -1213,8 +1274,8 @@ function createBarChart() {
         bar: {
           borderRadius: 14,
           borderSkipped: false,
-          barThickness: 22,
-          maxBarThickness: 30,
+          barThickness: 18,
+          maxBarThickness: 22,
           borderWidth: 0,
         }
       }
@@ -1379,7 +1440,7 @@ function confirmLogout() {
 /* ═══ MAIN ═══ */
 .main {
   flex: 1;
-  padding: 40px 44px 32px;
+  padding: 24px 44px 32px;
   overflow-y: auto;
   min-width: 0;
   display: flex;
@@ -1449,7 +1510,7 @@ function confirmLogout() {
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
-  width: min(430px, calc(100vw - 32px));
+  width: min(480px, calc(100vw - 32px));
   border: 1px solid rgba(255,255,255,.72);
   border-radius: 18px;
   background: linear-gradient(145deg, rgba(250,251,251,.98), rgba(218,223,226,.96));
@@ -1457,6 +1518,60 @@ function confirmLogout() {
   z-index: 999;
   overflow: hidden;
 }
+.notification-preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: min(330px, calc(100vw - 32px));
+  padding: 18px;
+  border: 1px solid rgba(255,255,255,.76);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #f0f2f3 0%, #d9dddf 54%, #c4c9cc 100%);
+  box-shadow: 0 18px 42px rgba(35,43,49,.24), inset 0 1px rgba(255,255,255,.9);
+  z-index: 1000;
+}
+.notification-preview-close {
+  position: absolute;
+  top: 10px;
+  right: 11px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #aab2b7;
+  border-radius: 6px;
+  background: #d7dbdd;
+  color: #58636a;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.notification-preview-close:hover { background: #c8ced1; color: #303940; }
+.notification-preview-kicker {
+  display: block;
+  margin-bottom: 12px;
+  color: #6d7a82;
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.notification-preview-heading { display: flex; align-items: center; gap: 10px; padding-right: 24px; }
+.notification-preview-avatar {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,.86);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 3px 8px rgba(46,55,62,.14);
+}
+.notification-preview-heading h2 { margin: 0; color: #252d33; font-size: .9rem; line-height: 1.25; }
+.notification-preview-heading time { display: block; margin-top: 3px; color: #78848b; font-size: .68rem; }
+.notification-preview-message { margin: 16px 0; color: #53616a; font-size: .78rem; line-height: 1.5; }
+.notification-preview-meta { display: grid; gap: 8px; margin: 0; padding-top: 12px; border-top: 1px solid rgba(103,114,121,.2); }
+.notification-preview-meta div { display: flex; justify-content: space-between; gap: 12px; }
+.notification-preview-meta dt { color: #77838a; font-size: .68rem; font-weight: 700; }
+.notification-preview-meta dd { margin: 0; color: #3f4b52; font-size: .68rem; font-weight: 700; text-align: right; }
 .notif-panel-header {
   display: flex;
   align-items: flex-end;
@@ -1508,12 +1623,25 @@ function confirmLogout() {
 }
 .notif-see-all {
   margin-left: auto;
-  font-size: 0.82rem;
-  color: #66747d;
+  padding: 6px 8px;
+  border: 1px solid #a5adb2;
+  border-radius: 6px;
+  background: #d7dbdd;
+  color: #4a555c;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
   cursor: pointer;
-  text-decoration: underline;
+  transition: background .18s, border-color .18s, color .18s;
 }
-.notif-see-all:hover { color: #30353a; }
+.notif-see-all:hover {
+  background: #c8ced1;
+  border-color: #858f96;
+  color: #303940;
+}
+.notif-see-all:active {
+  background: #bcc3c7;
+}
 .notif-section-label {
   color: #596871;
   font-size: 0.66rem;
@@ -1548,6 +1676,7 @@ function confirmLogout() {
   cursor: pointer;
 }
 .notif-item:hover { background: rgba(255,255,255,.48); }
+.notif-item.selected { background: linear-gradient(90deg, rgba(255,255,255,.72), rgba(198,205,209,.48)); box-shadow: inset 3px 0 #66747d; }
 .notif-avatar {
   width: 38px;
   height: 38px;
@@ -2090,7 +2219,8 @@ function confirmLogout() {
   flex: 1;
   min-height: 0;
   margin-top: 12px;
-  margin-bottom: 96px;
+  margin-bottom: 0;
+  padding-bottom: 400px;
 }
 .chart-card {
   background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(240,240,239,0.82) 100%);
@@ -2267,13 +2397,38 @@ function confirmLogout() {
   color: #69727c;
   text-align: center;
 }
-.consultation-day-modal { max-width: 620px; }
+.consultation-day-modal {
+  width: min(620px, calc(100vw - 32px));
+  max-width: 620px;
+  padding: 30px 30px 26px;
+  border: 1px solid rgba(255,255,255,.72);
+  background: linear-gradient(145deg, #f0f2f3 0%, #d9dddf 52%, #c4c9cc 100%);
+  box-shadow: 0 24px 58px rgba(25,31,36,.28), inset 0 1px rgba(255,255,255,.9);
+}
+.consultation-day-modal .modal-close {
+  top: 16px;
+  right: 18px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #aab2b7;
+  border-radius: 8px;
+  background: #d7dbdd;
+  color: #58636a;
+  font-size: 1rem;
+  box-shadow: inset 0 1px rgba(255,255,255,.78);
+}
+.consultation-day-modal .modal-close:hover {
+  background: #c8ced1;
+  color: #303940;
+}
+.consultation-day-modal .modal-title { color: #252d33; font-size: 1.35rem; }
+.consultation-day-modal .modal-sub { color: #68747b; }
 .consultation-day-list { display: flex; flex-direction: column; gap: 9px; max-height: 55vh; overflow-y: auto; }
-.consultation-day-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; border: 1px solid #e2e7e9; border-radius: 10px; background: #f8fafb; }
+.consultation-day-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 15px; border: 1px solid #b6bec2; border-radius: 10px; background: linear-gradient(145deg, #f7f8f8, #dfe3e5); box-shadow: inset 0 1px rgba(255,255,255,.8), 0 4px 10px rgba(45,53,59,.08); }
 .consultation-day-item-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.consultation-day-item-main strong { color: #202a31; font-size: .88rem; }
-.consultation-day-item-main span { color: #68757d; font-size: .76rem; }
-.consultation-status { flex-shrink: 0; padding: 4px 8px; border-radius: 999px; background: #e5eef8; color: #315f91; font-size: .64rem; font-weight: 700; text-transform: uppercase; }
+.consultation-day-item-main strong { color: #252d33; font-size: .88rem; }
+.consultation-day-item-main span { color: #68747b; font-size: .76rem; }
+.consultation-status { flex-shrink: 0; padding: 5px 9px; border: 1px solid #a8b2b8; border-radius: 999px; background: #d7dde0; color: #4c5b63; font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
 .modal-sched-top {
   display: flex;
   align-items: center;
@@ -2414,6 +2569,10 @@ function confirmLogout() {
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
   .today-teachers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .charts-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 1300px) {
+  .charts-row { grid-template-columns: 1fr; }
+  .chart-card { min-height: 360px; }
 }
 @media (max-width: 600px) {
   .main { padding: 20px 16px 32px; }

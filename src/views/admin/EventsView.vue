@@ -1693,7 +1693,7 @@ onMounted(() => {
 }
 
 .main {
-  padding: 32px 38px 44px;
+  padding: 24px 38px 44px;
 }
 
 .main-header {

@@ -10,14 +10,17 @@
         <span :class="['sidebar-status-dot', statusDotClass]"></span>
       </div>
       <div class="sidebar-status-action-row">
-        <span class="sidebar-status-value">{{ statusDisplay }}</span>
+        <span :class="['sidebar-status-value', statusDotClass]" :title="`Work status: ${statusDisplay}`" aria-label="Current work status">{{ statusDisplay }}</span>
         <button
           class="sidebar-status-button"
           type="button"
           :disabled="workStatusDisabled || saving"
+          :title="`Work status: ${statusDisplay}`"
           @click="clockOut"
         >
-          Clock Out
+          <svg class="sidebar-status-clock-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3 2" /></svg>
+          <span>Clock Out</span>
+          <span class="collapsed-status-tooltip">Work status: {{ statusDisplay }}</span>
         </button>
       </div>
       <div class="sidebar-time-in">Time in: {{ formattedTimeIn }}</div>
@@ -28,10 +31,15 @@
         <span>Office Hours</span>
         <span :class="['sidebar-status-dot', availabilityDotClass]"></span>
       </div>
-      <select v-model="availabilityChoice" class="sidebar-status-select" aria-label="Availability">
-        <option value="Available" :disabled="!canChangeAvailability">Open for consultations</option>
-        <option value="Unavailable" :disabled="!canChangeAvailability">Closed for consultations</option>
-      </select>
+      <div class="sidebar-status-select-wrap">
+        <select v-model="availabilityChoice" class="sidebar-status-select" title="Office hours" aria-label="Office hours availability">
+          <option value="Available" :disabled="!canChangeAvailability">Open for consultations</option>
+          <option value="Unavailable" :disabled="!canChangeAvailability">Closed for consultations</option>
+        </select>
+        <svg class="sidebar-status-select-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        <svg class="sidebar-status-office-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V6l7-3 7 3v15M9 21v-4h6v4M8 9h1M15 9h1M8 12h1M15 12h1" /></svg>
+        <span class="collapsed-status-tooltip">Office hours</span>
+      </div>
       <div class="sidebar-status-subtext">{{ availabilitySubtext }}</div>
     </div>
   </div>
@@ -249,7 +257,7 @@ onMounted(loadStatus)
 .sidebar-status-panel {
   width: 100%;
   margin-top: 0;
-  padding: 14px 12px 12px;
+  padding: 11px 10px 10px;
   border: 1px solid rgba(255, 255, 255, .62);
   border-radius: 16px;
   background: linear-gradient(145deg, rgba(250,251,251,.96), rgba(211,216,219,.88));
@@ -258,7 +266,7 @@ onMounted(loadStatus)
 }
 
 .sidebar-status-panel + .sidebar-status-panel {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .sidebar-status-head {
@@ -266,9 +274,9 @@ onMounted(loadStatus)
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 9px;
   color: #30353a;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   line-height: 1.1;
@@ -295,7 +303,7 @@ onMounted(loadStatus)
 
 .sidebar-status-value,
 .sidebar-status-select {
-  min-height: 40px;
+  min-height: 36px;
   color: #30353a;
   background: rgba(255,255,255,.78);
   border: 1px solid #b7c0c5;
@@ -310,28 +318,50 @@ onMounted(loadStatus)
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   padding: 0 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
+  cursor: default;
+  pointer-events: none;
 }
+.sidebar-status-value.is-in-school { color: #28613f; border-color: #9bc6aa; background: #e8f3ec; }
+.sidebar-status-value.is-on-leave { color: #9f3e46; border-color: #d8a3a8; background: #faebec; }
+.sidebar-status-value.is-offline { color: #59636a; border-color: #b7c0c5; background: #e5e8ea; }
 
 .sidebar-status-select {
   width: 100%;
-  height: 36px;
+  height: 34px;
   padding: 0 12px;
   appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, #525a61 50%), linear-gradient(135deg, #525a61 50%, transparent 50%);
-  background-position: calc(100% - 16px) calc(50% - 2px), calc(100% - 11px) calc(50% - 2px);
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
   padding-right: 28px;
 }
+.sidebar-status-select-wrap { position: relative; width: 100%; }
+.sidebar-status-select-wrap .sidebar-status-select { display: block; }
+.sidebar-status-select-icon {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: #59656d;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.sidebar-status-clock-icon { display: none; }
+.sidebar-status-calendar-icon,
+.sidebar-status-office-icon { display: none !important; }
+.collapsed-status-tooltip { display: none !important; }
 
 .sidebar-status-button {
   min-width: 92px;
-  height: 40px;
+  height: 36px;
   padding: 0 12px;
   border: 1px solid #30373d;
   border-radius: 11px;
@@ -344,6 +374,7 @@ onMounted(loadStatus)
   box-shadow: inset 0 1px rgba(255,255,255,.18), 0 4px 9px rgba(38,45,50,.2);
   transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
 }
+.sidebar-status-button span { display: inline; }
 .sidebar-status-button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: inset 0 1px rgba(255,255,255,.22), 0 6px 13px rgba(38,45,50,.24); }
 
 .sidebar-status-button:disabled {
@@ -355,9 +386,9 @@ onMounted(loadStatus)
 
 .sidebar-time-in,
 .sidebar-status-subtext {
-  margin-top: 10px;
+  margin-top: 8px;
   color: #66707a;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   line-height: 1.35;
 }
 

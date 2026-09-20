@@ -348,7 +348,7 @@ onMounted(loadLogs)
 
 .main {
   flex: 1;
-  padding: 40px 44px 32px;
+  padding: 24px 44px 32px;
   overflow-y: auto;
   min-width: 0;
   display: flex;

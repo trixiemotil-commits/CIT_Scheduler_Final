@@ -1345,6 +1345,19 @@ const faqs = [
   box-shadow: inset 0 1px rgba(255,255,255,.28), 0 4px 10px rgba(48, 53, 58, .16);
 }
 .send-otp-btn svg { flex: 0 0 auto; }
+.otp-entry-wrap .send-otp-btn {
+  min-height: 42px;
+  border: 1px solid #3f4c55;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #87949c 0%, #5c6a74 48%, #46535c 100%);
+  box-shadow: inset 0 1px rgba(255,255,255,.28), 0 4px 10px rgba(48, 53, 58, .16);
+  transition: background .15s, transform .15s, box-shadow .15s;
+}
+.otp-entry-wrap .send-otp-btn:hover {
+  background: linear-gradient(145deg, #9aa6ad 0%, #687780 48%, #52616b 100%);
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px rgba(255,255,255,.34), 0 6px 14px rgba(48, 53, 58, .22);
+}
 .settings-form-footer { justify-content: center; }
 .two-factor-card { position: relative; }
 .two-factor-card .settings-card-header { width: 100%; padding-right: 118px; }

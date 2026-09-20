@@ -1,7 +1,7 @@
 const Notification = require('../models/Notification')
 const User = require('../models/User')
 
-async function notifyActiveAdmins({ actorId, type, title, message, related = {}, route = '/admin/dashboard' }) {
+async function notifyActiveAdmins({ actorId, type, title, message, related = {}, route = null }) {
   const admins = await User.find({
     account_status: 'Active',
     $or: [{ role: 'admin' }, { roles: 'admin' }],

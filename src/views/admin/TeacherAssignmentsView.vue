@@ -2314,7 +2314,7 @@ onUnmounted(() => {
 /* ════════════════════════ RESPONSIVE ════════════════════════ */
 /* Teacher assignments readability refresh */
 .layout { background: linear-gradient(135deg, #f2f4f5, #dfe3e6); }
-.main { padding: 32px 38px 44px; }
+.main { padding: 24px 38px 44px; }
 .main-header { align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 25px; }
 .page-eyebrow { display: block; margin-bottom: 5px; color: #68747d; font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .page-title { margin: 0; color: #202830; font-size: clamp(2rem, 3vw, 2.55rem); font-weight: 700; letter-spacing: -.04em; }

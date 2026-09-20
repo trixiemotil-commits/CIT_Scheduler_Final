@@ -2634,7 +2634,7 @@ function confirmRestoreUser() {
 
 /* ── Shared admin content styling ───────────────────────────────────── */
 .main-header::before { display: none; }
-.main { padding: 32px 38px 44px; }
+.main { padding: 24px 38px 44px; }
 .main-header { margin-bottom: 25px; }
 .um-management-panel {
   padding: 17px 27px 24px !important;

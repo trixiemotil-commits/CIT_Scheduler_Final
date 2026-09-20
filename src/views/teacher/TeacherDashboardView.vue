@@ -61,12 +61,17 @@
           <!-- Notification Dropdown -->
           <div v-if="showNotif" class="notif-panel">
             <div class="notif-panel-header">
-              <span class="notif-panel-title">Notifications</span>
+              <div>
+                <span class="notif-panel-kicker">Activity center</span>
+                <span class="notif-panel-title">Notifications</span>
+              </div>
+              <span v-if="unreadNotifs.length" class="notif-count">{{ unreadNotifs.length }} unread</span>
             </div>
             <div class="notif-tabs">
               <button :class="['notif-tab', { active: notifTab === 'all' }]" @click="notifTab = 'all'">All</button>
               <button :class="['notif-tab', { active: notifTab === 'unread' }]" @click="notifTab = 'unread'">Unread</button>
               <button :class="['notif-tab', { active: notifTab === 'read' }]" @click="notifTab = 'read'">Read</button>
+              <button class="notif-see-all" type="button" @click="markAllNotificationsRead">Mark all read</button>
             </div>
             <div class="notif-list-wrap">
               <!-- Unread tab: all unread items under a single New section -->
@@ -76,7 +81,7 @@
                   <ul class="notif-list">
                     <li v-for="n in unreadNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><template v-if="n.type === 'new_event'"><strong>{{ n.eventTitle }}</strong><small>{{ n.eventMessage }}</small></template><template v-else><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></template></span>
+                      <span class="notif-text"><strong>{{ n.type === 'new_event' ? n.eventTitle : n.studentName }}</strong><small>{{ n.type === 'new_event' ? n.eventMessage : `Submitted a consultation request for ${n.subject}` }}</small><time v-if="n.type !== 'new_event'">{{ n.consultationTime }}</time></span>
                       <span class="notif-read-status unread">Unread</span>
                       <span class="notif-unread-dot"></span>
                     </li>
@@ -91,7 +96,7 @@
                   <ul class="notif-list">
                     <li v-for="n in readNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><template v-if="n.type === 'new_event'"><strong>{{ n.eventTitle }}</strong><small>{{ n.eventMessage }}</small></template><template v-else><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></template></span>
+                      <span class="notif-text"><strong>{{ n.type === 'new_event' ? n.eventTitle : n.studentName }}</strong><small>{{ n.type === 'new_event' ? n.eventMessage : `Submitted a consultation request for ${n.subject}` }}</small><time v-if="n.type !== 'new_event'">{{ n.consultationTime }}</time></span>
                       <span class="notif-read-status read">Read</span>
                     </li>
                   </ul>
@@ -106,7 +111,7 @@
                   <ul class="notif-list">
                     <li v-for="n in newNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><template v-if="n.type === 'new_event'"><strong>{{ n.eventTitle }}</strong><small>{{ n.eventMessage }}</small></template><template v-else><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></template></span>
+                      <span class="notif-text"><strong>{{ n.type === 'new_event' ? n.eventTitle : n.studentName }}</strong><small>{{ n.type === 'new_event' ? n.eventMessage : `Submitted a consultation request for ${n.subject}` }}</small><time v-if="n.type !== 'new_event'">{{ n.consultationTime }}</time></span>
                       <span :class="['notif-read-status', n.read ? 'read' : 'unread']">{{ n.read ? 'Read' : 'Unread' }}</span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
                     </li>
@@ -117,7 +122,7 @@
                   <ul class="notif-list">
                     <li v-for="n in todayNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><template v-if="n.type === 'new_event'"><strong>{{ n.eventTitle }}</strong><small>{{ n.eventMessage }}</small></template><template v-else><strong>{{ n.studentName }}</strong> submitted a <strong>consultation request</strong> for <strong>{{ n.subject }}</strong><small>{{ n.consultationTime }}</small></template></span>
+                      <span class="notif-text"><strong>{{ n.type === 'new_event' ? n.eventTitle : n.studentName }}</strong><small>{{ n.type === 'new_event' ? n.eventMessage : `Submitted a consultation request for ${n.subject}` }}</small><time v-if="n.type !== 'new_event'">{{ n.consultationTime }}</time></span>
                       <span :class="['notif-read-status', n.read ? 'read' : 'unread']">{{ n.read ? 'Read' : 'Unread' }}</span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
                     </li>
@@ -495,6 +500,15 @@ function markNotificationRead(notificationId) {
   notifications.value = notifications.value.map(notification =>
     notification.id === notificationId ? { ...notification, read: true } : notification
   )
+}
+
+async function markAllNotificationsRead() {
+  try {
+    await apiRequest('/notifications/mark-all-read', { method: 'PATCH' })
+    notifications.value = notifications.value.map(notification => ({ ...notification, read: true }))
+  } catch (_) {
+    // Keep the current notification state if the request fails.
+  }
 }
 
 function openNotification(notification) {
@@ -1574,7 +1588,7 @@ function confirmLogout() {
   right: 4px;
   width: 13px;
   height: 13px;
-  background: #ef4444;
+  background: #e8a020;
   border-radius: 50%;
   border: 1.5px solid #fff;
 }
@@ -1584,125 +1598,129 @@ function confirmLogout() {
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
-  width: 620px;
+  width: min(480px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
-  background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
-  border: 1px solid #e7ebee;
+  border: 1px solid rgba(255,255,255,.72);
   border-radius: 18px;
-  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.12);
+  background: linear-gradient(145deg, rgba(250,251,251,.98), rgba(218,223,226,.96));
+  box-shadow: 0 18px 42px rgba(35,43,49,.24), inset 0 1px rgba(255,255,255,.95);
   z-index: 5000;
   overflow: hidden;
   max-height: min(680px, calc(100vh - 110px));
 }
-.notif-panel-header { padding: 22px 22px 0; }
-.notif-panel-title { font-size: 1.2rem; font-weight: 700; color: #171b20; }
+.notif-panel-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid rgba(119,130,138,.2);
+}
+.notif-panel-header > div { display: flex; flex-direction: column; gap: 3px; }
+.notif-panel-kicker { color: #71808a; font-size: .62rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.notif-panel-title { color: #263139; font-size: 1.05rem; font-weight: 800; }
+.notif-count { padding: 4px 8px; border: 1px solid #b4bec3; border-radius: 999px; color: #596871; background: rgba(255,255,255,.55); font-size: .64rem; font-weight: 700; white-space: nowrap; }
 .notif-tabs {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 22px 0;
+  padding: 12px 18px 8px;
 }
 .notif-tab {
-  background: none;
-  border: none;
+  background: transparent;
+  border: 1px solid transparent;
   font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #66707a;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #888;
   cursor: pointer;
-  padding: 6px 14px;
-  border-radius: 999px;
-  transition: all 0.18s ease;
+  padding: 6px 11px;
+  border-radius: 8px;
+  transition: background 0.18s, color 0.18s;
 }
 .notif-tab.active {
-  background: #2d3740;
+  border-color: #3f4c55;
+  background: linear-gradient(145deg, #687780, #3f4c55);
   color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+  box-shadow: 0 3px 8px rgba(48,53,58,.16);
 }
+.notif-see-all { margin-left: auto; padding: 6px 8px; border: 1px solid #a5adb2; border-radius: 6px; background: #d7dbdd; color: #4a555c; font-family: inherit; font-size: .72rem; font-weight: 600; cursor: pointer; transition: background .18s, border-color .18s, color .18s; }
+.notif-see-all:hover { background: #c8ced1; border-color: #858f96; color: #303940; }
+.notif-see-all:active { background: #bcc3c7; }
 .notif-section-label {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #5b6470;
-  letter-spacing: 0.04em;
+  color: #596871;
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .09em;
   text-transform: uppercase;
-  padding: 18px 22px 8px;
+  padding: 12px 18px 6px;
 }
-.notif-list-wrap { max-height: 340px; overflow-y: auto; padding: 4px 12px 12px; }
+.notif-list-wrap { max-height: 390px; overflow-y: auto; padding-bottom: 8px; }
 .notif-list { list-style: none; padding: 0; margin: 0; }
 .notif-empty { text-align: center; font-size: 0.85rem; color: #7d8792; padding: 24px 20px; }
 .notif-item {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 12px 14px;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 18px;
+  border-top: 1px solid rgba(126,136,143,.12);
   cursor: pointer;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  background: #f8fafb;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s;
 }
 .notif-item:hover {
-  background: #f1f5f7;
-  border-color: #e2e8f0;
-  transform: translateY(-1px);
+  background: rgba(255,255,255,.48);
 }
 .notif-avatar {
-  width: 46px;
-  height: 46px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  border: 2px solid #edf2f4;
+  border: 2px solid rgba(255,255,255,.85);
+  box-shadow: 0 3px 8px rgba(46,55,62,.14);
 }
 .notif-text {
   flex: 1;
-  font-size: 0.9rem;
-  color: #2c3339;
-  line-height: 1.5;
-  padding-top: 4px;
-  font-weight: 500;
+  min-width: 0;
+  color: #53616a;
+  line-height: 1.35;
 }
 .notif-text strong {
-  color: #151b22;
-  font-weight: 700;
+  overflow: hidden;
+  color: #263139;
+  font-size: .75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .notif-text small {
   display: block;
-  margin-top: 4px;
-  color: #7a828b;
-  font-size: 0.72rem;
-  font-weight: 500;
+  overflow: hidden;
+  font-size: .7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.notif-text time { display: block; color: #8a969d; font-size: .62rem; font-weight: 600; }
 .notif-read-status {
   flex-shrink: 0;
   align-self: center;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 68px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-.notif-read-status.unread {
-  background: #fee2e2;
-  color: #b42318;
-}
-.notif-read-status.read {
-  background: #eafaf1;
-  color: #18794e;
+  min-width: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #8a969d;
+  font-size: 0;
 }
 .notif-unread-dot {
-  width: 10px;
+  width: 8px;
   height: 10px;
   border-radius: 50%;
-  background: #ef4444;
+  background: #e8a020;
   flex-shrink: 0;
   margin-top: 9px;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+  box-shadow: 0 0 0 3px rgba(232,160,32,.14);
 }
 
 /* ── Stat Cards ── */

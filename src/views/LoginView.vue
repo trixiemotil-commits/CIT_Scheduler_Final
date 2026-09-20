@@ -51,7 +51,9 @@
           <div ref="signinCaptchaRef" class="captcha-box"></div>
         </div>
 
-        <button type="submit" class="submit-btn">Login</button>
+        <button type="submit" class="submit-btn" :disabled="isLoggingIn">
+          {{ isLoggingIn ? 'Logging in...' : 'Login' }}
+        </button>
       </form>
 
       <!-- ── Sign Up Form ── -->
@@ -119,7 +121,9 @@
           <div ref="signupCaptchaRef" class="captcha-box"></div>
         </div>
 
-        <button type="submit" class="submit-btn">Sign up</button>
+        <button type="submit" class="submit-btn" :disabled="isSigningUp">
+          {{ isSigningUp ? 'Signing up...' : 'Sign up' }}
+        </button>
       </form>
     </div>
 
@@ -338,6 +342,8 @@ const IconEye = defineComponent({
 })
 
 const activeTab = ref('signin')
+const isLoggingIn = ref(false)
+const isSigningUp = ref(false)
 const loginError = ref('')
 const availableRoles = ref([])
 const isSelectingRole = ref(false)
@@ -713,6 +719,8 @@ function closeLoginAlert() {
 }
 
 async function handleLogin() {
+  if (isLoggingIn.value) return
+  isLoggingIn.value = true
   loginError.value = ''
   try {
     if (isMobileApp && Number(loginMathAnswer.value) !== loginMathChallenge.value.answer) {
@@ -770,6 +778,8 @@ async function handleLogin() {
     )
     try { resetRecaptcha(signinWidgetId) } catch (_) {}
     if (isMobileApp) resetMathChallenges()
+  } finally {
+    isLoggingIn.value = false
   }
 }
 
@@ -863,6 +873,8 @@ async function handleSignUp() {
     return
   }
 
+  if (isSigningUp.value) return
+  isSigningUp.value = true
   try {
     // Obtain reCAPTCHA only for the web client.
     let recaptchaToken = null
@@ -904,6 +916,8 @@ async function handleSignUp() {
     } else {
       signUpError.value = 'Sign up failed. ' + JSON.stringify(error)
     }
+  } finally {
+    isSigningUp.value = false
   }
 }
 
