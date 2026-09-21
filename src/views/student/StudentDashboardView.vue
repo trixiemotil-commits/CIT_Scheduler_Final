@@ -6,7 +6,10 @@
     <!-- Header -->
     <div class="app-header">
       <div class="header-left">
-        <div class="avatar-sm">{{ initials }}</div>
+        <div class="avatar-sm">
+          <img v-if="user.avatar" :src="user.avatar" alt="Profile picture" />
+          <span v-else>{{ initials }}</span>
+        </div>
         <div>
           <div class="header-title">Student Dashboard</div>
           <div class="header-sub">{{ user.name }}</div>
@@ -21,21 +24,25 @@
     <!-- Stats Grid -->
     <div class="stats-grid">
       <div class="stat-card green">
+        <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 19V6l6-3 6 3v13M9 19v-4h6v4M8 9h1M15 9h1M8 12h1M15 12h1" /></svg></span>
         <div class="stat-label">In School</div>
         <div class="stat-num">{{ teacherStats.inSchool }}</div>
         <div class="stat-desc">teachers on campus</div>
       </div>
       <div class="stat-card red">
+        <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3" /><path d="M5 20a7 7 0 0 1 14 0M16 4l4 4M20 4l-4 4" /></svg></span>
         <div class="stat-label">On Leave</div>
         <div class="stat-num">{{ teacherStats.onLeave }}</div>
         <div class="stat-desc">teachers on leave</div>
       </div>
       <div class="stat-card blue">
+        <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="m8 12 2.5 2.5L16 9" /></svg></span>
         <div class="stat-label">Available Teacher</div>
         <div class="stat-num">{{ teacherStats.available }}</div>
         <div class="stat-desc">ready for consultation</div>
       </div>
       <div class="stat-card orange">
+        <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M8 8l8 8M16 8l-8 8" /></svg></span>
         <div class="stat-label">Not Available</div>
         <div class="stat-num">{{ teacherStats.notAvailable }}</div>
         <div class="stat-desc">not accepting requests</div>
@@ -47,22 +54,10 @@
       <div class="consultations-heading">
         <div class="section-title">Recent Consultations</div>
         <div class="consultation-counts" aria-label="Consultation status counts">
-          <div class="consultation-count-card count-approved">
-            <span>Approved</span>
-            <strong>{{ consultationStatusCounts.approved }}</strong>
-          </div>
-          <div class="consultation-count-card count-pending">
-            <span>Pending</span>
-            <strong>{{ consultationStatusCounts.pending }}</strong>
-          </div>
-          <div class="consultation-count-card count-reschedule">
-            <span>Reschedule</span>
-            <strong>{{ consultationStatusCounts.reschedule }}</strong>
-          </div>
-          <div class="consultation-count-card count-completed">
-            <span>Completed</span>
-            <strong>{{ consultationStatusCounts.completed }}</strong>
-          </div>
+          <div class="consultation-count-card count-approved"><span class="count-icon">✓</span><span>Approved</span><strong>{{ consultationStatusCounts.approved }}</strong></div>
+          <div class="consultation-count-card count-pending"><span class="count-icon">◷</span><span>Pending</span><strong>{{ consultationStatusCounts.pending }}</strong></div>
+          <div class="consultation-count-card count-reschedule"><span class="count-icon">↻</span><span>Reschedule</span><strong>{{ consultationStatusCounts.reschedule }}</strong></div>
+          <div class="consultation-count-card count-completed"><span class="count-icon">✓</span><span>Completed</span><strong>{{ consultationStatusCounts.completed }}</strong></div>
         </div>
       </div>
       <div v-for="c in recentConsultations" :key="c.id" class="consult-row">
@@ -276,6 +271,12 @@ function formatDate(dateStr) {
   flex-shrink: 0;
   box-shadow: 0 4px 10px rgba(37, 42, 47, 0.2);
 }
+.avatar-sm img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
 .header-title { font-weight: 800; font-size: 0.98rem; color: #252a2f; letter-spacing: -0.01em; }
 .header-sub   { margin-top: 2px; font-size: 0.74rem; color: #727a81; }
 .header-notif-btn {
@@ -450,6 +451,178 @@ function formatDate(dateStr) {
   cursor: pointer;
 }
 .view-events-btn:active { background: #e7eaec; }
+
+/* Dashboard composition */
+.mobile-app {
+  position: relative;
+  gap: 0;
+  padding-bottom: 26px;
+  background:
+    radial-gradient(circle at 88% 2%, rgba(255,255,255,.82), transparent 15rem),
+    linear-gradient(155deg, #eef0f1 0%, #d7dbdd 48%, #b8bec1 100%) !important;
+}
+
+.app-header {
+  position: relative;
+  min-height: 118px;
+  padding: 25px 20px 24px !important;
+  align-items: flex-start;
+}
+
+.app-header::after {
+  content: 'OVERVIEW';
+  position: absolute;
+  left: 20px;
+  bottom: 5px;
+  color: #7c858d;
+  font-size: .58rem;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+
+.header-left { gap: 14px; }
+.avatar-sm { width: 52px; height: 52px; }
+.header-title { font-size: 1.12rem; line-height: 1.15; }
+.header-sub { margin-top: 5px; font-size: .79rem; }
+.header-notif-btn { margin-top: 2px; }
+
+.stats-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 10px 16px 18px;
+}
+
+.stat-card {
+  min-height: 112px;
+  padding: 16px 15px 14px;
+  border-left-width: 0;
+  border-top: 4px solid;
+  border-radius: 18px;
+}
+
+.stat-icon {
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.78);
+  border-radius: 12px;
+  background: rgba(255,255,255,.48);
+  color: currentColor;
+}
+
+.stat-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.stat-card.green { border-top-color: #5d8c72; }
+.stat-card.red { border-top-color: #c95c65; }
+.stat-card.blue { border-top-color: #667f9e; }
+.stat-card.orange { border-top-color: #c58a52; }
+.stat-card.green { background: linear-gradient(145deg, #f3f7f4, #d9e5df) !important; }
+.stat-card.red { background: linear-gradient(145deg, #f7f3f3, #e7dfe0) !important; }
+.stat-card.blue { background: linear-gradient(145deg, #f2f5f8, #dce3ea) !important; }
+.stat-card.orange { background: linear-gradient(145deg, #f7f5f1, #e8e1d6) !important; }
+.stat-card.green .stat-icon { color: #397051; background: rgba(221,237,228,.78); }
+.stat-card.red .stat-icon { color: #a95159; background: rgba(239,224,226,.78); }
+.stat-card.blue .stat-icon { color: #566f8c; background: rgba(222,231,240,.82); }
+.stat-card.orange .stat-icon { color: #a87543; background: rgba(239,230,215,.82); }
+.stat-label { font-size: .7rem; letter-spacing: .02em; }
+.stat-num { margin-top: 8px; font-size: 2rem; }
+.stat-desc { margin-top: 8px; font-size: .66rem; }
+
+.section-card {
+  border-radius: 22px;
+  margin: 0 16px;
+  padding: 18px 16px 14px;
+}
+
+.section-card:not(.events-card) {
+  position: relative;
+  padding-top: 20px;
+}
+
+.section-card:not(.events-card)::before {
+  content: 'ACTIVITY';
+  display: block;
+  margin-bottom: 5px;
+  color: #879099;
+  font-size: .56rem;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+
+.section-card:not(.events-card) .section-title,
+.events-card .section-title {
+  font-size: 1rem;
+  letter-spacing: -.01em;
+}
+
+.consultations-heading {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.consultations-heading .section-title { margin: 0; }
+.consultation-counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+  gap: 6px;
+  margin-top: 13px;
+}
+
+.consultation-count-card {
+  min-width: 0;
+  min-height: 38px;
+  justify-content: center;
+  gap: 3px;
+  padding: 5px 4px;
+  border: 1px solid rgba(255,255,255,.5);
+  border-radius: 10px;
+  font-size: .52rem;
+}
+
+.consultation-count-card .count-icon {
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.consultation-count-card strong { font-size: .72rem; }
+.consult-row { padding: 13px 0; border-bottom-color: rgba(104,112,120,.16); }
+.consult-name { font-size: .8rem; }
+.consult-teacher { margin-top: 4px; font-size: .68rem; }
+.consult-status-card { border-radius: 999px; font-size: .66rem; padding: 6px 10px; }
+
+.cta-row {
+  gap: 12px;
+  padding: 16px 16px 18px;
+}
+
+.cta-btn {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: .82rem;
+  letter-spacing: .01em;
+}
+
+.events-card {
+  margin-bottom: 18px;
+  background: rgba(245,246,246,.72) !important;
+}
+
+.events-card .consult-row { padding: 11px 0; }
+.view-events-btn { border-radius: 999px; padding: 10px; font-size: .78rem; }
 
 @media (max-width: 360px) {
   .stats-grid { gap: 8px; padding-left: 12px; padding-right: 12px; }

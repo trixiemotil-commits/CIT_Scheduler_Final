@@ -85,7 +85,8 @@
     </div>
 
     <!-- ══ VIEW DETAILS MODAL ══ -->
-    <div v-if="showDetails" class="modal-overlay" @click.self="showDetails = false">
+    <Teleport to="body">
+      <div v-if="showDetails" class="modal-overlay" @click.self="showDetails = false">
       <div class="modal-sheet">
         <div class="modal-handle"></div>
         <div class="modal-header"><span>Session Details</span><button class="modal-close" @click="showDetails = false">✕</button></div>
@@ -128,11 +129,11 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="modal-cancel" @click="showDetails = false">Close</button>
           <button class="modal-submit" @click="downloadQueueDetails">Download Queue Details</button>
         </div>
       </div>
-    </div>
+      </div>
+    </Teleport>
 
     <!-- ══ EDIT SESSION MODAL ══ -->
     <div v-if="showEdit" class="modal-overlay" @click.self="showEdit = false">
@@ -1130,4 +1131,148 @@ onMounted(() => {
   color: #111827;
   text-align: right;
 }
+
+/* Metallic bottom-sheet modal system */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30000 !important;
+  align-items: flex-end;
+  background: rgba(31,35,39,.58);
+  backdrop-filter: blur(7px);
+}
+
+.modal-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 30001;
+  margin: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  max-height: 92dvh;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,.85);
+  border-radius: 28px 28px 0 0;
+  background: linear-gradient(145deg, #f8f9f9, #dfe3e5);
+  box-shadow: 0 -14px 32px rgba(22,26,30,.26), inset 0 1px rgba(255,255,255,.95);
+}
+
+.modal-handle { width: 48px; height: 5px; margin: 12px auto 2px; border-radius: 999px; background: #aeb6bc; }
+.modal-header { padding: 17px 22px 16px; border-bottom-color: rgba(104,112,120,.18); color: #252b30; font-size: 1.08rem; font-weight: 800; }
+.modal-close { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(255,255,255,.8); border-radius: 50%; background: linear-gradient(145deg,#f8f9f9,#d8dde0); color: #69747d; box-shadow: inset 0 1px rgba(255,255,255,.9); }
+.modal-body { padding: 18px 20px 6px; gap: 16px; }
+.modal-footer { gap: 10px; padding: 14px 20px 24px; }
+.modal-cancel, .modal-submit, .modal-danger { min-height: 46px; border-radius: 13px; }
+.modal-cancel { border: 1px solid #cbd2d6; background: linear-gradient(145deg,#f3f4f4,#dfe2e3); color: #59646d; }
+.modal-submit { border: 1px solid #303940; background: linear-gradient(145deg,#59636b,#303940); box-shadow: inset 0 1px rgba(255,255,255,.18), 0 6px 13px rgba(39,44,49,.2); }
+.detail-hero { padding: 6px 0 14px; border-bottom-color: rgba(104,112,120,.18); }
+.detail-subject { color: #252b31; }
+.detail-teacher { color: #68747d; }
+.detail-row { padding: 13px 0; border-bottom-color: rgba(104,112,120,.16); }
+.detail-label { color: #68747d; }
+.detail-val { color: #303940; }
+.queue-card { border-color: #ccd5dc; border-radius: 16px; background: linear-gradient(145deg,#f1f4f5,#e0e5e8); box-shadow: inset 0 1px rgba(255,255,255,.82); }
+.queue-card-title { color: #303940; }
+.queue-card-subtitle { color: #68747d; }
+.queue-ticket-badge { border-radius: 12px; background: linear-gradient(145deg,#59636b,#303940); }
+.queue-qr-panel { border-color: #d1d8dc; background: #f8f9f9; }
+.queue-ticket-line { color: #68747d; }
+.queue-ticket-line strong { color: #303940; }
+
+/* Metallic consultation workspace */
+.mobile-app {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(255,255,255,.82), transparent 16rem),
+    linear-gradient(155deg, #eef0f1 0%, #d5dadd 52%, #b9bec1 100%) !important;
+}
+
+.mobile-app .app-header {
+  min-height: 84px;
+  padding: 22px 20px 18px !important;
+  background: transparent !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+.mobile-app .header-title {
+  color: #46515d !important;
+  font-size: 1.16rem !important;
+  letter-spacing: -.02em;
+}
+
+.back-btn {
+  width: 36px;
+  height: 36px;
+  justify-content: center;
+  margin-left: -2px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #f7f8f8, #d6dade);
+  color: #4b555e;
+  box-shadow: inset 0 1px rgba(255,255,255,.9), 0 5px 10px rgba(39,44,49,.13);
+}
+
+.tabs-row {
+  gap: 9px;
+  padding: 12px 18px 8px;
+  background: rgba(232,235,236,.7);
+  border-bottom: 1px solid rgba(255,255,255,.64);
+  box-shadow: 0 5px 12px rgba(39,44,49,.06);
+}
+
+.tab-btn {
+  min-height: 38px;
+  padding: 7px 16px;
+  border: 1px solid rgba(255,255,255,.82);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #f8f9f9, #dfe3e5);
+  color: #56616b;
+  box-shadow: inset 0 1px rgba(255,255,255,.9), 0 2px 5px rgba(39,44,49,.045);
+}
+
+.tab-btn.active {
+  background: linear-gradient(145deg, #59636b, #303940);
+  border-color: #414a51;
+  box-shadow: inset 0 1px rgba(255,255,255,.2), 0 3px 7px rgba(39,44,49,.11);
+}
+
+.sessions-list { gap: 14px; padding: 16px 18px 24px; }
+.session-card {
+  padding: 17px;
+  border: 1px solid rgba(255,255,255,.76);
+  border-radius: 21px;
+  background: linear-gradient(145deg, rgba(250,251,251,.96), rgba(224,228,230,.9));
+  box-shadow: inset 0 1px rgba(255,255,255,.94), 0 10px 22px rgba(39,44,49,.13);
+}
+
+.session-top { gap: 13px; margin-bottom: 15px; }
+.session-avatar { width: 58px; height: 58px; border-radius: 17px; box-shadow: inset 0 1px rgba(255,255,255,.45), 0 5px 10px rgba(39,44,49,.14); }
+.session-meta { min-width: 0; }
+.session-subject { font-size: .96rem; color: #252b31; }
+.session-teacher { color: #68747d; }
+.info-chip,
+.queue-chip {
+  border-color: #cdd4d9;
+  background: rgba(241,244,245,.8);
+  color: #59656e;
+  border-radius: 999px;
+}
+
+.queue-chip { border-radius: 12px; }
+.queue-chip.queue-next { color: #287344; background: #e1eee6; border-color: #a6d2b5; border-radius: 12px; }
+.status-pill { border: 1px solid rgba(255,255,255,.7); padding: 6px 10px; }
+.pill-green { background: #e0eee5; color: #397051; }
+.pill-blue { background: #e1e8ef; color: #526f8c; }
+.pill-yellow { background: #eee7d9; color: #9a713a; }
+.pill-red { background: #eee0e1; color: #a95159; }
+.pill-gray { background: #e3e6e8; color: #68727a; }
+
+.session-actions { padding-top: 2px; }
+.act-btn { min-height: 44px; border-radius: 13px; }
+.act-btn.outline { background: linear-gradient(145deg,#f7f8f8,#e0e3e5); color: #4d5963; border-color: #cbd2d6; }
+.act-btn.green { background: linear-gradient(145deg,#59636b,#303940); box-shadow: inset 0 1px rgba(255,255,255,.18), 0 6px 12px rgba(39,44,49,.2); }
+.act-btn.red { background: linear-gradient(145deg,#b96a70,#91474e); }
+.rejection-msg { border-color: #e3c5c8; background: #f2e5e6; color: #9a4d55; }
 </style>

@@ -34,7 +34,7 @@
       <div v-else-if="!visibleTeacherCount" class="empty-state-card">No teachers found.</div>
 
       <template v-if="(activeFilter === 'All' || activeFilter === 'Subject Teacher') && visibleSubjectTeachers.length">
-        <div class="section-title">Subject Teachers</div>
+        <div v-if="activeFilter === 'Subject Teacher'" class="section-title">Subject Teachers</div>
         <div v-for="t in visibleSubjectTeachers" :key="t.id" class="teacher-card">
           <div class="teacher-top">
             <div class="teacher-avatar" :style="{ background: t.color }">
@@ -60,7 +60,7 @@
             </div>
             <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
           </div>
-          <div class="teacher-footer">
+          <div v-if="t.status === 'In School'" class="teacher-footer">
             <span class="price">&nbsp;</span>
             <button
               :class="['action-btn', t.available && (t.isSubjectTeacher ? t.hasConsultationSlots : true) ? 'green' : 'disabled']"
@@ -91,7 +91,7 @@
             </div>
             <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
           </div>
-          <div class="teacher-footer">
+          <div v-if="t.status === 'In School'" class="teacher-footer">
             <span class="price">&nbsp;</span>
             <button
               :class="['action-btn', t.available && (t.isSubjectTeacher ? t.hasConsultationSlots : true) ? 'green' : 'disabled']"
@@ -109,7 +109,9 @@
     <div v-if="toastMsg" class="toast">{{ toastMsg }}</div>
 
     <!-- ══ REQUEST CONSULTATION MODAL ══ -->
-    <div v-if="showReqModal" class="modal-overlay" @click.self="showReqModal = false">
+    <Teleport to="body">
+      <Transition name="consultation-modal">
+        <div v-if="showReqModal" class="modal-overlay" @click.self="showReqModal = false">
       <div class="modal-sheet">
         <div class="modal-handle"></div>
         <div class="modal-header">
@@ -175,7 +177,9 @@
           </button>
         </div>
       </div>
-    </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- ══ VIEW PROFILE MODAL ══ -->
     <div v-if="showProfileModal" class="modal-overlay" @click.self="showProfileModal = false">
@@ -766,7 +770,7 @@ onUnmounted(() => {
 .teacher-avatar img,
 .tp-avatar img,
 .profile-avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
-.teacher-meta { flex: 1; }
+.teacher-meta { flex: 1; min-width: 0; }
 .teacher-name    { font-weight: 800; font-size: 0.88rem; line-height: 1.25; color: #252a2f; }
 .teacher-type-pill { display: inline-flex; margin-top: 4px; padding: 3px 7px; border-radius: 6px; font-size: 0.66rem; font-weight: 700; line-height: 1.1; }
 .teacher-type-pill.subject { background: #e8eef8; color: #3d618d; }
@@ -776,10 +780,13 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+  min-width: 0;
+  overflow: visible;
 }
 .subject-chip {
   display: inline-flex;
   align-items: center;
+  width: fit-content;
   max-width: 100%;
   padding: 4px 8px;
   border-radius: 8px;
@@ -789,6 +796,11 @@ onUnmounted(() => {
   font-size: 0.66rem;
   font-weight: 600;
   line-height: 1.15;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .subject-chip.more {
   background: #f5f6f8;
@@ -835,7 +847,10 @@ onUnmounted(() => {
 .status-pill {
   font-size: 0.68rem; font-weight: 700;
   padding: 5px 9px; border-radius: 8px;
-  white-space: nowrap; flex-shrink: 0;
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap; flex: 0 0 auto;
 }
 .pill-green  { background: #e0f2e7; color: #287344; }
 .pill-orange { background: #fff3e0; color: #b35e00; }
@@ -860,46 +875,199 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
+/* Metallic teachers directory */
+.mobile-app {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(255,255,255,.82), transparent 16rem),
+    linear-gradient(155deg, #eef0f1 0%, #d5dadd 52%, #b9bec1 100%) !important;
+}
+
+.mobile-app .app-header {
+  min-height: 84px;
+  padding: 22px 20px 18px !important;
+  background: transparent !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+.mobile-app .header-title {
+  color: #46515d !important;
+  font-size: 1.16rem !important;
+  letter-spacing: -.02em;
+}
+
+.back-btn {
+  width: 36px;
+  height: 36px;
+  justify-content: center;
+  margin-left: -2px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #f7f8f8, #d6dade);
+  color: #4b555e;
+  box-shadow: inset 0 1px rgba(255,255,255,.9), 0 5px 10px rgba(39,44,49,.13);
+}
+
+.search-wrap { margin: 2px 18px 0; }
+.search-input {
+  height: 48px;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 15px;
+  background: rgba(248,249,249,.72) !important;
+  color: #303940;
+  box-shadow: inset 0 1px rgba(255,255,255,.92), 0 8px 18px rgba(39,44,49,.1);
+}
+.search-input::placeholder { color: #8a939a; }
+.search-input:focus { border-color: #87939d; box-shadow: inset 0 1px rgba(255,255,255,.92), 0 0 0 3px rgba(75,85,99,.12); }
+.search-icon { left: 14px; stroke: #66727c; }
+
+.filter-row { gap: 9px; padding: 14px 18px 4px; }
+.filter-chip {
+  min-height: 38px;
+  padding: 7px 16px;
+  border: 1px solid rgba(255,255,255,.82);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #f8f9f9, #dfe3e5);
+  color: #56616b;
+  box-shadow: inset 0 1px rgba(255,255,255,.9), 0 2px 5px rgba(39,44,49,.045);
+}
+.filter-chip.active { background: linear-gradient(145deg, #59636b, #303940); border-color: #414a51; box-shadow: inset 0 1px rgba(255,255,255,.2), 0 3px 7px rgba(39,44,49,.11); }
+
+.teacher-list { gap: 14px; padding: 8px 18px 24px; }
+.teacher-list > .section-title {
+  position: relative;
+  margin: 2px 2px 0;
+  padding-left: 12px;
+  color: #3f4a54;
+  font-size: 1.04rem;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  line-height: 1.2;
+}
+.teacher-list > .section-title::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #697680, #3d474f);
+  box-shadow: 0 2px 5px rgba(39,44,49,.16);
+}
+.teacher-card {
+  padding: 17px;
+  border: 1px solid rgba(255,255,255,.76) !important;
+  border-radius: 21px;
+  background: linear-gradient(145deg, rgba(250,251,251,.96), rgba(224,228,230,.9)) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.94), 0 10px 22px rgba(39,44,49,.13) !important;
+}
+.teacher-top { gap: 13px; margin-bottom: 15px; }
+.teacher-avatar { width: 58px; height: 58px; border-radius: 17px; box-shadow: inset 0 1px rgba(255,255,255,.45), 0 5px 10px rgba(39,44,49,.14); }
+.teacher-name { font-size: .96rem; color: #252b31; }
+.teacher-type-pill { margin-top: 6px; padding: 4px 9px; border-radius: 999px; background: #e1e7ed !important; color: #4b6784 !important; }
+.teacher-type-pill.available { background: #dfeae4 !important; color: #397051 !important; }
+.subject-chip { border-color: #cdd4d9; border-radius: 999px; background: rgba(245,247,247,.7); color: #56616b; }
+.status-pill { border: 1px solid rgba(255,255,255,.7); border-radius: 999px; padding: 6px 10px; }
+.pill-green { background: #e0eee5; color: #397051; }
+.pill-gray { background: #e3e6e8; color: #68727a; }
+.consultation-hours { border-color: #cbded2; border-radius: 14px; background: #edf6f0; }
+.hours-chip { border-radius: 999px; background: #f8fbf9; }
+.teacher-footer { padding-top: 14px; border-top-color: rgba(104,112,120,.18); }
+.action-btn { min-height: 42px; padding: 10px 17px; border-radius: 13px; }
+.action-btn.green { background: linear-gradient(145deg, #59636b, #303940); box-shadow: inset 0 1px rgba(255,255,255,.18), 0 6px 12px rgba(39,44,49,.2); }
+.action-btn.disabled { background: linear-gradient(145deg, #eef0f1, #dfe3e5); border-color: #ccd3d7; }
+
 /* ── Modals ── */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-  z-index: 100; display: flex; align-items: flex-end; justify-content: center;
+  position: fixed;
+  inset: 0 0 0 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(31,35,39,.58);
+  z-index: 30000 !important;
+  padding-top: env(safe-area-inset-top, 0px);
+  backdrop-filter: blur(7px);
 }
 .modal-sheet {
-  width: 100%; max-width: 430px; background: #fff;
-  border-radius: 20px 20px 0 0;
-  max-height: 92dvh; overflow-y: auto; padding-bottom: 28px;
+  position: relative;
+  z-index: 30001;
+  align-self: flex-end;
+  margin-bottom: 0;
+  margin-top: auto;
+  width: 100%; max-width: 430px;
+  background: linear-gradient(145deg, #f8f9f9, #dfe3e5);
+  border: 1px solid rgba(255,255,255,.85);
+  border-radius: 28px 28px 0 0;
+  max-height: 92dvh; overflow-y: auto; padding-bottom: 30px;
+  box-shadow: 0 -14px 32px rgba(22,26,30,.26), inset 0 1px rgba(255,255,255,.95);
 }
-.modal-handle { width: 40px; height: 4px; background: #ddd; border-radius: 2px; margin: 12px auto 0; }
+
+.consultation-modal-enter-active,
+.consultation-modal-leave-active {
+  transition: opacity .24s ease;
+}
+
+.consultation-modal-enter-active .modal-sheet,
+.consultation-modal-leave-active .modal-sheet {
+  transition: transform .34s cubic-bezier(.22, 1, .36, 1), opacity .24s ease;
+}
+
+.consultation-modal-enter-from,
+.consultation-modal-leave-to {
+  opacity: 0;
+}
+
+.consultation-modal-enter-from .modal-sheet,
+.consultation-modal-leave-to .modal-sheet {
+  opacity: .7;
+  transform: translateY(100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consultation-modal-enter-active,
+  .consultation-modal-leave-active,
+  .consultation-modal-enter-active .modal-sheet,
+  .consultation-modal-leave-active .modal-sheet {
+    transition: none;
+  }
+}
+.modal-handle { width: 48px; height: 5px; background: #aeb6bc; border-radius: 999px; margin: 12px auto 2px; }
 .modal-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 20px 14px; font-weight: 700; font-size: 1rem;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 17px 22px 16px; font-weight: 800; font-size: 1.08rem;
+  color: #252b30;
+  border-bottom: 1px solid rgba(104,112,120,.18);
 }
-.modal-close { background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #999; line-height: 1; }
-.modal-body  { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
-.modal-footer { display: flex; gap: 10px; padding: 12px 20px 0; }
+.modal-close { display: grid; width: 36px; height: 36px; place-items: center; background: linear-gradient(145deg,#f8f9f9,#d8dde0); border: 1px solid rgba(255,255,255,.8); border-radius: 50%; font-size: 1.1rem; cursor: pointer; color: #69747d; line-height: 1; box-shadow: inset 0 1px rgba(255,255,255,.9); }
+.modal-body  { padding: 18px 20px 6px; display: flex; flex-direction: column; gap: 16px; }
+.modal-footer { display: flex; gap: 10px; padding: 14px 20px 0; }
 .modal-cancel {
-  flex: 1; padding: 12px; background: #f0f0f0; color: #555;
-  border: none; border-radius: 10px;
+  flex: 1; padding: 13px; background: linear-gradient(145deg,#f3f4f4,#dfe2e3); color: #59646d;
+  border: 1px solid #cbd2d6; border-radius: 13px;
   font-family: inherit; font-weight: 600; font-size: 0.88rem; cursor: pointer;
 }
 .modal-submit {
-  flex: 2; padding: 12px; background: #4b5563; color: #fff;
-  border: none; border-radius: 10px;
+  flex: 2; padding: 13px; background: linear-gradient(145deg,#59636b,#303940); color: #fff;
+  border: 1px solid #303940; border-radius: 13px;
   font-family: inherit; font-weight: 600; font-size: 0.88rem; cursor: pointer;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 6px 13px rgba(39,44,49,.2);
 }
 
 /* Form fields */
 .field-group  { display: flex; flex-direction: column; gap: 6px; }
-.field-label  { font-size: 0.8rem; font-weight: 600; color: #444; }
-.optional     { font-weight: 400; color: #aaa; }
+.field-label  { font-size: 0.76rem; font-weight: 800; color: #4b555e; letter-spacing: .03em; text-transform: uppercase; }
+.optional     { font-weight: 400; color: #89939a; text-transform: none; letter-spacing: 0; }
 .field-input  {
-  width: 100%; padding: 10px 12px; border: 1.5px solid #e5e7eb;
-  border-radius: 8px; font-family: inherit; font-size: 0.87rem;
+  width: 100%; min-height: 46px; padding: 10px 13px; border: 1px solid #cbd2d6;
+  border-radius: 13px; font-family: inherit; font-size: 0.87rem;
+  color: #303940; background: rgba(248,249,249,.78);
   outline: none; box-sizing: border-box;
+  box-shadow: inset 0 1px rgba(255,255,255,.9);
 }
-.field-input:focus { border-color: #4b5563; }
+.field-input:focus { border-color: #68747d; box-shadow: 0 0 0 3px rgba(75,85,99,.12), inset 0 1px rgba(255,255,255,.9); }
 .field-textarea { resize: none; }
 .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .msg-err { color: #e63946; font-size: 0.8rem; font-weight: 500; }
@@ -907,7 +1075,8 @@ onUnmounted(() => {
 /* Teacher preview pill */
 .teacher-pill {
   display: flex; align-items: center; gap: 12px;
-  background: #f5f6f8; border-radius: 12px; padding: 12px;
+  background: linear-gradient(145deg,#f1f3f4,#dfe3e5); border: 1px solid rgba(255,255,255,.75); border-radius: 16px; padding: 13px;
+  box-shadow: inset 0 1px rgba(255,255,255,.86);
 }
 .tp-avatar {
   width: 44px; height: 44px; border-radius: 50%; color: #fff;

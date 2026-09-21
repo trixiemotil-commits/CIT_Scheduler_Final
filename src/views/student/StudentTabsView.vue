@@ -1,6 +1,6 @@
 <template>
   <IonPage>
-    <div class="student-app-shell">
+    <div class="student-app-shell" :class="{ 'student-notifications-active': route.path.startsWith('/student/notifications') }">
       <IonTabs>
         <IonRouterOutlet />
 
@@ -11,7 +11,11 @@
             :tab="item.tab"
             :href="item.href"
           >
-            <IonIcon :icon="item.icon" aria-hidden="true" />
+            <span v-if="item.tab === 'profile' && studentUser.avatar" class="student-tab-profile-avatar" aria-hidden="true">
+              <img :src="studentUser.avatar" class="student-tab-profile-image" alt="" />
+              <span class="student-tab-profile-status"></span>
+            </span>
+            <IonIcon v-else :icon="item.icon" aria-hidden="true" />
             <IonLabel>{{ item.label }}</IonLabel>
           </IonTabButton>
         </IonTabBar>
@@ -65,8 +69,11 @@ import {
     personOutline,
 } from 'ionicons/icons'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const route = useRoute()
+const studentUser = ref(getUser() || {})
 const showTermPrompt = ref(false)
 const promptAlreadyHandled = ref(false)
 const publishedTerm = ref(null)

@@ -10,18 +10,29 @@
         <span :class="['sidebar-status-dot', statusDotClass]"></span>
       </div>
       <div class="sidebar-status-action-row">
-        <span :class="['sidebar-status-value', statusDotClass]" :title="`Work status: ${statusDisplay}`" aria-label="Current work status">{{ statusDisplay }}</span>
-        <button
-          class="sidebar-status-button"
-          type="button"
-          :disabled="workStatusDisabled || saving"
-          :title="`Work status: ${statusDisplay}`"
-          @click="clockOut"
-        >
-          <svg class="sidebar-status-clock-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3 2" /></svg>
-          <span>Clock Out</span>
-          <span class="collapsed-status-tooltip">Work status: {{ statusDisplay }}</span>
-        </button>
+        <span :class="['sidebar-status-value', statusDotClass]" aria-label="Current work status">{{ statusDisplay }}</span>
+        <div class="sidebar-status-button-wrap">
+          <button
+            class="sidebar-status-button"
+            type="button"
+            :disabled="workStatusDisabled || saving"
+            @click="handleClockButton"
+          >
+            <svg class="sidebar-status-clock-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3 2" /></svg>
+            <span>Clock Out</span>
+          </button>
+          <div v-if="showCollapsedStatusModal" class="collapsed-status-modal" role="dialog" aria-label="Work status" @click.stop>
+            <div class="collapsed-status-modal-head">
+              <span>Work Status</span>
+              <span :class="['sidebar-status-dot', statusDotClass]"></span>
+            </div>
+            <div :class="['collapsed-status-modal-value', statusDotClass]">{{ statusDisplay }}</div>
+            <button class="collapsed-status-modal-action" type="button" :disabled="workStatusDisabled || saving" @click="clockOutAndClose">
+              Clock Out
+            </button>
+            <div class="collapsed-status-modal-time">Time in: {{ formattedTimeIn }}</div>
+          </div>
+        </div>
       </div>
       <div class="sidebar-time-in">Time in: {{ formattedTimeIn }}</div>
     </div>
@@ -32,13 +43,28 @@
         <span :class="['sidebar-status-dot', availabilityDotClass]"></span>
       </div>
       <div class="sidebar-status-select-wrap">
-        <select v-model="availabilityChoice" class="sidebar-status-select" title="Office hours" aria-label="Office hours availability">
+        <select v-model="availabilityChoice" class="sidebar-status-select" aria-label="Office hours availability" @pointerdown="handleOfficeHoursPointerDown">
           <option value="Available" :disabled="!canChangeAvailability">Open for consultations</option>
           <option value="Unavailable" :disabled="!canChangeAvailability">Closed for consultations</option>
         </select>
         <svg class="sidebar-status-select-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-        <svg class="sidebar-status-office-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V6l7-3 7 3v15M9 21v-4h6v4M8 9h1M15 9h1M8 12h1M15 12h1" /></svg>
-        <span class="collapsed-status-tooltip">Office hours</span>
+        <svg class="sidebar-status-office-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 12a8 8 0 1 0-8 8" />
+          <path d="M12 7v4H8" />
+          <rect x="10" y="12" width="11" height="8" rx="1.5" />
+          <path d="M13 12v-1.2A1.8 1.8 0 0 1 14.8 9h1.4a1.8 1.8 0 0 1 1.8 1.8V12M10 15h11" />
+        </svg>
+        <div v-if="showCollapsedOfficeModal" class="collapsed-office-modal" role="dialog" aria-label="Office hours" @click.stop>
+          <div class="collapsed-status-modal-head">
+            <span>Office Hours</span>
+            <span :class="['sidebar-status-dot', availabilityDotClass]"></span>
+          </div>
+          <select v-model="availabilityChoice" class="collapsed-office-modal-select" aria-label="Office hours availability">
+            <option value="Available" :disabled="!canChangeAvailability">Open for consultations</option>
+            <option value="Unavailable" :disabled="!canChangeAvailability">Closed for consultations</option>
+          </select>
+          <div class="collapsed-office-modal-subtext">{{ availabilitySubtext }}</div>
+        </div>
       </div>
       <div class="sidebar-status-subtext">{{ availabilitySubtext }}</div>
     </div>
@@ -48,7 +74,7 @@
 <script setup>
 import { getToken, getUser, saveMergedUser } from '@/auth.js'
 import Swal from 'sweetalert2'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const user = ref(getUser() || {})
@@ -58,6 +84,8 @@ const teacherTimeIn = ref(user.value.teacher_time_in || null)
 const saving = ref(false)
 const message = ref('')
 const error = ref(false)
+const showCollapsedStatusModal = ref(false)
+const showCollapsedOfficeModal = ref(false)
 let messageTimer
 
 function normalizeTeacherStatus(statusOrObj) {
@@ -244,7 +272,41 @@ async function clockOut() {
   }
 }
 
-onMounted(loadStatus)
+function handleClockButton() {
+  if (document.documentElement.classList.contains('teacher-sidebar-collapsed')) {
+    showCollapsedOfficeModal.value = false
+    showCollapsedStatusModal.value = !showCollapsedStatusModal.value
+    return
+  }
+  clockOut()
+}
+
+function handleOfficeHoursPointerDown(event) {
+  if (!document.documentElement.classList.contains('teacher-sidebar-collapsed')) return
+  event.preventDefault()
+  event.stopPropagation()
+  showCollapsedStatusModal.value = false
+  showCollapsedOfficeModal.value = !showCollapsedOfficeModal.value
+}
+
+async function clockOutAndClose() {
+  showCollapsedStatusModal.value = false
+  await clockOut()
+}
+
+function closeCollapsedStatusModal(event) {
+  if (!event.target.closest('.sidebar-status-button-wrap')) showCollapsedStatusModal.value = false
+  if (!event.target.closest('.sidebar-status-select-wrap')) showCollapsedOfficeModal.value = false
+}
+
+onMounted(() => {
+  loadStatus()
+  document.addEventListener('click', closeCollapsedStatusModal)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeCollapsedStatusModal)
+})
 </script>
 
 <style scoped>
@@ -382,6 +444,111 @@ onMounted(loadStatus)
   opacity: 0.55;
   background: #8d949a;
   border-color: #747b81;
+}
+
+.sidebar-status-button-wrap { position: relative; }
+
+.collapsed-status-modal {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 12px);
+  z-index: 30;
+  width: 236px;
+  padding: 15px;
+  border: 1px solid #414950;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f8fafb, #dfe4e7);
+  box-shadow: 0 12px 24px rgba(26,31,35,.28), inset 0 1px rgba(255,255,255,.9);
+  transform: translateY(-50%);
+}
+
+.collapsed-status-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #30353a;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.collapsed-status-modal-value {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  border: 1px solid #9bc6aa;
+  border-radius: 10px;
+  background: #e8f3ec;
+  color: #28613f;
+  font-size: .86rem;
+  font-weight: 800;
+}
+
+.collapsed-status-modal-value.is-on-leave,
+.collapsed-status-modal-value.is-offline {
+  border-color: #b7c0c5;
+  background: #e5e8ea;
+  color: #59636a;
+}
+
+.collapsed-status-modal-action {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border: 1px solid #303940;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #4b555e, #2f383f);
+  color: #fff;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.collapsed-status-modal-action:disabled { cursor: not-allowed; opacity: .55; }
+
+.collapsed-status-modal-time {
+  margin-top: 10px;
+  color: #687582;
+  font-size: .72rem;
+}
+
+.collapsed-office-modal {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 12px);
+  z-index: 30;
+  width: 236px;
+  padding: 15px;
+  border: 1px solid #414950;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f8fafb, #dfe4e7);
+  box-shadow: 0 12px 24px rgba(26,31,35,.28), inset 0 1px rgba(255,255,255,.9);
+  transform: translateY(-50%);
+}
+
+.collapsed-office-modal-select {
+  width: 100%;
+  height: 40px;
+  margin-top: 10px;
+  padding: 0 12px;
+  border: 1px solid #b7c0c5;
+  border-radius: 10px;
+  background: rgba(255,255,255,.78);
+  color: #30353a;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.collapsed-office-modal-subtext {
+  margin-top: 10px;
+  color: #687582;
+  font-size: .72rem;
+  line-height: 1.35;
 }
 
 .sidebar-time-in,
