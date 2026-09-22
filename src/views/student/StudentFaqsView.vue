@@ -1,7 +1,7 @@
 <template>
   <IonPage>
     <IonContent :fullscreen="true">
-      <div class="faqs-page">
+      <div class="faqs-page student-faqs-active">
         <header class="faqs-header">
           <button class="faqs-back" type="button" aria-label="Go back to profile" @click="goToProfile">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -47,14 +47,22 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const searchQuery = ref('')
-const categories = ['Account', 'Security', 'Schedule']
+const categories = ['Account', 'Security', 'Schedule', 'Consultation', 'Campus & Events']
 const faqs = [
   {
     category: 'Account',
-    question: 'Is this a settings issue or a system issue?',
+    question: 'How do I update my profile details?',
     answers: [
-      'If the problem is on the student settings page itself, it is usually a personal account setting.',
-      'If login, API, or email problems happen, it is usually a backend or system configuration issue.',
+      'Open Profile and select Profile details to review or edit your account information.',
+      'Your student ID, year level, section, and role are managed by the school system.',
+    ],
+  },
+  {
+    category: 'Account',
+    question: 'Why can’t I access a student page?',
+    answers: [
+      'Make sure you are signed in with your student account and that your account is active.',
+      'If a page is still unavailable, contact CIT Scheduler support or your administrator.',
     ],
   },
   {
@@ -74,11 +82,67 @@ const faqs = [
     ],
   },
   {
+    category: 'Security',
+    question: 'What should I do if I cannot log in?',
+    answers: [
+      'Check that your email and password are correct, then try again.',
+      'Use Forgot Password if you need to reset your password or contact support if your account is locked.',
+    ],
+  },
+  {
     category: 'Schedule',
     question: 'How do I find my schedule?',
     answers: [
       'Use the student dashboard and schedule pages from the main navigation.',
       'Profile and account pages are only for personal information and security.',
+    ],
+  },
+  {
+    category: 'Schedule',
+    question: 'What should I do if my schedule is incorrect?',
+    answers: [
+      'Check that you are viewing the current published academic term.',
+      'If a subject, room, or schedule time is missing or incorrect, contact your administrator.',
+    ],
+  },
+  {
+    category: 'Consultation',
+    question: 'How do I book a teacher consultation?',
+    answers: [
+      'Open Browse Teachers and select a teacher who has consultation hours today.',
+      'Choose Book Consultation, select the subject and reason, then send your request.',
+    ],
+  },
+  {
+    category: 'Consultation',
+    question: 'Why can’t I book a consultation with a teacher?',
+    answers: [
+      'Teachers can be booked only when they are available and have consultation hours for today.',
+      'If no booking button appears, check another teacher or try again when their consultation hours are active.',
+    ],
+  },
+  {
+    category: 'Consultation',
+    question: 'How do I check my consultation request?',
+    answers: [
+      'Open Consultations from the student navigation to view your request status.',
+      'You can review pending, approved, completed, or declined consultation requests there.',
+    ],
+  },
+  {
+    category: 'Campus & Events',
+    question: 'Where can I see campus events?',
+    answers: [
+      'Open Events from the student navigation to view announcements and upcoming activities.',
+      'Check the event date, time, venue, and description before attending.',
+    ],
+  },
+  {
+    category: 'Campus & Events',
+    question: 'How do I contact CIT Scheduler support?',
+    answers: [
+      'Use the Still need help link at the bottom of this page to email citscheduler@gmail.com.',
+      'Include your name, student ID, and a short description of the issue so it can be handled faster.',
     ],
   },
 ]
@@ -97,12 +161,17 @@ function goToProfile() {
   router.push('/student/profile')
 }
 
-onMounted(() => document.body.classList.add('student-settings-active'))
-onBeforeUnmount(() => document.body.classList.remove('student-settings-active'))
+onMounted(() => {
+  document.body.classList.add('student-settings-active', 'student-faqs-active')
+})
+onBeforeUnmount(() => {
+  document.body.classList.remove('student-settings-active', 'student-faqs-active')
+})
 </script>
 
 <style scoped>
 :global(body.student-settings-active .student-tab-bar) { display: none !important; }
+:global(body.student-faqs-active .student-tab-bar) { display: none !important; }
 :global(ion-content) { --background: linear-gradient(145deg, #eef0f1 0%, #dfe3e5 52%, #c7cdd1 100%); }
 .faqs-page { width: 100%; max-width: 430px; min-height: 100dvh; margin: 0 auto; padding-bottom: calc(34px + env(safe-area-inset-bottom, 0px)); color: #252b31; background: radial-gradient(circle at 100% 0%, rgba(255,255,255,.78), transparent 34%), linear-gradient(145deg, #f1f3f4 0%, #dfe3e5 52%, #c7cdd1 100%); font-family: 'Poppins', sans-serif; }
 .faqs-header { min-height: 68px; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; }

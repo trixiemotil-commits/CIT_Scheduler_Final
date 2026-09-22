@@ -206,30 +206,28 @@
             <h2 class="faq-title">FAQs</h2>
           </div>
 
-          <div class="faq-list">
-            <div
-              v-for="(faq, i) in faqs"
-              :key="i"
-              class="faq-item"
-              :class="{ 'faq-item--open': openFaq === i }"
-            >
-              <button class="faq-question" @click="openFaq = openFaq === i ? null : i">
-                <span>{{ faq.q }}</span>
-                <svg
-                  class="faq-chevron"
-                  :class="{ 'faq-chevron--open': openFaq === i }"
-                  width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                ><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              <div v-show="openFaq === i" class="faq-answer">
-                <template v-if="Array.isArray(faq.a)">
+          <div v-for="category in faqCategories" :key="category" class="faq-category-group">
+            <div class="faq-category-divider"><span>{{ category }}</span></div>
+            <div class="faq-list">
+              <div
+                v-for="faq in faqs.filter((item) => item.category === category)"
+                :key="faq.q"
+                class="faq-item"
+                :class="{ 'faq-item--open': openFaq === faq.q }"
+              >
+                <button class="faq-question" @click="openFaq = openFaq === faq.q ? null : faq.q">
+                  <span>{{ faq.q }}</span>
+                  <svg
+                    class="faq-chevron"
+                    :class="{ 'faq-chevron--open': openFaq === faq.q }"
+                    width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                  ><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div v-show="openFaq === faq.q" class="faq-answer">
                   <ul class="faq-bullets">
-                    <li v-for="(item, idx) in faq.a" :key="idx">{{ item }}</li>
+                    <li v-for="(item, idx) in faq.a" :key="idx" v-html="highlightFaqText(item)"></li>
                   </ul>
-                </template>
-                <template v-else>
-                  {{ faq.a }}
-                </template>
+                </div>
               </div>
             </div>
           </div>
@@ -549,16 +547,102 @@ onUnmounted(clearOtpTimer)
 
 /* ── FAQs ── */
 const openFaq = ref(null)
+const faqCategories = ['Schedule Management', 'Faculty & Campus', 'Account & Security']
+const faqHighlightTerms = [
+  'Academic Terms',
+  'Current Term Schedule',
+  'Add Schedule',
+  'schedule workspace',
+  'schedule browser',
+  'published-term schedule link',
+  'teacher assignment',
+  'consultation hours',
+  'user management',
+  'Activity Logs',
+  'Teachers',
+  'Users',
+  'Events',
+  'student group',
+  'faculty member',
+  'room',
+  'section',
+  'Admin',
+  'Teacher',
+  'Student',
+  'OTP',
+  'Settings',
+  'Change Password',
+  'Email verification',
+  'Switch to Teacher',
+  'Logout',
+]
 const faqs = [
   {
-    q: 'Is this a settings issue or a system issue?',
+    category: 'Schedule Management',
+    q: 'How do I create a schedule for a new academic term?',
     a: [
-      'If the problem is on the admin, teacher, or student settings page itself, it is usually an account or role setting.',
-      'If the problem is login failure, API errors, database connection, or email delivery, it is a system configuration issue and should be checked in the backend environment settings.'
+      'Open Academic Terms from the sidebar and create or select the term you want to manage.',
+      'Set the term name, start date, end date, and semester status before adding schedule entries.',
+      'Use the schedule workspace to add classes by student group, room, or faculty member.'
     ]
   },
   {
-    q: 'How do I change my password in Settings?',
+    category: 'Schedule Management',
+    q: 'How do I add or update a weekly schedule?',
+    a: [
+      'Open Academic Terms and select the active term, then choose Add Schedule.',
+      'Select the year and section, faculty member, subject, room, day, and time.',
+      'Save the entry, then review the term schedule for conflicts or missing assignments.'
+    ]
+  },
+  {
+    category: 'Schedule Management',
+    q: 'What should I do when a schedule has a conflict?',
+    a: [
+      'Open the schedule browser and view the entries by student group, room, or faculty member.',
+      'Check whether the same room, faculty member, or student section has overlapping times.',
+      'Edit or remove the conflicting entry, then save the corrected schedule.'
+    ]
+  },
+  {
+    category: 'Schedule Management',
+    q: 'How do I publish the schedule for students and teachers?',
+    a: [
+      'Review the active academic term and confirm that its schedule entries are complete.',
+      'Use the published-term schedule link to make the approved term available to the portals.',
+      'Students and teachers will see the published schedule after their next data refresh.'
+    ]
+  },
+  {
+    category: 'Faculty & Campus',
+    q: 'How do I manage teacher availability and consultation hours?',
+    a: [
+      'Open the teacher assignment or user management area and select the faculty member.',
+      'Update their availability status and assign consultation hours when needed.',
+      'Students can request consultations only when the teacher is available and has hours for that day.'
+    ]
+  },
+  {
+    category: 'Account & Security',
+    q: 'How do I manage users and their roles?',
+    a: [
+      'Open Users from the sidebar to view, search, create, or update accounts.',
+      'Assign only the roles required for each account: Admin, Teacher, or Student.',
+      'Review account status when a user cannot access the expected portal.'
+    ]
+  },
+  {
+    category: 'Faculty & Campus',
+    q: 'How do I create and update campus events?',
+    a: [
+      'Open Events from the sidebar and create an event with its title, date, time, venue, and description.',
+      'Add a cover image when appropriate, then save the event for portal users.',
+      'Edit or remove outdated events so students and teachers see accurate information.'
+    ]
+  },
+  {
+    category: 'Account & Security',
+    q: 'How do I change my admin password?',
     a: [
       'Open Settings and go to Change Password.',
       'Enter your current password, the OTP sent to your email, and your new password.',
@@ -566,29 +650,42 @@ const faqs = [
     ]
   },
   {
-    q: 'How does email verification work?',
+    category: 'Account & Security',
+    q: 'How does email verification work for admin login?',
     a: [
-      'Go to Settings and toggle Email verification.',
-      'Confirm with your current password, then a code will be sent to your email on each login.',
-      'This is an account security setting and depends on the backend email configuration.'
+      'Open Settings and enable Email verification.',
+      'Confirm the change with your current password.',
+      'A verification code will be sent to your email each time you log in.'
     ]
   },
   {
+    category: 'Account & Security',
     q: 'How do I switch roles or log out?',
     a: [
-      'Use the role switch button in the sidebar if your account has access to multiple roles.',
-      'To log out, click Logout in the sidebar and confirm the prompt.',
-      'These are page-level actions, not backend configuration changes.'
+      'Use Switch to Teacher in the sidebar when your account has multiple roles.',
+      'To end your session, click Logout and confirm the prompt.'
     ]
   },
   {
+    category: 'Account & Security',
     q: 'Who can access the admin portal?',
     a: [
-      'Only users with the Admin role can access the admin portal.',
-      'Teacher and Student accounts can use their own portals and settings pages, but they do not have admin privileges.'
+      'Only accounts with the Admin role can access the admin portal.',
+      'Teacher and Student accounts use their own portals and cannot access admin tools.'
     ]
   },
 ]
+
+function highlightFaqText(text) {
+  const escaped = String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+  const terms = [...faqHighlightTerms].sort((a, b) => b.length - a.length).map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  return escaped.replace(new RegExp(`(${terms.join('|')})`, 'gi'), '<mark class="faq-inline-highlight">$1</mark>')
+}
 </script>
 
 <style scoped>
@@ -961,6 +1058,13 @@ const faqs = [
 }
 .otp-btn svg { flex: 0 0 auto; }
 .otp-btn:hover { background: linear-gradient(145deg, #9aa6ad 0%, #687780 48%, #52616b 100%); color: #fff; transform: translateY(-1px); box-shadow: inset 0 1px rgba(255,255,255,.34), 0 6px 14px rgba(48, 53, 58, .22); }
+.otp-btn:focus-visible,
+.update-pw-btn:focus-visible,
+.password-back-btn:focus-visible,
+.faq-question:focus-visible {
+  outline: 3px solid rgba(83, 91, 100, .3);
+  outline-offset: 3px;
+}
 .otp-btn:disabled,
 .update-pw-btn:disabled { cursor: not-allowed; opacity: 0.65; }
 .otp-expiry {
@@ -969,10 +1073,10 @@ const faqs = [
   align-self: flex-start;
   margin-top: 1px;
   padding: 4px 8px;
-  border: 1px solid #e6c98d;
+  border: 1px solid #aeb8be;
   border-radius: 999px;
-  background: #fff8e8;
-  color: #9a6811;
+  background: linear-gradient(145deg, #f2f4f4, #dfe3e5);
+  color: #68747d;
   font-size: 0.68rem;
   font-weight: 700;
 }
@@ -1397,6 +1501,9 @@ const faqs = [
   color: #2b363e;
   margin: 0;
 }
+.faq-category-group + .faq-category-group { margin-top: 24px; }
+.faq-category-divider { display: flex; align-items: center; gap: 10px; margin: 0 2px 10px; color: #737e86; font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.faq-category-divider::after { content: ''; height: 1px; flex: 1; background: linear-gradient(90deg, rgba(104,112,120,.3), transparent); }
 
 .faq-list {
   display: flex;
@@ -1404,16 +1511,27 @@ const faqs = [
   gap: 12px;
 }
 .faq-item {
+  position: relative;
   background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(231,235,238,.88));
   border: 1px solid rgba(135, 146, 154, .38);
   border-radius: 12px;
   overflow: hidden;
   transition: border-color 0.18s, box-shadow 0.18s, transform 0.15s;
 }
+.faq-item::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #69747d;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
 .faq-item--open {
   border-color: #8e9aa2;
   box-shadow: 0 7px 18px rgba(48, 53, 58,.1);
 }
+.faq-item--open::before { opacity: 1; }
 .faq-question {
   display: flex;
   align-items: center;
@@ -1429,9 +1547,9 @@ const faqs = [
   color: #364149;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
-.faq-question:hover { background: rgba(224, 229, 232, .52); }
+.faq-question:hover { background: rgba(224, 229, 232, .72); color: #202a31; }
 .faq-chevron {
   flex-shrink: 0;
   color: #888;
@@ -1458,6 +1576,19 @@ const faqs = [
 }
 .faq-bullets li {
   color: #4a4f57;
+}
+:deep(.faq-inline-highlight) {
+  display: inline;
+  padding: 1px 5px;
+  border: 1px solid rgba(105,116,125,.34);
+  border-radius: 5px;
+  background: linear-gradient(145deg, #f3f5f5, #d8dde0);
+  color: #4f5b63;
+  font-size: .92em;
+  font-weight: 750;
+  box-shadow: inset 0 1px rgba(255,255,255,.72);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 /* ── Modal overlay ── */
