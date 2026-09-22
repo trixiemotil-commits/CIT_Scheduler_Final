@@ -1022,10 +1022,7 @@ async function getAdminDashboardSummary(req, res) {
 
     const [availableTeachers, totalRooms, classesToday, activeConsultations] = await Promise.all([
       User.countDocuments({
-        $and: [
-          { $or: [{ role: "teacher" }, { roles: "teacher" }] },
-          { $nor: [{ role: "admin" }, { roles: "admin" }] },
-        ],
+        $or: [{ role: "teacher" }, { roles: "teacher" }],
         teacher_status: "On School",
       }),
       ScheduleEntry.aggregate([

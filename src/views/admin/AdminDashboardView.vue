@@ -1089,7 +1089,9 @@ async function loadChartData() {
     ]))
     consultationRequests.value = (requestsPayload.requests || []).map(request => ({
       ...request,
-      requestedTeacher: teachersByEmployeeId.get(String(request.employeeId || '').trim()) || '',
+      requestedTeacher: request.requestedTeacher
+        || teachersByEmployeeId.get(String(request.employeeId || '').trim())
+        || '',
     }))
     liveTeacherWorkloads.value = calculateWorkloads(usersPayload.users || [], schedulesPayload.entries || [])
     if (lineChartInstance || barChartInstance) {

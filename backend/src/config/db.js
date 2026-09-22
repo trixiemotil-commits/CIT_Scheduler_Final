@@ -145,11 +145,15 @@ async function migrateUserStatusFields() {
     // Set teacher_status only for teacher users when missing.
     const teacherStatusResult = await users.updateMany(
       {
-        role: "teacher",
-        $or: [
-          { teacher_status: { $exists: false } },
-          { teacher_status: null },
-          { teacher_status: "" },
+        $and: [
+          { $or: [{ role: "teacher" }, { roles: "teacher" }] },
+          {
+            $or: [
+              { teacher_status: { $exists: false } },
+              { teacher_status: null },
+              { teacher_status: "" },
+            ],
+          },
         ],
       },
       {
@@ -161,7 +165,13 @@ async function migrateUserStatusFields() {
 
     // Remove teacher_status for non-teacher accounts.
     await users.updateMany(
-      { role: { $ne: "teacher" }, teacher_status: { $exists: true } },
+      {
+        $and: [
+          { $or: [{ role: { $ne: "teacher" } }, { role: { $exists: false } }] },
+          { $or: [{ roles: { $exists: false } }, { roles: { $nin: ["teacher"] } }] },
+          { teacher_status: { $exists: true } },
+        ],
+      },
       { $unset: { teacher_status: "" } }
     );
 

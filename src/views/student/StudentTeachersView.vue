@@ -82,7 +82,7 @@
                 </div>
               </div>
             </div>
-            <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
+            <span :class="['status-pill', statusClass(t.status)]">{{ teacherStatusLabel(t.status) }}</span>
           </div>
           <div v-if="t.status === 'In School' && canBookTeacher(t)" class="teacher-footer">
             <span class="price">&nbsp;</span>
@@ -112,7 +112,7 @@
                 <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
               </div>
             </div>
-            <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
+            <span :class="['status-pill', statusClass(t.status)]">{{ teacherStatusLabel(t.status) }}</span>
           </div>
           <div v-if="t.status === 'In School' && canBookTeacher(t)" class="teacher-footer">
             <span class="price">&nbsp;</span>
@@ -308,6 +308,10 @@ function hasMatchingAssignment(teacher) {
 
 function isSubjectTeacher(teacher) {
   return Boolean(teacher?.isSubjectTeacher)
+}
+
+function teacherStatusLabel(status) {
+  return status === 'In School' ? 'On School' : status
 }
 
 function isAvailableTeacher(teacher) {

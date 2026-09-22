@@ -25,7 +25,7 @@
     <div class="stats-grid">
       <div class="stat-card green">
         <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 19V6l6-3 6 3v13M9 19v-4h6v4M8 9h1M15 9h1M8 12h1M15 12h1" /></svg></span>
-        <div class="stat-label">In School</div>
+        <div class="stat-label">On School</div>
         <div class="stat-num">{{ teacherStats.inSchool }}</div>
         <div class="stat-desc">teachers on campus</div>
       </div>

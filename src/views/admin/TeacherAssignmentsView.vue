@@ -75,7 +75,7 @@
           </div>
           <div class="summary-counts">
             <span class="summary-count summary-count--total"><b>{{ teachers.length }}</b><small>Total</small></span>
-            <span class="summary-count available"><b>{{ teachers.filter(item => item.status === 'In School').length }}</b><small>In school</small></span>
+            <span class="summary-count available"><b>{{ teachers.filter(item => item.status === 'In School').length }}</b><small>On School</small></span>
             <span class="summary-count summary-count--leave"><b>{{ teachers.filter(item => item.status === 'On Leave').length }}</b><small>On leave</small></span>
           </div>
         </div>
@@ -88,7 +88,7 @@
             :class="['status-tab', { active: activeTab === tab }]"
             @click="selectStatusTab(tab)"
           >
-            {{ tab }}
+            {{ statusTabLabel(tab) }}
             <span>{{ tab === 'All' ? teachers.length : teachers.filter(item => item.status === tab).length }}</span>
           </button>
         </div>
@@ -122,7 +122,7 @@
                 </svg>
               </span>
               <h3>No teachers are {{ emptyStatusDescription }}</h3>
-              <p>There are currently no teacher records under the “{{ activeTab }}” status.</p>
+              <p>There are currently no teacher records under the “{{ statusTabLabel(activeTab) }}” status.</p>
               <button type="button" @click="selectStatusTab('All')">View all teachers</button>
             </div>
             <div
@@ -163,7 +163,7 @@
                   :class="['status-dropdown', `status-${teacher.status.toLowerCase().replace(/\s+/g, '-')}`]"
                   @change="updateTeacherStatus(teacher)"
                 >
-                  <option value="In School">In School</option>
+                  <option value="In School">On School</option>
                   <option value="On Leave">On Leave</option>
                   <option value="On Meeting">On Meeting</option>
                     <option value="Offline" disabled>Offline</option>
@@ -517,6 +517,10 @@ function canAutoRefresh() {
 
 const statusTabs = ['All', 'In School', 'On Meeting', 'On Leave']
 
+function statusTabLabel(status) {
+  return status === 'In School' ? 'On School' : status
+}
+
 function selectStatusTab(tab) {
   activeTab.value = tab
   currentIndex.value = 0
@@ -524,7 +528,7 @@ function selectStatusTab(tab) {
 
 const emptyStatusDescription = computed(() => {
   const descriptions = {
-    'In School': 'currently in school',
+    'In School': 'currently on school',
     'On Meeting': 'currently in a meeting',
     'On Leave': 'currently on leave',
   }

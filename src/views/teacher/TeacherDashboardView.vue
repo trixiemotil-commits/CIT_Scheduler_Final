@@ -606,7 +606,7 @@ async function saveTeacherStatus({ record = false, durationMinutes = 0 } = {}) {
     teacherStatus.value = updatedUser.teacher_status || teacherStatus.value
     teacherAvailability.value = updatedUser.teacher_availability || teacherAvailability.value
     teacherTimeIn.value = updatedUser.teacher_time_in || teacherTimeIn.value
-    teacherStatusMessage.value = record ? 'Time in recorded and status saved.' : 'Status saved. Students can request consultations only when you are available and in school.'
+    teacherStatusMessage.value = record ? 'Time in recorded and status saved.' : 'Status saved. Students can request consultations only when you are available and on school.'
     clearTimeout(statusMessageTimer)
     statusMessageTimer = setTimeout(() => {
       teacherStatusMessage.value = ''
@@ -660,7 +660,7 @@ function setTeacherStatus(status) {
 const teacherStatusDisplay = computed(() => {
   if (teacherIsClockedOut.value) return 'Offline'
   const status = normalizeTeacherStatus(teacherStatus.value)
-  if (status === 'On School') return 'In School'
+  if (status === 'On School') return 'On School'
   if (status === 'On Meeting') return 'On Meeting'
   if (status === 'Off Campus') return 'Off Campus'
   return 'On Leave'
