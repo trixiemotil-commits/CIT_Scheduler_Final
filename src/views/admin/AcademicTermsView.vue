@@ -261,9 +261,9 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { initialsAvatar } from '@/utils/avatar.js'
 import PublishedTermScheduleLink from '@/components/PublishedTermScheduleLink.vue'
 import RoleSwitchButton from '@/components/RoleSwitchButton.vue'
+import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
 import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'

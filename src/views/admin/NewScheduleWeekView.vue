@@ -316,7 +316,6 @@
 
 <script setup>
 import { getUser, logout } from '@/auth.js'
-import { initialsAvatar } from '@/utils/avatar.js'
 import {
     colorForRoom,
     days,
@@ -330,6 +329,7 @@ import {
     timeSlots,
     years
 } from '@/composables/useSchedule.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 

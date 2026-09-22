@@ -516,7 +516,6 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { initialsAvatar } from '@/utils/avatar.js'
 import {
     colorForRoomType,
     days,
@@ -524,6 +523,7 @@ import {
     parseTime,
     timeOptions,
 } from '@/composables/useSchedule.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 

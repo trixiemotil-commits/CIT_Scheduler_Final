@@ -324,9 +324,9 @@
 
 <script setup>
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
-import { initialsAvatar } from '@/utils/avatar.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import useNotifications from '@/composables/useNotifications'
+import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 

@@ -150,8 +150,8 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js';
-import { initialsAvatar } from '@/utils/avatar.js';
 import SystemDateTimePicker from '@/components/SystemDateTimePicker.vue';
+import { initialsAvatar } from '@/utils/avatar.js';
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 

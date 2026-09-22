@@ -300,8 +300,8 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { initialsAvatar } from '@/utils/avatar.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
+import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 

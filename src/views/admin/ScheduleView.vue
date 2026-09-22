@@ -813,7 +813,6 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { initialsAvatar } from '@/utils/avatar.js'
 import TypeaheadSelect from '@/components/TypeaheadSelect.vue'
 import {
     colorForRoom,
@@ -828,6 +827,7 @@ import {
     timeOptions,
     years,
 } from '@/composables/useSchedule.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'

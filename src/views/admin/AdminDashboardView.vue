@@ -385,8 +385,8 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { initialsAvatar } from '@/utils/avatar.js'
 import useNotifications from '@/composables/useNotifications.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import Chart from 'chart.js/auto'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'

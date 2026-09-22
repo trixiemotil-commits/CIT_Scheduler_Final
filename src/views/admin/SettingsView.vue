@@ -264,9 +264,9 @@
 <script setup>
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
 import { initialsAvatar } from '@/utils/avatar.js'
+import Swal from 'sweetalert2'
 import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import Swal from 'sweetalert2'
 
 const router = useRouter()
 const route  = useRoute()

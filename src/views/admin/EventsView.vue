@@ -496,9 +496,9 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import { initialsAvatar } from '@/utils/avatar.js'
 import SystemClockPicker from '@/components/SystemClockPicker.vue'
 import SystemDatePicker from '@/components/SystemDatePicker.vue'
+import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
