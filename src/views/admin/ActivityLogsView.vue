@@ -116,7 +116,11 @@
                     </div>
                   </div>
                 </td>
-                <td class="um-log-action">{{ log.action }}</td>
+                <td class="um-log-action">
+                  <strong>{{ log.action }}</strong>
+                  <span v-if="log.targetName" class="um-log-target">{{ log.targetType }}: {{ log.targetName }}</span>
+                  <span v-if="formatDetails(log.details)" class="um-log-details">{{ formatDetails(log.details) }}</span>
+                </td>
                 <td>
                   <span :class="[
                     'um-role-badge',
@@ -214,6 +218,13 @@ function changePage(page) {
 }
 function initials(name) { return String(name || 'U').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() }
 function formatTime(value) { return new Date(value).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) }
+function formatDetails(details) {
+  if (!details || typeof details !== 'object') return ''
+  return Object.entries(details)
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
+    .join(' · ')
+}
 function logoutAndLeave() { logout(); router.push('/') }
 onMounted(loadLogs)
 </script>
@@ -769,6 +780,26 @@ onMounted(loadLogs)
   line-height: 1.5;
   max-width: 260px;
   font-size: 0.875rem;
+}
+
+.um-log-action strong,
+.um-log-target,
+.um-log-details {
+  display: block;
+}
+
+.um-log-target {
+  margin-top: 3px;
+  color: #667085;
+  font-size: 0.76rem;
+  text-transform: capitalize;
+}
+
+.um-log-details {
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
 }
 
 .um-role-badge {
