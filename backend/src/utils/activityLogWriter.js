@@ -1,7 +1,7 @@
 const ActivityLog = require("../models/ActivityLog");
 const { getRequestIp, getDeviceDescription } = require("./requestMetadata");
 
-async function logActivity({ actor, action, path = "/", method = "POST", req = null }) {
+async function logActivity({ actor, action, actionType = "system.update", targetType = "system", targetId = null, targetName = "", details = null, path = "/", method = "POST", req = null }) {
   if (!actor) return null;
 
   if (req) req.activityLogWritten = true;
@@ -19,6 +19,11 @@ async function logActivity({ actor, action, path = "/", method = "POST", req = n
       actorEmail: String(actor.email || "").trim(),
       actorRole,
       action: cleanAction,
+      actionType: String(actionType || "system.update").trim().slice(0, 80),
+      targetType: String(targetType || "system").trim().slice(0, 80),
+      targetId: targetId || null,
+      targetName: String(targetName || "").trim().slice(0, 200),
+      details,
       path: String(path || "/").trim().slice(0, 200),
       method: String(method || "POST").trim().slice(0, 20),
       ipAddress: req ? getRequestIp(req) : "",
