@@ -66,6 +66,17 @@
             <div class="preview-toolbar__intro">
               <button class="back-btn" @click="workspaceMode = ''; previewPage = 1"><span aria-hidden="true">&larr;</span> Choose another mode</button>
             </div>
+            <div class="schedule-type-filter" role="tablist" aria-label="Schedule type filter">
+              <button
+                v-for="option in scheduleTypeOptions"
+                :key="option.value"
+                type="button"
+                :class="{ active: scheduleTypeFilter === option.value }"
+                role="tab"
+                :aria-selected="scheduleTypeFilter === option.value"
+                @click="scheduleTypeFilter = option.value; previewPage = 1"
+              >{{ option.label }}</button>
+            </div>
             <label class="preview-search">
               <span>Search {{ workspaceMode === 'room' ? 'room' : (workspaceMode === 'teacher' ? 'teacher' : 'student') }}</span>
               <input v-model.trim="previewSearch" type="search" :placeholder="workspaceMode === 'room' ? 'Search rooms...' : (workspaceMode === 'teacher' ? 'Search teachers...' : 'Search student groups...')" />
@@ -91,12 +102,12 @@
               <button class="back-btn" @click="studentYearSelection = null"><span aria-hidden="true">&larr;</span> Choose another year</button>
               <div style="margin-left:12px"><strong>{{ studentYearSelection }}</strong><small style="display:block;color:#6b7680">Select a section to manage schedules</small></div>
             </div>
-            <div v-if="!workspaceEntries.length" class="empty-state">No schedules found for this term.</div>
+            <div v-if="!filteredWorkspaceEntries.length" class="empty-state">No {{ scheduleTypeFilter === 'all' ? '' : `${scheduleTypeFilter} ` }}schedules found for this term.</div>
             <div v-else class="section-grid">
               <button v-for="s in (workspaceTerm.sectionNames?.[studentYearSelection] || [])" :key="s" class="preview-card" @click="openSchedule({ value: { year: studentYearSelection, section: s } })">
                 <div class="preview-card-head">
                   <span class="preview-avatar"><span>{{ studentYearSelection.slice(0,1) }}</span></span>
-                  <div><strong>{{ studentYearSelection }} · {{ s }}</strong><small>{{ workspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length }} scheduled class{{ workspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length === 1 ? '' : 'es' }}</small></div>
+                  <div><strong>{{ studentYearSelection }} · {{ s }}</strong><small>{{ filteredWorkspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length }} scheduled class{{ filteredWorkspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length === 1 ? '' : 'es' }}</small></div>
                   <span class="open-arrow" aria-hidden="true">&rarr;</span>
                 </div>
               </button>
@@ -303,6 +314,7 @@ const workspaceEntries = ref([])
 const studentYearSelection = ref(null)
 const workspaceLoading = ref(false)
 const previewSearch = ref('')
+const scheduleTypeFilter = ref('all')
 const previewPage = ref(1)
 const previewPageSize = 4
 const showTermModal = ref(false)
@@ -320,10 +332,21 @@ const workspaceEyebrowBase = computed(() => isCurrentTermSource.value ? 'Current
 const allRoomNames = computed(() => roomFloors.flatMap(floor => floor.rooms))
 const allRoomsSelected = computed(() => allRoomNames.value.length > 0 && allRoomNames.value.every(room => selectedRooms.value.includes(room)))
 const someRoomsSelected = computed(() => selectedRooms.value.length > 0 && !allRoomsSelected.value)
+const scheduleTypeOptions = [
+  { value: 'all', label: 'All schedules' },
+  { value: 'parallel', label: 'Parallel' },
+  { value: 'non-parallel', label: 'Non-Parallel' },
+]
 
 function toggleAllRooms(event) {
   selectedRooms.value = event.target.checked ? [...allRoomNames.value] : []
 }
+
+const filteredWorkspaceEntries = computed(() => workspaceEntries.value.filter((entry) => {
+  if (scheduleTypeFilter.value === 'parallel') return Boolean(entry.parallel)
+  if (scheduleTypeFilter.value === 'non-parallel') return !entry.parallel
+  return true
+}))
 
 const filteredTerms = computed(() => terms.value
   .filter(term => {
@@ -345,17 +368,17 @@ const previewTargets = computed(() => {
     const source = [...new Set(termRooms(workspaceTerm.value))].map(room => ({ key: room, label: `Room ${room}`, initials: room, value: room }))
     return source
       .filter(target => target.label.toLowerCase().includes(query))
-      .map(target => ({ ...target, entries: workspaceEntries.value.filter(entry => entry.room === target.value) }))
+      .map(target => ({ ...target, entries: filteredWorkspaceEntries.value.filter(entry => entry.room === target.value) }))
   }
   if (workspaceMode.value === 'teacher') {
     const source = teachers.value.map(teacher => ({ key: teacher.id || teacher.name, label: teacher.name, initials: initials(teacher.name), avatar: teacher.avatar, value: teacher.name }))
     return source
       .filter(target => target.label.toLowerCase().includes(query))
-      .map(target => ({ ...target, entries: workspaceEntries.value.filter(entry => entry.teacher === target.value) }))
+      .map(target => ({ ...target, entries: filteredWorkspaceEntries.value.filter(entry => entry.teacher === target.value) }))
   }
   // student mode: group by year + section
   const groups = {}
-  workspaceEntries.value.forEach(entry => {
+  filteredWorkspaceEntries.value.forEach(entry => {
     const y = entry.year || 'Unknown'
     const s = entry.section || '—'
     const key = `${y}||${s}`
@@ -447,6 +470,7 @@ function openWorkspace(term, action) {
   workspaceMode.value = ''
   studentYearSelection.value = null
   previewSearch.value = ''
+  scheduleTypeFilter.value = 'all'
   previewPage.value = 1
   workspaceEntries.value = []
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1223,6 +1247,35 @@ loadPage()
   transition: border-color .16s ease, box-shadow .16s ease;
 }
 .preview-search input:focus { outline: none; border-color: #71808a; box-shadow: 0 0 0 3px rgba(62, 82, 95, .12); }
+.schedule-type-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid #d5dce0;
+  border-radius: 10px;
+  background: #edf1f3;
+}
+.schedule-type-filter button {
+  min-height: 32px;
+  padding: 6px 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #63717a;
+  font: inherit;
+  font-size: .68rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+}
+.schedule-type-filter button:hover { color: #27343c; background: rgba(255,255,255,.7); }
+.schedule-type-filter button.active {
+  color: #fff;
+  background: linear-gradient(145deg, #687780, #3f4b54);
+  box-shadow: 0 3px 8px rgba(39, 49, 57, .16);
+}
 .preview-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1400,6 +1453,8 @@ loadPage()
   .mode-card { min-height: 138px; padding: 20px; }
   .preview-toolbar { align-items: stretch; flex-direction: column; padding: 18px 20px; }
   .preview-toolbar__intro { justify-content: space-between; }
+  .schedule-type-filter { width: 100%; overflow-x: auto; }
+  .schedule-type-filter button { flex: 1 0 auto; }
   .preview-search { margin-left: 0; align-items: stretch; flex-direction: column; }
   .preview-search input { width: 100%; }
   .preview-grid { padding: 18px 20px 24px; }

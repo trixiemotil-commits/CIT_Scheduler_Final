@@ -1,4 +1,5 @@
 const AcademicTerm = require("../models/AcademicTerm");
+const User = require("../models/User");
 const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins } = require("../utils/adminNotification");
 
@@ -267,6 +268,11 @@ async function publishTerm(req, res) {
     target.isPublished = true;
     target.publishedAt = new Date();
     await target.save();
+
+    await User.updateMany(
+      { $or: [{ role: "student" }, { roles: "student" }] },
+      { $set: { authSessionInvalidatedAt: new Date() } }
+    );
 
     await logActivity({
       actor: req.user,

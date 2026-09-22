@@ -175,6 +175,14 @@ export async function verifyPasswordOtp({ email, otp }) {
 }
 
 export function logout() {
+  const token = getToken()
+  if (token) {
+    fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      keepalive: true,
+    }).catch(() => {})
+  }
   clearSession()
 }
 

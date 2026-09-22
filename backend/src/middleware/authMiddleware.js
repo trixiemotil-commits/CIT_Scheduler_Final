@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-function authRequired(req, res, next) {
+async function authRequired(req, res, next) {
   const authHeader = req.headers.authorization || "";
 
   if (!authHeader.startsWith("Bearer ")) {
@@ -11,6 +12,11 @@ function authRequired(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(payload.id).select("authSessionInvalidatedAt").lean();
+    const invalidatedAt = user?.authSessionInvalidatedAt ? new Date(user.authSessionInvalidatedAt).getTime() : 0;
+    if (invalidatedAt && payload.iat && payload.iat * 1000 <= invalidatedAt) {
+      return res.status(401).json({ message: "Your session ended because a new academic term was published. Please log in again." });
+    }
     req.user = payload;
     return next();
   } catch (_error) {
