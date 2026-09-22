@@ -14,8 +14,10 @@ import TeacherAssignmentsView from '@/views/admin/TeacherAssignmentsView.vue'
 import UserManagementView from '@/views/admin/UserManagementView.vue'
 import ViewScheduleView from '@/views/admin/ViewScheduleView.vue'
 import StudentConsultationsView from '@/views/student/StudentConsultationsView.vue'
+import StudentChangePasswordView from '@/views/student/StudentChangePasswordView.vue'
 import StudentDashboardView from '@/views/student/StudentDashboardView.vue'
 import StudentEventsView from '@/views/student/StudentEventsView.vue'
+import StudentFaqsView from '@/views/student/StudentFaqsView.vue'
 import StudentNotificationsView from '@/views/student/StudentNotificationsView.vue'
 import StudentProfileView from '@/views/student/StudentProfileView.vue'
 import StudentSettingsView from '@/views/student/StudentSettingsView.vue'
@@ -65,6 +67,8 @@ const router = createRouter({
         { path: 'events',        name: 'student-events',        component: StudentEventsView },
         { path: 'consultations', name: 'student-consultations', component: StudentConsultationsView },
         { path: 'profile',       name: 'student-profile',       component: StudentProfileView },
+        { path: 'change-password', name: 'student-change-password', component: StudentChangePasswordView },
+        { path: 'faqs',          name: 'student-faqs',          component: StudentFaqsView },
         { path: 'settings',      name: 'student-settings',      component: StudentSettingsView },
         { path: 'notifications', name: 'student-notifications', component: StudentNotificationsView },
       ],

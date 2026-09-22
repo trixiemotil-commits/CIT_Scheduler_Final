@@ -164,7 +164,7 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
             </div>
             <div>
-              <h2 class="settings-card-title">Email verification on login</h2>
+              <h2 class="settings-card-title">Email verification</h2>
             </div>
             <div class="tfa-control">
               <span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span>
@@ -566,9 +566,9 @@ const faqs = [
     ]
   },
   {
-    q: 'How does email verification on login work?',
+    q: 'How does email verification work?',
     a: [
-      'Go to Settings and toggle Email verification on login.',
+      'Go to Settings and toggle Email verification.',
       'Confirm with your current password, then a code will be sent to your email on each login.',
       'This is an account security setting and depends on the backend email configuration.'
     ]
