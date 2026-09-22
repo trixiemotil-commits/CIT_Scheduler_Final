@@ -1715,48 +1715,114 @@ body,
   }
 
   .layout:has(> .admin-sidebar) > .admin-sidebar {
-    width: 72px !important;
-    min-width: 72px !important;
-    padding: 58px 8px 14px !important;
+    width: 220px !important;
+    min-width: 220px !important;
+    padding: 58px 14px 14px !important;
     border-radius: 0 18px 18px 0 !important;
+    position: fixed !important;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    transition: transform .22s ease, box-shadow .22s ease;
+  }
+
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar {
+    width: 68px !important;
+    min-width: 68px !important;
+    padding: 58px 8px 14px !important;
+    border-right: 1px solid rgba(255, 255, 255, .16) !important;
+    overflow-y: auto !important;
+    box-shadow: 10px 0 28px rgba(29, 33, 37, .2) !important;
   }
 
   .layout:has(> .admin-sidebar) > .main {
+    width: 100%;
     min-width: 0;
     padding: 20px 16px 30px !important;
     overflow-x: hidden;
   }
 
-  .admin-sidebar .sidebar-profile {
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .main {
+    padding-left: 84px !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .admin-sidebar .sidebar-profile {
     display: flex !important;
     justify-content: center !important;
     padding: 0 0 14px !important;
   }
 
-  .admin-sidebar .avatar-wrap {
+  .layout:has(> .admin-sidebar) > .admin-sidebar .avatar-wrap {
+    width: 64px !important;
+    height: 64px !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .admin-sidebar .sidebar-profile :is(.brand, .role, .email) {
+    display: block !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .admin-sidebar .nav-item {
+    justify-content: flex-start !important;
+    min-height: 46px !important;
+    padding: 11px 16px !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .admin-sidebar .sidebar-nav > a:nth-of-type(3) {
+    margin-bottom: 16px !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .admin-sidebar :is(.logout-btn, .role-switch-btn, .switch-role-btn) {
+    min-width: 0 !important;
+    min-height: 44px !important;
+    padding: 11px 12px !important;
+    gap: 8px !important;
+    margin-inline: 0 !important;
+    font-size: .85rem !important;
+  }
+
+  .admin-sidebar-toggle,
+  .admin-sidebar .admin-sidebar-toggle {
+    top: 14px !important;
+    left: 180px !important;
+    width: 28px !important;
+    height: 28px !important;
+    transition: left .22s ease, color .18s ease, background-color .18s ease;
+  }
+
+  .admin-sidebar-collapsed .admin-sidebar-toggle,
+  .admin-sidebar-collapsed .admin-sidebar .admin-sidebar-toggle {
+    left: 16px !important;
+  }
+
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar {
+    padding-inline: 0 !important;
+  }
+
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar .sidebar-profile {
+    padding: 8px 0 14px !important;
+  }
+
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar .avatar-wrap {
     width: 48px !important;
     height: 48px !important;
   }
 
-  .admin-sidebar .sidebar-profile :is(.brand, .role, .email),
-  .admin-sidebar .nav-item > span:last-child,
-  .admin-sidebar .schedule-management-label {
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar .sidebar-profile :is(.brand, .role, .email),
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar .nav-item > span:last-child,
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar .schedule-management-label {
     display: none !important;
   }
 
-  .admin-sidebar .nav-item {
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar .nav-item {
     justify-content: center !important;
-    min-height: 46px !important;
-    padding: 0 !important;
+    padding-inline: 0 !important;
   }
 
-  .admin-sidebar .sidebar-nav > a:nth-of-type(3) {
-    margin-bottom: 16px !important;
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar .sidebar-profile {
+    justify-content: center !important;
   }
 
-  .admin-sidebar :is(.logout-btn, .role-switch-btn, .switch-role-btn) {
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar :is(.logout-btn, .role-switch-btn, .switch-role-btn) {
     min-width: 48px !important;
-    min-height: 44px !important;
     padding: 0 !important;
     gap: 0 !important;
     margin-inline: auto !important;
@@ -1764,22 +1830,32 @@ body,
     font-size: 0 !important;
   }
 
-  .admin-sidebar-toggle,
-  .admin-sidebar .admin-sidebar-toggle {
-    top: 14px !important;
-    left: 44px !important;
-    width: 28px !important;
-    height: 28px !important;
-  }
-
   .notif-panel {
     right: 0 !important;
-    width: min(360px, calc(100vw - 88px)) !important;
-    max-width: calc(100vw - 88px) !important;
+    width: min(360px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
   }
 }
 
 @media (max-width: 480px) {
+  .layout:has(> .admin-sidebar) > .admin-sidebar {
+    width: 200px !important;
+    min-width: 200px !important;
+    padding-inline: 12px !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .admin-sidebar .nav-item {
+    padding-inline: 12px !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .admin-sidebar .admin-sidebar-toggle {
+    left: 160px !important;
+  }
+
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar .admin-sidebar-toggle {
+    left: 16px !important;
+  }
+
   .layout:has(> .admin-sidebar) > .main {
     padding: 16px 12px 26px !important;
   }
@@ -1799,8 +1875,8 @@ body,
   }
 
   .notif-panel {
-    width: min(340px, calc(100vw - 84px)) !important;
-    max-width: calc(100vw - 84px) !important;
+    width: min(340px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
   }
 
   .layout:has(> .admin-sidebar) > .main :is(

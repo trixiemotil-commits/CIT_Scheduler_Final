@@ -26,11 +26,12 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 const isTeacherPage = window.location.pathname.startsWith('/teacher')
 const STORAGE_KEY = isTeacherPage ? 'cit-teacher-sidebar-collapsed' : 'cit-admin-sidebar-collapsed'
 const collapsed = ref(false)
+let viewportQuery
 
 function applyState() {
   document.documentElement.classList.toggle('teacher-sidebar-collapsed', isTeacherPage && collapsed.value)
@@ -47,8 +48,22 @@ function openSidebar() {
   if (collapsed.value) toggle()
 }
 
+function handleViewportChange(event) {
+  if (event.matches) {
+    collapsed.value = true
+    applyState()
+  }
+}
+
 onMounted(() => {
-  collapsed.value = localStorage.getItem(STORAGE_KEY) === '1'
+  const savedState = localStorage.getItem(STORAGE_KEY)
+  viewportQuery = window.matchMedia('(max-width: 900px)')
+  collapsed.value = savedState === '1' || viewportQuery.matches
   applyState()
+  viewportQuery.addEventListener('change', handleViewportChange)
+})
+
+onUnmounted(() => {
+  viewportQuery?.removeEventListener('change', handleViewportChange)
 })
 </script>
