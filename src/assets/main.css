@@ -1705,3 +1705,307 @@ body,
     display: none !important;
   }
 }
+
+/* Keep admin pages usable on phones without shrinking the navigation into the content. */
+@media (max-width: 768px) {
+  .layout:has(> .admin-sidebar) {
+    min-height: 100dvh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .layout:has(> .admin-sidebar) > .admin-sidebar {
+    width: 72px !important;
+    min-width: 72px !important;
+    padding: 58px 8px 14px !important;
+    border-radius: 0 18px 18px 0 !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .main {
+    min-width: 0;
+    padding: 20px 16px 30px !important;
+    overflow-x: hidden;
+  }
+
+  .admin-sidebar .sidebar-profile {
+    display: flex !important;
+    justify-content: center !important;
+    padding: 0 0 14px !important;
+  }
+
+  .admin-sidebar .avatar-wrap {
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  .admin-sidebar .sidebar-profile :is(.brand, .role, .email),
+  .admin-sidebar .nav-item > span:last-child,
+  .admin-sidebar .schedule-management-label {
+    display: none !important;
+  }
+
+  .admin-sidebar .nav-item {
+    justify-content: center !important;
+    min-height: 46px !important;
+    padding: 0 !important;
+  }
+
+  .admin-sidebar .sidebar-nav > a:nth-of-type(3) {
+    margin-bottom: 16px !important;
+  }
+
+  .admin-sidebar :is(.logout-btn, .role-switch-btn, .switch-role-btn) {
+    min-width: 48px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    margin-inline: auto !important;
+    overflow: hidden !important;
+    font-size: 0 !important;
+  }
+
+  .admin-sidebar-toggle,
+  .admin-sidebar .admin-sidebar-toggle {
+    top: 14px !important;
+    left: 44px !important;
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .notif-panel {
+    right: 0 !important;
+    width: min(360px, calc(100vw - 88px)) !important;
+    max-width: calc(100vw - 88px) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .layout:has(> .admin-sidebar) > .main {
+    padding: 16px 12px 26px !important;
+  }
+
+  .layout:has(> .admin-sidebar) .main-header {
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .layout:has(> .admin-sidebar) .page-title {
+    font-size: clamp(1.55rem, 8vw, 2rem) !important;
+  }
+
+  .layout:has(> .admin-sidebar) .page-sub {
+    font-size: .78rem !important;
+    line-height: 1.4;
+  }
+
+  .notif-panel {
+    width: min(340px, calc(100vw - 84px)) !important;
+    max-width: calc(100vw - 84px) !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .page-title,
+    .page-title-main,
+    .section-title,
+    .section-heading h2,
+    .card-title,
+    .settings-card-title,
+    .form-card-title,
+    .events-section-title
+  ) {
+    max-width: 100%;
+    font-size: clamp(1.05rem, 5.5vw, 1.45rem) !important;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .page-title,
+    .page-title-main
+  ) {
+    font-size: clamp(1.25rem, 7vw, 1.7rem) !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .section-title,
+    .section-heading h2,
+    .card-title,
+    .settings-card-title,
+    .form-card-title,
+    .events-section-title
+  ) {
+    font-size: clamp(.95rem, 4.8vw, 1.2rem) !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .page-sub,
+    .section-sub,
+    .card-sub,
+    .field-help,
+    .stat-sub,
+    .today-teachers-header p,
+    .empty-state,
+    .form-hint
+  ) {
+    font-size: .68rem !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .stat-label,
+    .table-label,
+    .toolbar-label,
+    .filter-label,
+    label,
+    th,
+    td,
+    .btn,
+    button,
+    input,
+    select,
+    textarea
+  ) {
+    font-size: .7rem !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .content-card,
+    .settings-card,
+    .profile-card,
+    .teachers-section,
+    .schedule-card,
+    .calendar-card,
+    .table-card,
+    .event-card,
+    .request-card,
+    .today-teachers-section
+  ) {
+    padding: 12px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .layout:has(> .admin-sidebar) > .main > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .page-eyebrow,
+    .page-title-kicker,
+    .section-eyebrow,
+    .today-section-eyebrow
+  ) {
+    font-size: .58rem !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .page-sub,
+    .section-sub,
+    .card-sub,
+    .field-help,
+    .stat-sub,
+    .today-teachers-header p,
+    .empty-state,
+    .form-hint
+  ) {
+    font-size: .72rem !important;
+    line-height: 1.4;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .stat-label,
+    .table-label,
+    .toolbar-label,
+    .filter-label,
+    label,
+    th,
+    td,
+    .nav-item,
+    .btn,
+    button,
+    input,
+    select,
+    textarea
+  ) {
+    font-size: .75rem !important;
+    line-height: 1.35;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .content-card,
+    .settings-card,
+    .profile-card,
+    .teachers-section,
+    .schedule-card,
+    .calendar-card,
+    .table-card,
+    .event-card,
+    .request-card,
+    .today-teachers-section
+  ) {
+    padding: 16px !important;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .page-header,
+    .main-header,
+    .section-heading,
+    .section-header,
+    .card-header,
+    .form-actions,
+    .toolbar,
+    .filter-row,
+    .um-topbar
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .page-title,
+    .page-title-main,
+    .page-sub,
+    .section-title,
+    .section-sub,
+    .card-title,
+    .card-sub,
+    .settings-card-title,
+    .form-card-title,
+    .events-section-title,
+    .event-card-title,
+    .teacher-name,
+    .schedule-subject,
+    .schedule-section,
+    .field-help,
+    .empty-state,
+    td,
+    th,
+    label,
+    button,
+    .btn,
+    .action-btn
+  ) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(input, select, textarea, button) {
+    max-width: 100%;
+  }
+
+  .layout:has(> .admin-sidebar) > .main :is(
+    .table-wrap,
+    .um-table-wrap,
+    .schedule-list-table-wrap,
+    .schedule-table-wrap,
+    .sched-grid-wrap,
+    .calendar-wrap,
+    .data-table-wrap
+  ) {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

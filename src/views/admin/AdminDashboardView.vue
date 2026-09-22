@@ -2587,4 +2587,25 @@ function confirmLogout() {
   .sidebar { width: 200px; min-width: 200px; }
 }
 
+@media (max-width: 768px) {
+  .stat-cards { gap: 12px; }
+  .stat-card { padding: 20px 18px 18px; }
+  .today-teachers-section { padding: 20px 16px 16px; }
+  .today-teachers-header { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .today-carousel-controls { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .today-schedule-table-wrap { overflow-x: auto; }
+  .today-schedule-track:not(.carousel-table) {
+    width: max-content;
+    min-width: 100%;
+    grid-template-columns: repeat(var(--teacher-columns), minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-cards { grid-template-columns: 1fr; }
+  .today-teachers-header h2 { font-size: 1.12rem; }
+  .today-teachers-header p { line-height: 1.5; }
+  .today-teachers-header p span { display: block; margin: 2px 0 0; padding: 0; border: 0; }
+}
+
 </style>

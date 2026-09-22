@@ -127,7 +127,7 @@
 <script setup>
 import { getToken, getUser, saveMergedUser } from '@/auth.js'
 import { IonContent, IonPage } from '@ionic/vue'
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const user = getUser() || { name: 'Anna Cooper', email: 'anna.cooper@student.edu' }
 const initials = computed(() => user.name?.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'A')
@@ -193,17 +193,34 @@ function handleUpdatePassword() {
   pwSuccess.value = ''
   showSuccessModal.value = true
 }
+
+onMounted(() => {
+  document.body.classList.add('student-settings-active')
+})
+
+onBeforeUnmount(() => {
+  document.body.classList.remove('student-settings-active')
+})
 </script>
 
 <style scoped>
+:global(body.student-settings-active .student-tab-bar) {
+  display: none !important;
+}
+
+:global(ion-content) {
+  --background: linear-gradient(145deg, #eef0f1 0%, #dfe3e5 52%, #cfd4d7 100%);
+}
+
 .mobile-app {
   max-width: 430px;
-  min-height: 100%;
+  min-height: 100dvh;
+  box-sizing: border-box;
   margin: 0 auto;
-  background: #f3f5f7;
+  background: linear-gradient(145deg, #eef0f1 0%, #dfe3e5 52%, #cfd4d7 100%) !important;
   display: flex;
   flex-direction: column;
-  padding-bottom: 16px;
+  padding-bottom: 40px;
   padding-top: env(safe-area-inset-top, 0px);
   font-family: 'Poppins', sans-serif;
 }
@@ -211,38 +228,44 @@ function handleUpdatePassword() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
+  background: rgba(255,255,255,.88);
   padding: 16px 18px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid rgba(113,123,131,.18);
+  backdrop-filter: blur(10px);
 }
 .back-btn {
-  background: none;
-  border: none;
+  width: 34px;
+  height: 34px;
+  justify-content: center;
+  background: linear-gradient(145deg,#fafbfb,#dfe3e5);
+  border: 1px solid rgba(255,255,255,.9);
   cursor: pointer;
-  color: #444;
-  padding: 4px;
+  color: #4d5860;
+  padding: 0;
   display: flex;
   align-items: center;
-  border-radius: 6px;
-  margin-left: -4px;
+  border-radius: 50%;
+  margin-left: 0;
+  box-shadow: inset 0 1px rgba(255,255,255,.95), 0 5px 12px rgba(48,57,64,.1);
 }
-.header-title { font-weight: 700; font-size: 1rem; color: #23272c; }
+.header-title { font-weight: 700; font-size: 1.15rem; color: #4b5563; }
 
 .user-card {
-  background: #fff;
-  margin: 14px 16px 0;
-  border-radius: 12px;
+  background: linear-gradient(145deg,rgba(255,255,255,.96),rgba(235,239,241,.9));
+  margin: 12px 16px 0;
+  border-radius: 18px;
   padding: 12px;
   display: flex;
   align-items: center;
   gap: 12px;
-  border: 1px solid #e4e7eb;
+  border: 1px solid rgba(255,255,255,.98);
+  box-shadow: inset 0 1px rgba(255,255,255,.98), 0 10px 22px rgba(48,57,64,.1);
 }
 .user-avatar {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #4b5563;
+  background: linear-gradient(145deg,#69747d,#303940);
   color: #fff;
   display: flex;
   align-items: center;
@@ -253,30 +276,32 @@ function handleUpdatePassword() {
 .user-name { font-weight: 700; font-size: 0.9rem; color: #181c20; }
 .user-email { font-size: 0.75rem; color: #85909b; }
 .profile-link {
-  background: #4b5563;
+  background: linear-gradient(145deg,#69747d,#303940);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 7px 14px;
+  border-radius: 11px;
+  padding: 9px 15px;
   font-size: 0.76rem;
   font-weight: 600;
 }
 
 .section-card {
-  background: #fff;
-  margin: 10px 16px 0;
-  border-radius: 12px;
-  border: 1px solid #e4e7eb;
-  padding: 14px;
+  background: linear-gradient(145deg,rgba(255,255,255,.96),rgba(235,239,241,.9));
+  margin: 14px 16px 0;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.98);
+  padding: 18px;
+  box-shadow: inset 0 1px rgba(255,255,255,.98), 0 10px 22px rgba(48,57,64,.1);
 }
-.section-title { font-weight: 700; color: #262b30; margin-bottom: 12px; font-size: 1.08rem; }
+.section-title { font-weight: 800; color: #303940; margin-bottom: 14px; font-size: 1.12rem; }
 
 .faq-card { margin-top: 12px; }
 .faq-list { display: flex; flex-direction: column; gap: 10px; }
 .faq-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  border: 1px solid rgba(255,255,255,.82);
+  border-radius: 13px;
+  background: rgba(255,255,255,.58);
+  box-shadow: inset 0 1px rgba(255,255,255,.9);
   padding: 12px 14px;
 }
 .faq-item summary {
@@ -298,16 +323,16 @@ function handleUpdatePassword() {
   gap: 6px;
 }
 
-.pw-form { display: flex; flex-direction: column; gap: 10px; }
+.pw-form { display: flex; flex-direction: column; gap: 12px; }
 .field-group { display: flex; flex-direction: column; gap: 6px; }
-.field-label { font-size: 0.8rem; color: #606a75; font-weight: 600; }
+.field-label { font-size: 0.8rem; color: #606a75; font-weight: 700; }
 .field-input {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #d8dde3;
-  border-radius: 9px;
-  padding: 10px 38px 10px 12px;
-  background: #f8fafb;
+  border: 1px solid #cbd3d9;
+  border-radius: 12px;
+  padding: 12px 38px 12px 13px;
+  background: rgba(255,255,255,.62);
   font-size: 0.86rem;
   font-family: inherit;
 }
@@ -329,13 +354,14 @@ function handleUpdatePassword() {
   padding: 0;
 }
 .update-btn {
-  border: none;
-  background: #4b5563;
+  border: 1px solid #303940;
+  background: linear-gradient(145deg,#69747d,#303940);
   color: #fff;
-  border-radius: 9px;
-  padding: 11px;
+  border-radius: 12px;
+  padding: 13px;
   font-weight: 700;
   margin-top: 2px;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 7px 15px rgba(39,44,49,.2);
 }
 .msg { font-size: 0.78rem; padding: 8px 10px; border-radius: 8px; }
 .msg-err { color: #d0414f; background: #fff1f3; }
@@ -375,9 +401,9 @@ function handleUpdatePassword() {
   line-height: 1.45;
 }
 .two-factor-card { position: relative; padding: 16px; }
-.twofa-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.twofa-title-row > span { display: inline-flex; align-items: center; gap: 8px; }
-.twofa-title-row .tfa-control { position: absolute; top: 16px; right: 16px; display: flex; align-items: center; gap: 8px; }
+.twofa-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.twofa-title-row > span { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; line-height: 1.25; }
+.twofa-title-row .tfa-control { position: static; flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
 .two-factor-card .section-title { margin-bottom: 6px; }
 .two-factor-card .twofa-msg { margin: 0 0 12px; color: #687078; background: transparent; padding: 0; }
 .two-factor-card .field-input { margin-bottom: 12px; }
@@ -388,7 +414,7 @@ function handleUpdatePassword() {
   display: block;
   width: 50px;
   height: 27px;
-  margin-top: 10px;
+  margin-top: 0;
   border: 0;
   border-radius: 20px;
   background: #c7cdd3;
@@ -415,7 +441,8 @@ function handleUpdatePassword() {
   position: fixed;
   inset: 0;
   z-index: 120;
-  background: rgba(0, 0, 0, 0.34);
+  background: rgba(31,35,39,.58);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -423,10 +450,10 @@ function handleUpdatePassword() {
 }
 .success-modal {
   width: min(320px, 100%);
-  background: #fff;
-  border: 2px solid #4b5563;
-  border-radius: 14px;
-  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(145deg, #f8f9f9, #dfe3e5);
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 18px;
+  box-shadow: 0 16px 28px rgba(22,26,30,.26), inset 0 1px rgba(255,255,255,.95);
   padding: 18px 16px 16px;
   text-align: center;
 }

@@ -8,7 +8,9 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <div class="header-title">Profile Page</div>
-      <button class="edit-btn" @click="openEditModal">Edit</button>
+      <button class="settings-icon-btn" type="button" aria-label="Open settings" @click="$router.push('/student/settings')">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
     </div>
 
     <div class="profile-card">
@@ -27,26 +29,29 @@
       <div class="profile-name">{{ fullName }}</div>
       <div class="profile-email">{{ user.email || '--' }}</div>
       <span class="active-badge">{{ accountStatusLabel }} Student</span>
+      <button class="edit-btn" type="button" @click="openEditModal">Edit Profile</button>
     </div>
 
     <div class="info-card">
       <div class="info-title">Personal Information</div>
-      <div class="info-row"><span class="info-label">Full Name</span><span class="info-val">{{ fullName }}</span></div>
-      <div class="info-row"><span class="info-label">Student ID</span><span class="info-val">{{ studentIdDisplay }}</span></div>
-      <div class="info-row"><span class="info-label">Email</span><span class="info-val">{{ user.email || '--' }}</span></div>
-      <div class="info-row"><span class="info-label">Year Level</span><span class="info-val">{{ yearLevelDisplay }}</span></div>
-      <div class="info-row"><span class="info-label">Section</span><span class="info-val">{{ sectionDisplay }}</span></div>
-      <div class="info-row"><span class="info-label">Department</span><span class="info-val">{{ user.department || '--' }}</span></div>
-      <div class="info-row"><span class="info-label">Role</span><span class="info-val">{{ roleLabel }}</span></div>
+      <div class="info-rows">
+        <div class="info-row"><span class="info-label">Full Name</span><span class="info-val">{{ fullName }}</span></div>
+        <div class="info-row"><span class="info-label">Student ID</span><span class="info-val">{{ studentIdDisplay }}</span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-val">{{ user.email || '--' }}</span></div>
+        <div class="info-row"><span class="info-label">Year Level</span><span class="info-val">{{ yearLevelDisplay }}</span></div>
+        <div class="info-row"><span class="info-label">Section</span><span class="info-val">{{ sectionDisplay }}</span></div>
+        <div class="info-row"><span class="info-label">Department</span><span class="info-val">{{ user.department || '--' }}</span></div>
+        <div class="info-row"><span class="info-label">Role</span><span class="info-val">{{ roleLabel }}</span></div>
+      </div>
     </div>
 
     <div class="action-row">
-      <button class="act-btn green" @click="$router.push('/student/settings')">Settings</button>
       <button class="act-btn red" @click="doLogout">Logout</button>
     </div>
 
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
       <div class="modal-sheet">
+        <div class="modal-handle" aria-hidden="true"></div>
         <div class="modal-header">Edit Profile</div>
         <div class="modal-body">
           <div class="modal-avatar-row">
@@ -291,14 +296,19 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
 </script>
 
 <style scoped>
+:global(ion-content) {
+  --background: linear-gradient(145deg, #eef0f1 0%, #dfe3e5 52%, #cfd4d7 100%);
+}
+
 .mobile-app {
   max-width: 430px;
-  min-height: 100%;
+  min-height: 100dvh;
+  box-sizing: border-box;
   margin: 0 auto;
-  background: #f3f5f7;
+  background: linear-gradient(145deg, #eef0f1 0%, #dfe3e5 52%, #cfd4d7 100%) !important;
   display: flex;
   flex-direction: column;
-  padding-bottom: 16px;
+  padding-bottom: 110px;
   padding-top: env(safe-area-inset-top, 0px);
   font-family: 'Poppins', sans-serif;
 }
@@ -306,39 +316,62 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
+  background: rgba(255, 255, 255, .88);
   padding: 16px 18px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid rgba(113, 123, 131, .18);
+  backdrop-filter: blur(10px);
 }
 .back-btn {
-  background: none;
-  border: none;
+  width: 34px;
+  height: 34px;
+  justify-content: center;
+  background: linear-gradient(145deg, #fafbfb, #dfe3e5);
+  border: 1px solid rgba(255,255,255,.9);
   cursor: pointer;
-  color: #444;
-  padding: 4px;
+  color: #4d5860;
+  padding: 0;
   display: flex;
   align-items: center;
+  border-radius: 50%;
+  box-shadow: inset 0 1px rgba(255,255,255,.95), 0 5px 12px rgba(48,57,64,.1);
 }
-.header-title { font-weight: 700; color: #252a2f; font-size: 1rem; }
+.header-title { font-weight: 700; color: #4b5563; font-size: 1.15rem; }
+.settings-icon-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #fafbfb, #dfe3e5);
+  color: #59656e;
+  cursor: pointer;
+  box-shadow: inset 0 1px rgba(255,255,255,.95), 0 5px 12px rgba(48,57,64,.1);
+}
+.settings-icon-btn:active { transform: translateY(1px); }
 .edit-btn {
-  border: none;
-  background: #4b5563;
+  width: 100%;
+  margin-top: 14px;
+  border: 1px solid #303940;
+  background: linear-gradient(145deg, #69747d, #303940);
   color: #fff;
-  border-radius: 8px;
-  padding: 6px 14px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  border-radius: 11px;
+  padding: 11px 16px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 6px 13px rgba(39,44,49,.18);
 }
 
 .profile-card,
 .info-card {
-  background: #fff;
-  border: 1px solid #e3e8ed;
-  border-radius: 12px;
-  margin: 12px 16px 0;
+  background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(235,239,241,.9));
+  border: 1px solid rgba(255,255,255,.98);
+  border-radius: 18px;
+  margin: 4px 16px 0;
+  box-shadow: inset 0 1px rgba(255,255,255,.98), 0 10px 22px rgba(48,57,64,.1);
 }
 .profile-card {
-  padding: 16px 14px;
+  padding: 26px 18px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -357,7 +390,7 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  background: #4b5563;
+  background: linear-gradient(145deg, #69747d, #303940);
   color: #fff;
   display: flex;
   align-items: center;
@@ -370,7 +403,8 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
   height: 58px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #4b5563;
+  border: 3px solid #59656e;
+  box-shadow: 0 4px 10px rgba(39,44,49,.18);
 }
 .avatar-plus {
   position: absolute;
@@ -379,23 +413,23 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #4b5563;
+  background: linear-gradient(145deg, #69747d, #303940);
   color: #fff;
   font-size: 0.95rem;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #fff;
+  border: 2px solid #f8f9f9;
 }
 .avatar-input {
   display: none;
 }
-.profile-name { margin-top: 8px; font-size: 1.05rem; font-weight: 700; color: #171b20; }
-.profile-email { margin-top: 2px; font-size: 0.79rem; color: #89939d; }
+.profile-name { margin-top: 10px; font-size: 1.15rem; font-weight: 800; color: #283139; }
+.profile-email { margin-top: 3px; font-size: 0.82rem; color: #7d8992; }
 .active-badge {
-  margin-top: 6px;
-  background: #4b5563;
+  margin-top: 9px;
+  background: linear-gradient(145deg, #69747d, #303940);
   color: #fff;
   border-radius: 999px;
   font-size: 0.72rem;
@@ -403,54 +437,75 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
   font-weight: 700;
 }
 
-.info-card { padding: 12px; }
-.info-title { font-weight: 700; color: #2e343a; margin-bottom: 10px; }
+.info-card { margin-top: 14px; padding: 16px 18px 10px; }
+.info-title {
+  display: block;
+  color: #303940;
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-align: left;
+}
+.info-rows { margin-top: 6px; }
 .info-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 0;
-  border-bottom: 1px solid #eef1f4;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(104,112,120,.16);
 }
 .info-row:last-child { border-bottom: none; }
-.info-label { color: #8a93a0; font-size: 0.84rem; }
-.info-val { color: #2b3035; font-size: 0.84rem; font-weight: 600; text-align: right; }
+.info-label { color: #7f8b94; font-size: 0.84rem; flex: 0 0 34%; }
+.info-val { color: #303940; font-size: 0.84rem; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
 
-.action-row { display: flex; gap: 8px; padding: 12px 16px 0; }
+.action-row { display: flex; gap: 10px; padding: 16px 16px 0; }
+.action-row .act-btn:only-child { flex: 1; }
 .act-btn {
   flex: 1;
   border: none;
-  border-radius: 9px;
-  padding: 11px;
+  border-radius: 12px;
+  padding: 13px 11px;
   color: #fff;
   font-weight: 700;
   font-family: inherit;
 }
-.act-btn.green { background: #4b5563; }
-.act-btn.red { background: #be404a; }
+.act-btn.green { background: linear-gradient(145deg, #69747d, #303940); border: 1px solid #303940; box-shadow: inset 0 1px rgba(255,255,255,.18), 0 7px 14px rgba(39,44,49,.18); }
+.act-btn.red { background: linear-gradient(145deg, #d04d59, #b33743); border: 1px solid #a9323d; box-shadow: inset 0 1px rgba(255,255,255,.18), 0 7px 14px rgba(125,42,51,.16); }
 
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(31,35,39,.58);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  z-index: 100;
+  z-index: 2000;
 }
 .modal-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  margin: 0;
+  transform: translateX(-50%);
   width: 100%;
   max-width: 430px;
-  background: #fff;
-  border-radius: 18px 18px 0 0;
-  border: 1px solid #d7dde4;
-  padding-bottom: 18px;
+  max-height: 92dvh;
+  overflow-y: auto;
+  background: linear-gradient(145deg, #f8f9f9, #dfe3e5);
+  border-radius: 24px 24px 0 0;
+  border: 1px solid rgba(255,255,255,.9);
+  padding-bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  z-index: 2001;
+  box-shadow: 0 -14px 35px rgba(22,26,30,.26), inset 0 1px rgba(255,255,255,.95);
 }
+.modal-handle { width: 40px; height: 4px; margin: 12px auto 0; border-radius: 999px; background: #aeb6bc; }
 .modal-header {
-  font-size: 1.85rem;
-  font-weight: 700;
-  color: #171c21;
-  padding: 16px 18px 8px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #303940;
+  padding: 17px 22px 16px;
+  border-bottom: 1px solid rgba(104,112,120,.18);
 }
 .modal-body {
   display: flex;
@@ -545,26 +600,27 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
 }
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
+  align-items: stretch;
   gap: 10px;
-  padding: 14px 18px 0;
+  padding: 16px 18px 0;
 }
 .modal-cancel,
 .modal-save {
-  border: none;
-  background: none;
+  min-height: 46px;
+  flex: 1;
+  border: 1px solid transparent;
   font-family: inherit;
-  font-size: 1.05rem;
+  font-size: .88rem;
+  font-weight: 700;
   cursor: pointer;
+  border-radius: 13px;
 }
-.modal-cancel { color: #be404a; font-weight: 600; }
+.modal-cancel { color: #59656e; background: linear-gradient(145deg, #f7f9f9, #dfe3e5); border-color: #cbd2d6; box-shadow: inset 0 1px rgba(255,255,255,.9); }
 .modal-save {
   color: #fff;
-  background: #4b5563;
-  border-radius: 10px;
-  padding: 7px 12px;
-  font-size: 1rem;
-  font-weight: 600;
+  background: linear-gradient(145deg, #69747d, #303940);
+  border-color: #303940;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 7px 15px rgba(39,44,49,.2);
 }
 .admin-managed-note{display:block;margin-top:6px;color:#7a8289;font-size:.7rem;line-height:1.4}.field-select:disabled{cursor:not-allowed;opacity:.72;background:#eef0f2}
 </style>

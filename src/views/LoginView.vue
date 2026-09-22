@@ -968,11 +968,14 @@ watch(activeTab, (val) => {
 <style scoped>
 .page-bg {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: radial-gradient(ellipse at 50% 110%, #f6f7f9 0%, #cfd3d8 26%, #9da4ad 54%, #5f6871 75%, #2b3036 100%);
-  padding: 24px;
+  padding: clamp(16px, 4vw, 32px);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .card {
@@ -980,7 +983,7 @@ watch(activeTab, (val) => {
   border: 1px solid rgba(255,255,255,0.8);
   border-radius: 24px;
   padding: 32px 40px 28px;
-  width: 100%;
+  width: min(100%, 540px);
   max-width: 460px;
   box-shadow: 0 14px 40px rgba(24, 30, 36, 0.22);
   display: flex;
@@ -1468,7 +1471,8 @@ watch(activeTab, (val) => {
 @keyframes role-modal-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 
 @media (max-width: 520px) {
-  .card { padding: 28px 20px 24px; }
+  .page-bg { align-items: flex-start; }
+  .card { width: 100%; padding: 28px 20px 24px; margin: auto 0; }
   .title { font-size: 1.65rem; }
   .name-row { flex-direction: column; gap: 12px; }
   .login-brand { gap: 11px; }
@@ -1480,6 +1484,19 @@ watch(activeTab, (val) => {
   .role-modal__title { font-size: 1.5rem; }
   .role-selection__button { padding: 14px 12px; gap: 11px; }
   .role-selection__description { line-height: 1.35; }
+}
+
+@media (max-width: 360px) {
+  .page-bg { padding: 12px; }
+  .card { padding: 22px 14px 18px; border-radius: 18px; }
+  .login-brand { align-items: flex-start; }
+  .login-brand__seal-wrap { width: 58px; height: 58px; flex-basis: 58px; }
+  .login-brand__seal { width: 51px; height: 51px; }
+  .login-brand__copy .title { font-size: 1.42rem; }
+  .login-brand__copy > span { max-width: 170px; }
+  .form-row { align-items: flex-start; gap: 10px; }
+  .remember-label { flex: 0 1 auto; }
+  .action-link { text-align: right; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1525,7 +1542,8 @@ watch(activeTab, (val) => {
 .page-bg {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: #12171b !important;
 }
 

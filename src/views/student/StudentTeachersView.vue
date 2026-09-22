@@ -28,8 +28,32 @@
     </div>
 
     <!-- Teacher List -->
-    <div class="teacher-list">
-      <div v-if="loadingTeachers" class="empty-state-card">Loading teachers...</div>
+    <div :class="['teacher-list', { 'is-loading': loadingTeachers }]">
+      <div v-if="loadingTeachers" class="empty-state-card loading-state" role="status" aria-label="Loading teachers">
+        <div class="loading-panel">
+          <div class="loading-orbit" aria-hidden="true"><span></span></div>
+          <div class="loading-copy">
+            <strong>Loading teachers</strong>
+            <span>Finding teachers and consultation hours...</span>
+          </div>
+          <div class="teacher-skeleton" aria-hidden="true">
+            <div class="skeleton-avatar"></div>
+            <div class="skeleton-content">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line skeleton-subtitle"></div>
+              <div class="skeleton-chips"><span></span><span></span></div>
+            </div>
+          </div>
+          <div class="teacher-skeleton second" aria-hidden="true">
+            <div class="skeleton-avatar"></div>
+            <div class="skeleton-content">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line skeleton-subtitle"></div>
+              <div class="skeleton-chips"><span></span><span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div v-else-if="loadError" class="empty-state-card error">{{ loadError }}</div>
       <div v-else-if="!visibleTeacherCount" class="empty-state-card">No teachers found.</div>
 
@@ -63,11 +87,11 @@
           <div v-if="t.status === 'In School'" class="teacher-footer">
             <span class="price">&nbsp;</span>
             <button
-              :class="['action-btn', t.available && (t.isSubjectTeacher ? t.hasConsultationSlots : true) ? 'green' : 'disabled']"
-              :disabled="!t.available || (t.isSubjectTeacher && !t.hasConsultationSlots)"
+              :class="['action-btn', canBookTeacher(t) ? 'green' : 'disabled']"
+              :disabled="!canBookTeacher(t)"
               @click="openRequest(t)"
             >
-              {{ t.isSubjectTeacher && !t.hasConsultationSlots && t.available ? 'No consultation hours' : (t.available ? 'Book Consultation' : 'Request Consultation') }}
+              {{ consultationButtonLabel(t) }}
             </button>
           </div>
         </div>
@@ -94,11 +118,11 @@
           <div v-if="t.status === 'In School'" class="teacher-footer">
             <span class="price">&nbsp;</span>
             <button
-              :class="['action-btn', t.available && (t.isSubjectTeacher ? t.hasConsultationSlots : true) ? 'green' : 'disabled']"
-              :disabled="!t.available || (t.isSubjectTeacher && !t.hasConsultationSlots)"
+              :class="['action-btn', canBookTeacher(t) ? 'green' : 'disabled']"
+              :disabled="!canBookTeacher(t)"
               @click="openRequest(t)"
             >
-              {{ t.isSubjectTeacher && !t.hasConsultationSlots && t.available ? 'No consultation hours' : (t.available ? 'Book Consultation' : 'Request Consultation') }}
+              {{ consultationButtonLabel(t) }}
             </button>
           </div>
         </div>
@@ -261,6 +285,8 @@ const CONSULTATION_REASONS = [
 ]
 
 const teachers = ref([])
+const currentTime = ref(new Date())
+let clockTimer
 const currentUser = computed(() => getUser() || {})
 const studentYearLevel = computed(() => String(currentUser.value.yearLevel || currentUser.value.grade || '').trim())
 const studentSection = computed(() => String(currentUser.value.section || '').trim())
@@ -290,6 +316,49 @@ function isSubjectTeacher(teacher) {
 
 function isAvailableTeacher(teacher) {
   return Boolean(teacher?.available)
+}
+
+function slotStartsLaterToday(slot) {
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const now = currentTime.value
+  if (String(slot?.dayOfWeek || '').trim().toLowerCase() !== dayNames[now.getDay()].toLowerCase()) return false
+
+  const start = to24Hour(slot?.startTime)
+  if (!start) return false
+  const [hour, minute] = start.split(':').map(Number)
+  return (hour * 60) + minute > (now.getHours() * 60) + now.getMinutes()
+}
+
+function slotIsActiveToday(slot) {
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const now = currentTime.value
+  if (String(slot?.dayOfWeek || '').trim().toLowerCase() !== dayNames[now.getDay()].toLowerCase()) return false
+
+  const start = to24Hour(slot?.startTime)
+  const end = to24Hour(slot?.endTime)
+  if (!start || !end) return false
+  const nowMinutes = (now.getHours() * 60) + now.getMinutes()
+  const [startHour, startMinute] = start.split(':').map(Number)
+  const [endHour, endMinute] = end.split(':').map(Number)
+  return nowMinutes >= (startHour * 60) + startMinute && nowMinutes < (endHour * 60) + endMinute
+}
+
+function waitingSlotFor(teacher) {
+  if (!teacher?.isSubjectTeacher) return null
+  if ((teacher.consultationSlots || []).some(slotIsActiveToday)) return null
+  return (teacher.consultationSlots || []).find(slotStartsLaterToday) || null
+}
+
+function canBookTeacher(teacher) {
+  return Boolean(teacher?.available)
+    && !(teacher?.isSubjectTeacher && (!teacher.hasConsultationSlots || waitingSlotFor(teacher)))
+}
+
+function consultationButtonLabel(teacher) {
+  const waitingSlot = waitingSlotFor(teacher)
+  if (waitingSlot) return `Wait for ${waitingSlot.startTime}`
+  if (teacher?.isSubjectTeacher && !teacher.hasConsultationSlots && teacher.available) return 'No consultation hours'
+  return teacher?.available ? 'Book Consultation' : 'Request Consultation'
 }
 
 function initialsFor(name) {
@@ -685,10 +754,14 @@ function showToast(msg) {
 
 onMounted(() => {
   loadTeachers()
+  clockTimer = setInterval(() => {
+    currentTime.value = new Date()
+  }, 30 * 1000)
   useNotifications.addNotificationListener(_onNotification)
 })
 
 onUnmounted(() => {
+  clearInterval(clockTimer)
   useNotifications.removeNotificationListener(_onNotification)
   useNotifications.closeNotifications()
 })
@@ -746,6 +819,7 @@ onUnmounted(() => {
 
 /* Teacher cards */
 .teacher-list { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 16px; }
+.teacher-list.is-loading { min-height: calc(100dvh - 250px); padding: 0; }
 .empty-state-card {
   background: #fff;
   border-radius: 12px;
@@ -758,6 +832,68 @@ onUnmounted(() => {
   color: #b23a48;
   border-color: #f3c3ca;
   background: #fff4f5;
+}
+.empty-state-card.loading-state {
+  display: flex;
+  align-items: stretch;
+  min-height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.loading-panel {
+  width: 100%;
+  min-height: calc(100dvh - 250px);
+  box-sizing: border-box;
+  padding: 28px 16px 24px;
+  border: 1px solid rgba(91, 99, 106, 0.12);
+  border-radius: 12px;
+  background: linear-gradient(145deg, #ffffff 0%, #f5f7f7 100%);
+  box-shadow: 0 8px 18px rgba(38, 44, 49, 0.08), inset 0 1px rgba(255, 255, 255, 0.95);
+}
+.loading-orbit {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #dfe7e7;
+  border-top-color: #4b7565;
+  border-radius: 50%;
+  animation: loading-spin 0.9s linear infinite;
+}
+.loading-orbit span { width: 8px; height: 8px; border-radius: 50%; background: #4b7565; }
+.loading-copy { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 20px; }
+.loading-copy strong { color: #34423b; font-size: 0.92rem; font-weight: 700; }
+.loading-copy span { color: #9ba3ab; font-size: 0.73rem; }
+.teacher-skeleton {
+  display: flex;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #e7ebeb;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.72);
+}
+.teacher-skeleton.second { margin-top: 8px; opacity: 0.58; }
+.skeleton-avatar,
+.skeleton-line,
+.skeleton-chips span {
+  background: linear-gradient(90deg, #e7ecec 25%, #f5f7f7 50%, #e7ecec 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-avatar { width: 46px; height: 46px; flex: 0 0 auto; border-radius: 14px; }
+.skeleton-content { flex: 1; min-width: 0; padding-top: 2px; }
+.skeleton-line { height: 9px; border-radius: 6px; }
+.skeleton-title { width: 72%; }
+.skeleton-subtitle { width: 43%; margin-top: 8px; }
+.skeleton-chips { display: flex; gap: 6px; margin-top: 12px; }
+.skeleton-chips span { width: 76px; height: 18px; border-radius: 10px; }
+.skeleton-chips span:last-child { width: 58px; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+@keyframes skeleton-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .loading-orbit, .skeleton-avatar, .skeleton-line, .skeleton-chips span { animation: none; }
 }
 .teacher-card { background: rgba(255, 255, 255, 0.96); border: 1px solid rgba(91, 99, 106, 0.14); border-radius: 15px; padding: 15px; box-shadow: 0 7px 16px rgba(38, 44, 49, 0.09), inset 0 1px rgba(255, 255, 255, 0.9); }
 .teacher-top  { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 13px; }
