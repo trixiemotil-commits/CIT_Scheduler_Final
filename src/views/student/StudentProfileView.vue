@@ -46,7 +46,25 @@
     </div>
 
     <div class="action-row">
-      <button class="act-btn red" @click="doLogout">Logout</button>
+      <button class="act-btn red" @click="showLogoutModal = true">Logout</button>
+    </div>
+
+    <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
+      <div class="logout-modal-box">
+        <div class="logout-modal-icon">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </div>
+        <h2 class="logout-modal-title">Log Out</h2>
+        <p class="logout-modal-sub">Are you sure you want to log out?</p>
+        <div class="logout-modal-actions">
+          <button class="logout-cancel-btn" @click="showLogoutModal = false">Cancel</button>
+          <button class="logout-confirm-btn" @click="confirmLogout">Log Out</button>
+        </div>
+      </div>
     </div>
 
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
@@ -135,6 +153,7 @@ const yearLevelOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 const sectionOptions = ['South 1', 'South 2', 'South 3', 'South 4', 'South 5', 'South 6', 'South 7']
 
 const showModal = ref(false)
+const showLogoutModal = ref(false)
 const form = ref({
   name: fullName.value,
   email: user.value.email || '',
@@ -283,8 +302,9 @@ async function saveProfile() {
     isSaving.value = false
   }
 }
-function doLogout() {
+function confirmLogout() {
   logout()
+  showLogoutModal.value = false
   router.push('/')
 }
 
@@ -471,6 +491,82 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
 }
 .act-btn.green { background: linear-gradient(145deg, #69747d, #303940); border: 1px solid #303940; box-shadow: inset 0 1px rgba(255,255,255,.18), 0 7px 14px rgba(39,44,49,.18); }
 .act-btn.red { background: linear-gradient(145deg, #d04d59, #b33743); border: 1px solid #a9323d; box-shadow: inset 0 1px rgba(255,255,255,.18), 0 7px 14px rgba(125,42,51,.16); }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 35, 39, 0.48);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.logout-modal-box {
+  width: min(88vw, 350px);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 18px;
+  padding: 26px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.14);
+  text-align: center;
+}
+
+.logout-modal-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(230, 57, 70, 0.08);
+}
+
+.logout-modal-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1f2933;
+}
+
+.logout-modal-sub {
+  margin: 0;
+  color: #59656e;
+  font-size: 0.9rem;
+}
+
+.logout-modal-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.logout-cancel-btn,
+.logout-confirm-btn {
+  flex: 1;
+  border: none;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 800;
+  padding: 12px 10px;
+  cursor: pointer;
+}
+
+.logout-cancel-btn {
+  background: #ffffff;
+  color: #303940;
+  box-shadow: inset 0 0 0 1px rgba(48, 57, 64, 0.08);
+}
+
+.logout-confirm-btn {
+  background: linear-gradient(145deg, #69747d, #303940);
+  color: #fff;
+  box-shadow: 0 8px 14px rgba(39, 44, 49, 0.18);
+}
 
 .modal-overlay {
   position: fixed;
