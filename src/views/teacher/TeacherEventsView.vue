@@ -4,7 +4,7 @@
       <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=47'" alt="Teacher" class="avatar" />
+          <img :src="user.avatar || initialsAvatar(user)" alt="Teacher" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
@@ -329,6 +329,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { eventCoverStyle, eventInitials } from '@/utils/eventCover.js'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'

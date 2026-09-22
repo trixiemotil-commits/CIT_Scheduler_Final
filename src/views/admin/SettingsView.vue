@@ -5,7 +5,7 @@
       <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
+          <img :src="user.avatar || initialsAvatar(user)" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
@@ -263,6 +263,7 @@
 
 <script setup>
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
@@ -453,7 +454,7 @@ function clearOtpTimer() {
 
 function startOtpTimer() {
   clearOtpTimer()
-  otpSecondsRemaining.value = 60
+  otpSecondsRemaining.value = 5 * 60
   otpTimer = setInterval(() => {
     otpSecondsRemaining.value -= 1
     if (otpSecondsRemaining.value <= 0) {

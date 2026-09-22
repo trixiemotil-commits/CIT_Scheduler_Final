@@ -191,6 +191,7 @@
 
 <script setup>
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import Swal from 'sweetalert2'
 import { computed, onMounted, ref } from 'vue'
@@ -229,7 +230,7 @@ const profile = ref({
   status:     user.status || 'Active',
   employeeId: user.employeeId || user.studentId || 'N/A',
   role:       ((user.role || 'teacher').toString().charAt(0).toUpperCase() + (user.role || 'teacher').toString().slice(1).toLowerCase()),
-  avatar:     user.avatar || 'https://i.pravatar.cc/100?img=47'
+  avatar:     user.avatar || initialsAvatar(user)
 })
 
 async function apiRequest(path, options = {}) {
@@ -283,7 +284,7 @@ async function loadProfile() {
       status: dbUser.status || 'Active',
       employeeId: dbUser.employeeId || dbUser.studentId || 'N/A',
       role: normalizeRoleLabel(dbUser.role),
-      avatar: dbUser.avatar || user.avatar || 'https://i.pravatar.cc/100?img=47',
+      avatar: dbUser.avatar || user.avatar || initialsAvatar(dbUser),
     }
   } catch (error) {
     await Swal.fire({
@@ -407,7 +408,7 @@ async function saveProfile() {
       status: updatedUser.status || 'Active',
       employeeId: updatedUser.employeeId || updatedUser.studentId || 'N/A',
       role: normalizeRoleLabel(updatedUser.role),
-      avatar: updatedUser.avatar || user.avatar || 'https://i.pravatar.cc/100?img=47',
+      avatar: updatedUser.avatar || user.avatar || initialsAvatar(updatedUser),
     }
 
     closeEdit()

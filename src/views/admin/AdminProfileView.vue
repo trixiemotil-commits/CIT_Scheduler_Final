@@ -187,6 +187,7 @@
 
 <script setup>
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -196,7 +197,7 @@ const route  = useRoute()
 const currentRoute = computed(() => route.path)
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
-const DEFAULT_AVATAR = 'https://i.pravatar.cc/100?img=15'
+const DEFAULT_AVATAR = initialsAvatar(user)
 
 const navItems = [
   {

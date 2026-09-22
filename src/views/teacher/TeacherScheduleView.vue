@@ -305,6 +305,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { timeOptions } from '@/composables/useSchedule.js'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -319,7 +320,7 @@ const AUTO_REFRESH_MS = 30000
 /* ── User ── */
 const user = computed(() => getUser())
 const userEmail = computed(() => user.value?.email || 'teacher@example.com')
-const userAvatar = computed(() => user.value?.avatar || 'https://i.pravatar.cc/100?img=47')
+const userAvatar = computed(() => user.value?.avatar || initialsAvatar(user.value))
 const userName = computed(() => {
   const fullName = typeof user.value?.name === 'string' ? user.value.name.trim() : ''
   if (fullName) return fullName
@@ -557,7 +558,7 @@ async function apiRequest(path, options = {}) {
 
 function mapEntriesToSchedule(entries) {
   const grouped = new Map()
-  const avatar = user.value?.avatar || 'https://i.pravatar.cc/100?img=47'
+  const avatar = user.value?.avatar || initialsAvatar(user.value)
 
   entries.forEach((entry) => {
     const day = entry.day

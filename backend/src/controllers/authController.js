@@ -39,7 +39,7 @@ async function verifyRecaptcha(token, remoteIp = null) {
 }
 
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
-const PASSWORD_OTP_LIFETIME_MS = 60 * 1000;
+const PASSWORD_OTP_LIFETIME_MS = 5 * 60 * 1000;
 const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
 const PASSWORD_OTP_MAX_ATTEMPTS = 5;
 const LOGIN_OTP_LIFETIME_MS = 5 * 60 * 1000;
@@ -860,6 +860,48 @@ async function resetPassword(req, res) {
   }
 }
 
+async function verifyPasswordOtp(req, res) {
+  try {
+    const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+    const otp = String(req.body?.otp || "").trim();
+    if (!normalizedEmail || !/^\d{6}$/.test(otp)) {
+      return res.status(400).json({ message: "Enter the full 6-digit code." });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail })
+      .select("+passwordOtpHash +passwordOtpExpiresAt +passwordOtpAttempts");
+    if (!user || !user.passwordOtpHash || !user.passwordOtpExpiresAt) {
+      return res.status(400).json({ message: "Request a new OTP and enter the 6-digit code." });
+    }
+
+    if (user.passwordOtpExpiresAt.getTime() <= Date.now()) {
+      clearPasswordOtp(user);
+      await user.save();
+      return res.status(400).json({ message: "This OTP has expired. Request a new one." });
+    }
+
+    const enteredOtpHash = hashOtp(otp);
+    const otpMatches = crypto.timingSafeEqual(
+      Buffer.from(enteredOtpHash, "hex"),
+      Buffer.from(user.passwordOtpHash, "hex")
+    );
+    if (!otpMatches) {
+      user.passwordOtpAttempts += 1;
+      if (user.passwordOtpAttempts >= PASSWORD_OTP_MAX_ATTEMPTS) {
+        clearPasswordOtp(user);
+        await user.save();
+        return res.status(429).json({ message: "Too many incorrect codes. Request a new OTP." });
+      }
+      await user.save();
+      return res.status(401).json({ message: "The OTP is incorrect." });
+    }
+
+    return res.status(200).json({ message: "OTP verified." });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to verify OTP.", error: error.message });
+  }
+}
+
 async function changePassword(req, res) {
   try {
     const { currentPassword, newPassword, otp } = req.body || {};
@@ -943,5 +985,6 @@ module.exports = {
   requestPasswordOtp,
   changePassword,
   requestPasswordReset,
+  verifyPasswordOtp,
   resetPassword,
 };

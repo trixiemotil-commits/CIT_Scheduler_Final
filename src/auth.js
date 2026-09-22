@@ -161,6 +161,13 @@ export async function resetPassword({ email, otp, newPassword }) {
   })
 }
 
+export async function verifyPasswordOtp({ email, otp }) {
+  return request('/auth/verify-password-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp })
+  })
+}
+
 export function logout() {
   clearSession()
 }

@@ -4,7 +4,7 @@
       <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" @click="router.push('/admin/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" class="avatar" alt="Admin" />
+          <img :src="user.avatar || initialsAvatar(user)" class="avatar" alt="Admin" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
@@ -261,6 +261,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import PublishedTermScheduleLink from '@/components/PublishedTermScheduleLink.vue'
 import RoleSwitchButton from '@/components/RoleSwitchButton.vue'
 import Swal from 'sweetalert2'

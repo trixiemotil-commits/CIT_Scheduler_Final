@@ -5,7 +5,7 @@
       <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
+          <img :src="user.avatar || initialsAvatar(user)" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
@@ -165,6 +165,9 @@
                         >{{ getEntriesForCell(slot, day)[0].subbedLabel || 'SUBSTITUTE' }}</span>
                         <div class="entry-teacher">{{ getEntriesForCell(slot, day)[0].teacher }}</div>
                         <div class="entry-subject">{{ getEntriesForCell(slot, day)[0].subject }}</div>
+                        <div v-if="getEntriesForCell(slot, day)[0].parallel" class="entry-parallel-badge">
+                          Parallel ({{ getEntriesForCell(slot, day)[0].parallelCount || getEntriesForCell(slot, day).length }})
+                        </div>
                         <div class="entry-time-range">{{ getEntriesForCell(slot, day)[0].slot }}</div>
                         <!-- Section rows (one per section) -->
                         <div
@@ -810,6 +813,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import TypeaheadSelect from '@/components/TypeaheadSelect.vue'
 import {
     colorForRoom,
@@ -2466,6 +2470,18 @@ function confirmLogout() {
   font-size: 0.84rem; opacity: 0.9;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding-right: 60px;
+}
+.entry-parallel-badge {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 2px 6px;
+  border: 1px solid rgba(255,255,255,0.45);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.18);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .entry-time-range {
   font-size: 0.76rem; opacity: 0.75; font-style: italic; margin-top: 1px;

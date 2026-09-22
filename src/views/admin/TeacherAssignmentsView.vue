@@ -6,7 +6,7 @@
       <!-- Profile -->
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
+          <img :src="user.avatar || initialsAvatar(user)" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
@@ -435,6 +435,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import useNotifications from '@/composables/useNotifications'
 import Swal from 'sweetalert2'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
@@ -718,7 +719,7 @@ function mapTeacherFromApi(user) {
     name: fullName || user.name || 'Prof. Teacher',
     college: user.department || 'College of Information Technology',
     email: user.email || '',
-    avatar: user.avatar || `https://i.pravatar.cc/150?u=${encodeURIComponent(user.id || user.email || fullName)}`,
+    avatar: user.avatar || initialsAvatar(fullName),
     status: isClockedOut ? 'Offline' : mapTeacherStatus(user.teacher_status),
     currentStatus: 'Offline',
     account_status: user.account_status || 'Active',

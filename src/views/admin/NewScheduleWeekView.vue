@@ -5,7 +5,7 @@
       <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
-          <img src="https://i.pravatar.cc/100?img=47" alt="Admin" class="avatar" />
+          <img :src="initialsAvatar(user)" alt="Admin" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
@@ -316,6 +316,7 @@
 
 <script setup>
 import { getUser, logout } from '@/auth.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import {
     colorForRoom,
     days,

@@ -46,7 +46,7 @@
           </svg>
         </div>
         <h2 class="step-title">Step 2: OTP</h2>
-        <p class="step-desc">Enter the 6-digit verification code sent to your email.</p>
+        <p class="step-desc">Enter the 6-digit verification code sent to your email. The code expires in 5 minutes.</p>
 
         <div v-if="error" class="error-msg">{{ error }}</div>
         <div v-if="message" class="success-msg">{{ message }}</div>
@@ -152,7 +152,7 @@
 </template>
 
 <script setup>
-import { requestPasswordReset, resetPassword } from '@/auth.js'
+import { requestPasswordReset, resetPassword, verifyPasswordOtp } from '@/auth.js'
 import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
@@ -315,13 +315,21 @@ async function goToStep2() {
   }
 }
 
-function goToStep3() {
+async function goToStep3() {
   error.value = ''
   if (otp.value.length < 6) {
     error.value = 'Enter the full 6-digit code.'
     return
   }
-  step.value = 3
+  isSending.value = true
+  try {
+    await verifyPasswordOtp({ email: email.value.trim(), otp: otp.value })
+    step.value = 3
+  } catch (err) {
+    error.value = err.message || 'This verification code is invalid or expired.'
+  } finally {
+    isSending.value = false
+  }
 }
 
 async function handleReset() {
