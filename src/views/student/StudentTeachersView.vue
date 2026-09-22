@@ -18,19 +18,6 @@
       <input v-model="search" type="text" class="search-input" placeholder="Search by name or subject..." />
     </div>
 
-    <div class="consultation-date-section">
-      <div class="consultation-date-heading">
-        <span>Available consultation dates</span>
-        <small>Select a date to book</small>
-      </div>
-      <div class="consultation-date-list" role="tablist" aria-label="Available consultation dates">
-        <button v-for="dateOption in consultationDateOptions" :key="dateOption.value" type="button" :class="['consultation-date-chip', { active: selectedConsultationDate === dateOption.value }]" @click="selectedConsultationDate = dateOption.value">
-          <strong>{{ dateOption.day }}</strong>
-          <span>{{ dateOption.label }}</span>
-        </button>
-      </div>
-    </div>
-
     <!-- Filters -->
     <div class="filter-row">
       <button
@@ -97,11 +84,10 @@
             </div>
             <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
           </div>
-          <div v-if="t.status === 'In School'" class="teacher-footer">
+          <div v-if="t.status === 'In School' && canBookTeacher(t)" class="teacher-footer">
             <span class="price">&nbsp;</span>
             <button
-              :class="['action-btn', canBookTeacher(t) ? 'green' : 'disabled']"
-              :disabled="!canBookTeacher(t)"
+              class="action-btn green"
               @click="openRequest(t)"
             >
               {{ consultationButtonLabel(t) }}
@@ -128,11 +114,10 @@
             </div>
             <span :class="['status-pill', statusClass(t.status)]">{{ t.status }}</span>
           </div>
-          <div v-if="t.status === 'In School'" class="teacher-footer">
+          <div v-if="t.status === 'In School' && canBookTeacher(t)" class="teacher-footer">
             <span class="price">&nbsp;</span>
             <button
-              :class="['action-btn', canBookTeacher(t) ? 'green' : 'disabled']"
-              :disabled="!canBookTeacher(t)"
+              class="action-btn green"
               @click="openRequest(t)"
             >
               {{ consultationButtonLabel(t) }}
@@ -332,12 +317,12 @@ function isAvailableTeacher(teacher) {
 function canBookTeacher(teacher) {
   if (!teacher?.available) return false
   if (!teacher?.isSubjectTeacher) return true
-  return Boolean(scheduledSlotForSelectedDate(teacher))
+  return Boolean(scheduledSlotForToday(teacher))
 }
 
 function consultationButtonLabel(teacher) {
   if (teacher?.isSubjectTeacher) {
-    const selectedSlot = scheduledSlotForSelectedDate(teacher)
+    const selectedSlot = scheduledSlotForToday(teacher)
     if (selectedSlot) return `Book ${selectedSlot.dayOfWeek} • ${selectedSlot.startTime}`
     return 'No hours on date'
   }
@@ -535,8 +520,10 @@ const subjectTeachers = computed(() => {
   return teachers.value
     .filter((t) => isSubjectTeacher(t) && matchesSearch(t) && hasMatchingAssignment(t))
     .sort((a, b) => {
-      if (Number(b.available) !== Number(a.available)) {
-        return Number(b.available) - Number(a.available)
+      const bHasTodayHours = Boolean(scheduledSlotForToday(b))
+      const aHasTodayHours = Boolean(scheduledSlotForToday(a))
+      if (Number(bHasTodayHours) !== Number(aHasTodayHours)) {
+        return Number(bHasTodayHours) - Number(aHasTodayHours)
       }
       return a.name.localeCompare(b.name)
     })
@@ -591,29 +578,7 @@ const toastMsg         = ref('')
 const reqError         = ref('')
 const isSubmittingRequest = ref(false)
 const today = formatDateInput(new Date())
-const selectedConsultationDate = ref(today)
 const reqForm          = ref({ subject: '', reason: CONSULTATION_REASONS[0], availabilityId: '', date: '', time: '', description: '' })
-
-const consultationDateOptions = computed(() => {
-  const availableDays = new Set(
-    teachers.value.flatMap((teacher) => (teacher.consultationSlots || []).map((slot) => String(slot.dayOfWeek || '').toLowerCase()))
-  )
-  const options = []
-  const date = new Date(`${today}T00:00:00`)
-  for (let offset = 0; offset < 14; offset += 1) {
-    const candidate = new Date(date)
-    candidate.setDate(date.getDate() + offset)
-    const dayName = candidate.toLocaleDateString('en-US', { weekday: 'long' })
-    if (!availableDays.has(dayName.toLowerCase())) continue
-    const value = formatDateInput(candidate)
-    options.push({
-      value,
-      day: offset === 0 ? 'Today' : dayName.slice(0, 3),
-      label: candidate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    })
-  }
-  return options
-})
 
 function formatDateInput(date) {
   const year = date.getFullYear()
@@ -622,13 +587,13 @@ function formatDateInput(date) {
   return `${year}-${month}-${day}`
 }
 
-function selectedDateDayName() {
-  return new Date(`${selectedConsultationDate.value}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+function todayDayName() {
+  return new Date(`${today}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
 }
 
-function scheduledSlotForSelectedDate(teacher) {
-  if (!teacher?.isSubjectTeacher) return null
-  const dayName = selectedDateDayName().toLowerCase()
+function scheduledSlotForToday(teacher) {
+  if (!teacher) return null
+  const dayName = todayDayName().toLowerCase()
   return (teacher.consultationSlots || []).find((slot) => String(slot.dayOfWeek || '').trim().toLowerCase() === dayName) || null
 }
 
@@ -683,13 +648,13 @@ function nextDateForDay(dayOfWeek, startTime) {
 }
 
 function openRequest(t) {
-  const selectedSlot = scheduledSlotForSelectedDate(t)
+  const selectedSlot = scheduledSlotForToday(t)
   selectedTeacher.value = t
   reqForm.value = {
     subject: t.subjectList?.[0] || '',
     reason: CONSULTATION_REASONS[0],
     availabilityId: t.isSubjectTeacher ? selectedSlot?.id || '' : '',
-    date: !t.isSubjectTeacher ? selectedConsultationDate.value : '',
+    date: !t.isSubjectTeacher ? today : '',
     time: '',
     description: '',
   }
@@ -735,7 +700,7 @@ async function submitRequest() {
     if (!slot) { reqError.value = 'Selected consultation availability is invalid.'; return }
 
     body.availabilityId = reqForm.value.availabilityId
-    body.date = selectedConsultationDate.value
+    body.date = today
     body.time = to24Hour(slot.startTime)
     if (!body.date || !body.time) { reqError.value = 'Selected consultation availability is invalid.'; return }
   } else {
@@ -823,16 +788,6 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(45, 50, 55, 0.07);
 }
 .search-input:focus { border-color: #7d8992; box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.12); }
-
-.consultation-date-section { margin: 14px 18px 0; }
-.consultation-date-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: #59656e; font-size: .76rem; font-weight: 800; }
-.consultation-date-heading small { color: #87919a; font-size: .65rem; font-weight: 500; }
-.consultation-date-list { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 5px; scrollbar-width: none; }
-.consultation-date-list::-webkit-scrollbar { display: none; }
-.consultation-date-chip { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 82px; padding: 8px 11px; border: 1px solid #c5cdd2; border-radius: 12px; color: #69747d; background: linear-gradient(145deg,#fafbfb,#e3e7e9); font-family: inherit; text-align: left; box-shadow: inset 0 1px rgba(255,255,255,.86), 0 3px 7px rgba(48,57,64,.08); }
-.consultation-date-chip strong { font-size: .73rem; font-weight: 800; }
-.consultation-date-chip span { font-size: .65rem; font-weight: 600; }
-.consultation-date-chip.active { color: #fff; border-color: #424950; background: linear-gradient(145deg,#69747d,#303940); box-shadow: inset 0 1px rgba(255,255,255,.2), 0 5px 10px rgba(39,44,49,.16); }
 
 /* Filters */
 .filter-row { display: flex; gap: 8px; padding: 12px 18px 1px; overflow-x: auto; scrollbar-width: none; }
