@@ -53,20 +53,20 @@
 <script setup>
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
 import {
-    IonIcon,
-    IonLabel,
-    IonPage,
-    IonRouterOutlet,
-    IonTabBar,
-    IonTabButton,
-    IonTabs,
+  IonIcon,
+  IonLabel,
+  IonPage,
+  IonRouterOutlet,
+  IonTabBar,
+  IonTabButton,
+  IonTabs,
 } from '@ionic/vue'
 import {
-    calendarOutline,
-    homeOutline,
-    megaphoneOutline,
-    peopleOutline,
-    personOutline,
+  calendarOutline,
+  homeOutline,
+  megaphoneOutline,
+  peopleOutline,
+  personOutline,
 } from 'ionicons/icons'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
