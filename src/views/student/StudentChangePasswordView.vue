@@ -94,7 +94,7 @@ const initials = computed(() => String(user.name || 'Student').split(' ').map((w
 
 function goToProfile() {
   document.body.classList.remove('student-settings-active')
-  router.push('/student/profile')
+  router.back()
 }
 const otp = computed(() => otpDigits.value.join(''))
 

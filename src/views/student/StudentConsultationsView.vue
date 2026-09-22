@@ -13,7 +13,7 @@
     </div>
 
     <!-- Tabs -->
-    <div class="tabs-row">
+    <div class="tabs-row" @wheel.prevent="handleFilterWheel">
       <button
         v-for="tab in tabs" :key="tab"
         :class="['tab-btn', { active: activeTab === tab }]"
@@ -329,6 +329,12 @@ const activeTab  = ref('All')
 const filteredSessions = computed(() =>
   activeTab.value === 'All' ? sessions.value : sessions.value.filter(s => s.status === activeTab.value)
 )
+
+function handleFilterWheel(event) {
+  const row = event.currentTarget
+  if (!row || row.scrollWidth <= row.clientWidth) return
+  row.scrollLeft += event.deltaY || event.deltaX
+}
 
 function pillClass(s) {
   return {
@@ -762,12 +768,16 @@ onMounted(() => {
 /* Tabs */
 .tabs-row {
   display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid #e9eeeb;
   padding: 10px 16px;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   position: sticky;
   top: 65px;
@@ -776,6 +786,7 @@ onMounted(() => {
 .tabs-row::-webkit-scrollbar { display: none; }
 .tab-btn {
   flex: 0 0 auto;
+  min-width: max-content;
   padding: 8px 15px;
   background: #fff;
   border: 1.5px solid #e4e8e6;

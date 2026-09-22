@@ -32,7 +32,7 @@
               </template>
             </div>
             <div v-if="!filteredFaqs.length" class="faq-empty">No matching FAQs found.</div>
-            <a class="support-link" href="mailto:citscheduler@gmail.com"><span class="support-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="m4 6 8 6 8-6"/></svg></span><span><strong>Still need help?</strong><small>Contact CIT Scheduler support</small></span><svg class="support-arrow" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></a>
+            <a class="support-link" href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=citscheduler%40gmail.com" target="_blank" rel="noopener noreferrer"><span class="support-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="m4 6 8 6 8-6"/></svg></span><span><strong>Still need help?</strong><small>Contact CIT Scheduler support</small></span><svg class="support-arrow" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></a>
           </section>
         </main>
       </div>
@@ -158,7 +158,7 @@ function faqsByCategory(category) {
 
 function goToProfile() {
   document.body.classList.remove('student-settings-active')
-  router.push('/student/profile')
+  router.back()
 }
 
 onMounted(() => {

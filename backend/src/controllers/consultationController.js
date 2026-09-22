@@ -206,6 +206,9 @@ async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTea
   }
 
   const configuredStatus = String(userDoc.teacher_status || "").trim();
+  if (configuredStatus === "On Leave") {
+    return "Offline";
+  }
   if (["On School", "On Meeting", "On Leave"].includes(configuredStatus)) {
     return configuredStatus;
   }
@@ -561,7 +564,7 @@ async function listTeachersForStudents(req, res) {
           .filter(Boolean);
         const uniqueStudentSubjects = [...new Set(studentSubjects)];
         const isSubjectTeacher = uniqueStudentSubjects.length > 0;
-        const canAcceptRequests = !["on leave", "offline", "on event"].includes(String(status || '').toLowerCase())
+        const canAcceptRequests = String(status || '').toLowerCase() === "on school"
           && String(teacherUser.teacher_availability || '').toLowerCase() !== "unavailable";
 
         return {
