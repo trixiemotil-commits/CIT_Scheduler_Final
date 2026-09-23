@@ -766,6 +766,11 @@ select {
   }
 }
 
+.admin-sidebar-collapsed .admin-sidebar-toggle,
+.teacher-sidebar-collapsed .admin-sidebar-toggle {
+  display: none !important;
+}
+
 /* ── SweetAlert2 overrides ── */
 .swal-rounded { border-radius: 20px !important; }
 
@@ -1024,6 +1029,12 @@ body,
 
 .sidebar .logout-btn,
 .sidebar :is(.role-switch-btn, .switch-role-btn) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  font-size: .78rem !important;
   min-height: 46px !important;
   margin-top: 18px !important;
   color: #343a40 !important;
@@ -1035,6 +1046,11 @@ body,
     inset 0 1px rgba(255, 255, 255, 0.72) !important;
   font-weight: 600 !important;
   margin-bottom: -10px !important;
+}
+
+.sidebar :is(.logout-btn, .role-switch-btn, .switch-role-btn) svg {
+  width: 16px !important;
+  height: 16px !important;
 }
 
 .sidebar .logout-btn:hover,
@@ -1224,6 +1240,10 @@ body,
 .admin-sidebar .nav-item > span:last-child {
   min-width: 0;
   white-space: nowrap !important;
+}
+
+.admin-sidebar .sidebar-nav > a[href="/admin/users"] {
+  margin-top: -6px !important;
 }
 
 .admin-sidebar .nav-icon {
@@ -1632,6 +1652,26 @@ body,
   margin-bottom: 20px !important;
 }
 
+.admin-sidebar-collapsed .admin-sidebar .current-term-schedule-link::after,
+.admin-sidebar-collapsed .admin-sidebar .current-term-link::after {
+  display: block !important;
+}
+
+.admin-sidebar-collapsed .admin-sidebar .unified-academic-link::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: 8px;
+  left: 8px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(87, 97, 105, .28) 14%, rgba(87, 97, 105, .28) 86%, transparent);
+  pointer-events: none;
+}
+
+.admin-sidebar-collapsed .admin-sidebar .unified-academic-link {
+  margin-top: 8px !important;
+}
+
 .admin-sidebar-collapsed .admin-sidebar :is(.logout-btn, .role-switch-btn, .switch-role-btn) {
   min-width: 48px !important;
   padding-inline: 0 !important;
@@ -1715,8 +1755,8 @@ body,
   }
 
   .layout:has(> .admin-sidebar) > .admin-sidebar {
-    width: 220px !important;
-    min-width: 220px !important;
+    width: 100vw !important;
+    min-width: 100vw !important;
     padding: 58px 14px 14px !important;
     border-radius: 0 18px 18px 0 !important;
     position: fixed !important;
@@ -1726,12 +1766,17 @@ body,
   }
 
   .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar {
-    width: 68px !important;
-    min-width: 68px !important;
-    padding: 58px 8px 14px !important;
-    border-right: 1px solid rgba(255, 255, 255, .16) !important;
-    overflow-y: auto !important;
-    box-shadow: 10px 0 28px rgba(29, 33, 37, .2) !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar > :not(.admin-sidebar-toggle) {
+    visibility: hidden !important;
+    pointer-events: none !important;
   }
 
   .layout:has(> .admin-sidebar) > .main {
@@ -1742,7 +1787,7 @@ body,
   }
 
   .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .main {
-    padding-left: 84px !important;
+    padding-left: 58px !important;
   }
 
   .layout:has(> .admin-sidebar) > .admin-sidebar .sidebar-profile {
@@ -1790,7 +1835,10 @@ body,
 
   .admin-sidebar-collapsed .admin-sidebar-toggle,
   .admin-sidebar-collapsed .admin-sidebar .admin-sidebar-toggle {
-    left: 16px !important;
+    display: grid !important;
+    top: 14px !important;
+    left: 14px !important;
+    z-index: 40 !important;
   }
 
   .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar {
@@ -1839,9 +1887,16 @@ body,
 
 @media (max-width: 480px) {
   .layout:has(> .admin-sidebar) > .admin-sidebar {
-    width: 200px !important;
-    min-width: 200px !important;
+    width: 100vw !important;
+    min-width: 100vw !important;
     padding-inline: 12px !important;
+  }
+
+  .admin-sidebar-collapsed .layout:has(> .admin-sidebar) > .admin-sidebar {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
   }
 
   .layout:has(> .admin-sidebar) > .admin-sidebar .nav-item {

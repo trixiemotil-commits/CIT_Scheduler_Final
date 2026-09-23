@@ -2568,6 +2568,11 @@ function confirmLogout() {
 .logout-confirm-btn:hover { background: #4b5259; }
 
 /* Responsive */
+@media (max-width: 1100px) {
+  .main { padding-inline: 28px; }
+  .stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+}
+
 @media (max-width: 900px) {
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
   .today-teachers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

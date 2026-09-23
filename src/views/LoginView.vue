@@ -1023,9 +1023,10 @@ watch(activeTab, (val) => {
 <style scoped>
 .page-bg {
   min-height: 100vh;
+  min-height: 100svh;
   min-height: 100dvh;
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
   background: radial-gradient(ellipse at 50% 110%, #f6f7f9 0%, #cfd3d8 26%, #9da4ad 54%, #5f6871 75%, #2b3036 100%);
   padding: clamp(16px, 4vw, 32px);
@@ -1557,8 +1558,8 @@ watch(activeTab, (val) => {
 @keyframes role-modal-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 
 @media (max-width: 520px) {
-  .page-bg { align-items: flex-start; }
-  .card { width: 100%; padding: 28px 20px 24px; margin: auto 0; }
+  .page-bg { align-items: flex-start; padding-inline: 12px; }
+  .card { width: 100%; padding: 28px 20px 24px; margin: 0; }
   .title { font-size: 1.65rem; }
   .name-row { flex-direction: column; gap: 12px; }
   .login-brand { gap: 11px; }
@@ -1573,7 +1574,7 @@ watch(activeTab, (val) => {
 }
 
 @media (max-width: 360px) {
-  .page-bg { padding: 12px; }
+  .page-bg { padding: 12px 8px; }
   .card { padding: 22px 14px 18px; border-radius: 18px; }
   .login-brand { align-items: flex-start; }
   .login-brand__seal-wrap { width: 58px; height: 58px; flex-basis: 58px; }

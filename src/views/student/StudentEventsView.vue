@@ -49,7 +49,7 @@
                   <span>{{ eventInitials(ev.title) }}</span><small>CIT SCHEDULER EVENT</small>
                 </div>
                 <div class="event-card-head">
-                  <span class="event-badge">Active</span>
+                  <span class="event-badge event-badge--active">Active</span>
                   <div v-if="false" class="event-card-actions">
                     <button class="ec-btn ec-btn--edit" @click.stop="openEditEvent(ev)">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -678,6 +678,16 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   color: #4f5c65;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+}
+
+.event-badge--active {
+  background: #d9f2e3;
+  color: #247044;
+}
+
+.event-badge--ended {
+  background: #f8dede;
+  color: #a83232;
 }
 
 .event-badge--archived {

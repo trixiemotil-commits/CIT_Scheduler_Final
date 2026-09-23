@@ -17,7 +17,14 @@
         <PublishedTermScheduleLink />
       </nav>
       <RoleSwitchButton />
-      <button class="logout-btn" @click="logoutAndLeave">Logout</button>
+      <button class="logout-btn" @click="logoutAndLeave">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        Logout
+      </button>
     </aside>
 
     <main class="main">
@@ -1071,7 +1078,7 @@ loadPage()
 .term-actions .view-btn:hover:not(:disabled) { color: #fff; background: #263744; }
 .term-actions .add-btn { color: #315e47; border-color: #bed4c8; background: #edf7f1; }
 .term-actions .excel-btn { color: #176a94; border-color: #b9d7e6; background: #eaf6fc; }
-.term-actions .publish-btn { color: #176a94; border-color: #b9d7e6; background: #eaf6fc; }
+.term-actions .publish-btn { grid-column: 1 / -1; justify-content: center; color: #176a94; border-color: #b9d7e6; background: #eaf6fc; }
 .term-actions .publish-btn:disabled { color: #668176; border-color: #cfddd5; background: #e7f1eb; opacity: 1; }
 .empty-state { border: 1px dashed #ccd4d9; border-radius: 14px; background: #f8fafb; }
 
@@ -1432,6 +1439,20 @@ loadPage()
 }
 .preview-pagination button:hover:not(:disabled) { border-color: #929fa7; transform: translateY(-1px); }
 .preview-pagination button:disabled { cursor: default; opacity: .45; }
+@media (max-width: 1200px) {
+  .main { padding-inline: 28px; }
+  .terms-card { padding: 24px; }
+  .page-header h1 { font-size: clamp(1.8rem, 3vw, 2.25rem); }
+  .page-header p { font-size: .82rem; }
+  .new-term-btn { min-height: 42px; padding-inline: 14px; font-size: .8rem; white-space: nowrap; }
+  .term-row { flex-direction: column; padding: 18px; }
+  .term-actions { width: min(100%, 480px); margin-top: 4px; }
+  .term-actions button { min-height: 38px; padding: 7px 9px; gap: 6px; font-size: .64rem; }
+  .term-actions button svg { width: 15px; height: 15px; flex-basis: 15px; }
+  .mode-grid { width: min(980px, calc(100% - 40px)); gap: 12px; }
+  .mode-card { min-height: 145px; padding: 18px; gap: 14px; }
+  .mode-card .mode-copy small { font-size: .7rem; line-height: 1.4; }
+}
 @media (max-width: 1100px) {
   .term-row { flex-direction: column; }
   .term-actions { width: min(100%, 480px); justify-content: flex-start; }
