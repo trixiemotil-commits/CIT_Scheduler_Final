@@ -181,7 +181,7 @@
                   <template v-for="day in days" :key="day">
                     <td
                       v-if="!isSpannedRoomCell(slot, day)"
-                      :rowspan="getEntriesForRoomCell(slot, day).length ? getRoomRowspan(getEntriesForRoomCell(slot, day)[0]) : 1"
+                      :rowspan="getEntriesForRoomCell(slot, day).length ? getRoomScheduleRowspan(getEntriesForRoomCell(slot, day)[0]) : 1"
                       class="td-cell"
                       :class="{
                         'has-entry': getEntriesForRoomCell(slot, day).length,
@@ -227,7 +227,7 @@
 
       <!-- ── BY STUDENT GROUP ── -->
       <template v-else-if="viewMode === 'student'">
-        <div class="schedule-card">
+        <div class="schedule-card schedule-card--student">
           <div class="sched-topbar">
             <button class="schedule-back-btn" aria-label="Back to student section selection" title="Back to student section selection" @click="returnToScheduleSelection">&larr;</button>
             <div class="sched-topbar-left">
@@ -256,9 +256,9 @@
                 <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
                   <td class="td-time">{{ slot }}</td>
                   <template v-for="day in days" :key="day">
-                    <td v-if="!isSpannedStudentCell(slot, day)" :rowspan="getEntriesForStudentCell(slot, day).length ? getRoomRowspan(getEntriesForStudentCell(slot, day)[0]) : 1" class="td-cell" :class="{ 'has-entry': getEntriesForStudentCell(slot, day).length, 'free-time-cell': !getEntriesForStudentCell(slot, day).length }">
+                    <td v-if="!isSpannedStudentCell(slot, day)" :rowspan="getEntriesForStudentCell(slot, day).length ? getStudentRowspan(getEntriesForStudentCell(slot, day)[0]) : 1" class="td-cell" :class="{ 'has-entry': getEntriesForStudentCell(slot, day).length, 'free-time-cell': !getEntriesForStudentCell(slot, day).length }">
                       <template v-if="getEntriesForStudentCell(slot, day).length">
-                        <div class="sched-entry sched-entry-clickable" :class="getEntriesForStudentCell(slot, day)[0].color" role="button" tabindex="0" @click="openScheduleDetails(getEntriesForStudentCell(slot, day))" @keydown.enter.space.prevent="openScheduleDetails(getEntriesForStudentCell(slot, day))">
+                        <div class="sched-entry sched-entry-clickable" :class="getEntriesForStudentCell(slot, day)[0].color" :style="studentEntryStyle(slot, getEntriesForStudentCell(slot, day)[0])" role="button" tabindex="0" @click="openScheduleDetails(getEntriesForStudentCell(slot, day))" @keydown.enter.space.prevent="openScheduleDetails(getEntriesForStudentCell(slot, day))">
                           <div class="entry-teacher">{{ getEntriesForStudentCell(slot, day)[0].subject }}</div>
                           <div class="entry-subject">{{ getEntriesForStudentCell(slot, day)[0].teacher }}</div>
                           <div class="entry-section-row"><span class="entry-room">{{ getEntriesForStudentCell(slot, day)[0].room || 'Room not assigned' }}</span></div>
@@ -350,7 +350,7 @@
                   <template v-for="day in days" :key="day">
                     <td
                     v-if="!isSpannedTeacherCell(slot, day) && !isSpannedConsultTeacherCell(slot, day)"
-                    :rowspan="getEntriesForTeacherCell(slot, day).length ? getRoomRowspan(getEntriesForTeacherCell(slot, day)[0]) : (getConsultationForTeacherCell(slot, day) ? getConsultRowspan(getConsultationForTeacherCell(slot, day)) : 1)"
+                    :rowspan="getEntriesForTeacherCell(slot, day).length ? getTeacherRowspan(getEntriesForTeacherCell(slot, day)[0]) : (getConsultationForTeacherCell(slot, day) ? getConsultRowspan(getConsultationForTeacherCell(slot, day)) : 1)"
                     class="td-cell"
                     :class="{
                       'has-entry': getEntriesForTeacherCell(slot, day).length,
@@ -363,7 +363,7 @@
                         <div
                           class="sched-entry sched-entry-clickable"
                           :class="getEntriesForTeacherCell(slot, day)[0].color"
-                          :style="roomEntryStyle(slot, getEntriesForTeacherCell(slot, day)[0])"
+                          :style="teacherEntryStyle(slot, getEntriesForTeacherCell(slot, day)[0])"
                           role="button"
                           tabindex="0"
                           @click="openScheduleDetails(getEntriesForTeacherCell(slot, day))"
@@ -965,9 +965,13 @@ function isSpannedStudentCell(slot, day) {
   if (slotIndex <= 0) return false
   for (let index = 0; index < slotIndex; index += 1) {
     const previous = getEntriesForStudentCell(timeSlots30[index], day)
-    if (previous.length && index + getRoomRowspan(previous[0]) > slotIndex) return true
+    if (previous.length && index + getStudentRowspan(previous[0]) > slotIndex) return true
   }
   return false
+}
+
+function getStudentRowspan(entry) {
+  return Math.min(timeSlots30.length, getRoomRowspan(entry) + 1)
 }
 
 function isSpannedTeacherCell(slot, day) {
@@ -975,9 +979,13 @@ function isSpannedTeacherCell(slot, day) {
   if (slotIndex <= 0) return false
   for (let i = 0; i < slotIndex; i++) {
     const prev = getEntriesForTeacherCell(timeSlots30[i], day)
-    if (prev.length > 0 && i + getRoomRowspan(prev[0]) > slotIndex) return true
+    if (prev.length > 0 && i + getTeacherRowspan(prev[0]) > slotIndex) return true
   }
   return false
+}
+
+function getTeacherRowspan(entry) {
+  return Math.min(timeSlots30.length, getRoomRowspan(entry) + 1)
 }
 
 function getConsultationForTeacherCell(rowSlot, day) {
@@ -993,7 +1001,7 @@ function getConsultationForTeacherCell(rowSlot, day) {
 
 function getConsultRowspan(consult) {
   if (!consult?.startTime || !consult?.endTime) return 1
-  return Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime)) / 30))
+  return Math.min(timeSlots30.length, Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime)) / 30) + 1))
 }
 
 function isSpannedConsultTeacherCell(slot, day) {
@@ -1010,13 +1018,11 @@ function consultEntryStyle(rowSlot, consult) {
   if (!consult?.startTime || !consult?.endTime) return {}
   const rowStart     = parseTime(rowSlot)
   const consultStart = parseTime(consult.startTime)
-  const mins         = Math.max(1, parseTime(consult.endTime) - consultStart)
   const offsetMins   = Math.max(0, consultStart - rowStart)
   const spannedMins  = getConsultRowspan(consult) * 30
-  const trailingMins = Math.max(0, spannedMins - offsetMins - mins)
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
-    bottom: `calc(${(trailingMins / spannedMins) * 100}% + 4px)`,
+    bottom: '4px',
     height: 'auto',
     zIndex: 3,
   }
@@ -1129,9 +1135,13 @@ function isSpannedRoomCell(slot, day) {
   if (slotIndex <= 0) return false
   for (let i = 0; i < slotIndex; i++) {
     const prev = getEntriesForRoomCell(timeSlots30[i], day)
-    if (prev.length > 0 && i + getRoomRowspan(prev[0]) > slotIndex) return true
+    if (prev.length > 0 && i + getRoomScheduleRowspan(prev[0]) > slotIndex) return true
   }
   return false
+}
+
+function getRoomScheduleRowspan(entry) {
+  return Math.min(timeSlots30.length, getRoomRowspan(entry) + 1)
 }
 
 function getRoomRowspan(entry) {
@@ -1148,21 +1158,41 @@ function roomEntryStyle(rowHour, entry) {
   if (!entry?.timeIn || !entry?.timeOut) return {}
   const rowStart   = parseTime(rowHour)
   const entryStart = parseTime(entry.timeIn)
-  const mins       = Math.max(1, parseTime(entry.timeOut) - entryStart)
   const offsetMins = Math.max(0, entryStart - rowStart)
-  const spannedMins = getRoomRowspan(entry) * 30
-  const trailingMins = Math.max(0, spannedMins - offsetMins - mins)
-  const hasFollowingEntry = Object.values(entries).some(candidate =>
-    candidate.day === entry.day &&
-    parseTime(candidate.timeIn) === parseTime(entry.timeOut) &&
-    (viewMode.value === 'room'
-      ? candidate.room === entry.room
-      : candidate.teacher === entry.teacher)
-  )
-  const bottomGap = hasFollowingEntry ? 4 : -40
+  const spannedMins = getRoomScheduleRowspan(entry) * 30
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
-    bottom: `calc(${(trailingMins / spannedMins) * 100}% + ${bottomGap}px)`,
+    bottom: '4px',
+    height: 'auto',
+    zIndex: 3,
+  }
+}
+
+function studentEntryStyle(rowSlot, entry) {
+  if (!entry?.timeIn || !entry?.timeOut) return {}
+  const rowStart = parseTime(rowSlot)
+  const entryStart = parseTime(entry.timeIn)
+  const offset = Math.max(0, entryStart - rowStart)
+  const spannedMinutes = getStudentRowspan(entry) * 30
+
+  return {
+    top: `calc(${(offset / spannedMinutes) * 100}% + 4px)`,
+    bottom: '4px',
+    height: 'auto',
+    zIndex: 3,
+  }
+}
+
+function teacherEntryStyle(rowSlot, entry) {
+  if (!entry?.timeIn || !entry?.timeOut) return {}
+  const rowStart = parseTime(rowSlot)
+  const entryStart = parseTime(entry.timeIn)
+  const offset = Math.max(0, entryStart - rowStart)
+  const spannedMinutes = getTeacherRowspan(entry) * 30
+
+  return {
+    top: `calc(${(offset / spannedMinutes) * 100}% + 4px)`,
+    bottom: '4px',
     height: 'auto',
     zIndex: 3,
   }
@@ -1940,10 +1970,15 @@ function printSchedule() {
   border-radius: 18px;
   box-shadow: 0 14px 34px rgba(38,46,52,.11), inset 0 1px 0 #fff;
   padding: 0;
-  overflow: visible;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   flex: 1;
+}
+.schedule-card--student {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 .sched-topbar {
   display: flex;
@@ -2058,7 +2093,9 @@ function printSchedule() {
 /* Grid */
 .sched-grid-wrap {
   width: 100%;
-  overflow-x: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   margin: 0;
   padding: 18px;
   position: relative;
@@ -2066,6 +2103,11 @@ function printSchedule() {
   border: 0;
   border-radius: 0 0 17px 17px;
   box-shadow: none;
+}
+.schedule-card--student .sched-grid-wrap {
+  flex: 0 0 auto;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 .sched-grid {
   width: 100%;

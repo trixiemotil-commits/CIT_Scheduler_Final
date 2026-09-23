@@ -75,8 +75,8 @@
           </div>
           <div class="summary-counts">
             <span class="summary-count summary-count--total"><b>{{ teachers.length }}</b><small>Total</small></span>
-            <span class="summary-count available"><b>{{ teachers.filter(item => item.status === 'In School').length }}</b><small>On School</small></span>
-            <span class="summary-count summary-count--leave"><b>{{ teachers.filter(item => item.status === 'On Leave').length }}</b><small>On leave</small></span>
+            <span class="summary-count available"><b>{{ teachers.filter(item => normalizeTeacherStatus(item.status) === 'On School').length }}</b><small>On School</small></span>
+            <span class="summary-count summary-count--leave"><b>{{ teachers.filter(item => normalizeTeacherStatus(item.status) === 'On Leave').length }}</b><small>On leave</small></span>
           </div>
         </div>
 
@@ -89,7 +89,7 @@
             @click="selectStatusTab(tab)"
           >
             {{ statusTabLabel(tab) }}
-            <span>{{ tab === 'All' ? teachers.length : teachers.filter(item => item.status === tab).length }}</span>
+            <span>{{ tab === 'All' ? teachers.length : teachers.filter(item => normalizeTeacherStatus(item.status) === normalizeTeacherStatus(tab)).length }}</span>
           </button>
         </div>
 
@@ -101,7 +101,7 @@
             </svg>
           </button>
 
-          <div class="teachers-grid">
+          <div :key="carouselAnimationKey" class="teachers-grid">
             <div v-if="loadingTeachers" class="teachers-loading" aria-live="polite" aria-label="Loading teachers">
               <div v-for="index in 3" :key="index" class="teacher-skeleton">
                 <div class="teacher-skeleton-badge"></div>
@@ -128,10 +128,10 @@
             <div
               v-for="teacher in visibleTeachers"
               :key="teacher.id"
-              :class="['teacher-card', `card-${teacher.status.toLowerCase().replace(/\s+/g, '-')}`]"  
+              :class="['teacher-card', `card-${statusCssClass(teacher.status)}`]"
             >
               <!-- Status Badge -->
-              <div :class="['status-badge', `badge-${teacher.currentStatus.toLowerCase().replace(/\s+/g, '-')}`]">
+              <div :class="['status-badge', `badge-${statusCssClass(teacher.currentStatus)}`]">
                 {{ teacher.currentStatus }}
               </div>
 
@@ -160,13 +160,13 @@
                 <label>Availability status</label>
                 <select
                   v-model="teacher.status"
-                  :class="['status-dropdown', `status-${teacher.status.toLowerCase().replace(/\s+/g, '-')}`]"
+                  :class="['status-dropdown', `status-${statusCssClass(teacher.status)}`]"
                   @change="updateTeacherStatus(teacher)"
                 >
-                  <option value="In School">On School</option>
+                  <option value="On School">On School</option>
                   <option value="On Leave">On Leave</option>
                   <option value="On Meeting">On Meeting</option>
-                    <option value="Offline" disabled>Offline</option>
+                  <option value="Offline" disabled>Offline</option>
                 </select>
               </div>
 
@@ -226,7 +226,7 @@
             v-for="(_, idx) in carouselPages"
             :key="idx"
             :class="['indicator', { active: currentIndex === idx * itemsPerPage }]"
-            @click="currentIndex = idx * itemsPerPage"
+            @click="goToPage(idx)"
           />
         </div>
       </section>
@@ -469,6 +469,16 @@ const isSavingNewTeacher = ref(false)
 const activeTab = ref('All')
 const currentIndex = ref(0)
 const itemsPerPage = 3
+const carouselAnimationKey = ref(0)
+
+function triggerCarouselAnimation() {
+  carouselAnimationKey.value += 1
+}
+
+function goToPage(pageIndex) {
+  currentIndex.value = pageIndex * itemsPerPage
+  triggerCarouselAnimation()
+}
 
 function confirmLogout() {
   showLogoutModal.value = false
@@ -516,10 +526,20 @@ function canAutoRefresh() {
   return !Object.keys(unsavedChanges.value || {}).length
 }
 
-const statusTabs = ['All', 'In School', 'On Meeting', 'On Leave']
+const statusTabs = ['All', 'On School', 'On Meeting', 'On Leave']
+
+function normalizeTeacherStatus(status) {
+  if (!status) return 'On School'
+  return String(status).trim() === 'In School' ? 'On School' : String(status).trim()
+}
+
+function statusCssClass(status) {
+  const normalized = normalizeTeacherStatus(status)
+  return normalized === 'On School' ? 'in-school' : normalized.toLowerCase().replace(/\s+/g, '-')
+}
 
 function statusTabLabel(status) {
-  return status === 'In School' ? 'On School' : status
+  return normalizeTeacherStatus(status)
 }
 
 function selectStatusTab(tab) {
@@ -529,11 +549,11 @@ function selectStatusTab(tab) {
 
 const emptyStatusDescription = computed(() => {
   const descriptions = {
-    'In School': 'currently on school',
+    'On School': 'currently on school',
     'On Meeting': 'currently in a meeting',
     'On Leave': 'currently on leave',
   }
-  return descriptions[activeTab.value] || 'available'
+  return descriptions[normalizeTeacherStatus(activeTab.value)] || 'available'
 })
 
 const teachers = ref([])
@@ -579,9 +599,10 @@ async function apiRequest(path, options = {}) {
 }
 
 function mapTeacherStatus(status) {
-  if (status === 'On Meeting' || status === 'On-Meeting') return 'On Meeting'
-  if (status === 'On Leave') return 'On Leave'
-  return 'In School'
+  const normalized = normalizeTeacherStatus(status)
+  if (normalized === 'On Meeting' || normalized === 'On-Meeting') return 'On Meeting'
+  if (normalized === 'On Leave') return 'On Leave'
+  return 'On School'
 }
 
 function parseTimeToMinutes(timeStr) {
@@ -745,9 +766,9 @@ function isTeacherActive(teacher) {
 function getActualTeacherStatus(teacher) {
   if (
     teacher.teacher_clocked_out
-    || (teacher.status === 'On Leave' && !teacher.teacher_time_in)
+    || (normalizeTeacherStatus(teacher.status) === 'On Leave' && !teacher.teacher_time_in)
   ) return 'Offline'
-  return teacher.status || 'In School'
+  return normalizeTeacherStatus(teacher.status) || 'On School'
 }
 
 function refreshActualStatuses() {
@@ -788,7 +809,7 @@ function getTeacherNameById(id) {
 }
 
 function getAvailableSubstitutesForEntry(currentTeacher, entry) {
-  const candidates = teachers.value.filter((t) => t.id !== currentTeacher.id && t.status === 'In School')
+  const candidates = teachers.value.filter((t) => t.id !== currentTeacher.id && normalizeTeacherStatus(t.status) === 'On School')
 
   const filtered = candidates.filter((candidate) => {
     const schedule = getScheduleForTeacher(candidate.name)
@@ -839,10 +860,26 @@ async function loadTeachers() {
   }
 }
 
+const statusPriority = {
+  'On School': 0,
+  'On Meeting': 1,
+  'On Leave': 2,
+  Offline: 3,
+}
+
 const filteredTeachers = computed(() => {
-  if (activeTab.value === 'All') return teachers.value
-  if (activeTab.value === 'On Leave') return teachers.value.filter(t => t.status === 'On Leave')
-  return teachers.value.filter(t => t.status === activeTab.value)
+  const sortTeachers = (items) => [...items].sort((a, b) => {
+    const aStatus = normalizeTeacherStatus(a.status)
+    const bStatus = normalizeTeacherStatus(b.status)
+    const aPriority = statusPriority[aStatus] ?? 99
+    const bPriority = statusPriority[bStatus] ?? 99
+    if (aPriority !== bPriority) return aPriority - bPriority
+    return (a.name || '').localeCompare(b.name || '')
+  })
+
+  if (activeTab.value === 'All') return sortTeachers(teachers.value)
+  if (activeTab.value === 'On Leave') return sortTeachers(teachers.value.filter(t => normalizeTeacherStatus(t.status) === 'On Leave'))
+  return sortTeachers(teachers.value.filter(t => normalizeTeacherStatus(t.status) === normalizeTeacherStatus(activeTab.value)))
 })
 
 const visibleTeachers = computed(() => {
@@ -896,12 +933,14 @@ const navItems = [
 const nextTeachers = () => {
   if (currentIndex.value < maxIndex.value) {
     currentIndex.value += itemsPerPage
+    triggerCarouselAnimation()
   }
 }
 
 const previousTeachers = () => {
   if (currentIndex.value > 0) {
     currentIndex.value -= itemsPerPage
+    triggerCarouselAnimation()
   }
 }
 
@@ -932,7 +971,7 @@ const updateTeacherStatus = async (teacher) => {
 
 const getAvailableSubstitutes = (currentTeacher) => {
   const todayEntries = getTeacherWeeklySchedule(currentTeacher)
-  const candidates = teachers.value.filter((t) => t.id !== currentTeacher.id && t.status === 'In School')
+  const candidates = teachers.value.filter((t) => t.id !== currentTeacher.id && normalizeTeacherStatus(t.status) === 'On School')
 
   if (!todayEntries.length) {
     candidates.forEach((candidate) => {
@@ -1448,6 +1487,21 @@ onUnmounted(() => {
   width: 100%;
   min-width: 0;
   align-items: start;
+}
+
+.teachers-grid .teacher-card {
+  animation: teacherCardSlideIn 0.38s ease;
+}
+
+@keyframes teacherCardSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(28px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 /* ════════════════════════ TEACHER CARD ════════════════════════ */

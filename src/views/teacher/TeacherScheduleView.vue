@@ -470,7 +470,7 @@ function resolveGridSpan(startTime, endTime) {
     return null
   }
 
-  const visualEndIndex = Math.min(maxEndIndex, endIndex + 1)
+  const visualEndIndex = Math.min(maxEndIndex, endIndex)
 
   return {
     startIndex,
