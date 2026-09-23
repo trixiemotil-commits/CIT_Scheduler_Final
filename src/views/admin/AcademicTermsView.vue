@@ -225,14 +225,14 @@
             <section v-if="modalStep === 1" class="form-section setup-section">
               <div class="setup-section__heading"><span class="step-number">1</span><div><h3>Term details</h3><p>Name the school year and semester.</p></div></div>
               <div class="two-columns">
-                <label><span>School year</span><input :value="form.schoolYear" inputmode="numeric" maxlength="7" placeholder="Enter School Year (SY00-00)" autocomplete="off" @input="formatSchoolYear" /></label>
+                <label><span>School year</span><select v-model="form.schoolYear" required><option value="">Choose a school year</option><option v-for="schoolYear in schoolYearOptions" :key="schoolYear" :value="schoolYear">{{ schoolYear }}</option></select></label>
                 <label><span>Semester</span><select v-model="form.semester"><option value="">Choose a semester</option><option>1st Semester</option><option>2nd Semester</option></select></label>
               </div>
             </section>
             <section v-else-if="modalStep === 2" class="form-section setup-section">
               <div class="setup-section__heading"><span class="step-number">2</span><div><h3>Sections</h3><p>Enter how many sections each year level will have.</p></div></div>
               <div class="count-grid">
-                <label v-for="year in yearOptions" :key="year"><span>{{ year }}</span><input v-model.number="form.sectionCounts[year]" type="number" min="0" step="1" placeholder="0" /></label>
+                <label v-for="year in yearOptions" :key="year"><span>{{ year }}</span><input :value="form.sectionCounts[year] ?? ''" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{0,2}" placeholder="0" @input="limitSectionCountInput($event, year)" /></label>
               </div>
               <div v-if="yearOptions.some(year => form.sectionNames[year]?.length)" class="name-groups">
                 <div v-for="year in yearOptions.filter(item => form.sectionNames[item]?.length)" :key="year" class="name-group">
@@ -284,6 +284,15 @@ const route = useRoute()
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const yearOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+const schoolYearOptions = ref([])
+function refreshSchoolYearOptions() {
+  const currentCalendarYear = new Date().getFullYear()
+  schoolYearOptions.value = Array.from({ length: 10 }, (_, index) => {
+    const startYear = currentCalendarYear + index
+    return `SY${String(startYear).slice(-2)}-${String(startYear + 1).slice(-2)}`
+  })
+}
+refreshSchoolYearOptions()
 const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const roomFloors = [
   { label: '2nd Floor', rooms: ['201', '202', '204', '205', '208', '209'] },
@@ -434,6 +443,11 @@ function ensureSectionNames() {
     const old = Array.isArray(form.sectionNames[year]) ? form.sectionNames[year] : []
     form.sectionNames[year] = Array.from({ length: count }, (_, index) => old[index] || `South ${index + 1}`)
   })
+}
+function limitSectionCountInput(event, year) {
+  const digits = String(event.target.value || '').replace(/\D/g, '').slice(0, 2)
+  event.target.value = digits
+  form.sectionCounts[year] = digits === '' ? '' : Number(digits)
 }
 watch(() => ({ ...form.sectionCounts }), ensureSectionNames, { deep: true })
 
@@ -958,14 +972,8 @@ function resetForm() {
   selectedRooms.value = []
   ensureSectionNames()
 }
-function formatSchoolYear(event) {
-  const digits = String(event.target.value || '').replace(/\D/g, '').slice(0, 4)
-  const firstYear = digits.slice(0, 2)
-  const secondYear = digits.slice(2, 4)
-  form.schoolYear = digits ? `SY${firstYear}${secondYear ? `-${secondYear}` : ''}` : ''
-  event.target.value = form.schoolYear
-}
 function openTermModal(term = null) {
+  refreshSchoolYearOptions()
   resetForm()
   modalStep.value = 1
   editingTermId.value = termId(term)
@@ -985,8 +993,8 @@ async function nextModalStep() {
       await Swal.fire({ icon: 'warning', title: 'Complete term details', text: 'School year and semester are required before continuing.' })
       return
     }
-    if (!/^SY\d{2}-\d{2}$/.test(form.schoolYear)) {
-      await Swal.fire({ icon: 'warning', title: 'Check the school year', text: 'Use the format SY00-00, for example SY26-27.' })
+    if (!schoolYearOptions.value.includes(form.schoolYear)) {
+      await Swal.fire({ icon: 'warning', title: 'Check the school year', text: 'Choose the current school year or a future school year.' })
       return
     }
   }
@@ -995,7 +1003,7 @@ async function nextModalStep() {
 }
 async function saveTerm() {
   if (!form.schoolYear || !form.semester) return Swal.fire({ icon: 'warning', title: 'Missing details', text: 'School year and semester are required.' })
-  if (!/^SY\d{2}-\d{2}$/.test(form.schoolYear)) return Swal.fire({ icon: 'warning', title: 'Incomplete school year', text: 'Enter four numbers for the school year, for example 2627.' })
+  if (!schoolYearOptions.value.includes(form.schoolYear)) return Swal.fire({ icon: 'warning', title: 'Invalid school year', text: 'Choose the current school year or a future school year.' })
   ensureSectionNames(); saving.value = true
   const payload = {
     schoolYear: form.schoolYear, semester: form.semester, sectionCounts: form.sectionCounts, sectionNames: form.sectionNames,

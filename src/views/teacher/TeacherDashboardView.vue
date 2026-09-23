@@ -587,7 +587,7 @@ const formattedTimeIn = computed(() => {
   return date.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
 })
 
-async function saveTeacherStatus({ record = false, durationMinutes = 0 } = {}) {
+async function saveTeacherStatus({ record = false, durationMinutes = 0, clockOut = false } = {}) {
   if (savingTeacherStatus.value) return
   savingTeacherStatus.value = true
   teacherStatusMessage.value = ''
@@ -601,6 +601,7 @@ async function saveTeacherStatus({ record = false, durationMinutes = 0 } = {}) {
         teacher_availability: teacherAvailability.value,
         recordTimeIn: record,
         statusDurationMinutes: durationMinutes,
+        clockOut,
       }),
     })
     const updatedUser = saveMergedUser(payload.user || {})
@@ -644,7 +645,7 @@ function setTeacherStatus(status) {
     teacherIsClockedOut.value = true
     teacherStatus.value = 'On Leave'
     closePresenceMenu()
-    saveTeacherStatus()
+    saveTeacherStatus({ clockOut: true })
     return
   }
 
@@ -754,7 +755,7 @@ function shouldEnforceAutoOffline() {
   if (!isWeekday()) return false
   if (forcedOfflineDate.value === getTodayKey()) return false
   const now = new Date()
-  return now.getHours() > 20 || (now.getHours() === 20 && now.getMinutes() >= 0)
+  return now.getHours() > 19 || (now.getHours() === 19 && now.getMinutes() >= 30)
 }
 
 function openMorningPrompt() {
@@ -776,8 +777,8 @@ function enforceAutoOffline() {
   markForcedOfflineToday()
   teacherStatus.value = 'On Leave'
   showMorningPrompt.value = false
-  saveTeacherStatus()
-  teacherStatusMessage.value = 'You are automatically offline for today because you did not clock out before 8:00 PM.'
+  saveTeacherStatus({ clockOut: true })
+  teacherStatusMessage.value = 'You were automatically clocked out at 7:30 PM.'
   teacherStatusError.value = false
   clearTimeout(statusMessageTimer)
   statusMessageTimer = setTimeout(() => { teacherStatusMessage.value = '' }, 4000)
