@@ -49,16 +49,13 @@ function openSidebar() {
 }
 
 function handleViewportChange(event) {
-  if (event.matches) {
-    collapsed.value = true
-    applyState()
-  }
+  collapsed.value = event.matches || localStorage.getItem(STORAGE_KEY) === '1'
+  applyState()
 }
 
 onMounted(() => {
-  const savedState = localStorage.getItem(STORAGE_KEY)
-  viewportQuery = window.matchMedia('(max-width: 900px)')
-  collapsed.value = savedState === '1' || viewportQuery.matches
+  viewportQuery = window.matchMedia('(max-width: 1024px)')
+  collapsed.value = viewportQuery.matches || localStorage.getItem(STORAGE_KEY) === '1'
   applyState()
   viewportQuery.addEventListener('change', handleViewportChange)
 })

@@ -1308,9 +1308,9 @@ onMounted(() => {
   width: fit-content;
   backdrop-filter: blur(4px);
 }
-.ev-view-badge--active   { background: rgba(83, 91, 100,0.88); color: #fff; }
+.ev-view-badge--active   { background: rgba(47, 143, 91, 0.92); color: #fff; }
 .ev-view-badge--archived { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
-.ev-view-badge--ended    { background: rgba(107, 114, 128, 0.35); color: #f3f4f6; border: 1px solid rgba(255,255,255,0.3); }
+.ev-view-badge--ended    { background: rgba(201, 74, 74, 0.92); color: #fff; }
 .ev-view-title {
   font-size: 1.6rem;
   font-weight: 800;

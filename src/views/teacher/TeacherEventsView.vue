@@ -870,7 +870,8 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
-.event-badge--active   { background: #d8dcdf; color: #4f575f; }
+.event-badge--active   { background: #d9f2e3; color: #247044; }
+.event-badge--ended    { background: #f8dede; color: #a83232; }
 .event-badge--archived { background: #f0f0f0; color: #888; }
 
 .event-card-actions { display: flex; gap: 6px; }
@@ -1080,8 +1081,8 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   width: fit-content;
   backdrop-filter: blur(4px);
 }
-.ev-view-badge--active   { background: rgba(83, 91, 100,0.88); color: #fff; }
-.ev-view-badge--ended    { background: rgba(88, 96, 103, 0.9); color: #fff; }
+.ev-view-badge--active   { background: rgba(47, 143, 91, 0.92); color: #fff; }
+.ev-view-badge--ended    { background: rgba(201, 74, 74, 0.92); color: #fff; }
 .ev-view-badge--archived { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
 .ev-view-title {
   font-size: 1.6rem;
