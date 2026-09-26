@@ -300,7 +300,7 @@
                 </label>
                 <label class="modal-field">
                   <span>Employee ID <b>*</b></span>
-                  <input v-model="newTeacherEmployeeId" type="text" inputmode="text" maxlength="12" placeholder="AU2025-00000" class="modal-input" required />
+                  <input :value="newTeacherEmployeeId" type="text" inputmode="numeric" maxlength="12" placeholder="AU2025-00000" class="modal-input" @input="formatNewTeacherEmployeeId" required />
                 </label>
               </div>
               <div class="teacher-form-row">
@@ -1120,6 +1120,15 @@ const resetAddTeacherForm = () => {
   previewImage.value = ''
 }
 
+const formatNewTeacherEmployeeId = (event) => {
+  const digits = event.target.value.replace(/\D/g, '').slice(0, 9)
+  const year = digits.slice(0, 4)
+  const sequence = digits.slice(4)
+  newTeacherEmployeeId.value = digits
+    ? `AU${year}${digits.length > 4 ? `-${sequence}` : ''}`
+    : ''
+}
+
 const addNewTeacher = async () => {
   const emailLocalPart = getTeacherEmailLocalPart()
 
@@ -1133,6 +1142,10 @@ const addNewTeacher = async () => {
   }
   if (newTeacherPassword.value.length < 8) {
     alert('Password must be at least 8 characters long.')
+    return
+  }
+  if (!/^AU\d{4}-\d{4,5}$/.test(newTeacherEmployeeId.value)) {
+    alert('Employee ID must include four digits after AU and four or five digits after the hyphen.')
     return
   }
 
