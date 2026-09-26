@@ -131,7 +131,7 @@ const normalizedStatus = computed(() => {
 const isOffline = computed(() => normalizedStatus.value === 'On Leave')
 
 const statusDisplay = computed(() => {
-  if (normalizedStatus.value === 'On School') return 'In School'
+  if (normalizedStatus.value === 'On School') return 'On School'
   if (normalizedStatus.value === 'On Meeting') return 'On Meeting'
   if (normalizedStatus.value === 'Off Campus') return 'Off Campus'
   return 'Offline'
@@ -153,7 +153,7 @@ const availabilityDotClass = computed(() => {
 })
 
 const availabilitySubtext = computed(() => {
-  if (!canChangeAvailability.value) return 'Availability is locked while not in school.'
+  if (!canChangeAvailability.value) return 'Availability is locked while not on school.'
   return 'Updates your consultation availability.'
 })
 

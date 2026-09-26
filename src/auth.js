@@ -27,6 +27,12 @@ function saveSession({ token, user }, remember = false) {
   storage.setItem('cit_user', JSON.stringify(user))
 }
 
+function replaceActiveSession({ token, user }) {
+  const storage = activeStorage()
+  storage.setItem('cit_token', token)
+  storage.setItem('cit_user', JSON.stringify(user))
+}
+
 function clearSession() {
   localStorage.removeItem('cit_token')
   localStorage.removeItem('cit_user')
@@ -131,7 +137,7 @@ export async function selectRole(role) {
     headers: { Authorization: `Bearer ${getToken()}` },
     body: JSON.stringify({ role })
   }))
-  saveSession(payload, Boolean(localStorage.getItem('cit_token')))
+  replaceActiveSession(payload)
   return payload.user
 }
 
@@ -161,7 +167,22 @@ export async function resetPassword({ email, otp, newPassword }) {
   })
 }
 
+export async function verifyPasswordOtp({ email, otp }) {
+  return request('/auth/verify-password-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, otp })
+  })
+}
+
 export function logout() {
+  const token = getToken()
+  if (token) {
+    fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      keepalive: true,
+    }).catch(() => {})
+  }
   clearSession()
 }
 

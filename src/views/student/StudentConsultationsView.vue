@@ -13,7 +13,7 @@
     </div>
 
     <!-- Tabs -->
-    <div class="tabs-row">
+    <div class="tabs-row" @wheel.prevent="handleFilterWheel">
       <button
         v-for="tab in tabs" :key="tab"
         :class="['tab-btn', { active: activeTab === tab }]"
@@ -22,10 +22,31 @@
     </div>
 
     <!-- Sessions -->
-    <div class="sessions-list">
-      <div v-if="isLoadingSessions" class="empty-state">
-        <div class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-        <div>Loading sessions...</div>
+    <div :class="['sessions-list', { 'is-loading': isLoadingSessions }]">
+      <div v-if="isLoadingSessions" class="empty-state loading-state">
+        <div class="loading-panel" role="status" aria-label="Loading consultation sessions">
+          <div class="loading-orbit" aria-hidden="true"><span></span></div>
+          <div class="loading-copy">
+            <strong>Loading your sessions</strong>
+            <span>Getting your latest consultation details...</span>
+          </div>
+          <div class="session-skeleton" aria-hidden="true">
+            <div class="skeleton-avatar"></div>
+            <div class="skeleton-content">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line skeleton-subtitle"></div>
+              <div class="skeleton-chips"><span></span><span></span></div>
+            </div>
+          </div>
+          <div class="session-skeleton second" aria-hidden="true">
+            <div class="skeleton-avatar"></div>
+            <div class="skeleton-content">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line skeleton-subtitle"></div>
+              <div class="skeleton-chips"><span></span><span></span></div>
+            </div>
+          </div>
+        </div>
       </div>
       <div v-else-if="sessionsError" class="empty-state">
         <div class="empty-icon error-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v4M12 16h.01"/></svg></div>
@@ -35,7 +56,8 @@
         <div class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5h6M8.5 10h7M8.5 14h7M8.5 18h4"/></svg></div>
         <div>No sessions found.</div>
       </div>
-      <div v-for="s in filteredSessions" :key="s.id" class="session-card">
+      <template v-for="s in filteredSessions" :key="s.id">
+        <div v-if="!isLoadingSessions && !sessionsError" class="session-card">
         <div class="session-top">
           <div class="session-avatar" :style="{ background: s.teacherColor }">
             <img v-if="s.teacherAvatar" :src="s.teacherAvatar" :alt="`${s.teacher} profile`" />
@@ -81,7 +103,8 @@
             <button class="act-btn outline full" @click="openDetails(s)">View Notes</button>
           </template>
         </div>
-      </div>
+        </div>
+      </template>
     </div>
 
     <!-- ══ VIEW DETAILS MODAL ══ -->
@@ -306,6 +329,12 @@ const activeTab  = ref('All')
 const filteredSessions = computed(() =>
   activeTab.value === 'All' ? sessions.value : sessions.value.filter(s => s.status === activeTab.value)
 )
+
+function handleFilterWheel(event) {
+  const row = event.currentTarget
+  if (!row || row.scrollWidth <= row.clientWidth) return
+  row.scrollLeft += event.deltaY || event.deltaX
+}
 
 function pillClass(s) {
   return {
@@ -739,12 +768,16 @@ onMounted(() => {
 /* Tabs */
 .tabs-row {
   display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid #e9eeeb;
   padding: 10px 16px;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   position: sticky;
   top: 65px;
@@ -753,6 +786,7 @@ onMounted(() => {
 .tabs-row::-webkit-scrollbar { display: none; }
 .tab-btn {
   flex: 0 0 auto;
+  min-width: max-content;
   padding: 8px 15px;
   background: #fff;
   border: 1.5px solid #e4e8e6;
@@ -775,10 +809,12 @@ onMounted(() => {
 
 /* Sessions */
 .sessions-list { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px 10px; }
+.sessions-list.is-loading { min-height: calc(100dvh - 126px); padding: 0; }
 .empty-state {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   text-align: center; color: #9ba3ab; font-size: 0.9rem; padding: 54px 0;
 }
+.empty-state.loading-state { align-items: stretch; min-height: 100%; padding: 0; }
 .empty-icon {
   width: 42px;
   height: 42px;
@@ -790,6 +826,60 @@ onMounted(() => {
 }
 .empty-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .empty-icon.error-icon { color: #d34b58; background: #ffedf0; }
+.loading-panel {
+  width: 100%;
+  min-height: calc(100dvh - 126px);
+  box-sizing: border-box;
+  padding: 28px 16px 24px;
+  border: 1px solid rgba(91, 99, 106, 0.12);
+  border-radius: 12px;
+  background: linear-gradient(145deg, #ffffff 0%, #f5f7f7 100%);
+  box-shadow: 0 8px 18px rgba(38, 44, 49, 0.08), inset 0 1px rgba(255, 255, 255, 0.95);
+}
+.loading-orbit {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #dfe7e7;
+  border-top-color: #4b7565;
+  border-radius: 50%;
+  animation: loading-spin 0.9s linear infinite;
+}
+.loading-orbit span { width: 8px; height: 8px; border-radius: 50%; background: #4b7565; }
+.loading-copy { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 20px; }
+.loading-copy strong { color: #34423b; font-size: 0.92rem; font-weight: 700; }
+.loading-copy span { color: #9ba3ab; font-size: 0.73rem; }
+.session-skeleton {
+  display: flex;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #e7ebeb;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.72);
+}
+.session-skeleton.second { margin-top: 8px; opacity: 0.58; }
+.skeleton-avatar,
+.skeleton-line,
+.skeleton-chips span {
+  background: linear-gradient(90deg, #e7ecec 25%, #f5f7f7 50%, #e7ecec 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-avatar { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 50%; }
+.skeleton-content { flex: 1; min-width: 0; padding-top: 2px; }
+.skeleton-line { height: 9px; border-radius: 6px; }
+.skeleton-title { width: 72%; }
+.skeleton-subtitle { width: 43%; margin-top: 8px; }
+.skeleton-chips { display: flex; gap: 6px; margin-top: 12px; }
+.skeleton-chips span { width: 76px; height: 18px; border-radius: 10px; }
+.skeleton-chips span:last-child { width: 58px; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+@keyframes skeleton-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .loading-orbit, .skeleton-avatar, .skeleton-line, .skeleton-chips span { animation: none; }
+}
 .session-card {
   background: #fff;
   border-radius: 16px;
@@ -887,13 +977,15 @@ onMounted(() => {
 /* ── Modals ── */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-  z-index: 100; display: flex; align-items: flex-end; justify-content: center;
+  z-index: 2000; display: flex; align-items: flex-end; justify-content: center;
 }
 .alert-overlay {
   align-items: center;
   backdrop-filter: blur(1.5px);
 }
 .modal-sheet {
+  position: relative;
+  z-index: 2001;
   width: 100%; max-width: 430px; background: #fff;
   border-radius: 22px 22px 0 0;
   max-height: 92dvh;

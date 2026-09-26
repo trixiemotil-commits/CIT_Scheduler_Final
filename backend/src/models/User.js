@@ -174,6 +174,22 @@ const userSchema = new mongoose.Schema(
       unique: true,
       default: () => new mongoose.Types.ObjectId().toHexString(),
     },
+    authSessionInvalidatedAt: {
+      type: Date,
+      default: null,
+    },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
+    activeSessions: {
+      type: [{
+        id: { type: String, required: true },
+        createdAt: { type: Date, required: true },
+        expiresAt: { type: Date, required: true },
+      }],
+      default: [],
+    },
   },
   {
     timestamps: true,

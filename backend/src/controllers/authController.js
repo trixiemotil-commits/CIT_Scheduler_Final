@@ -39,7 +39,7 @@ async function verifyRecaptcha(token, remoteIp = null) {
 }
 
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
-const PASSWORD_OTP_LIFETIME_MS = 60 * 1000;
+const PASSWORD_OTP_LIFETIME_MS = 5 * 60 * 1000;
 const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
 const PASSWORD_OTP_MAX_ATTEMPTS = 5;
 const LOGIN_OTP_LIFETIME_MS = 5 * 60 * 1000;
@@ -57,17 +57,34 @@ function getUserRoles(user) {
   return [...new Set(roles)].filter(Boolean);
 }
 
-function signToken(user, activeRole = user.role) {
+function signToken(user, activeRole = user.role, sessionId = null) {
   return jwt.sign(
     {
       id: user._id.toString(),
       role: activeRole,
       roles: getUserRoles(user),
       email: user.email,
+      ...(sessionId ? { sid: sessionId } : {}),
     },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
+}
+
+async function completeLogin(user) {
+  const now = new Date();
+  const activeSessions = Array.isArray(user.activeSessions) ? user.activeSessions : [];
+  user.activeSessions = activeSessions.filter((session) => new Date(session.expiresAt).getTime() > now.getTime());
+  const loginWarning = user.activeSessions.length > 0;
+  const sessionId = crypto.randomUUID();
+  user.activeSessions.push({
+    id: sessionId,
+    createdAt: now,
+    expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+  });
+  user.lastLoginAt = now;
+  await user.save();
+  return { loginWarning, sessionId };
 }
 
 function toSafeUser(user) {
@@ -394,10 +411,12 @@ async function login(req, res) {
       });
     }
 
-    const token = signToken(user, user.role);
+    const loginSession = await completeLogin(user);
+    const token = signToken(user, user.role, loginSession.sessionId);
 
     return res.status(200).json({
       message: "Login successful.",
+      loginWarning: loginSession.loginWarning,
       token,
       user: { ...toSafeUser(user), role: user.role, roles },
     });
@@ -450,10 +469,12 @@ async function verifyLoginOtp(req, res) {
 
     clearLoginOtp(user);
     await user.save();
+    const loginSession = await completeLogin(user);
     const roles = getUserRoles(user);
     return res.status(200).json({
       message: "Login successful.",
-      token: signToken(user, user.role),
+      loginWarning: loginSession.loginWarning,
+      token: signToken(user, user.role, loginSession.sessionId),
       user: { ...toSafeUser(user), role: user.role, roles },
     });
   } catch (error) {
@@ -473,11 +494,24 @@ async function selectRole(req, res) {
     }
 
     return res.status(200).json({
-      token: signToken(user, selectedRole),
+      token: signToken(user, selectedRole, req.user?.sid || null),
       user: { ...toSafeUser(user), role: selectedRole, roles },
     });
   } catch (error) {
     return res.status(500).json({ message: "Unable to select role.", error: error.message });
+  }
+}
+
+async function logoutSession(req, res) {
+  try {
+    const user = await User.findById(req.user.id);
+    if (user && Array.isArray(user.activeSessions) && req.user.sid) {
+      user.activeSessions = user.activeSessions.filter((session) => String(session.id) !== String(req.user.sid));
+      await user.save();
+    }
+    return res.json({ message: "Session ended." });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to end session.", error: error.message });
   }
 }
 
@@ -489,7 +523,20 @@ async function me(req, res) {
       return res.status(404).json({ message: "User not found." });
     }
 
-    return res.status(200).json({ user: toSafeUser(user) });
+    const tokenIssuedAt = Number(req.user?.iat || 0) * 1000;
+    const now = Date.now();
+    const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt).getTime() : 0;
+    const activeSessions = Array.isArray(user.activeSessions) ? user.activeSessions : [];
+    const newLoginDetected = activeSessions.some((session) => {
+      const createdAt = new Date(session.createdAt).getTime();
+      const expiresAt = new Date(session.expiresAt).getTime();
+      return expiresAt > now && createdAt > tokenIssuedAt + 1000 && String(session.id) !== String(req.user?.sid || '');
+    });
+
+    return res.status(200).json({
+      user: toSafeUser(user),
+      security: { newLoginDetected, lastLoginAt: lastLoginAt || null },
+    });
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch user profile.", error: error.message });
   }
@@ -860,6 +907,48 @@ async function resetPassword(req, res) {
   }
 }
 
+async function verifyPasswordOtp(req, res) {
+  try {
+    const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+    const otp = String(req.body?.otp || "").trim();
+    if (!normalizedEmail || !/^\d{6}$/.test(otp)) {
+      return res.status(400).json({ message: "Enter the full 6-digit code." });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail })
+      .select("+passwordOtpHash +passwordOtpExpiresAt +passwordOtpAttempts");
+    if (!user || !user.passwordOtpHash || !user.passwordOtpExpiresAt) {
+      return res.status(400).json({ message: "Request a new OTP and enter the 6-digit code." });
+    }
+
+    if (user.passwordOtpExpiresAt.getTime() <= Date.now()) {
+      clearPasswordOtp(user);
+      await user.save();
+      return res.status(400).json({ message: "This OTP has expired. Request a new one." });
+    }
+
+    const enteredOtpHash = hashOtp(otp);
+    const otpMatches = crypto.timingSafeEqual(
+      Buffer.from(enteredOtpHash, "hex"),
+      Buffer.from(user.passwordOtpHash, "hex")
+    );
+    if (!otpMatches) {
+      user.passwordOtpAttempts += 1;
+      if (user.passwordOtpAttempts >= PASSWORD_OTP_MAX_ATTEMPTS) {
+        clearPasswordOtp(user);
+        await user.save();
+        return res.status(429).json({ message: "Too many incorrect codes. Request a new OTP." });
+      }
+      await user.save();
+      return res.status(401).json({ message: "The OTP is incorrect." });
+    }
+
+    return res.status(200).json({ message: "OTP verified." });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to verify OTP.", error: error.message });
+  }
+}
+
 async function changePassword(req, res) {
   try {
     const { currentPassword, newPassword, otp } = req.body || {};
@@ -938,10 +1027,12 @@ module.exports = {
   login,
   verifyLoginOtp,
   selectRole,
+  logoutSession,
   me,
   updateMe,
   requestPasswordOtp,
   changePassword,
   requestPasswordReset,
+  verifyPasswordOtp,
   resetPassword,
 };

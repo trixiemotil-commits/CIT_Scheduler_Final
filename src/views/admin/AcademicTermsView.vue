@@ -4,7 +4,7 @@
       <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" @click="router.push('/admin/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" class="avatar" alt="Admin" />
+          <img :src="user.avatar || initialsAvatar(user)" class="avatar" alt="Admin" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
@@ -17,7 +17,14 @@
         <PublishedTermScheduleLink />
       </nav>
       <RoleSwitchButton />
-      <button class="logout-btn" @click="logoutAndLeave">Logout</button>
+      <button class="logout-btn" @click="logoutAndLeave">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        Logout
+      </button>
     </aside>
 
     <main class="main">
@@ -66,6 +73,17 @@
             <div class="preview-toolbar__intro">
               <button class="back-btn" @click="workspaceMode = ''; previewPage = 1"><span aria-hidden="true">&larr;</span> Choose another mode</button>
             </div>
+            <div class="schedule-type-filter" role="tablist" aria-label="Schedule type filter">
+              <button
+                v-for="option in scheduleTypeOptions"
+                :key="option.value"
+                type="button"
+                :class="{ active: scheduleTypeFilter === option.value }"
+                role="tab"
+                :aria-selected="scheduleTypeFilter === option.value"
+                @click="scheduleTypeFilter = option.value; previewPage = 1"
+              >{{ option.label }}</button>
+            </div>
             <label class="preview-search">
               <span>Search {{ workspaceMode === 'room' ? 'room' : (workspaceMode === 'teacher' ? 'teacher' : 'student') }}</span>
               <input v-model.trim="previewSearch" type="search" :placeholder="workspaceMode === 'room' ? 'Search rooms...' : (workspaceMode === 'teacher' ? 'Search teachers...' : 'Search student groups...')" />
@@ -91,12 +109,12 @@
               <button class="back-btn" @click="studentYearSelection = null"><span aria-hidden="true">&larr;</span> Choose another year</button>
               <div style="margin-left:12px"><strong>{{ studentYearSelection }}</strong><small style="display:block;color:#6b7680">Select a section to manage schedules</small></div>
             </div>
-            <div v-if="!workspaceEntries.length" class="empty-state">No schedules found for this term.</div>
+            <div v-if="!filteredWorkspaceEntries.length" class="empty-state">No {{ scheduleTypeFilter === 'all' ? '' : `${scheduleTypeFilter} ` }}schedules found for this term.</div>
             <div v-else class="section-grid">
               <button v-for="s in (workspaceTerm.sectionNames?.[studentYearSelection] || [])" :key="s" class="preview-card" @click="openSchedule({ value: { year: studentYearSelection, section: s } })">
                 <div class="preview-card-head">
                   <span class="preview-avatar"><span>{{ studentYearSelection.slice(0,1) }}</span></span>
-                  <div><strong>{{ studentYearSelection }} · {{ s }}</strong><small>{{ workspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length }} scheduled class{{ workspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length === 1 ? '' : 'es' }}</small></div>
+                  <div><strong>{{ studentYearSelection }} · {{ s }}</strong><small>{{ filteredWorkspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length }} scheduled class{{ filteredWorkspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length === 1 ? '' : 'es' }}</small></div>
                   <span class="open-arrow" aria-hidden="true">&rarr;</span>
                 </div>
               </button>
@@ -214,14 +232,14 @@
             <section v-if="modalStep === 1" class="form-section setup-section">
               <div class="setup-section__heading"><span class="step-number">1</span><div><h3>Term details</h3><p>Name the school year and semester.</p></div></div>
               <div class="two-columns">
-                <label><span>School year</span><input :value="form.schoolYear" inputmode="numeric" maxlength="7" placeholder="Enter School Year (SY00-00)" autocomplete="off" @input="formatSchoolYear" /></label>
+                <label><span>School year</span><select v-model="form.schoolYear" required><option value="">Choose a school year</option><option v-for="schoolYear in schoolYearOptions" :key="schoolYear" :value="schoolYear">{{ schoolYear }}</option></select></label>
                 <label><span>Semester</span><select v-model="form.semester"><option value="">Choose a semester</option><option>1st Semester</option><option>2nd Semester</option></select></label>
               </div>
             </section>
             <section v-else-if="modalStep === 2" class="form-section setup-section">
               <div class="setup-section__heading"><span class="step-number">2</span><div><h3>Sections</h3><p>Enter how many sections each year level will have.</p></div></div>
               <div class="count-grid">
-                <label v-for="year in yearOptions" :key="year"><span>{{ year }}</span><input v-model.number="form.sectionCounts[year]" type="number" min="0" step="1" placeholder="0" /></label>
+                <label v-for="year in yearOptions" :key="year"><span>{{ year }}</span><input :value="form.sectionCounts[year] ?? ''" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{0,2}" placeholder="0" @input="limitSectionCountInput($event, year)" /></label>
               </div>
               <div v-if="yearOptions.some(year => form.sectionNames[year]?.length)" class="name-groups">
                 <div v-for="year in yearOptions.filter(item => form.sectionNames[item]?.length)" :key="year" class="name-group">
@@ -263,6 +281,7 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import PublishedTermScheduleLink from '@/components/PublishedTermScheduleLink.vue'
 import RoleSwitchButton from '@/components/RoleSwitchButton.vue'
+import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
 import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -272,6 +291,15 @@ const route = useRoute()
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const yearOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+const schoolYearOptions = ref([])
+function refreshSchoolYearOptions() {
+  const currentCalendarYear = new Date().getFullYear()
+  schoolYearOptions.value = Array.from({ length: 10 }, (_, index) => {
+    const startYear = currentCalendarYear + index
+    return `SY${String(startYear).slice(-2)}-${String(startYear + 1).slice(-2)}`
+  })
+}
+refreshSchoolYearOptions()
 const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const roomFloors = [
   { label: '2nd Floor', rooms: ['201', '202', '204', '205', '208', '209'] },
@@ -302,6 +330,7 @@ const workspaceEntries = ref([])
 const studentYearSelection = ref(null)
 const workspaceLoading = ref(false)
 const previewSearch = ref('')
+const scheduleTypeFilter = ref('all')
 const previewPage = ref(1)
 const previewPageSize = 4
 const showTermModal = ref(false)
@@ -319,10 +348,21 @@ const workspaceEyebrowBase = computed(() => isCurrentTermSource.value ? 'Current
 const allRoomNames = computed(() => roomFloors.flatMap(floor => floor.rooms))
 const allRoomsSelected = computed(() => allRoomNames.value.length > 0 && allRoomNames.value.every(room => selectedRooms.value.includes(room)))
 const someRoomsSelected = computed(() => selectedRooms.value.length > 0 && !allRoomsSelected.value)
+const scheduleTypeOptions = [
+  { value: 'all', label: 'All schedules' },
+  { value: 'parallel', label: 'Parallel' },
+  { value: 'non-parallel', label: 'Non-Parallel' },
+]
 
 function toggleAllRooms(event) {
   selectedRooms.value = event.target.checked ? [...allRoomNames.value] : []
 }
+
+const filteredWorkspaceEntries = computed(() => workspaceEntries.value.filter((entry) => {
+  if (scheduleTypeFilter.value === 'parallel') return Boolean(entry.parallel)
+  if (scheduleTypeFilter.value === 'non-parallel') return !entry.parallel
+  return true
+}))
 
 const filteredTerms = computed(() => terms.value
   .filter(term => {
@@ -344,17 +384,17 @@ const previewTargets = computed(() => {
     const source = [...new Set(termRooms(workspaceTerm.value))].map(room => ({ key: room, label: `Room ${room}`, initials: room, value: room }))
     return source
       .filter(target => target.label.toLowerCase().includes(query))
-      .map(target => ({ ...target, entries: workspaceEntries.value.filter(entry => entry.room === target.value) }))
+      .map(target => ({ ...target, entries: filteredWorkspaceEntries.value.filter(entry => entry.room === target.value) }))
   }
   if (workspaceMode.value === 'teacher') {
     const source = teachers.value.map(teacher => ({ key: teacher.id || teacher.name, label: teacher.name, initials: initials(teacher.name), avatar: teacher.avatar, value: teacher.name }))
     return source
       .filter(target => target.label.toLowerCase().includes(query))
-      .map(target => ({ ...target, entries: workspaceEntries.value.filter(entry => entry.teacher === target.value) }))
+      .map(target => ({ ...target, entries: filteredWorkspaceEntries.value.filter(entry => entry.teacher === target.value) }))
   }
   // student mode: group by year + section
   const groups = {}
-  workspaceEntries.value.forEach(entry => {
+  filteredWorkspaceEntries.value.forEach(entry => {
     const y = entry.year || 'Unknown'
     const s = entry.section || '—'
     const key = `${y}||${s}`
@@ -411,6 +451,11 @@ function ensureSectionNames() {
     form.sectionNames[year] = Array.from({ length: count }, (_, index) => old[index] || `South ${index + 1}`)
   })
 }
+function limitSectionCountInput(event, year) {
+  const digits = String(event.target.value || '').replace(/\D/g, '').slice(0, 2)
+  event.target.value = digits
+  form.sectionCounts[year] = digits === '' ? '' : Number(digits)
+}
 watch(() => ({ ...form.sectionCounts }), ensureSectionNames, { deep: true })
 
 async function loadPage() {
@@ -446,6 +491,7 @@ function openWorkspace(term, action) {
   workspaceMode.value = ''
   studentYearSelection.value = null
   previewSearch.value = ''
+  scheduleTypeFilter.value = 'all'
   previewPage.value = 1
   workspaceEntries.value = []
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -933,14 +979,8 @@ function resetForm() {
   selectedRooms.value = []
   ensureSectionNames()
 }
-function formatSchoolYear(event) {
-  const digits = String(event.target.value || '').replace(/\D/g, '').slice(0, 4)
-  const firstYear = digits.slice(0, 2)
-  const secondYear = digits.slice(2, 4)
-  form.schoolYear = digits ? `SY${firstYear}${secondYear ? `-${secondYear}` : ''}` : ''
-  event.target.value = form.schoolYear
-}
 function openTermModal(term = null) {
+  refreshSchoolYearOptions()
   resetForm()
   modalStep.value = 1
   editingTermId.value = termId(term)
@@ -960,8 +1000,8 @@ async function nextModalStep() {
       await Swal.fire({ icon: 'warning', title: 'Complete term details', text: 'School year and semester are required before continuing.' })
       return
     }
-    if (!/^SY\d{2}-\d{2}$/.test(form.schoolYear)) {
-      await Swal.fire({ icon: 'warning', title: 'Check the school year', text: 'Use the format SY00-00, for example SY26-27.' })
+    if (!schoolYearOptions.value.includes(form.schoolYear)) {
+      await Swal.fire({ icon: 'warning', title: 'Check the school year', text: 'Choose the current school year or a future school year.' })
       return
     }
   }
@@ -970,7 +1010,7 @@ async function nextModalStep() {
 }
 async function saveTerm() {
   if (!form.schoolYear || !form.semester) return Swal.fire({ icon: 'warning', title: 'Missing details', text: 'School year and semester are required.' })
-  if (!/^SY\d{2}-\d{2}$/.test(form.schoolYear)) return Swal.fire({ icon: 'warning', title: 'Incomplete school year', text: 'Enter four numbers for the school year, for example 2627.' })
+  if (!schoolYearOptions.value.includes(form.schoolYear)) return Swal.fire({ icon: 'warning', title: 'Invalid school year', text: 'Choose the current school year or a future school year.' })
   ensureSectionNames(); saving.value = true
   const payload = {
     schoolYear: form.schoolYear, semester: form.semester, sectionCounts: form.sectionCounts, sectionNames: form.sectionNames,
@@ -1038,7 +1078,7 @@ loadPage()
 .term-actions .view-btn:hover:not(:disabled) { color: #fff; background: #263744; }
 .term-actions .add-btn { color: #315e47; border-color: #bed4c8; background: #edf7f1; }
 .term-actions .excel-btn { color: #176a94; border-color: #b9d7e6; background: #eaf6fc; }
-.term-actions .publish-btn { color: #176a94; border-color: #b9d7e6; background: #eaf6fc; }
+.term-actions .publish-btn { grid-column: 1 / -1; justify-content: center; color: #176a94; border-color: #b9d7e6; background: #eaf6fc; }
 .term-actions .publish-btn:disabled { color: #668176; border-color: #cfddd5; background: #e7f1eb; opacity: 1; }
 .empty-state { border: 1px dashed #ccd4d9; border-radius: 14px; background: #f8fafb; }
 
@@ -1222,6 +1262,35 @@ loadPage()
   transition: border-color .16s ease, box-shadow .16s ease;
 }
 .preview-search input:focus { outline: none; border-color: #71808a; box-shadow: 0 0 0 3px rgba(62, 82, 95, .12); }
+.schedule-type-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid #d5dce0;
+  border-radius: 10px;
+  background: #edf1f3;
+}
+.schedule-type-filter button {
+  min-height: 32px;
+  padding: 6px 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #63717a;
+  font: inherit;
+  font-size: .68rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+}
+.schedule-type-filter button:hover { color: #27343c; background: rgba(255,255,255,.7); }
+.schedule-type-filter button.active {
+  color: #fff;
+  background: linear-gradient(145deg, #687780, #3f4b54);
+  box-shadow: 0 3px 8px rgba(39, 49, 57, .16);
+}
 .preview-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1370,6 +1439,20 @@ loadPage()
 }
 .preview-pagination button:hover:not(:disabled) { border-color: #929fa7; transform: translateY(-1px); }
 .preview-pagination button:disabled { cursor: default; opacity: .45; }
+@media (max-width: 1200px) {
+  .main { padding-inline: 28px; }
+  .terms-card { padding: 24px; }
+  .page-header h1 { font-size: clamp(1.8rem, 3vw, 2.25rem); }
+  .page-header p { font-size: .82rem; }
+  .new-term-btn { min-height: 42px; padding-inline: 14px; font-size: .8rem; white-space: nowrap; }
+  .term-row { flex-direction: column; padding: 18px; }
+  .term-actions { width: min(100%, 480px); margin-top: 4px; }
+  .term-actions button { min-height: 38px; padding: 7px 9px; gap: 6px; font-size: .64rem; }
+  .term-actions button svg { width: 15px; height: 15px; flex-basis: 15px; }
+  .mode-grid { width: min(980px, calc(100% - 40px)); gap: 12px; }
+  .mode-card { min-height: 145px; padding: 18px; gap: 14px; }
+  .mode-card .mode-copy small { font-size: .7rem; line-height: 1.4; }
+}
 @media (max-width: 1100px) {
   .term-row { flex-direction: column; }
   .term-actions { width: min(100%, 480px); justify-content: flex-start; }
@@ -1399,6 +1482,8 @@ loadPage()
   .mode-card { min-height: 138px; padding: 20px; }
   .preview-toolbar { align-items: stretch; flex-direction: column; padding: 18px 20px; }
   .preview-toolbar__intro { justify-content: space-between; }
+  .schedule-type-filter { width: 100%; overflow-x: auto; }
+  .schedule-type-filter button { flex: 1 0 auto; }
   .preview-search { margin-left: 0; align-items: stretch; flex-direction: column; }
   .preview-search input { width: 100%; }
   .preview-grid { padding: 18px 20px 24px; }

@@ -19,7 +19,7 @@
       <button class="profile-link" @click="$router.push('/student/profile')">Profile</button>
     </div>
 
-    <div class="section-card">
+    <div id="password" class="section-card">
       <div class="section-title">Change Password</div>
       <form @submit.prevent="handleUpdatePassword" class="pw-form">
         <div class="field-group">
@@ -62,7 +62,7 @@
 
     <div class="section-card twofa-card two-factor-card">
       <div class="section-title twofa-title-row">
-        <span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Email verification on login</span>
+        <span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Email verification</span>
         <div class="tfa-control"><span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span><button type="button" class="toggle-switch" :class="{ 'toggle-switch--on': twoFactorEnabled }" :disabled="isSavingTwoFactor" :aria-pressed="twoFactorEnabled" :aria-label="twoFactorEnabled ? 'Disable email verification' : 'Enable email verification'" @click="toggleTwoFactor"><span class="toggle-thumb"></span></button></div>
       </div>
       <p class="twofa-msg">Send a verification code to your PHINMA Gmail address whenever you log in.</p>
@@ -71,7 +71,7 @@
       <div v-if="twoFactorSuccess" class="msg">{{ twoFactorSuccess }}</div>
     </div>
 
-    <div class="section-card faq-card">
+    <div id="faqs" class="section-card faq-card">
       <div class="section-title">FAQs</div>
       <div class="faq-list">
         <details class="faq-item" open>
@@ -92,7 +92,7 @@
         <details class="faq-item">
           <summary>How does email verification work?</summary>
           <ul class="faq-bullets">
-            <li>Toggle Email verification on login to enable or disable it.</li>
+            <li>Toggle Email verification to enable or disable it.</li>
             <li>Once enabled, a code will be sent to your email each time you log in.</li>
           </ul>
         </details>
@@ -127,7 +127,7 @@
 <script setup>
 import { getToken, getUser, saveMergedUser } from '@/auth.js'
 import { IonContent, IonPage } from '@ionic/vue'
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const user = getUser() || { name: 'Anna Cooper', email: 'anna.cooper@student.edu' }
 const initials = computed(() => user.name?.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'A')
@@ -193,56 +193,83 @@ function handleUpdatePassword() {
   pwSuccess.value = ''
   showSuccessModal.value = true
 }
+
+onMounted(() => {
+  document.body.classList.add('student-settings-active')
+})
+
+onBeforeUnmount(() => {
+  document.body.classList.remove('student-settings-active')
+})
 </script>
 
 <style scoped>
+:global(body.student-settings-active .student-tab-bar) {
+  display: none !important;
+}
+
+:global(ion-content) {
+  --background: linear-gradient(145deg, #eef0f1 0%, #dfe3e5 52%, #cfd4d7 100%);
+}
+
 .mobile-app {
+  width: 100%;
   max-width: 430px;
-  min-height: 100%;
+  min-height: 100dvh;
+  box-sizing: border-box;
   margin: 0 auto;
-  background: #f3f5f7;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, .78), transparent 34%),
+    linear-gradient(145deg, #f1f3f4 0%, #dfe3e5 52%, #c7cdd1 100%) !important;
   display: flex;
   flex-direction: column;
-  padding-bottom: 16px;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
   padding-top: env(safe-area-inset-top, 0px);
   font-family: 'Poppins', sans-serif;
 }
 .app-header {
+  min-height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
-  padding: 16px 18px;
-  border-bottom: 1px solid #e5e7eb;
+  background: rgba(246, 248, 249, .76);
+  padding: 16px clamp(18px, 5vw, 28px);
+  border-bottom: 1px solid rgba(113,123,131,.16);
+  backdrop-filter: blur(10px);
 }
 .back-btn {
-  background: none;
-  border: none;
+  width: 44px;
+  height: 44px;
+  justify-content: center;
+  background: linear-gradient(145deg,#fafbfb,#dfe3e5);
+  border: 1px solid rgba(255,255,255,.9);
   cursor: pointer;
-  color: #444;
-  padding: 4px;
+  color: #4d5860;
+  padding: 0;
   display: flex;
   align-items: center;
-  border-radius: 6px;
-  margin-left: -4px;
+  border-radius: 50%;
+  margin-left: 0;
+  box-shadow: inset 0 1px rgba(255,255,255,.95), 0 6px 14px rgba(48,57,64,.14);
 }
-.header-title { font-weight: 700; font-size: 1rem; color: #23272c; }
+.header-title { font-weight: 800; font-size: 1.08rem; color: #3e4851; letter-spacing: .01em; }
 
 .user-card {
-  background: #fff;
-  margin: 14px 16px 0;
-  border-radius: 12px;
-  padding: 12px;
+  background: linear-gradient(145deg,rgba(255,255,255,.96),rgba(235,239,241,.9));
+  margin: 16px clamp(16px, 5vw, 28px) 0;
+  border-radius: 22px;
+  padding: 14px;
   display: flex;
   align-items: center;
   gap: 12px;
-  border: 1px solid #e4e7eb;
+  border: 1px solid rgba(255,255,255,.98);
+  box-shadow: inset 0 1px rgba(255,255,255,.98), 0 10px 22px rgba(48,57,64,.1);
 }
 .user-avatar {
-  width: 38px;
-  height: 38px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: #4b5563;
+  background: linear-gradient(145deg,#69747d,#303940);
   color: #fff;
   display: flex;
   align-items: center;
@@ -250,33 +277,36 @@ function handleUpdatePassword() {
   font-weight: 700;
 }
 .user-info { flex: 1; }
-.user-name { font-weight: 700; font-size: 0.9rem; color: #181c20; }
-.user-email { font-size: 0.75rem; color: #85909b; }
+.user-name { font-weight: 800; font-size: .88rem; color: #181c20; line-height: 1.25; }
+.user-email { font-size: .72rem; color: #75808a; line-height: 1.35; overflow-wrap: anywhere; }
 .profile-link {
-  background: #4b5563;
+  background: linear-gradient(145deg,#69747d,#303940);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 7px 14px;
-  font-size: 0.76rem;
+  border-radius: 13px;
+  padding: 11px 16px;
+  font-size: 0.78rem;
   font-weight: 600;
+  box-shadow: inset 0 1px rgba(255,255,255,.22), 0 5px 10px rgba(39,44,49,.16);
 }
 
 .section-card {
-  background: #fff;
-  margin: 10px 16px 0;
-  border-radius: 12px;
-  border: 1px solid #e4e7eb;
-  padding: 14px;
+  background: linear-gradient(145deg,rgba(255,255,255,.96),rgba(235,239,241,.9));
+  margin: 16px clamp(16px, 5vw, 28px) 0;
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,.98);
+  padding: 18px;
+  box-shadow: inset 0 1px rgba(255,255,255,.98), 0 12px 26px rgba(48,57,64,.13);
 }
-.section-title { font-weight: 700; color: #262b30; margin-bottom: 12px; font-size: 1.08rem; }
+.section-title { font-weight: 800; color: #252b31; margin-bottom: 16px; font-size: 1.18rem; line-height: 1.2; }
 
 .faq-card { margin-top: 12px; }
 .faq-list { display: flex; flex-direction: column; gap: 10px; }
 .faq-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  border: 1px solid rgba(255,255,255,.82);
+  border-radius: 13px;
+  background: rgba(255,255,255,.58);
+  box-shadow: inset 0 1px rgba(255,255,255,.9);
   padding: 12px 14px;
 }
 .faq-item summary {
@@ -298,17 +328,18 @@ function handleUpdatePassword() {
   gap: 6px;
 }
 
-.pw-form { display: flex; flex-direction: column; gap: 10px; }
-.field-group { display: flex; flex-direction: column; gap: 6px; }
-.field-label { font-size: 0.8rem; color: #606a75; font-weight: 600; }
+.pw-form { display: flex; flex-direction: column; gap: 16px; }
+.field-group { display: flex; flex-direction: column; gap: 8px; }
+.field-label { font-size: .8rem; color: #5d6872; font-weight: 800; }
 .field-input {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #d8dde3;
-  border-radius: 9px;
-  padding: 10px 38px 10px 12px;
-  background: #f8fafb;
-  font-size: 0.86rem;
+  border: 1px solid #cbd3d9;
+  min-height: 56px;
+  border-radius: 16px;
+  padding: 13px 46px 13px 16px;
+  background: rgba(250,251,251,.7);
+  font-size: .86rem;
   font-family: inherit;
 }
 .pw-wrap {
@@ -316,7 +347,7 @@ function handleUpdatePassword() {
 }
 .eye-btn {
   position: absolute;
-  right: 10px;
+  right: 14px;
   top: 50%;
   transform: translateY(-50%);
   border: none;
@@ -326,16 +357,18 @@ function handleUpdatePassword() {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  padding: 0;
+  padding: 10px;
 }
 .update-btn {
-  border: none;
-  background: #4b5563;
+  border: 1px solid #303940;
+  background: linear-gradient(145deg,#69747d,#303940);
   color: #fff;
-  border-radius: 9px;
-  padding: 11px;
+  min-height: 56px;
+  border-radius: 16px;
+  padding: 13px 18px;
   font-weight: 700;
   margin-top: 2px;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 7px 15px rgba(39,44,49,.2);
 }
 .msg { font-size: 0.78rem; padding: 8px 10px; border-radius: 8px; }
 .msg-err { color: #d0414f; background: #fff1f3; }
@@ -375,9 +408,12 @@ function handleUpdatePassword() {
   line-height: 1.45;
 }
 .two-factor-card { position: relative; padding: 16px; }
-.twofa-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.twofa-title-row > span { display: inline-flex; align-items: center; gap: 8px; }
-.twofa-title-row .tfa-control { position: absolute; top: 16px; right: 16px; display: flex; align-items: center; gap: 8px; }
+.twofa-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.twofa-title-row > span { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; line-height: 1.25; }
+.twofa-title-row .tfa-control { position: static; flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.twofa-title-row .tfa-control { flex-direction: column; gap: 4px; align-items: center; }
+.twofa-title-row .tfa-control .toggle-switch { order: 1; }
+.twofa-title-row .tfa-control .tfa-status { order: 2; }
 .two-factor-card .section-title { margin-bottom: 6px; }
 .two-factor-card .twofa-msg { margin: 0 0 12px; color: #687078; background: transparent; padding: 0; }
 .two-factor-card .field-input { margin-bottom: 12px; }
@@ -388,7 +424,7 @@ function handleUpdatePassword() {
   display: block;
   width: 50px;
   height: 27px;
-  margin-top: 10px;
+  margin-top: 0;
   border: 0;
   border-radius: 20px;
   background: #c7cdd3;
@@ -415,7 +451,8 @@ function handleUpdatePassword() {
   position: fixed;
   inset: 0;
   z-index: 120;
-  background: rgba(0, 0, 0, 0.34);
+  background: rgba(31,35,39,.58);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -423,10 +460,10 @@ function handleUpdatePassword() {
 }
 .success-modal {
   width: min(320px, 100%);
-  background: #fff;
-  border: 2px solid #4b5563;
-  border-radius: 14px;
-  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(145deg, #f8f9f9, #dfe3e5);
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 18px;
+  box-shadow: 0 16px 28px rgba(22,26,30,.26), inset 0 1px rgba(255,255,255,.95);
   padding: 18px 16px 16px;
   text-align: center;
 }
@@ -464,5 +501,31 @@ function handleUpdatePassword() {
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+@media (max-width: 380px) {
+  .user-card {
+    gap: 9px;
+    padding: 11px;
+  }
+
+  .user-avatar {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+  }
+
+  .profile-link {
+    padding-inline: 12px;
+  }
+
+  .twofa-title-row {
+    flex-direction: column;
+  }
+
+  .twofa-title-row .tfa-control {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 </style>

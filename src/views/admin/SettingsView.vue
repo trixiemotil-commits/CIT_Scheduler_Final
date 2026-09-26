@@ -5,7 +5,7 @@
       <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
+          <img :src="user.avatar || initialsAvatar(user)" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
@@ -164,7 +164,7 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
             </div>
             <div>
-              <h2 class="settings-card-title">Email verification on login</h2>
+              <h2 class="settings-card-title">Email verification</h2>
             </div>
             <div class="tfa-control">
               <span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span>
@@ -206,30 +206,28 @@
             <h2 class="faq-title">FAQs</h2>
           </div>
 
-          <div class="faq-list">
-            <div
-              v-for="(faq, i) in faqs"
-              :key="i"
-              class="faq-item"
-              :class="{ 'faq-item--open': openFaq === i }"
-            >
-              <button class="faq-question" @click="openFaq = openFaq === i ? null : i">
-                <span>{{ faq.q }}</span>
-                <svg
-                  class="faq-chevron"
-                  :class="{ 'faq-chevron--open': openFaq === i }"
-                  width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                ><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              <div v-show="openFaq === i" class="faq-answer">
-                <template v-if="Array.isArray(faq.a)">
+          <div v-for="category in faqCategories" :key="category" class="faq-category-group">
+            <div class="faq-category-divider"><span>{{ category }}</span></div>
+            <div class="faq-list">
+              <div
+                v-for="faq in faqs.filter((item) => item.category === category)"
+                :key="faq.q"
+                class="faq-item"
+                :class="{ 'faq-item--open': openFaq === faq.q }"
+              >
+                <button class="faq-question" @click="openFaq = openFaq === faq.q ? null : faq.q">
+                  <span>{{ faq.q }}</span>
+                  <svg
+                    class="faq-chevron"
+                    :class="{ 'faq-chevron--open': openFaq === faq.q }"
+                    width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                  ><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div v-show="openFaq === faq.q" class="faq-answer">
                   <ul class="faq-bullets">
-                    <li v-for="(item, idx) in faq.a" :key="idx">{{ item }}</li>
+                    <li v-for="(item, idx) in faq.a" :key="idx" v-html="highlightFaqText(item)"></li>
                   </ul>
-                </template>
-                <template v-else>
-                  {{ faq.a }}
-                </template>
+                </div>
               </div>
             </div>
           </div>
@@ -265,9 +263,10 @@
 
 <script setup>
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
+import { initialsAvatar } from '@/utils/avatar.js'
+import Swal from 'sweetalert2'
 import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import Swal from 'sweetalert2'
 
 const router = useRouter()
 const route  = useRoute()
@@ -455,7 +454,7 @@ function clearOtpTimer() {
 
 function startOtpTimer() {
   clearOtpTimer()
-  otpSecondsRemaining.value = 60
+  otpSecondsRemaining.value = 5 * 60
   otpTimer = setInterval(() => {
     otpSecondsRemaining.value -= 1
     if (otpSecondsRemaining.value <= 0) {
@@ -549,16 +548,102 @@ onUnmounted(clearOtpTimer)
 
 /* ── FAQs ── */
 const openFaq = ref(null)
+const faqCategories = ['Schedule Management', 'Faculty & Campus', 'Account & Security']
+const faqHighlightTerms = [
+  'Academic Terms',
+  'Current Term Schedule',
+  'Add Schedule',
+  'schedule workspace',
+  'schedule browser',
+  'published-term schedule link',
+  'teacher assignment',
+  'consultation hours',
+  'user management',
+  'Activity Logs',
+  'Teachers',
+  'Users',
+  'Events',
+  'student group',
+  'faculty member',
+  'room',
+  'section',
+  'Admin',
+  'Teacher',
+  'Student',
+  'OTP',
+  'Settings',
+  'Change Password',
+  'Email verification',
+  'Switch to Teacher',
+  'Logout',
+]
 const faqs = [
   {
-    q: 'Is this a settings issue or a system issue?',
+    category: 'Schedule Management',
+    q: 'How do I create a schedule for a new academic term?',
     a: [
-      'If the problem is on the admin, teacher, or student settings page itself, it is usually an account or role setting.',
-      'If the problem is login failure, API errors, database connection, or email delivery, it is a system configuration issue and should be checked in the backend environment settings.'
+      'Open Academic Terms from the sidebar and create or select the term you want to manage.',
+      'Set the term name, start date, end date, and semester status before adding schedule entries.',
+      'Use the schedule workspace to add classes by student group, room, or faculty member.'
     ]
   },
   {
-    q: 'How do I change my password in Settings?',
+    category: 'Schedule Management',
+    q: 'How do I add or update a weekly schedule?',
+    a: [
+      'Open Academic Terms and select the active term, then choose Add Schedule.',
+      'Select the year and section, faculty member, subject, room, day, and time.',
+      'Save the entry, then review the term schedule for conflicts or missing assignments.'
+    ]
+  },
+  {
+    category: 'Schedule Management',
+    q: 'What should I do when a schedule has a conflict?',
+    a: [
+      'Open the schedule browser and view the entries by student group, room, or faculty member.',
+      'Check whether the same room, faculty member, or student section has overlapping times.',
+      'Edit or remove the conflicting entry, then save the corrected schedule.'
+    ]
+  },
+  {
+    category: 'Schedule Management',
+    q: 'How do I publish the schedule for students and teachers?',
+    a: [
+      'Review the active academic term and confirm that its schedule entries are complete.',
+      'Use the published-term schedule link to make the approved term available to the portals.',
+      'Students and teachers will see the published schedule after their next data refresh.'
+    ]
+  },
+  {
+    category: 'Faculty & Campus',
+    q: 'How do I manage teacher availability and consultation hours?',
+    a: [
+      'Open the teacher assignment or user management area and select the faculty member.',
+      'Update their availability status and assign consultation hours when needed.',
+      'Students can request consultations only when the teacher is available and has hours for that day.'
+    ]
+  },
+  {
+    category: 'Account & Security',
+    q: 'How do I manage users and their roles?',
+    a: [
+      'Open Users from the sidebar to view, search, create, or update accounts.',
+      'Assign only the roles required for each account: Admin, Teacher, or Student.',
+      'Review account status when a user cannot access the expected portal.'
+    ]
+  },
+  {
+    category: 'Faculty & Campus',
+    q: 'How do I create and update campus events?',
+    a: [
+      'Open Events from the sidebar and create an event with its title, date, time, venue, and description.',
+      'Add a cover image when appropriate, then save the event for portal users.',
+      'Edit or remove outdated events so students and teachers see accurate information.'
+    ]
+  },
+  {
+    category: 'Account & Security',
+    q: 'How do I change my admin password?',
     a: [
       'Open Settings and go to Change Password.',
       'Enter your current password, the OTP sent to your email, and your new password.',
@@ -566,29 +651,42 @@ const faqs = [
     ]
   },
   {
-    q: 'How does email verification on login work?',
+    category: 'Account & Security',
+    q: 'How does email verification work for admin login?',
     a: [
-      'Go to Settings and toggle Email verification on login.',
-      'Confirm with your current password, then a code will be sent to your email on each login.',
-      'This is an account security setting and depends on the backend email configuration.'
+      'Open Settings and enable Email verification.',
+      'Confirm the change with your current password.',
+      'A verification code will be sent to your email each time you log in.'
     ]
   },
   {
+    category: 'Account & Security',
     q: 'How do I switch roles or log out?',
     a: [
-      'Use the role switch button in the sidebar if your account has access to multiple roles.',
-      'To log out, click Logout in the sidebar and confirm the prompt.',
-      'These are page-level actions, not backend configuration changes.'
+      'Use Switch to Teacher in the sidebar when your account has multiple roles.',
+      'To end your session, click Logout and confirm the prompt.'
     ]
   },
   {
+    category: 'Account & Security',
     q: 'Who can access the admin portal?',
     a: [
-      'Only users with the Admin role can access the admin portal.',
-      'Teacher and Student accounts can use their own portals and settings pages, but they do not have admin privileges.'
+      'Only accounts with the Admin role can access the admin portal.',
+      'Teacher and Student accounts use their own portals and cannot access admin tools.'
     ]
   },
 ]
+
+function highlightFaqText(text) {
+  const escaped = String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+  const terms = [...faqHighlightTerms].sort((a, b) => b.length - a.length).map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  return escaped.replace(new RegExp(`(${terms.join('|')})`, 'gi'), '<mark class="faq-inline-highlight">$1</mark>')
+}
 </script>
 
 <style scoped>
@@ -599,9 +697,10 @@ const faqs = [
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background: radial-gradient(circle at 82% 8%, #f8fafb 0, #e7ebee 34%, #d8dde1 100%);
+  background: #f5f6f8;
   font-family: 'Poppins', sans-serif;
 }
+.layout button, .layout input, .layout select { font-family: inherit; }
 
 /* ── Sidebar ── */
 .sidebar {
@@ -633,7 +732,10 @@ const faqs = [
   overflow: hidden;
   margin-bottom: 10px;
   border: 3px solid #c4c9cd;
+  cursor: pointer;
+  transition: opacity 0.18s;
 }
+.avatar-wrap:hover { opacity: 0.85; }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
 .brand  { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
 .role   { font-size: 0.88rem; color: #444; font-weight: 500; }
@@ -687,12 +789,13 @@ const faqs = [
 /* ── Main ── */
 .main {
   flex: 1;
-  padding: 24px 58px 48px;
+  padding: 40px 44px 32px;
   overflow-y: auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   height: 100vh;
+  box-sizing: border-box;
 }
 .main-header {
   display: flex;
@@ -702,25 +805,25 @@ const faqs = [
 }
 .settings-eyebrow {
   display: block;
-  margin-bottom: 6px;
-  color: #697780;
-  font-size: .68rem;
-  font-weight: 800;
-  letter-spacing: .1em;
+  margin: 0 0 2px;
+  color: #6d7880;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 .page-title {
   margin: 0;
-  font-size: 2.15rem;
+  font-size: clamp(1.9rem, 2.5vw, 2.5rem);
   font-weight: 700;
-  color: #27323a;
-  letter-spacing: -.04em;
-  line-height: 1.2;
+  color: #2b3137;
+  letter-spacing: -0.05em;
+  line-height: 1.15;
 }
 .page-sub {
-  font-size: .9rem;
-  color: #6d7981;
-  margin-top: 6px;
+  font-size: 0.92rem;
+  color: #6a7279;
+  margin: 6px 0 0;
 }
 
 /* ── Settings body ── */
@@ -728,7 +831,7 @@ const faqs = [
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 18px;
-  max-width: 1180px;
+  max-width: none;
   width: 100%;
 }
 
@@ -787,7 +890,7 @@ const faqs = [
 }
 
 /* ── Form ── */
-.settings-form { display: flex; flex-direction: column; gap: 24px; max-width: 920px; }
+.settings-form { display: flex; flex-direction: column; gap: 12px; max-width: none; }
 .settings-step-label {
   display: flex;
   align-items: center;
@@ -961,6 +1064,13 @@ const faqs = [
 }
 .otp-btn svg { flex: 0 0 auto; }
 .otp-btn:hover { background: linear-gradient(145deg, #9aa6ad 0%, #687780 48%, #52616b 100%); color: #fff; transform: translateY(-1px); box-shadow: inset 0 1px rgba(255,255,255,.34), 0 6px 14px rgba(48, 53, 58, .22); }
+.otp-btn:focus-visible,
+.update-pw-btn:focus-visible,
+.password-back-btn:focus-visible,
+.faq-question:focus-visible {
+  outline: 3px solid rgba(83, 91, 100, .3);
+  outline-offset: 3px;
+}
 .otp-btn:disabled,
 .update-pw-btn:disabled { cursor: not-allowed; opacity: 0.65; }
 .otp-expiry {
@@ -969,10 +1079,10 @@ const faqs = [
   align-self: flex-start;
   margin-top: 1px;
   padding: 4px 8px;
-  border: 1px solid #e6c98d;
+  border: 1px solid #aeb8be;
   border-radius: 999px;
-  background: #fff8e8;
-  color: #9a6811;
+  background: linear-gradient(145deg, #f2f4f4, #dfe3e5);
+  color: #68747d;
   font-size: 0.68rem;
   font-weight: 700;
 }
@@ -1397,6 +1507,9 @@ const faqs = [
   color: #2b363e;
   margin: 0;
 }
+.faq-category-group + .faq-category-group { margin-top: 24px; }
+.faq-category-divider { display: flex; align-items: center; gap: 10px; margin: 0 2px 10px; color: #737e86; font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.faq-category-divider::after { content: ''; height: 1px; flex: 1; background: linear-gradient(90deg, rgba(104,112,120,.3), transparent); }
 
 .faq-list {
   display: flex;
@@ -1404,34 +1517,45 @@ const faqs = [
   gap: 12px;
 }
 .faq-item {
-  background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(231,235,238,.88));
-  border: 1px solid rgba(135, 146, 154, .38);
+  position: relative;
+  background: #fff;
+  border: 1.5px solid #ececec;
   border-radius: 12px;
   overflow: hidden;
   transition: border-color 0.18s, box-shadow 0.18s, transform 0.15s;
 }
-.faq-item--open {
-  border-color: #8e9aa2;
-  box-shadow: 0 7px 18px rgba(48, 53, 58,.1);
+.faq-item::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #69747d;
+  opacity: 0;
+  transition: opacity .18s ease;
 }
+.faq-item--open {
+  border-color: #bfc6cb;
+  box-shadow: 0 4px 14px rgba(48, 53, 58,0.08);
+}
+.faq-item--open::before { opacity: 1; }
 .faq-question {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  background: transparent;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
   border: none;
-  padding: 15px 18px;
+  padding: 18px 20px;
   font-family: inherit;
-  font-size: .9rem;
+  font-size: 1.03rem;
   font-weight: 600;
-  color: #364149;
+  color: #222;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
-.faq-question:hover { background: rgba(224, 229, 232, .52); }
+.faq-question:hover { background: #f1f3f4; color: #202a31; }
 .faq-chevron {
   flex-shrink: 0;
   color: #888;
@@ -1458,6 +1582,19 @@ const faqs = [
 }
 .faq-bullets li {
   color: #4a4f57;
+}
+:deep(.faq-inline-highlight) {
+  display: inline;
+  padding: 1px 5px;
+  border: 1px solid rgba(105,116,125,.34);
+  border-radius: 5px;
+  background: linear-gradient(145deg, #f3f5f5, #d8dde0);
+  color: #4f5b63;
+  font-size: .92em;
+  font-weight: 750;
+  box-shadow: inset 0 1px rgba(255,255,255,.72);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 /* ── Modal overlay ── */

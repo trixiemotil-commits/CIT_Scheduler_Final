@@ -6,6 +6,18 @@ const { getRequestIp, getDeviceDescription } = require("../utils/requestMetadata
 
 const router = express.Router();
 
+function displayAction(log) {
+  if (log.action !== "Updated system details") return log.action;
+  const path = String(log.path || "");
+  if (path === "/api/auth/me") return "Changed profile or teacher status";
+  if (path.includes("/users")) return "Updated user account";
+  if (path.includes("/schedules")) return "Updated schedule entry";
+  if (path.includes("/events")) return "Updated event";
+  if (path.includes("/consultations")) return "Updated consultation availability";
+  if (path.includes("/academic-terms")) return "Updated academic term";
+  return "Updated system resource";
+}
+
 router.get("/", authRequired, authorizeRoles("admin"), async (req, res) => {
   try {
     const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
@@ -61,7 +73,7 @@ router.get("/", authRequired, authorizeRoles("admin"), async (req, res) => {
       logs: logs.map((log) => {
         const actor = actorById.get(String(log.actorId));
         const name = actor ? `${actor.firstName || ""} ${actor.lastName || ""}`.trim() : "";
-        return { id: log._id, actorName: name || log.actorEmail || "Unknown user", actorEmail: log.actorEmail, actorAvatar: actor?.avatar || "", actorRole: log.actorRole, action: log.action, ipAddress: log.ipAddress || "", device: log.device || "", createdAt: log.createdAt };
+        return { id: log._id, actorName: name || log.actorEmail || "Unknown user", actorEmail: log.actorEmail, actorAvatar: actor?.avatar || "", actorRole: log.actorRole, action: displayAction(log), actionType: log.actionType || "system.update", targetType: log.targetType || "system", targetName: log.targetName || "", details: log.details || null, ipAddress: log.ipAddress || "", device: log.device || "", createdAt: log.createdAt };
       }),
       pagination: {
         page,
@@ -84,6 +96,10 @@ router.post("/navigation", authRequired, authorizeRoles("admin", "teacher", "stu
       actorEmail: req.user.email || "",
       actorRole: req.user.role,
       action: `Opened ${routeLabel}`,
+      actionType: "navigation.open",
+      targetType: "page",
+      targetName: routeLabel,
+      details: { routePath },
       path: routePath || "/",
       method: "NAVIGATE",
       ipAddress: getRequestIp(req),

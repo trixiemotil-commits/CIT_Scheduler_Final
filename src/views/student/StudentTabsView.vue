@@ -51,31 +51,31 @@
 </template>
 
 <script setup>
-import { getToken, getUser, saveMergedUser } from '@/auth.js'
+import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
 import {
-    IonIcon,
-    IonLabel,
-    IonPage,
-    IonRouterOutlet,
-    IonTabBar,
-    IonTabButton,
-    IonTabs,
+  IonIcon,
+  IonLabel,
+  IonPage,
+  IonRouterOutlet,
+  IonTabBar,
+  IonTabButton,
+  IonTabs,
 } from '@ionic/vue'
 import {
-    calendarOutline,
-    homeOutline,
-    megaphoneOutline,
-    peopleOutline,
-    personOutline,
+  calendarOutline,
+  homeOutline,
+  megaphoneOutline,
+  peopleOutline,
+  personOutline,
 } from 'ionicons/icons'
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const route = useRoute()
+const router = useRouter()
 const studentUser = ref(getUser() || {})
 const showTermPrompt = ref(false)
-const promptAlreadyHandled = ref(false)
 const publishedTerm = ref(null)
 const savingAssignment = ref(false)
 const termPromptError = ref('')
@@ -99,7 +99,7 @@ function getStudentTermStorageKeys() {
   const userKey = user.id || user._id || user.email || 'student'
   return {
     assignment: `cit_student_term_assignment_${userKey}`,
-    prompt: `cit_student_term_prompt_${userKey}`,
+    notification: `cit_student_term_notification_${userKey}`,
   }
 }
 
@@ -111,11 +111,20 @@ async function authenticatedRequest(path, options = {}) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}`, ...(options.headers || {}) },
   })
   const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(payload.message || 'Unable to save your semester details.')
+  if (!response.ok) {
+    const error = new Error(payload.message || 'Unable to save your semester details.')
+    error.status = response.status
+    throw error
+  }
   return payload
 }
 
+let termCheckInFlight = false
+
 async function checkPublishedTerm() {
+  if (termCheckInFlight || showTermPrompt.value) return
+  termCheckInFlight = true
+
   try {
     const payload = await authenticatedRequest('/academic-terms/published')
     const term = payload.term
@@ -124,16 +133,20 @@ async function checkPublishedTerm() {
     const termId = String(term.id || term._id || '')
     if (!termId) return
 
-    const { assignment, prompt } = getStudentTermStorageKeys()
+    const { assignment, notification } = getStudentTermStorageKeys()
     if (localStorage.getItem(assignment) === termId) return
-    if (localStorage.getItem(prompt) === termId || promptAlreadyHandled.value) return
-    if (showTermPrompt.value) return
+    if (localStorage.getItem(notification) === termId) return
 
-    localStorage.setItem(prompt, termId)
-    promptAlreadyHandled.value = true
+    localStorage.setItem(notification, termId)
     showTermPrompt.value = true
-  } catch (_) {
+  } catch (error) {
+    if (error.status === 401) {
+      logout()
+      await router.replace('/')
+    }
     // The app remains usable if the term service is temporarily unavailable.
+  } finally {
+    termCheckInFlight = false
   }
 }
 
@@ -148,10 +161,8 @@ async function saveTermAssignment() {
     })
     const user = saveMergedUser(payload.user || {})
     const termId = String(publishedTerm.value?.id || publishedTerm.value?._id || '')
-    const { assignment, prompt } = getStudentTermStorageKeys()
+    const { assignment } = getStudentTermStorageKeys()
     localStorage.setItem(assignment, termId)
-    localStorage.setItem(prompt, termId)
-    promptAlreadyHandled.value = false
     showTermPrompt.value = false
   } catch (error) {
     termPromptError.value = error.message
@@ -160,7 +171,22 @@ async function saveTermAssignment() {
   }
 }
 
-onMounted(checkPublishedTerm)
+let termCheckInterval = null
+
+function checkPublishedTermWhenVisible() {
+  if (document.visibilityState === 'visible') checkPublishedTerm()
+}
+
+onMounted(() => {
+  checkPublishedTerm()
+  termCheckInterval = window.setInterval(checkPublishedTermWhenVisible, 15000)
+  document.addEventListener('visibilitychange', checkPublishedTermWhenVisible)
+})
+
+onBeforeUnmount(() => {
+  if (termCheckInterval) window.clearInterval(termCheckInterval)
+  document.removeEventListener('visibilitychange', checkPublishedTermWhenVisible)
+})
 
 const navigation = [
   { tab: 'home', label: 'Home', href: '/student/dashboard', icon: homeOutline },

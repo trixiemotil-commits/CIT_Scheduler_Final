@@ -206,6 +206,9 @@ async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTea
   }
 
   const configuredStatus = String(userDoc.teacher_status || "").trim();
+  if (configuredStatus === "On Leave") {
+    return "Offline";
+  }
   if (["On School", "On Meeting", "On Leave"].includes(configuredStatus)) {
     return configuredStatus;
   }
@@ -397,6 +400,7 @@ function toClientRequest(doc, studentMeta = null, availabilityMeta = null, consu
     purpose: doc.purpose,
     requestDate: doc.requestDate,
     consultationDate: doc.consultationDate,
+    requestedTeacher: availabilityMeta?.teacher || "",
     consultationDayOfWeek: availabilityMeta?.dayOfWeek || "",
     consultationStartTime: availabilityMeta?.startTime || doc.consultationStartTime || "",
     consultationEndTime: availabilityMeta?.endTime || doc.consultationEndTime || "",
@@ -560,7 +564,7 @@ async function listTeachersForStudents(req, res) {
           .filter(Boolean);
         const uniqueStudentSubjects = [...new Set(studentSubjects)];
         const isSubjectTeacher = uniqueStudentSubjects.length > 0;
-        const canAcceptRequests = !["on leave", "offline", "on event"].includes(String(status || '').toLowerCase())
+        const canAcceptRequests = String(status || '').toLowerCase() === "on school"
           && String(teacherUser.teacher_availability || '').toLowerCase() !== "unavailable";
 
         return {
@@ -910,9 +914,22 @@ async function listConsultationRequests(req, res) {
 
     const availabilities = availabilityIds.length
       ? await ConsultationAvailability.find({ _id: { $in: availabilityIds } })
-        .select("dayOfWeek startTime endTime")
+        .select("teacher dayOfWeek startTime endTime")
         .lean()
       : [];
+
+    const teachers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
+      .select("firstName lastName employeeId")
+      .lean();
+
+    const teacherByIdentifier = new Map();
+    teachers.forEach((teacher) => {
+      const teacherName = normalizeTeacherFullName(teacher);
+      const identifiers = [teacher.employeeId, teacherName]
+        .map((value) => String(value || "").trim().toLowerCase())
+        .filter(Boolean);
+      identifiers.forEach((identifier) => teacherByIdentifier.set(identifier, teacherName));
+    });
 
     const studentById = new Map(
       students.map((student) => [String(student._id), student])
@@ -947,7 +964,12 @@ async function listConsultationRequests(req, res) {
       toClientRequest(
         doc,
         studentById.get(String(doc.studentId || "")) || null,
-        availabilityById.get(String(doc.availabilityId || "")) || null,
+        {
+          ...(availabilityById.get(String(doc.availabilityId || "")) || {}),
+          teacher: availabilityById.get(String(doc.availabilityId || ""))?.teacher
+            || teacherByIdentifier.get(String(doc.employeeId || "").trim().toLowerCase())
+            || "",
+        },
         noteByRequestId.get(String(doc._id || "")) || ""
       )
     );

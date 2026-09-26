@@ -5,7 +5,7 @@
       <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
+          <img :src="user.avatar || initialsAvatar(user)" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
@@ -281,12 +281,13 @@
                   <th>Teacher</th>
                   <th>Room</th>
                   <th>Section</th>
+                  <th>Schedule type</th>
                   <th>Campus</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!visibleScheduleEntries.length" class="empty-state-row">
-                  <td colspan="8" class="empty-state small-empty-state">No schedules are currently available.</td>
+                  <td colspan="9" class="empty-state small-empty-state">No schedules are currently available.</td>
                 </tr>
                 <tr v-for="entry in visibleScheduleEntries" :key="entry._key" class="schedule-list-row" @click="openEditModal(entry.slot, entry.day, entry)">
                   <td><span class="list-day">{{ entry.day }}</span></td>
@@ -296,6 +297,7 @@
                   <td><span class="list-teacher">{{ entry.teacher }}</span></td>
                   <td><span class="list-room">{{ entry.room }}</span></td>
                   <td><span class="list-section">{{ entry.section }}</span></td>
+                  <td><span :class="['list-schedule-type', entry.parallel ? 'is-parallel' : 'is-single']">{{ entry.parallel ? `Parallel (${entry.parallelCount || 2})` : 'Not Parallel' }}</span></td>
                   <td><span class="list-campus">{{ entry.campus }}</span></td>
                 </tr>
               </tbody>
@@ -314,42 +316,48 @@
             <div class="list-add-grid">
               <label class="list-field">
                 <span>Day</span>
-                <select v-model="listAddForm.day" class="form-select">
-                  <option value="" disabled>Day</option>
+                <select v-model="listAddForm.day" class="form-select" :class="{ 'list-placeholder': !listAddForm.day }">
+                  <option value="" disabled>Choose Day</option>
                   <option v-for="d in days" :key="d" :value="d">{{ d }}</option>
                 </select>
               </label>
               <label class="list-field list-field-time">
                 <span>Class time</span>
                 <div class="time-inputs">
-                  <select v-model="listAddForm.timeIn" class="form-select"><option value="" disabled>From</option><option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option></select>
+                  <select v-model="listAddForm.timeIn" class="form-select" :class="{ 'list-placeholder': !listAddForm.timeIn }"><option value="" disabled>From</option><option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option></select>
                   <span class="time-separator">to</span>
-                  <select v-model="listAddForm.timeOut" class="form-select"><option value="" disabled>To</option><option v-for="t in endTimeOptionsAfter(listAddForm.timeIn)" :key="t" :value="t">{{ t }}</option></select>
+                  <select v-model="listAddForm.timeOut" class="form-select" :class="{ 'list-placeholder': !listAddForm.timeOut }"><option value="" disabled>To</option><option v-for="t in endTimeOptionsAfter(listAddForm.timeIn)" :key="t" :value="t">{{ t }}</option></select>
                 </div>
                 <small v-if="listTimeError" class="list-field-error">{{ listTimeError }}</small>
               </label>
               <label class="list-field">
                 <span>Year level</span>
-                <select v-model="listAddForm.year" class="form-select"><option value="" disabled>Year</option><option v-for="y in effectiveYears" :key="y" :value="y">{{ y }}</option></select>
+                <select v-model="listAddForm.year" class="form-select" :class="{ 'list-placeholder': !listAddForm.year }"><option value="" disabled>Choose Year</option><option v-for="y in effectiveYears" :key="y" :value="y">{{ y }}</option></select>
               </label>
               <label v-if="listAddForm.year === '3rd Year' || listAddForm.year === '4th Year'" class="list-field">
                 <span>Major</span>
-                <select v-model="listAddForm.major" class="form-select"><option value="" disabled>Major</option><option v-for="m in majorOptions" :key="m" :value="m">{{ m || 'None' }}</option></select>
+                <select v-model="listAddForm.major" class="form-select" :class="{ 'list-placeholder': !listAddForm.major }"><option value="" disabled>Choose Major</option><option v-for="m in majorOptions" :key="m" :value="m">{{ m || 'None' }}</option></select>
               </label>
               <label class="list-field list-field-wide">
                 <span>Subject</span>
-                <input
+                  <input
                   v-if="listAddForm.campus === 'Main Campus'"
                   v-model.trim="listAddForm.subject"
                   type="text"
                   class="form-input"
                   placeholder="Enter Subject"
                 />
-                <TypeaheadSelect v-else v-model="listAddForm.subject" :options="listSubjectOptions" placeholder="Subject" />
+                <select v-else v-model="listAddForm.subject" class="form-select" :class="{ 'list-placeholder': !listAddForm.subject }">
+                  <option value="" disabled>Choose Subject</option>
+                  <option v-for="subject in listSubjectOptions" :key="subject" :value="subject">{{ subject }}</option>
+                </select>
               </label>
               <label class="list-field list-field-wide">
                 <span>Teacher</span>
-                <TypeaheadSelect v-model="listAddForm.teacher" :options="teacherSelectOptions" placeholder="Teacher" />
+                <select v-model="listAddForm.teacher" class="form-select" :class="{ 'list-placeholder': !listAddForm.teacher }">
+                  <option value="" disabled>Choose Teacher</option>
+                  <option v-for="teacher in teacherSelectOptions" :key="teacher.value" :value="teacher.value">{{ teacher.label }}</option>
+                </select>
               </label>
               <label class="list-field">
                 <span>Room type</span>
@@ -363,17 +371,65 @@
                 </div>
               </div>
             </div>
+            <div class="list-parallel-controls">
+              <div class="list-parallel-choice">
+                <span>Schedule type</span>
+                <div class="list-parallel-toggle">
+                  <button type="button" :class="{ active: listAddForm.parallel }" @click="listAddForm.parallel = true">
+                    Parallel
+                  </button>
+                  <button type="button" :class="{ active: !listAddForm.parallel }" @click="listAddForm.parallel = false">
+                    Not Parallel
+                  </button>
+                </div>
+              </div>
+              <template v-if="listAddForm.parallel">
+                <label class="list-field list-parallel-count">
+                  <span>Parallel sections</span>
+                  <select v-model.number="listAddForm.parallelCount" class="form-select">
+                    <option v-for="count in [2, 3, 4, 5, 6, 7, 8]" :key="count" :value="count">{{ count }} sections</option>
+                  </select>
+                </label>
+                <div class="list-parallel-slots" :class="`parallel-count-${listAddForm.parallelCount}`">
+                  <div v-for="(slot, index) in listAddForm.parallelSlots" :key="index" class="list-parallel-slot">
+                    <strong>Slot {{ index + 1 }}</strong>
+                    <select v-model="slot.section" class="form-select" :class="{ 'list-placeholder': !slot.section }">
+                      <option value="" disabled>Section</option>
+                      <option v-for="s in getSectionsForYear(listAddForm.year)" :key="s" :value="s">{{ s }}</option>
+                    </select>
+                    <select v-model="slot.room" class="form-select" :class="{ 'list-placeholder': !slot.room }">
+                      <option value="" disabled>Room</option>
+                      <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
+                    </select>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <label class="list-field list-parallel-single-field">
+                  <span>Section</span>
+                  <select v-model="listAddForm.section" class="form-select" :class="{ 'list-placeholder': !listAddForm.section }">
+                    <option value="" disabled>Choose Section</option>
+                    <option v-for="s in getSectionsForYear(listAddForm.year)" :key="s" :value="s">{{ s }}</option>
+                  </select>
+                </label>
+                <label class="list-field list-parallel-single-field">
+                  <span>Room</span>
+                  <select v-model="listAddForm.room" class="form-select" :class="{ 'list-placeholder': !listAddForm.room }">
+                    <option value="" disabled>Choose Room</option>
+                    <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
+                  </select>
+                </label>
+              </template>
+            </div>
             <div class="list-add-actions">
               <span>{{ listAddFormValid ? 'Ready to add this schedule.' : 'Complete the required schedule details.' }}</span>
-              <button type="button" class="list-add-submit" :disabled="!listAddFormValid" @click="addListEntry">Add schedule</button>
+              <button type="button" class="list-add-submit" :disabled="!listAddFormValid || addingListSchedule" @click="addListEntry">
+                {{ addingListSchedule ? 'Adding schedule...' : 'Add schedule' }}
+              </button>
             </div>
           </section>
           <div v-if="visibleScheduleEntries.length" class="schedule-list-footer">
             <span>Showing all {{ visibleScheduleEntries.length }} schedule entries</span>
-            <button type="button" class="list-footer-action" @click="scrollToListAddForm">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add another schedule
-            </button>
           </div>
         </div>
       </div>
@@ -446,6 +502,7 @@
                   <th>Subject</th>
                   <th>{{ addMode === 'teacher' ? 'Room' : 'Teacher' }}</th>
                   <th>Section</th>
+                  <th>Schedule type</th>
                   <th>Campus</th>
                 </tr>
               </thead>
@@ -456,6 +513,7 @@
                   <td>{{ entry.subject }}</td>
                   <td>{{ addMode === 'teacher' ? entry.room : entry.teacher }}</td>
                   <td>{{ entry.section }}</td>
+                  <td><span :class="['list-schedule-type', entry.parallel ? 'is-parallel' : 'is-single']">{{ entry.parallel ? `Parallel (${entry.parallelCount || 2})` : 'Not Parallel' }}</span></td>
                   <td>{{ entry.campus }}</td>
                 </tr>
               </tbody>
@@ -480,7 +538,7 @@
                 <template v-for="day in days" :key="day">
                   <td
                     v-if="!isSpannedCell30(slot, day) && !isConsultSpannedCell30(slot, day)"
-                    :rowspan="getEntriesForCell30(slot, day).length ? getRowspan30(getEntriesForCell30(slot, day)[0]) : (getConsultationForCell30(slot, day) ? getConsultRowspan30(getConsultationForCell30(slot, day)) : 1)"
+                    :rowspan="getEntriesForCell30(slot, day).length ? getScheduleRowspan30(getEntriesForCell30(slot, day)[0]) : (getConsultationForCell30(slot, day) ? getConsultRowspan30(getConsultationForCell30(slot, day)) : 1)"
                     class="td-cell"
                     :class="{
                       'has-entry': getEntriesForCell30(slot, day).length,
@@ -495,7 +553,7 @@
                       <div
                         class="sched-entry"
                         :class="[getEntriesForCell30(slot, day)[0].color, { 'entry-readonly': addMode === 'teacher' && !selectedTeacher }]"
-                        :style="entryStyle30(slot, getEntriesForCell30(slot, day)[0])"
+                        :style="scheduleEntryStyle30(slot, getEntriesForCell30(slot, day)[0])"
                       >
                         <div
                           v-if="getEntriesForCell30(slot, day)[0].isSubstitute"
@@ -632,13 +690,7 @@
             </template>
             <div class="form-row-inline schedule-start-field">
               <label class="form-label">Start of Class</label>
-              <div class="form-select-wrap">
-                <select v-model="form.timeIn" class="form-select">
-                  <option value="" disabled>Select Start of Class</option>
-                  <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
-                </select>
-                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-              </div>
+              <div class="form-value-locked">{{ form.timeIn || 'Select a timetable slot' }}</div>
             </div>
             <div class="form-row-inline schedule-end-field">
               <label class="form-label">End of Class</label>
@@ -701,7 +753,8 @@
             <template v-if="!form.parallel">
               <div class="form-row-inline schedule-room-field">
                 <label class="form-label">Room</label>
-                <input v-if="form.campus === 'Main Campus'" v-model.trim="form.room" type="text" class="form-input" placeholder="Enter Room"/>
+                <div v-if="addMode === 'room' && contextRoom" class="form-value-locked">{{ contextRoom }}</div>
+                <input v-else-if="form.campus === 'Main Campus'" v-model.trim="form.room" type="text" class="form-input" placeholder="Enter Room"/>
                 <div v-else class="form-select-wrap">
                   <select v-model="form.room" class="form-select">
                     <option value="" disabled>Select Room</option>
@@ -748,7 +801,8 @@
                 </div>
                 <div class="form-row-inline">
                   <label class="form-label">Room {{ i + 1 }}</label>
-                  <input v-if="form.campus === 'Main Campus'" v-model.trim="ps.room" type="text" class="form-input" :placeholder="`Enter Room ${i + 1}`"/>
+                  <div v-if="addMode === 'room' && contextRoom" class="form-value-locked">{{ contextRoom }}</div>
+                  <input v-else-if="form.campus === 'Main Campus'" v-model.trim="ps.room" type="text" class="form-input" :placeholder="`Enter Room ${i + 1}`"/>
                   <div v-else class="form-select-wrap">
                     <select v-model="ps.room" class="form-select">
                       <option value="" disabled>Select Room</option>
@@ -909,13 +963,7 @@
               </div>
               <div class="form-row-inline">
                 <label class="form-label">Start of Class</label>
-                <div class="form-select-wrap">
-                  <select v-model="addForm.timeIn" class="form-select">
-                    <option value="" disabled>Select Start of Class</option>
-                    <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
-                  </select>
-                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
+                <div class="form-value-locked">{{ addForm.timeIn || 'Select a timetable slot' }}</div>
               </div>
               <div class="form-row-inline">
                 <label class="form-label">End of Class</label>
@@ -931,7 +979,7 @@
                 <label class="form-label">Year</label>
                 <div v-if="addMode === 'student' && studentYear" class="form-value-locked">{{ studentYear }}</div>
                 <div v-else class="form-select-wrap">
-                  <select v-model="addForm.year" class="form-select">
+                  <select v-model="addForm.year" class="form-select" :disabled="addMode === 'student'">
                     <option value="" disabled>Select Year</option>
                     <option v-for="y in effectiveYears" :key="y" :value="y">{{ y }}</option>
                   </select>
@@ -991,7 +1039,8 @@
               <template v-if="!addForm.parallel">
                 <div class="form-row-inline">
                   <label class="form-label">Room</label>
-                  <input v-if="addForm.campus === 'Main Campus'" v-model.trim="addForm.room" list="add-room-suggestions" type="text" class="form-input" placeholder="Enter Room"/>
+                  <div v-if="addMode === 'room' && contextRoom" class="form-value-locked">{{ contextRoom }}</div>
+                  <input v-else-if="addForm.campus === 'Main Campus'" v-model.trim="addForm.room" list="add-room-suggestions" type="text" class="form-input" placeholder="Enter Room"/>
                   <div v-else class="form-select-wrap">
                     <select v-model="addForm.room" class="form-select">
                       <option value="" disabled>Select Room</option>
@@ -1044,7 +1093,8 @@
                   </div>
                   <div class="form-row-inline">
                     <label class="form-label">Room {{ i + 1 }}</label>
-                    <input v-if="addForm.campus === 'Main Campus'" v-model.trim="ps.room" list="add-room-suggestions" type="text" class="form-input" :placeholder="`Enter Room ${i + 1}`"/>
+                    <div v-if="addMode === 'room' && contextRoom" class="form-value-locked">{{ contextRoom }}</div>
+                    <input v-else-if="addForm.campus === 'Main Campus'" v-model.trim="ps.room" list="add-room-suggestions" type="text" class="form-input" :placeholder="`Enter Room ${i + 1}`"/>
                     <div v-else class="form-select-wrap">
                       <select v-model="ps.room" class="form-select">
                         <option value="" disabled>Select Room</option>
@@ -1255,6 +1305,7 @@ import {
     timeOptions,
     years,
 } from '@/composables/useSchedule.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -1412,7 +1463,15 @@ const effectiveRoomOptions = computed(() => {
     .map(room => typeof room === 'string' ? room : room.name)
     .filter(Boolean)
   const availableRooms = configuredRooms.length ? configuredRooms : roomOptions
-  return availableRooms.map((room) => {
+  const roomOptionsForContext = addMode.value === 'room' && contextRoom.value
+    ? availableRooms.filter(room => (
+      room === contextRoom.value
+      || room.startsWith(`${contextRoom.value} `)
+      || contextRoom.value.startsWith(`${room} `)
+    ))
+    : availableRooms
+  const filteredRooms = roomOptionsForContext.length ? roomOptionsForContext : (addMode.value === 'room' && contextRoom.value ? [contextRoom.value] : [])
+  return filteredRooms.map((room) => {
     return { name: room, label: room }
   })
 })
@@ -1592,6 +1651,13 @@ function chooseRoomFromFloor(floorLabel, room) {
   contextRoom.value = room
 }
 
+function entryUsesRoom(entry, room) {
+  if (!entry || !room) return false
+  if (entry.room === room) return true
+  return Boolean(entry.parallel && Array.isArray(entry.parallelSlots)
+    && entry.parallelSlots.some(slot => slot?.room === room))
+}
+
 /* ── Room-context grid helpers (for room add mode) ── */
 function getEntriesForRoomCell30(rowSlot, day) {
   if (!contextRoom.value) return []
@@ -1599,7 +1665,7 @@ function getEntriesForRoomCell30(rowSlot, day) {
   const rowEnd   = rowStart + 30
   return Object.entries(entries)
     .filter(([, v]) => {
-      if (!v.room || v.room !== contextRoom.value) return false
+      if (!entryUsesRoom(v, contextRoom.value)) return false
       if (v.day !== day) return false
       const t = parseTime(v.timeIn)
       return t >= rowStart && t < rowEnd
@@ -1620,13 +1686,7 @@ function isSpannedRoomCell30(slot, day) {
 async function handleRoomCellClick30(slot, day) {
   const cell = getEntriesForRoomCell30(slot, day)
   if (cell.length > 0) {
-    // Show info — editing via teacher mode is cleaner
-    await Swal.fire({
-      icon: 'info', title: 'Slot Occupied',
-      html: `<div style="font-size:0.9rem;color:#444"><b>${cell[0].teacher}</b><br>${cell[0].subject}<br>${cell[0].slot}</div><p style="font-size:0.8rem;color:#888;margin-top:8px;">To edit this entry, use the <b>By Teacher</b> mode.</p>`,
-      confirmButtonText: 'OK', confirmButtonColor: '#4b5563', background: '#fff',
-      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
-    })
+    openEditModal(slot, day, cell[0])
   } else {
     openAddModal(slot, day)
   }
@@ -1676,7 +1736,7 @@ const visibleScheduleEntries = computed(() => {
     .filter((entry) => {
       if (scheduleViewMode.value !== 'list') {
         if (addMode.value === 'teacher' && entry.teacher !== selectedTeacher.value) return false
-        if (addMode.value === 'room' && entry.room !== contextRoom.value) return false
+        if (addMode.value === 'room' && !entryUsesRoom(entry, contextRoom.value)) return false
         if (addMode.value === 'student') {
           if (!studentYear.value || !studentSection.value) return false
           if (entry.year !== studentYear.value || entry.section !== studentSection.value) return false
@@ -1695,15 +1755,25 @@ const visibleScheduleEntries = computed(() => {
 
 const listAddForm = reactive({
   day: '', timeIn: '', timeOut: '', year: '', section: '', campus: 'South Campus',
-  teacher: 'CIT Faculty', major: '', subject: '', room: '', roomType: 'Lecture', parallel: false, parallelCount: 1,
+  teacher: 'CIT Faculty', major: '', subject: '', room: '', roomType: 'Lecture', parallel: false, parallelCount: 2,
+  parallelSlots: [{ section: '', room: '', roomType: 'Lecture' }, { section: '', room: '', roomType: 'Lecture' }],
 })
 const listTimeError = ref('')
 const listAddSection = ref(null)
+const addingListSchedule = ref(false)
 const listAddFormValid = computed(() =>
   listAddForm.day && listAddForm.timeIn && listAddForm.timeOut &&
-  listAddForm.year && listAddForm.teacher && listAddForm.subject && listAddForm.room &&
+  listAddForm.year && listAddForm.teacher && listAddForm.subject &&
+  (listAddForm.parallel
+    ? listAddForm.parallelSlots.length === listAddForm.parallelCount && listAddForm.parallelSlots.every(slot => slot.section && slot.room)
+    : listAddForm.section && listAddForm.room) &&
   !listTimeError.value
 )
+
+watch(() => listAddForm.parallelCount, (count) => {
+  while (listAddForm.parallelSlots.length < count) listAddForm.parallelSlots.push({ section: '', room: '', roomType: 'Lecture' })
+  while (listAddForm.parallelSlots.length > count) listAddForm.parallelSlots.pop()
+})
 
 watch([() => listAddForm.timeIn, () => listAddForm.timeOut], () => {
   if (listAddForm.timeIn && listAddForm.timeOut) {
@@ -1718,6 +1788,7 @@ watch([() => listAddForm.timeIn, () => listAddForm.timeOut], () => {
 
 async function addListEntry() {
   if (!listAddFormValid.value) return
+  addingListSchedule.value = true
   try {
     const payload = buildSchedulePayload(listAddForm)
     const conflicts = checkScheduleConflict(payload)
@@ -1729,10 +1800,14 @@ async function addListEntry() {
     listAddForm.day = ''; listAddForm.timeIn = ''; listAddForm.timeOut = '';
     listAddForm.year = ''; listAddForm.section = ''; listAddForm.teacher = '';
     listAddForm.subject = ''; listAddForm.room = ''; listAddForm.major = '';
-    listAddForm.roomType = 'Lecture'
+    listAddForm.roomType = 'Lecture'; listAddForm.parallel = false; listAddForm.parallelCount = 2
+    listAddForm.parallelSlots.splice(0, listAddForm.parallelSlots.length, { section: '', room: '', roomType: 'Lecture' }, { section: '', room: '', roomType: 'Lecture' })
     listAddForm.campus = 'South Campus'
+    await showSuccessToast('Schedule added successfully')
   } catch (error) {
     await showScheduleError(error)
+  } finally {
+    addingListSchedule.value = false
   }
 }
 
@@ -1851,9 +1926,28 @@ function isSpannedCell30(slot, day) {
   if (slotIndex <= 0) return false
   for (let i = 0; i < slotIndex; i++) {
     const prev = getEntriesForCell30(timeSlots30[i], day)
-    if (prev.length > 0 && i + getRowspan30(prev[0]) > slotIndex) return true
+    if (prev.length > 0 && i + getScheduleRowspan30(prev[0]) > slotIndex) return true
   }
   return false
+}
+
+function getScheduleRowspan30(entry) {
+  return Math.min(timeSlots30.length, getRowspan30(entry) + 1)
+}
+
+function scheduleEntryStyle30(rowSlot, entry) {
+  if (!entry?.timeIn || !entry?.timeOut) return {}
+  const rowStart = parseTime(rowSlot)
+  const entryStart = parseTime(entry.timeIn)
+  const offsetMins = Math.max(0, entryStart - rowStart)
+  const spannedMins = getScheduleRowspan30(entry) * 30
+
+  return {
+    top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
+    bottom: '4px',
+    height: 'auto',
+    zIndex: 3,
+  }
 }
 
 function entryStyle30(rowSlot, entry) {
@@ -1864,17 +1958,9 @@ function entryStyle30(rowSlot, entry) {
   const offsetMins = Math.max(0, entryStart - rowStart)
   const spannedMins = getRowspan30(entry) * 30
   const trailingMins = Math.max(0, spannedMins - offsetMins - mins)
-  const hasFollowingEntry = Object.values(entries).some(candidate =>
-    candidate.day === entry.day &&
-    parseTime(candidate.timeIn) === parseTime(entry.timeOut) &&
-    (addMode.value === 'room'
-      ? candidate.room === entry.room
-      : candidate.teacher === entry.teacher)
-  )
-  const bottomGap = hasFollowingEntry ? 4 : -40
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
-    bottom: `calc(${(trailingMins / spannedMins) * 100}% + ${bottomGap}px)`,
+    bottom: `calc(${(trailingMins / spannedMins) * 100}% + 4px)`,
     height: 'auto',
     zIndex: 3,
   }
@@ -1893,7 +1979,7 @@ function getConsultationForCell30(rowSlot, day) {
 
 function getConsultRowspan30(consult) {
   if (!consult?.startTime || !consult?.endTime) return 1
-  return Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime)) / 30))
+  return Math.min(timeSlots30.length, Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime)) / 30) + 1))
 }
 
 function isConsultSpannedCell30(slot, day) {
@@ -1910,13 +1996,11 @@ function consultEntryStyle30(rowSlot, consult) {
   if (!consult?.startTime || !consult?.endTime) return {}
   const rowStart     = parseTime(rowSlot)
   const consultStart = parseTime(consult.startTime)
-  const mins         = Math.max(1, parseTime(consult.endTime) - consultStart)
   const offsetMins   = Math.max(0, consultStart - rowStart)
   const spannedMins  = getConsultRowspan30(consult) * 30
-  const trailingMins = Math.max(0, spannedMins - offsetMins - mins)
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
-    bottom: `calc(${(trailingMins / spannedMins) * 100}% + 4px)`,
+    bottom: '4px',
     height: 'auto',
   }
 }
@@ -2193,6 +2277,21 @@ function buildConflictHtml(conflicts) {
         <div style="font-size:0.78rem;color:#666;margin-top:1px;">${c.detail}</div>
       </div>
     </div>`).join('')
+}
+
+function showSuccessToast(title) {
+  return Swal.fire({
+    toast: true,
+    position: 'top-end',
+    icon: 'success',
+    title,
+    showConfirmButton: false,
+    timer: 5000,
+    timerProgressBar: true,
+    background: '#fff',
+    color: '#344149',
+    customClass: { popup: 'swal-cit-toast' },
+  })
 }
 
 async function showConflictDialog(conflicts) {
@@ -2899,6 +2998,7 @@ async function proceedWithSave(payload) {
     yearDropdown.value   = 'All'
     filterSection.value  = 'All'
     showSchedModal.value = false
+    await showSuccessToast(editMode.value ? 'Schedule updated successfully' : 'Schedule added successfully')
   } catch (error) { await showScheduleError(error) }
 }
 
@@ -2917,6 +3017,7 @@ async function clearSlot() {
     yearDropdown.value   = 'All'
     filterSection.value  = 'All'
     showSchedModal.value = false
+    await showSuccessToast('Schedule deleted successfully')
   } catch (error) { await showScheduleError(error, 'Unable to remove schedule') }
 }
 
@@ -3740,6 +3841,38 @@ onMounted(async () => {
 .schedule-list-table th { background: #f8fafc; color: #334155; font-weight: 700; }
 .schedule-list-row { cursor: pointer; }
 .schedule-list-row:hover { background: #f8fafc; }
+.list-schedule-type {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: .68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.list-schedule-type.is-parallel { background: #f1e8ff; color: #7c3aed; }
+.list-schedule-type.is-single { background: #eef2f3; color: #52616b; }
+.list-parallel-controls { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin-top: 4px; padding-top: 14px; padding-bottom: 16px; border-top: 1px solid #e3e7e9; border-bottom: 1px solid #e3e7e9; }
+.list-parallel-choice { display: flex; flex: 0 0 auto; min-width: 0; flex-direction: column; gap: 7px; color: #56636c; font-size: .65rem; font-weight: 680; }
+.list-parallel-toggle { display: grid; width: max-content; grid-template-columns: 150px 170px; gap: 5px; padding: 4px; border: 1px solid #cbd3d8; border-radius: 9px; background: #e9edef; }
+.list-parallel-toggle button { min-height: 32px; padding: 0 12px; color: #5e6a72; border: 0; border-radius: 6px; background: transparent; font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer; transition: color .15s ease, background .15s ease, box-shadow .15s ease; }
+.list-parallel-toggle button:hover { color: #354149; background: rgba(255,255,255,.65); }
+.list-parallel-toggle button.active { color: #fff; background: linear-gradient(145deg,#66727c,#3c4750); box-shadow: 0 3px 7px rgba(38,46,52,.17); }
+.list-parallel-single-field { width: 150px; flex: 0 1 150px; }
+.list-parallel-count { min-width: 170px; }
+.list-parallel-slots { display: grid; width: 100%; flex: 1 0 100%; gap: 10px; }
+.list-parallel-slots.parallel-count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.list-parallel-slots.parallel-count-3,
+.list-parallel-slots.parallel-count-5,
+.list-parallel-slots.parallel-count-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.list-parallel-slots.parallel-count-4,
+.list-parallel-slots.parallel-count-7,
+.list-parallel-slots.parallel-count-8 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.list-parallel-slot { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: 8px; min-width: 0; padding: 10px; border: 1px solid #d7dfe3; border-radius: 10px; background: rgba(255,255,255,.58); }
+.list-parallel-slot strong { color: #53616b; font-size: .72rem; white-space: nowrap; }
+.list-parallel-slot .form-select { min-width: 0; min-height: 42px; padding: 9px 22px 9px 9px; color: #354149; border-color: #cbd3d8; border-radius: 9px; background-color: #fbfcfc; font-size: .66rem; font-weight: 520; text-overflow: ellipsis; }
+.list-parallel-slot .form-select.list-placeholder { color: #c0c7cb; }
 .schedule-list-note { color: #6b7280; }
 .empty-state-row td { padding: 28px 10px; text-align: center; color: #6b7280; }
 .schedule-input-row { background: #fbfbfb; }
@@ -3835,6 +3968,7 @@ onMounted(async () => {
 .form-label { font-size: 0.95rem; font-weight: 700; color: #111; }
 .form-select-wrap { position: relative; display: flex; align-items: center; }
 .form-select { width: 100%; appearance: none; border: 1px solid #ccc; border-radius: 10px; padding: 9px 34px 9px 14px; font-size: 0.88rem; font-family: inherit; color: #333; background: #fff; cursor: pointer; outline: none; transition: border-color 0.15s; }
+.form-select:disabled { color: #7c8790; background: #e9edef; border-color: #c5cdd2; cursor: not-allowed; opacity: 1; }
 .form-select:focus { border-color: #9ca3af; }
 .form-input { width: 100%; border: 1px solid #ccc; border-radius: 10px; padding: 9px 14px; font-size: 0.88rem; font-family: inherit; color: #333; background: #fff; outline: none; transition: border-color 0.15s; }
 .form-input:focus { border-color: #9ca3af; }
@@ -4554,16 +4688,14 @@ onMounted(async () => {
   align-items: flex-start;
   gap: 12px;
   padding: 19px 2px 16px;
-  overflow-x: visible;
-  scrollbar-color: #aab3b9 transparent;
-  scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 .list-field { display: flex; min-width: 0; flex-direction: column; gap: 7px; color: #56636c; font-size: .65rem; font-weight: 680; }
-.list-field { width: 118px; min-width: 0; flex: 1 1 118px; }
-.list-field-time { width: 230px; min-width: 0; flex: 1.5 1 230px; }
-.list-field-wide { width: 220px; min-width: 0; flex: 1.6 1 220px; }
-.list-campus-field { width: 156px; min-width: 0; flex: 1.1 1 156px; }
+.list-field { width: auto; flex: 1 1 0; }
+.list-field-time { flex: 1.8 1 0; }
+.list-field-wide { flex: 1.6 1 0; }
+.list-campus-field { flex: 1.1 1 0; }
 .list-field .form-select {
   width: 100%;
   min-width: 0;
@@ -4577,6 +4709,7 @@ onMounted(async () => {
   font-weight: 520;
   text-overflow: ellipsis;
 }
+.list-field .form-select.list-placeholder { color: #c0c7cb; }
 .list-field .form-select:focus { border-color: #7e8c95; background-color: #fff; box-shadow: 0 0 0 3px rgba(76,91,102,.09); }
 .list-field-time .time-inputs { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
 .list-field-time .time-separator { color: #7b878f; font-size: .62rem; font-weight: 650; }
@@ -4584,7 +4717,7 @@ onMounted(async () => {
 .list-campus-options { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 4px; border: 1px solid #cbd3d8; border-radius: 9px; background: #e9edef; }
 .list-campus-options button { min-height: 32px; color: #5e6a72; border: 0; border-radius: 6px; background: transparent; font: inherit; cursor: pointer; }
 .list-campus-options button.active { color: #fff; background: linear-gradient(145deg,#66727c,#3c4750); box-shadow: 0 3px 7px rgba(38,46,52,.17); }
-.list-add-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; border-top: 1px solid #dce2e5; color: #758189; font-size: .66rem; }
+.list-add-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; color: #758189; font-size: .66rem; }
 .list-add-submit { min-height: 40px; padding: 9px 18px; color: #fff; border: 1px solid #3f4b54; border-radius: 9px; background: linear-gradient(145deg,#626f78,#354149); box-shadow: 0 4px 10px rgba(38,46,52,.16); font: inherit; font-size: .72rem; font-weight: 680; cursor: pointer; }
 .list-add-submit:hover:not(:disabled) { background: linear-gradient(145deg,#707d86,#424e57); transform: translateY(-1px); }
 .list-add-submit:disabled { color: #8d969c; border-color: #d2d8dc; background: #e1e5e7; box-shadow: none; cursor: not-allowed; }

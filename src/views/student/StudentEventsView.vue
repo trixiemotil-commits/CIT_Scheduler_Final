@@ -8,23 +8,36 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <div class="header-title">Events</div>
+          <div style="width:34px"></div>
         </div>
 
         <section class="events-wrap">
-          <header class="events-head">
-            <h1 class="events-title">Events</h1>
-            <p class="events-sub">View school events and announcements</p>
-          </header>
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            <input v-model="eventSearch" class="search-input" type="search" placeholder="Search events..." aria-label="Search events" />
+            <button v-if="eventSearch" type="button" aria-label="Clear search" @click="eventSearch = ''">&times;</button>
+          </div>
 
-          <div class="events-tabs-mobile">
-            <button :class="['tab-btn', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active</button>
-             <button :class="['tab-btn', { active: eventsTab === 'ended' }]" @click="eventsTab = 'ended'">Ended</button>
+          <div class="filter-row">
+            <button :class="['filter-chip', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active</button>
+            <button :class="['filter-chip', { active: eventsTab === 'ended' }]" @click="eventsTab = 'ended'">Ended</button>
           </div>
 
           <div class="events-grid">
             <template v-if="eventsTab === 'active'">
-              <p v-if="eventsLoading">Loading events…</p>
-              <p v-else-if="eventsError">{{ eventsError }}</p>
+              <div v-if="eventsLoading" class="events-state events-state--loading" role="status">
+                <span class="events-loader" aria-hidden="true"></span>
+                <strong>Loading events</strong>
+                <span>Checking the latest school announcements...</span>
+              </div>
+              <div v-else-if="eventsError" class="events-state events-state--error">{{ eventsError }}</div>
+              <div v-else-if="!activeEvents.length" class="events-state">
+                <span class="events-state-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h3M8 17h6"/></svg>
+                </span>
+                <strong>No active events</strong>
+                <span>New school announcements will appear here.</span>
+              </div>
               <article
                 v-for="ev in activeEvents"
                 :key="ev.id"
@@ -36,7 +49,7 @@
                   <span>{{ eventInitials(ev.title) }}</span><small>CIT SCHEDULER EVENT</small>
                 </div>
                 <div class="event-card-head">
-                  <span class="event-badge">Active</span>
+                  <span class="event-badge event-badge--active">Active</span>
                   <div v-if="false" class="event-card-actions">
                     <button class="ec-btn ec-btn--edit" @click.stop="openEditEvent(ev)">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -55,7 +68,7 @@
                   </span>
                   <span class="meta-item">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
+                    {{ formatDisplayTime(ev.time) }}{{ ev.endTime ? ` – ${formatDisplayTime(ev.endTime)}` : '' }}
                   </span>
                   <span class="meta-item">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -66,8 +79,18 @@
             </template>
 
             <template v-else>
-              <p v-if="eventsLoading">Loading events…</p>
-              <p v-else-if="!endedEvents.length">No ended events.</p>
+              <div v-if="eventsLoading" class="events-state events-state--loading" role="status">
+                <span class="events-loader" aria-hidden="true"></span>
+                <strong>Loading events</strong>
+                <span>Checking the latest school announcements...</span>
+              </div>
+              <div v-else-if="!endedEvents.length" class="events-state">
+                <span class="events-state-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>
+                </span>
+                <strong>No ended events</strong>
+                <span>Past events will be kept here for reference.</span>
+              </div>
               <article
                 v-for="ev in endedEvents"
                 :key="ev.id"
@@ -98,7 +121,7 @@
                   </span>
                   <span class="meta-item">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
+                    {{ formatDisplayTime(ev.time) }}{{ ev.endTime ? ` – ${formatDisplayTime(ev.endTime)}` : '' }}
                   </span>
                   <span class="meta-item">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -115,11 +138,9 @@
       <Teleport to="body">
         <div v-if="showViewModal" class="modal-overlay-mobile" @click.self="showViewModal = false">
           <div class="modal-box-mobile" v-if="viewEvent">
+            <div class="modal-handle" aria-hidden="true"></div>
             <div class="modal-header-mobile">
               <h2>{{ viewEvent.title }}</h2>
-              <button class="modal-close-btn" @click="showViewModal = false">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
             </div>
             <div class="modal-body-mobile">
               <img v-if="viewEvent.image" :src="viewEvent.image" class="modal-event-cover" alt="" />
@@ -141,6 +162,7 @@
                   <span class="info-val">{{ viewEvent.location || '—' }}</span>
                 </div>
               </div>
+              <button class="modal-close-btn detail-close-btn" type="button" @click="showViewModal = false">Close</button>
             </div>
           </div>
         </div>
@@ -152,9 +174,7 @@
           <div class="event-modal-mobile">
             <div class="modal-header-mobile">
               <h2>{{ editingEvent ? 'Edit Event' : 'Add Event' }}</h2>
-              <button class="modal-close-btn" @click="showEventModal = false">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
+              <button class="modal-close-btn" type="button" @click="showEventModal = false">Close</button>
             </div>
 
             <form @submit.prevent="saveEvent" class="event-form-mobile">
@@ -215,6 +235,7 @@ const events = ref([])
 const eventsLoading = ref(false)
 const eventsError = ref('')
 const eventsTab = ref('active')
+const eventSearch = ref('')
 const now = ref(new Date())
 
 const showViewModal = ref(false)
@@ -241,8 +262,14 @@ const todayDate = (() => {
 })()
 
 // Computed
-const activeEvents = computed(() => events.value.filter(e => e.status === 'active' && !isEventEnded(e)))
-const endedEvents = computed(() => events.value.filter(e => e.status === 'active' && isEventEnded(e)))
+function matchesSearch(event) {
+  const query = eventSearch.value.trim().toLowerCase()
+  if (!query) return true
+  return [event.title, event.description, event.location].some(value => String(value || '').toLowerCase().includes(query))
+}
+
+const activeEvents = computed(() => events.value.filter(e => e.status === 'active' && !isEventEnded(e) && matchesSearch(e)))
+const endedEvents = computed(() => events.value.filter(e => e.status === 'active' && isEventEnded(e) && matchesSearch(e)))
 
 function isEventEnded(event) {
   if (!event?.date || !event?.endTime) return false
@@ -375,15 +402,23 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 
 <style scoped>
 .mobile-app {
-  background: #fff;
+  max-width: 430px;
+  min-height: 100%;
+  margin: 0 auto;
+  background: linear-gradient(160deg, #f8f9fa 0%, #e7eaec 52%, #f4f5f6 100%);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 16px;
+  padding-top: env(safe-area-inset-top, 0px);
+  font-family: 'Poppins', sans-serif;
 }
 
 .app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e5e5e5;
+  padding: 16px 18px;
+  border-bottom: 1px solid #eee;
   position: sticky;
   top: 0;
   background: #fff;
@@ -394,10 +429,10 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 .add-event-mobile-btn {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
-  border: none;
-  background: #f5f5f5;
-  color: #333;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(145deg, #fafbfb, #dfe3e5);
+  color: #4d5860;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -410,57 +445,145 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   background: #e5e5e5;
 }
 
-.header-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #333;
+.app-header .header-title {
+  font-size: 1.25rem !important;
+  line-height: normal;
+  font-weight: 700;
+  color: #4b5563;
   flex: 1;
   text-align: center;
 }
 
 .events-wrap {
-  padding: 16px 16px 24px;
+  padding: 15px 16px 100px;
 }
+.search-wrap {
+  position: relative;
+  margin: 0 0 12px;
+}
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  fill: none;
+  stroke: #77848d;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.search-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 44px;
+  padding: 11px 40px 11px 36px;
+  border: 1px solid #dfe3e6;
+  border-radius: 10px;
+  outline: none;
+  background: rgba(255,255,255,.96);
+  color: #354149;
+  font: inherit;
+  font-size: .87rem;
+  box-shadow: 0 4px 12px rgba(45, 50, 55, 0.07);
+}
+.search-input::placeholder { color: #929da4; }
+.search-input:focus { border-color: #87939b; box-shadow: 0 0 0 3px rgba(75,85,99,.1), inset 0 1px rgba(255,255,255,.95); }
+.search-wrap button {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #75818a;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.event-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  margin-bottom: 12px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 12px;
+  background: rgba(255,255,255,.76);
+  box-shadow: inset 0 1px rgba(255,255,255,.95), 0 4px 12px rgba(48,57,64,.06);
+}
+.event-search > svg { width: 17px; height: 17px; flex: 0 0 auto; fill: none; stroke: #72808a; stroke-width: 1.8; stroke-linecap: round; }
+.event-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #354149; font: inherit; font-size: .82rem; }
+.event-search input::placeholder { color: #929da4; }
+.event-search button { border: 0; background: transparent; color: #75818a; font-size: 1.2rem; line-height: 1; cursor: pointer; }
 
 .events-head {
   margin-bottom: 16px;
 }
 
 .events-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1a1a1a;
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #252c32;
   margin: 0 0 4px;
 }
 
 .events-sub {
   font-size: 0.85rem;
-  color: #666;
+  color: #68747d;
   margin: 0;
 }
 
 .events-tabs-mobile {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+}
+.filter-row { display: flex; gap: 8px; margin-bottom: 12px; padding: 12px 0 1px; overflow-x: auto; scrollbar-width: none; }
+.filter-row::-webkit-scrollbar { display: none; }
+.filter-chip {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 20px;
+  background: #fff;
+  color: #555;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: inset 0 1px rgba(255,255,255,.9), 0 4px 10px rgba(48,57,64,.06);
+}
+.filter-chip.active {
+  border-color: #4b555d;
+  background: linear-gradient(145deg, #69747d, #303940);
+  color: #fff;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 6px 13px rgba(48,57,64,.2);
 }
 
 .tab-btn {
   flex: 1;
+  min-height: 48px;
   padding: 8px 12px;
-  background: #f5f5f5;
-  border: none;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 13px;
   font-size: 0.88rem;
   font-weight: 500;
-  color: #666;
+  color: #68747d;
+  box-shadow: inset 0 1px rgba(255,255,255,.9), 0 4px 12px rgba(49, 56, 62, .06);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .tab-btn.active {
-  background: #333;
+  background: linear-gradient(145deg, #69747d, #303940);
   color: #fff;
+  border-color: #4b555d;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 7px 15px rgba(48, 57, 64, .22);
 }
 
 .events-grid {
@@ -468,19 +591,71 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   flex-direction: column;
   gap: 12px;
 }
+.events-state {
+  min-height: 230px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 24px;
+  box-sizing: border-box;
+  text-align: center;
+  color: #8a959d;
+  border: 1px solid rgba(255,255,255,.88);
+  border-radius: 16px;
+  background: rgba(255,255,255,.48);
+  box-shadow: inset 0 1px rgba(255,255,255,.95), 0 8px 20px rgba(48,57,64,.06);
+}
+.events-state strong { color: #3d4850; font-size: .94rem; }
+.events-state span:last-child { font-size: .74rem; }
+.events-state--error { color: #a34e58; }
+.events-state-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 5px;
+  border-radius: 14px;
+  color: #65727b;
+  background: linear-gradient(145deg, #f7f9f9, #dce1e4);
+  box-shadow: inset 0 1px rgba(255,255,255,.95), 0 5px 12px rgba(52,60,66,.1);
+}
+.events-state-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.events-loader {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 6px;
+  border: 3px solid #d8dfe2;
+  border-top-color: #4f5c65;
+  border-radius: 50%;
+  animation: events-spin .85s linear infinite;
+}
+@keyframes events-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .events-loader { animation: none; } }
 
 .event-card {
-  background: #fff;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(235,239,241,.9));
+  border: 1px solid rgba(255, 255, 255, 0.98);
+  border-radius: 22px;
   padding: 14px;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: inset 0 1px rgba(255,255,255,.98), 0 10px 22px rgba(48, 57, 64, .13);
+}
+
+.event-card .event-card-cover-image,
+.event-card .event-card-default-cover {
+  height: 180px;
+  margin-bottom: 14px;
+  border-radius: 15px;
+  box-shadow: 0 5px 12px rgba(38, 47, 52, .12);
 }
 
 .event-card:active {
-  background: #f9f9f9;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: #f6f8f8;
+  transform: translateY(1px);
+  box-shadow: 0 3px 10px rgba(48, 57, 64, .1);
 }
 
 .event-card--archived {
@@ -491,18 +666,28 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .event-badge {
-  font-size: 0.65rem;
+  font-size: 0.67rem;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: #d8dcdf;
-  color: #4f575f;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #e9edef, #d2d8dc);
+  color: #4f5c65;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+}
+
+.event-badge--active {
+  background: #d9f2e3;
+  color: #247044;
+}
+
+.event-badge--ended {
+  background: #f8dede;
+  color: #a83232;
 }
 
 .event-badge--archived {
@@ -545,24 +730,26 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 }
 
 .event-card-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin: 0 0 4px;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #283139;
+  margin: 0 0 6px;
   line-height: 1.3;
 }
 
 .event-card-desc {
-  font-size: 0.8rem;
-  color: #666;
-  margin: 0 0 8px;
+  font-size: 0.83rem;
+  color: #68747d;
+  margin: 0 0 14px;
   line-height: 1.4;
 }
 
 .event-card-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(104,112,120,.16);
   font-size: 0.75rem;
 }
 
@@ -570,7 +757,11 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   display: flex;
   align-items: center;
   gap: 3px;
-  color: #555;
+  padding: 5px 7px;
+  border: 1px solid rgba(255,255,255,.75);
+  border-radius: 9px;
+  background: rgba(255,255,255,.45);
+  color: #64717a;
 }
 
 /* Modals */
@@ -581,7 +772,8 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   left: 50%;
   width: min(430px, 100vw);
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(31, 35, 39, 0.58);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -595,74 +787,102 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 
 .modal-box-mobile,
 .event-modal-mobile {
-  background: #fff;
-  border-radius: 20px 20px 0 0;
+  background: linear-gradient(145deg, #f8f9f9, #dfe3e5);
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 24px 24px 0 0;
   width: 100%;
   max-width: 430px;
-  max-height: 88dvh;
+  max-height: 92dvh;
   overflow-y: auto;
   animation: slideUp 0.3s ease-out;
-  box-shadow: 0 -12px 35px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 -14px 35px rgba(22,26,30,.26), inset 0 1px rgba(255,255,255,.95);
+}
+.modal-handle {
+  width: 40px;
+  height: 4px;
+  margin: 12px auto 0;
+  border-radius: 999px;
+  background: #aeb6bc;
 }
 
 .modal-header-mobile {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
-  border-bottom: 1px solid #e5e5e5;
+  padding: 17px 22px 16px;
+  border-bottom: 1px solid rgba(104,112,120,.18);
 }
 
 .modal-header-mobile h2 {
   margin: 0;
-  font-size: 1.1rem;
-  color: #1a1a1a;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #303940;
 }
 
 .modal-close-btn {
-  width: 32px;
-  height: 32px;
+  min-width: 64px;
+  height: 34px;
+  padding: 0 14px;
   border: none;
-  border-radius: 50%;
-  background: #f5f5f5;
-  color: #333;
+  border-radius: 10px;
+  background: linear-gradient(145deg,#59636b,#303940);
+  color: #fff;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 700;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  box-shadow: inset 0 1px rgba(255,255,255,.18), 0 5px 11px rgba(39,44,49,.16);
+}
+.modal-close-btn:active { transform: translateY(1px); }
+.detail-close-btn {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 2px;
+  border-radius: 13px;
+  font-size: .88rem;
+  border: 1px solid #303940;
+  background: linear-gradient(145deg, #69747d, #303940);
+  box-shadow: inset 0 1px rgba(255,255,255,.2), 0 7px 15px rgba(39,44,49,.22);
 }
 
 .modal-body-mobile {
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 20px 24px;
 }
 
 .modal-desc {
   font-size: 0.9rem;
-  color: #666;
+  color: #68747d;
   line-height: 1.6;
-  margin: 0 0 16px;
+  margin: -2px 2px 0;
 }
 
 .modal-info-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 0;
 }
 
 .info-item {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 10px;
-  background: #f9f9f9;
-  border-radius: 8px;
+  min-height: 68px;
+  padding: 12px 13px;
+  background: rgba(255,255,255,.62);
+  border: 1px solid rgba(255,255,255,.82);
+  border-radius: 12px;
+  box-shadow: inset 0 1px rgba(255,255,255,.9);
 }
 
 .info-label {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #999;
+  color: #8a959d;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -670,16 +890,16 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 .info-val {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #1a1a1a;
+  color: #303940;
 }
 
 .modal-edit-btn {
   width: 100%;
   padding: 12px;
-  background: #333;
+  background: linear-gradient(145deg,#59636b,#303940);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 11px;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;

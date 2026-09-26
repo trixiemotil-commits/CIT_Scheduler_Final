@@ -1020,37 +1020,52 @@ async function getAdminDashboardSummary(req, res) {
       ? { academicTermId: publishedAcademicTermId }
       : { _id: { $exists: false } };
 
-    const [availableTeachers, totalRooms, classesToday, activeConsultations] = await Promise.all([
+    const [availableTeachers, roomAllocation, classesToday, activeConsultations] = await Promise.all([
       User.countDocuments({
-        $and: [
-          { $or: [{ role: "teacher" }, { roles: "teacher" }] },
-          { $nor: [{ role: "admin" }, { roles: "admin" }] },
-        ],
+        $or: [{ role: "teacher" }, { roles: "teacher" }],
         teacher_status: "On School",
       }),
-      ScheduleEntry.aggregate([
-        { $match: scheduleTermFilter },
-        {
-          $project: {
-            rooms: {
-              $setUnion: [
-                ["$room"],
-                {
-                  $map: {
-                    input: "$parallelSlots",
-                    as: "slot",
-                    in: "$$slot.room",
-                  },
-                },
-              ],
+      Promise.all([
+        ScheduleEntry.aggregate([
+          { $match: { ...scheduleTermFilter, entryType: "class" } },
+          {
+            $project: {
+              rooms: {
+                $setUnion: [
+                  ["$room"],
+                  { $map: { input: "$parallelSlots", as: "slot", in: "$$slot.room" } },
+                ],
+              },
             },
           },
-        },
-        { $unwind: "$rooms" },
-        { $match: { rooms: { $ne: "" } } },
-        { $group: { _id: "$rooms" } },
-        { $count: "rooms" },
-      ]).then((results) => (results[0]?.rooms || 0)),
+          { $unwind: "$rooms" },
+          { $project: { room: { $trim: { input: { $ifNull: ["$rooms", ""] } } } } },
+          { $match: { room: { $ne: "" } } },
+          { $group: { _id: "$room" } },
+          { $count: "rooms" },
+        ]),
+        ScheduleEntry.aggregate([
+          { $match: { ...scheduleTermFilter, entryType: "class", day: dashboardDay } },
+          {
+            $project: {
+              rooms: {
+                $setUnion: [
+                  ["$room"],
+                  { $map: { input: "$parallelSlots", as: "slot", in: "$$slot.room" } },
+                ],
+              },
+            },
+          },
+          { $unwind: "$rooms" },
+          { $project: { room: { $trim: { input: { $ifNull: ["$rooms", ""] } } } } },
+          { $match: { room: { $ne: "" } } },
+          { $group: { _id: "$room" } },
+          { $count: "rooms" },
+        ]),
+      ]).then(([totalResults, allocatedResults]) => ({
+        total: totalResults[0]?.rooms || 0,
+        allocated: allocatedResults[0]?.rooms || 0,
+      })),
       ScheduleEntry.countDocuments({
         ...scheduleTermFilter,
         day: dashboardDay,
@@ -1086,14 +1101,16 @@ async function getAdminDashboardSummary(req, res) {
       availableTeachers,
       publishedAcademicTermId,
       dashboardDay,
-      totalRooms,
+      roomAllocation,
       classesToday,
       activeConsultations,
     })
 
     return res.json({
       availableTeachers: Number(availableTeachers) || 0,
-      availableRooms: Number(totalRooms) || 0,
+      availableRooms: Number(roomAllocation.total) || 0,
+      allocatedRooms: Number(roomAllocation.allocated) || 0,
+      totalRooms: Number(roomAllocation.total) || 0,
       classesToday: Number(classesToday) || 0,
       consultations: Number(activeConsultations) || 0,
     });

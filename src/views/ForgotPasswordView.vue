@@ -46,7 +46,7 @@
           </svg>
         </div>
         <h2 class="step-title">Step 2: OTP</h2>
-        <p class="step-desc">Enter the 6-digit verification code sent to your email.</p>
+        <p class="step-desc">Enter the 6-digit verification code sent to your email. The code expires in 5 minutes.</p>
 
         <div v-if="error" class="error-msg">{{ error }}</div>
         <div v-if="message" class="success-msg">{{ message }}</div>
@@ -69,7 +69,7 @@
             />
           </div>
           <button type="submit" class="submit-btn">CONTINUE</button>
-          <button type="button" class="plain-btn" @click="goToStep2" :disabled="isSending">RESEND CODE</button>
+          <button type="button" class="resend-btn" @click="goToStep2" :disabled="isSending">{{ isSending ? 'SENDING...' : 'RESEND CODE' }}</button>
           <RouterLink to="/" class="cancel-link">Cancel</RouterLink>
         </form>
       </template>
@@ -152,7 +152,7 @@
 </template>
 
 <script setup>
-import { requestPasswordReset, resetPassword } from '@/auth.js'
+import { requestPasswordReset, resetPassword, verifyPasswordOtp } from '@/auth.js'
 import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
@@ -315,13 +315,21 @@ async function goToStep2() {
   }
 }
 
-function goToStep3() {
+async function goToStep3() {
   error.value = ''
   if (otp.value.length < 6) {
     error.value = 'Enter the full 6-digit code.'
     return
   }
-  step.value = 3
+  isSending.value = true
+  try {
+    await verifyPasswordOtp({ email: email.value.trim(), otp: otp.value })
+    step.value = 3
+  } catch (err) {
+    error.value = err.message || 'This verification code is invalid or expired.'
+  } finally {
+    isSending.value = false
+  }
 }
 
 async function handleReset() {
@@ -537,6 +545,30 @@ async function handleReset() {
 .submit-btn:active { transform: scale(0.98); }
 .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* Secondary OTP action */
+.resend-btn {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 18px;
+  border: 1px solid #c8cdd2;
+  border-radius: 50px;
+  background: #f4f6f7;
+  color: #4b5563;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s;
+}
+.resend-btn:hover:not(:disabled) {
+  border-color: #9ca3af;
+  background: #e9edf0;
+  color: #374151;
+}
+.resend-btn:active:not(:disabled) { transform: scale(0.98); }
+.resend-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
 /* Cancel */
 .cancel-link {
   font-size: 0.92rem;
@@ -578,6 +610,7 @@ async function handleReset() {
 @media (max-width: 480px) {
   .card { padding: 36px 22px 32px; }
   .pin-box { width: 40px; height: 48px; font-size: 1.2rem; }
+  .resend-btn { min-height: 40px; }
 }
 
 </style>

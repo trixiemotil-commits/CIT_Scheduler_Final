@@ -25,15 +25,15 @@
     <div class="stats-grid">
       <div class="stat-card green">
         <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 19V6l6-3 6 3v13M9 19v-4h6v4M8 9h1M15 9h1M8 12h1M15 12h1" /></svg></span>
-        <div class="stat-label">In School</div>
+        <div class="stat-label">On School</div>
         <div class="stat-num">{{ teacherStats.inSchool }}</div>
         <div class="stat-desc">teachers on campus</div>
       </div>
       <div class="stat-card red">
         <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3" /><path d="M5 20a7 7 0 0 1 14 0M16 4l4 4M20 4l-4 4" /></svg></span>
-        <div class="stat-label">On Leave</div>
-        <div class="stat-num">{{ teacherStats.onLeave }}</div>
-        <div class="stat-desc">teachers on leave</div>
+        <div class="stat-label">Offline</div>
+        <div class="stat-num">{{ teacherStats.offline }}</div>
+        <div class="stat-desc">teachers offline</div>
       </div>
       <div class="stat-card blue">
         <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="m8 12 2.5 2.5L16 9" /></svg></span>
@@ -105,11 +105,13 @@ const teachers = ref([])
 
 const teacherStats = computed(() => {
   const list = teachers.value
+  const isOnSchool = (teacher) => ['on school', 'in school'].includes(String(teacher.status || '').trim().toLowerCase())
+  const isAvailable = (teacher) => isOnSchool(teacher) && teacher.available === true
   return {
-    inSchool: list.filter((teacher) => teacher.status === 'In School').length,
-    onLeave: list.filter((teacher) => teacher.status === 'On Leave' || teacher.teacher_status === 'On Leave').length,
-    available: list.filter((teacher) => teacher.available === true).length,
-    notAvailable: list.filter((teacher) => teacher.available !== true).length,
+    inSchool: list.filter(isOnSchool).length,
+    offline: list.filter((teacher) => String(teacher.status || '').trim().toLowerCase() === 'offline').length,
+    available: list.filter(isAvailable).length,
+    notAvailable: list.filter((teacher) => !isAvailable(teacher)).length,
   }
 })
 

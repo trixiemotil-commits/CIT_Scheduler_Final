@@ -4,7 +4,7 @@
       <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=47'" alt="Teacher" class="avatar" />
+          <img :src="user.avatar || initialsAvatar(user)" alt="Teacher" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
@@ -86,7 +86,7 @@
               </span>
               <span class="event-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                {{ ev.time }}{{ ev.endTime ? ` – ${ev.endTime}` : '' }}
+                {{ formatDisplayTime(ev.time) }}{{ ev.endTime ? ` – ${formatDisplayTime(ev.endTime)}` : '' }}
               </span>
               <span class="event-meta-item">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -330,6 +330,7 @@
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
+import { initialsAvatar } from '@/utils/avatar.js'
 import { eventCoverStyle, eventInitials } from '@/utils/eventCover.js'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -869,7 +870,8 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
-.event-badge--active   { background: #d8dcdf; color: #4f575f; }
+.event-badge--active   { background: #d9f2e3; color: #247044; }
+.event-badge--ended    { background: #f8dede; color: #a83232; }
 .event-badge--archived { background: #f0f0f0; color: #888; }
 
 .event-card-actions { display: flex; gap: 6px; }
@@ -1079,8 +1081,8 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   width: fit-content;
   backdrop-filter: blur(4px);
 }
-.ev-view-badge--active   { background: rgba(83, 91, 100,0.88); color: #fff; }
-.ev-view-badge--ended    { background: rgba(88, 96, 103, 0.9); color: #fff; }
+.ev-view-badge--active   { background: rgba(47, 143, 91, 0.92); color: #fff; }
+.ev-view-badge--ended    { background: rgba(201, 74, 74, 0.92); color: #fff; }
 .ev-view-badge--archived { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.35); }
 .ev-view-title {
   font-size: 1.6rem;

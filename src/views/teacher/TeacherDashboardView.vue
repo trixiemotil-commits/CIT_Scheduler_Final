@@ -6,7 +6,7 @@
       <!-- Profile -->
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=47'" alt="Teacher" class="avatar" />
+          <img :src="user.avatar || initialsAvatar(user)" alt="Teacher" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
@@ -326,6 +326,7 @@
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import useNotifications from '@/composables/useNotifications'
+import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -586,7 +587,7 @@ const formattedTimeIn = computed(() => {
   return date.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
 })
 
-async function saveTeacherStatus({ record = false, durationMinutes = 0 } = {}) {
+async function saveTeacherStatus({ record = false, durationMinutes = 0, clockOut = false } = {}) {
   if (savingTeacherStatus.value) return
   savingTeacherStatus.value = true
   teacherStatusMessage.value = ''
@@ -600,13 +601,14 @@ async function saveTeacherStatus({ record = false, durationMinutes = 0 } = {}) {
         teacher_availability: teacherAvailability.value,
         recordTimeIn: record,
         statusDurationMinutes: durationMinutes,
+        clockOut,
       }),
     })
     const updatedUser = saveMergedUser(payload.user || {})
     teacherStatus.value = updatedUser.teacher_status || teacherStatus.value
     teacherAvailability.value = updatedUser.teacher_availability || teacherAvailability.value
     teacherTimeIn.value = updatedUser.teacher_time_in || teacherTimeIn.value
-    teacherStatusMessage.value = record ? 'Time in recorded and status saved.' : 'Status saved. Students can request consultations only when you are available and in school.'
+    teacherStatusMessage.value = record ? 'Time in recorded and status saved.' : 'Status saved. Students can request consultations only when you are available and on school.'
     clearTimeout(statusMessageTimer)
     statusMessageTimer = setTimeout(() => {
       teacherStatusMessage.value = ''
@@ -643,7 +645,7 @@ function setTeacherStatus(status) {
     teacherIsClockedOut.value = true
     teacherStatus.value = 'On Leave'
     closePresenceMenu()
-    saveTeacherStatus()
+    saveTeacherStatus({ clockOut: true })
     return
   }
 
@@ -660,7 +662,7 @@ function setTeacherStatus(status) {
 const teacherStatusDisplay = computed(() => {
   if (teacherIsClockedOut.value) return 'Offline'
   const status = normalizeTeacherStatus(teacherStatus.value)
-  if (status === 'On School') return 'In School'
+  if (status === 'On School') return 'On School'
   if (status === 'On Meeting') return 'On Meeting'
   if (status === 'Off Campus') return 'Off Campus'
   return 'On Leave'
@@ -753,7 +755,7 @@ function shouldEnforceAutoOffline() {
   if (!isWeekday()) return false
   if (forcedOfflineDate.value === getTodayKey()) return false
   const now = new Date()
-  return now.getHours() > 20 || (now.getHours() === 20 && now.getMinutes() >= 0)
+  return now.getHours() > 19 || (now.getHours() === 19 && now.getMinutes() >= 30)
 }
 
 function openMorningPrompt() {
@@ -775,8 +777,8 @@ function enforceAutoOffline() {
   markForcedOfflineToday()
   teacherStatus.value = 'On Leave'
   showMorningPrompt.value = false
-  saveTeacherStatus()
-  teacherStatusMessage.value = 'You are automatically offline for today because you did not clock out before 8:00 PM.'
+  saveTeacherStatus({ clockOut: true })
+  teacherStatusMessage.value = 'You were automatically clocked out at 7:30 PM.'
   teacherStatusError.value = false
   clearTimeout(statusMessageTimer)
   statusMessageTimer = setTimeout(() => { teacherStatusMessage.value = '' }, 4000)

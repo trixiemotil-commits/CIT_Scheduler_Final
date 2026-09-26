@@ -136,7 +136,11 @@
         </div>
         <h2 id="login-alert-title">{{ loginAlert.title }}</h2>
         <p id="login-alert-message" :class="{ 'login-alert__message--error': loginAlert.type === 'credentials' }">{{ loginAlert.message }}</p>
-        <button type="button" @click="closeLoginAlert">Try again</button>
+        <div v-if="loginAlert.type === 'security'" class="security-login-actions">
+          <button type="button" @click="closeLoginAlert">Continue</button>
+          <button type="button" class="security-login-logout" @click="logoutCurrentLogin">Log out this device</button>
+        </div>
+        <button v-else type="button" @click="closeLoginAlert">{{ pendingLoginRoute ? 'Continue' : 'Try again' }}</button>
       </section>
     </div>
 
@@ -353,6 +357,8 @@ const twoFactorCode = ref('')
 const twoFactorDigits = ref(['', '', '', '', '', ''])
 const twoFactorInputRefs = []
 const loginAlert = ref(null)
+const pendingLoginRoute = ref('')
+const pendingRoleSelection = ref(false)
 const signUpError = ref('')
 const signUpSuccess = ref('')
 const router = useRouter()
@@ -716,6 +722,40 @@ function showLoginAlert(type, title, message) {
 
 function closeLoginAlert() {
   loginAlert.value = null
+  if (pendingRoleSelection.value) {
+    pendingRoleSelection.value = false
+    availableRoles.value = ['admin', 'teacher']
+    showRoleSelection.value = true
+    return
+  }
+  if (pendingLoginRoute.value) {
+    const destination = pendingLoginRoute.value
+    pendingLoginRoute.value = ''
+    router.push(destination)
+  }
+}
+
+function logoutCurrentLogin() {
+  logout()
+  loginAlert.value = null
+  pendingLoginRoute.value = ''
+  pendingRoleSelection.value = false
+  showRoleSelection.value = false
+  availableRoles.value = []
+  signIn.password = ''
+}
+
+function continueAfterLogin(user) {
+  const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
+  const normalizedRoles = roles.map(role => String(role).toLowerCase())
+  if (normalizedRoles.includes('admin') && normalizedRoles.includes('teacher')) {
+    availableRoles.value = ['admin', 'teacher']
+    showRoleSelection.value = true
+    return
+  }
+  const destination = routeByRole(user.role)
+  pendingLoginRoute.value = destination
+  router.push(destination)
 }
 
 async function handleLogin() {
@@ -760,14 +800,18 @@ async function handleLogin() {
       return
     }
     const user = payload?.user
-    const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
-    const normalizedRoles = roles.map(role => String(role).toLowerCase())
-    if (normalizedRoles.includes('admin') && normalizedRoles.includes('teacher')) {
-      availableRoles.value = ['admin', 'teacher']
-      showRoleSelection.value = true
+    if (payload?.loginWarning) {
+      showLoginAlert('security', 'Security notice', 'This account was recently used to sign in on another device. If this was not you, change your password immediately.')
+      const roles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role].filter(Boolean)
+      const normalizedRoles = roles.map(role => String(role).toLowerCase())
+      if (normalizedRoles.includes('admin') && normalizedRoles.includes('teacher')) {
+        pendingRoleSelection.value = true
+      } else {
+        pendingLoginRoute.value = routeByRole(user.role)
+      }
       return
     }
-    router.push(routeByRole(user.role))
+    continueAfterLogin(user)
   } catch (error) {
     loginError.value = error.message || 'Invalid email or password.'
     const isCaptchaError = /recaptcha|captcha|verification/i.test(loginError.value)
@@ -788,6 +832,17 @@ async function confirmTwoFactor() {
   try {
     const payload = await verifyLoginOtp(twoFactorChallenge.value.challengeToken, twoFactorCode.value, signIn.remember)
     twoFactorChallenge.value = null
+    if (payload?.loginWarning) {
+      const roles = Array.isArray(payload.user?.roles) && payload.user.roles.length ? payload.user.roles : [payload.user?.role].filter(Boolean)
+      const normalizedRoles = roles.map(role => String(role).toLowerCase())
+      if (normalizedRoles.includes('admin') && normalizedRoles.includes('teacher')) {
+        pendingRoleSelection.value = true
+      } else {
+        pendingLoginRoute.value = routeByRole(payload.user.role)
+      }
+      showLoginAlert('security', 'Security notice', 'This account was recently used to sign in on another device. If this was not you, change your password immediately.')
+      return
+    }
     const roles = Array.isArray(payload.user?.roles) && payload.user.roles.length ? payload.user.roles : [payload.user?.role].filter(Boolean)
     const normalizedRoles = roles.map(role => String(role).toLowerCase())
     if (normalizedRoles.includes('admin') && normalizedRoles.includes('teacher')) {
@@ -795,7 +850,7 @@ async function confirmTwoFactor() {
       showRoleSelection.value = true
       return
     }
-    router.push(routeByRole(payload.user.role))
+    continueAfterLogin(payload.user)
   } catch (error) {
     loginError.value = error.message || 'Unable to verify the code.'
   }
@@ -968,11 +1023,15 @@ watch(activeTab, (val) => {
 <style scoped>
 .page-bg {
   min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
   background: radial-gradient(ellipse at 50% 110%, #f6f7f9 0%, #cfd3d8 26%, #9da4ad 54%, #5f6871 75%, #2b3036 100%);
-  padding: 24px;
+  padding: clamp(16px, 4vw, 32px);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .card {
@@ -980,7 +1039,7 @@ watch(activeTab, (val) => {
   border: 1px solid rgba(255,255,255,0.8);
   border-radius: 24px;
   padding: 32px 40px 28px;
-  width: 100%;
+  width: min(100%, 540px);
   max-width: 460px;
   box-shadow: 0 14px 40px rgba(24, 30, 36, 0.22);
   display: flex;
@@ -1299,6 +1358,37 @@ watch(activeTab, (val) => {
 }
 .login-alert > button:hover { background: linear-gradient(135deg, #687581, #394550); }
 .login-alert > button:focus-visible { outline: 3px solid rgba(76, 91, 103, .3); outline-offset: 2px; }
+.security-login-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 9px;
+}
+.security-login-actions button {
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid #3f4b54;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #596570, #303944);
+  color: #fff;
+  font-family: inherit;
+  font-size: .76rem;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 7px 15px rgba(43, 52, 61, .18);
+  transition: background .16s ease, transform .1s ease, box-shadow .16s ease;
+}
+.security-login-actions button:hover { background: linear-gradient(135deg, #687581, #394550); }
+.security-login-actions button:active { transform: scale(.98); }
+.security-login-actions button:focus-visible { outline: 3px solid rgba(76, 91, 103, .3); outline-offset: 2px; }
+.security-login-actions .security-login-logout {
+  border-color: #b64f59;
+  background: linear-gradient(135deg, #c96b73, #a33f4a);
+}
+.security-login-actions .security-login-logout:hover { background: linear-gradient(135deg, #d37a82, #b44b57); }
+
+@media (max-width: 380px) {
+  .security-login-actions { grid-template-columns: 1fr; }
+}
 
 .role-modal-overlay {
   position: fixed;
@@ -1468,7 +1558,8 @@ watch(activeTab, (val) => {
 @keyframes role-modal-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 
 @media (max-width: 520px) {
-  .card { padding: 28px 20px 24px; }
+  .page-bg { align-items: flex-start; padding-inline: 12px; }
+  .card { width: 100%; padding: 28px 20px 24px; margin: 0; }
   .title { font-size: 1.65rem; }
   .name-row { flex-direction: column; gap: 12px; }
   .login-brand { gap: 11px; }
@@ -1480,6 +1571,19 @@ watch(activeTab, (val) => {
   .role-modal__title { font-size: 1.5rem; }
   .role-selection__button { padding: 14px 12px; gap: 11px; }
   .role-selection__description { line-height: 1.35; }
+}
+
+@media (max-width: 360px) {
+  .page-bg { padding: 12px 8px; }
+  .card { padding: 22px 14px 18px; border-radius: 18px; }
+  .login-brand { align-items: flex-start; }
+  .login-brand__seal-wrap { width: 58px; height: 58px; flex-basis: 58px; }
+  .login-brand__seal { width: 51px; height: 51px; }
+  .login-brand__copy .title { font-size: 1.42rem; }
+  .login-brand__copy > span { max-width: 170px; }
+  .form-row { align-items: flex-start; gap: 10px; }
+  .remember-label { flex: 0 1 auto; }
+  .action-link { text-align: right; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1525,7 +1629,8 @@ watch(activeTab, (val) => {
 .page-bg {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: #12171b !important;
 }
 

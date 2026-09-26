@@ -5,7 +5,7 @@
       <AdminSidebarToggle />
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/teacher/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=47'" alt="Teacher" class="avatar" />
+          <img :src="user.avatar || initialsAvatar(user)" alt="Teacher" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Teachers Portal</div>
@@ -155,7 +155,7 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
             </div>
             <div>
-              <h2 class="settings-card-title">Email verification on login</h2>
+              <h2 class="settings-card-title">Email verification</h2>
             </div>
             <div class="tfa-control">
               <span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span>
@@ -193,28 +193,28 @@
             </div>
             <h2 class="faq-title">FAQs</h2>
           </div>
-          <div class="faq-list">
-            <div
-              v-for="(faq, i) in faqs"
-              :key="i"
-              class="faq-item"
-              :class="{ 'faq-item--open': openFaq === i }"
-            >
-              <button class="faq-question" @click="openFaq = openFaq === i ? null : i">
-                <span>{{ faq.q }}</span>
-                <svg
-                  class="faq-chevron"
-                  :class="{ 'faq-chevron--open': openFaq === i }"
-                  width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                ><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              <div v-show="openFaq === i" class="faq-answer">
-                <template v-if="Array.isArray(faq.a)">
+          <div v-for="category in faqCategories" :key="category" class="faq-category-group">
+            <div class="faq-category-divider"><span>{{ category }}</span></div>
+            <div class="faq-list">
+              <div
+                v-for="faq in faqs.filter((item) => item.category === category)"
+                :key="faq.q"
+                class="faq-item"
+                :class="{ 'faq-item--open': openFaq === faq.q }"
+              >
+                <button class="faq-question" @click="openFaq = openFaq === faq.q ? null : faq.q">
+                  <span>{{ faq.q }}</span>
+                  <svg
+                    class="faq-chevron"
+                    :class="{ 'faq-chevron--open': openFaq === faq.q }"
+                    width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                  ><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div v-show="openFaq === faq.q" class="faq-answer">
                   <ul class="faq-bullets">
-                    <li v-for="(item, idx) in faq.a" :key="idx">{{ item }}</li>
+                    <li v-for="(item, idx) in faq.a" :key="idx" v-html="highlightFaqText(item)"></li>
                   </ul>
-                </template>
-                <template v-else>{{ faq.a }}</template>
+                </div>
               </div>
             </div>
           </div>
@@ -301,6 +301,7 @@
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
+import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -469,7 +470,7 @@ function clearOtpTimer() {
 
 function startOtpTimer() {
   clearOtpTimer()
-  otpSecondsRemaining.value = 60
+  otpSecondsRemaining.value = 5 * 60
   otpTimer = setInterval(() => {
     otpSecondsRemaining.value -= 1
     if (otpSecondsRemaining.value <= 0) {
@@ -542,45 +543,94 @@ onUnmounted(clearOtpTimer)
 
 /* ── FAQs ── */
 const openFaq = ref(null)
+const faqCategories = ['Teaching & Consultation', 'Schedule & Events', 'Account & Security']
+const faqHighlightTerms = [
+  'Settings',
+  'Change Password',
+  'Email verification',
+  'OTP',
+  'Schedule',
+  'Consultation',
+  'Office Hours',
+  'Events',
+  'Teacher Portal',
+  'Logout',
+  'Switch to Admin',
+]
 const faqs = [
   {
-    q: 'Is this a settings issue or a system issue?',
-    a: [
-      'If the problem is in the Teacher Settings page itself, it is usually a personal account setting or role setting.',
-      'If you are having login errors, API issues, or email not sending, this is usually a system configuration problem and should be checked in the backend environment settings.'
-    ]
-  },
-  {
+    category: 'Account & Security',
     q: 'How do I change my teacher password?',
     a: [
-      'Open Settings and go to Change Password.',
-      'Enter your current password, request the OTP code sent to your email, and then type your new password.',
-      'Press Update Password to save.'
+      'Open Settings and choose Change Password.',
+      'Enter your current password, request the OTP sent to your email, and enter your new password.',
+      'Press Update Password to save the change.'
     ]
   },
   {
-    q: 'How do I enable email verification on login?',
+    category: 'Account & Security',
+    q: 'How do I enable email verification?',
     a: [
-      'Go to Settings and find Email verification on login.',
-      'Enter your current password to confirm the change, then toggle it on.',
-      'The system will send a verification code to your email whenever you log in.'
+      'Open Settings and find Email verification.',
+      'Enter your current password to confirm the change, then enable the toggle.',
+      'A verification code will be sent to your email whenever you log in.'
     ]
   },
   {
-    q: 'Where do I find my schedule and consultation tools?',
+    category: 'Teaching & Consultation',
+    q: 'How do I update my consultation availability?',
     a: [
-      'Use the sidebar options for Schedule and Consultation.',
-      'These are teacher-specific pages and are separate from the account settings page.'
+      'Use the Office Hours panel in the sidebar to set your current availability.',
+      'Choose Open for consultations when you are accepting student requests.',
+      'Students can book only when you are available and have consultation hours for that day.'
     ]
   },
   {
-    q: 'How do I log out or switch back to another role?',
+    category: 'Teaching & Consultation',
+    q: 'How do I review consultation requests?',
     a: [
-      'Use the Logout option in the sidebar to end your session.',
-      'If your account supports role switching, use the role switch option in the sidebar instead of changing backend settings.'
+      'Open Consultation from the sidebar to view incoming student requests.',
+      'Review the requested subject, schedule, and description before responding.',
+      'Keep your Office Hours updated so students can select accurate times.'
+    ]
+  },
+  {
+    category: 'Schedule & Events',
+    q: 'Where do I find my teaching schedule?',
+    a: [
+      'Open Schedule from the sidebar to view your assigned classes.',
+      'Use the schedule view to check rooms, subjects, days, and teaching times.',
+      'Contact an administrator if an assigned class or time is incorrect.'
+    ]
+  },
+  {
+    category: 'Schedule & Events',
+    q: 'How do I view school events?',
+    a: [
+      'Open Events from the sidebar to see campus announcements and activities.',
+      'Check each event for its date, time, venue, and description.'
+    ]
+  },
+  {
+    category: 'Account & Security',
+    q: 'How do I log out or switch roles?',
+    a: [
+      'Use Switch to Admin when your account has access to the admin portal.',
+      'Use Logout in the sidebar to end your session and return to the login page.'
     ]
   },
 ]
+
+function highlightFaqText(text) {
+  const escaped = String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+  const terms = [...faqHighlightTerms].sort((a, b) => b.length - a.length).map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  return escaped.replace(new RegExp(`(${terms.join('|')})`, 'gi'), '<mark class="faq-inline-highlight">$1</mark>')
+}
 </script>
 
 <style scoped>
@@ -995,8 +1045,12 @@ const faqs = [
   display: flex; align-items: center; justify-content: center;
 }
 .faq-title { font-size: 1.35rem; font-weight: 700; color: #111; margin: 0; }
+.faq-category-group + .faq-category-group { margin-top: 24px; }
+.faq-category-divider { display: flex; align-items: center; gap: 10px; margin: 0 2px 10px; color: #737e86; font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.faq-category-divider::after { content: ''; height: 1px; flex: 1; background: linear-gradient(90deg, rgba(104,112,120,.3), transparent); }
 .faq-list  { display: flex; flex-direction: column; gap: 12px; }
 .faq-item {
+  position: relative;
   background: #fff;
   border: 1.5px solid #ececec;
   border-radius: 12px;
@@ -1004,6 +1058,8 @@ const faqs = [
   transition: border-color 0.18s, box-shadow 0.18s, transform 0.15s;
 }
 .faq-item--open { border-color: #bfc6cb; box-shadow: 0 4px 14px rgba(48, 53, 58,0.08); }
+.faq-item::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: #69747d; opacity: 0; transition: opacity .18s ease; }
+.faq-item--open::before { opacity: 1; }
 .faq-question {
   display: flex;
   align-items: center;
@@ -1021,7 +1077,7 @@ const faqs = [
   cursor: pointer;
   transition: background 0.15s;
 }
-.faq-question:hover { background: #f4f5f5; }
+.faq-question:hover { background: #f1f3f4; color: #202a31; }
 .faq-chevron { flex-shrink: 0; color: #888; transition: transform 0.22s; }
 .faq-chevron--open { transform: rotate(180deg); color: #4b5563; }
 .faq-answer {
@@ -1041,6 +1097,19 @@ const faqs = [
 }
 .faq-bullets li {
   color: #4a4f57;
+}
+:deep(.faq-inline-highlight) {
+  display: inline;
+  padding: 1px 5px;
+  border: 1px solid rgba(105,116,125,.34);
+  border-radius: 5px;
+  background: linear-gradient(145deg, #f3f5f5, #d8dde0);
+  color: #4f5b63;
+  font-size: .92em;
+  font-weight: 750;
+  box-shadow: inset 0 1px rgba(255,255,255,.72);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 /* ── Modal overlay ── */

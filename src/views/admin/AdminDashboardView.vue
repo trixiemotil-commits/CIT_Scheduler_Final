@@ -6,7 +6,7 @@
       <!-- Profile -->
       <div class="sidebar-profile">
         <div class="avatar-wrap" style="cursor:pointer" @click="router.push('/admin/profile')">
-          <img :src="user.avatar || 'https://i.pravatar.cc/100?img=15'" :alt="user.name || 'Admin'" class="avatar" />
+          <img :src="user.avatar || initialsAvatar(user)" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
         <div class="role">Admin Portal</div>
@@ -386,6 +386,7 @@
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
 import useNotifications from '@/composables/useNotifications.js'
+import { initialsAvatar } from '@/utils/avatar.js'
 import Chart from 'chart.js/auto'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -707,7 +708,7 @@ const stats = ref([
     icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#626a72" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
   },
   {
-    label: 'Available Rooms', value: 0, sub: 'Distinct rooms in schedules',
+    label: 'Allocated Rooms', value: '0/0', sub: 'Rooms scheduled today',
     icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#626a72" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`
   },
   {
@@ -725,7 +726,7 @@ async function loadDashboardSummary() {
     const dashboardDay = encodeURIComponent(todayName.value)
     const payload = await apiRequest(`/schedules/dashboard-summary?day=${dashboardDay}`)
     stats.value[0].value = payload.availableTeachers
-    stats.value[1].value = payload.availableRooms
+    stats.value[1].value = `${Number(payload.allocatedRooms) || 0}/${Number(payload.totalRooms ?? payload.availableRooms) || 0}`
     stats.value[2].value = payload.classesToday
     stats.value[3].value = payload.consultations
   } catch (error) {
@@ -883,7 +884,7 @@ function scrollWorkloadHorizontally(event) {
 
 const teacherWorkloads = [
   {
-    name: 'Sir. Jhon', avatar: 'https://i.pravatar.cc/100?img=51',
+    name: 'Sir. Jhon', avatar: initialsAvatar('Sir. Jhon'),
     totalHours: 19, daysTeaching: 5,
     schedule: [
       { day: 'Monday',    time: '08:00-09:00', duration: '1h', subject: 'Data Structures',  section: '1st Year - Section A' },
@@ -893,7 +894,7 @@ const teacherWorkloads = [
     ]
   },
   {
-    name: 'Maam. Aira', avatar: 'https://i.pravatar.cc/100?img=47',
+    name: 'Maam. Aira', avatar: initialsAvatar('Maam. Aira'),
     totalHours: 12, daysTeaching: 3,
     schedule: [
       { day: 'Monday',  time: '10:00-11:00', duration: '1h', subject: 'Web Development', section: '2nd Year - Section A' },
@@ -902,7 +903,7 @@ const teacherWorkloads = [
     ]
   },
   {
-    name: 'Sir. Gab', avatar: 'https://i.pravatar.cc/100?img=53',
+    name: 'Sir. Gab', avatar: initialsAvatar('Sir. Gab'),
     totalHours: 24, daysTeaching: 5,
     schedule: [
       { day: 'Monday',    time: '07:00-08:00', duration: '1h', subject: 'Database Systems', section: '2nd Year - Section A' },
@@ -912,7 +913,7 @@ const teacherWorkloads = [
     ]
   },
   {
-    name: 'Sir.Bads', avatar: 'https://i.pravatar.cc/100?img=57',
+    name: 'Sir.Bads', avatar: initialsAvatar('Sir.Bads'),
     totalHours: 19, daysTeaching: 4,
     schedule: [
       { day: 'Monday',   time: '11:00-12:00', duration: '1h', subject: 'Networks',      section: '3rd Year - Section A' },
@@ -921,7 +922,7 @@ const teacherWorkloads = [
     ]
   },
   {
-    name: 'Maam. Daniella', avatar: 'https://i.pravatar.cc/100?img=44',
+    name: 'Maam. Daniella', avatar: initialsAvatar('Maam. Daniella'),
     totalHours: 9, daysTeaching: 2,
     schedule: [
       { day: 'Wednesday', time: '14:00-15:00', duration: '1h', subject: 'Capstone Project', section: '4th Year - Section A' },
@@ -929,7 +930,7 @@ const teacherWorkloads = [
     ]
   },
   {
-    name: 'Sir. Jolo', avatar: 'https://i.pravatar.cc/100?img=60',
+    name: 'Sir. Jolo', avatar: initialsAvatar('Sir. Jolo'),
     totalHours: 8, daysTeaching: 2,
     schedule: [
       { day: 'Tuesday',  time: '10:00-11:00', duration: '1h', subject: 'Software Engineering', section: '3rd Year - Section A' },
@@ -937,7 +938,7 @@ const teacherWorkloads = [
     ]
   },
   {
-    name: 'Maam.Aj', avatar: 'https://i.pravatar.cc/100?img=35',
+    name: 'Maam.Aj', avatar: initialsAvatar('Maam.Aj'),
     totalHours: 11, daysTeaching: 3,
     schedule: [
       { day: 'Monday',   time: '13:00-14:00', duration: '1h', subject: 'Technical Writing', section: '2nd Year - Section A' },
@@ -1089,7 +1090,9 @@ async function loadChartData() {
     ]))
     consultationRequests.value = (requestsPayload.requests || []).map(request => ({
       ...request,
-      requestedTeacher: teachersByEmployeeId.get(String(request.employeeId || '').trim()) || '',
+      requestedTeacher: request.requestedTeacher
+        || teachersByEmployeeId.get(String(request.employeeId || '').trim())
+        || '',
     }))
     liveTeacherWorkloads.value = calculateWorkloads(usersPayload.users || [], schedulesPayload.entries || [])
     if (lineChartInstance || barChartInstance) {
@@ -1167,7 +1170,7 @@ function createLineChart() {
         x: { grid: { display: false }, ticks: { color: '#69727c', font: { size: 12 } } },
         y: {
           beginAtZero: true,
-          ticks: { color: '#69727c', font: { size: 12 } },
+          ticks: { color: '#69727c', font: { size: 12 }, stepSize: 2, precision: 0 },
           grid: { color: 'rgba(83, 91, 100, 0.16)' }
         }
       }
@@ -2565,6 +2568,11 @@ function confirmLogout() {
 .logout-confirm-btn:hover { background: #4b5259; }
 
 /* Responsive */
+@media (max-width: 1100px) {
+  .main { padding-inline: 28px; }
+  .stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+}
+
 @media (max-width: 900px) {
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
   .today-teachers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2585,6 +2593,27 @@ function confirmLogout() {
   .today-stage-arrow.previous { left: 0; }
   .today-stage-arrow.next { right: 0; }
   .sidebar { width: 200px; min-width: 200px; }
+}
+
+@media (max-width: 768px) {
+  .stat-cards { gap: 12px; }
+  .stat-card { padding: 20px 18px 18px; }
+  .today-teachers-section { padding: 20px 16px 16px; }
+  .today-teachers-header { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .today-carousel-controls { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .today-schedule-table-wrap { overflow-x: auto; }
+  .today-schedule-track:not(.carousel-table) {
+    width: max-content;
+    min-width: 100%;
+    grid-template-columns: repeat(var(--teacher-columns), minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-cards { grid-template-columns: 1fr; }
+  .today-teachers-header h2 { font-size: 1.12rem; }
+  .today-teachers-header p { line-height: 1.5; }
+  .today-teachers-header p span { display: block; margin: 2px 0 0; padding: 0; border: 0; }
 }
 
 </style>
