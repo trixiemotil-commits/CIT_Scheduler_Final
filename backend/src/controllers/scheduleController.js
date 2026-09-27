@@ -1020,12 +1020,20 @@ async function getAdminDashboardSummary(req, res) {
       ? { academicTermId: publishedAcademicTermId }
       : { _id: { $exists: false } };
 
+    const publishedTermRoomTotal = publishedAcademicTermId
+      ? await AcademicTerm.findById(publishedAcademicTermId).select("rooms").lean().then((term) => {
+          if (!term || !Array.isArray(term.rooms)) return 0;
+          return term.rooms.filter((room) => String(room?.name || '').trim()).length;
+        })
+      : 0;
+
     const [availableTeachers, roomAllocation, classesToday, activeConsultations] = await Promise.all([
       User.countDocuments({
         $or: [{ role: "teacher" }, { roles: "teacher" }],
         teacher_status: "On School",
       }),
       Promise.all([
+        Promise.resolve(publishedTermRoomTotal),
         ScheduleEntry.aggregate([
           { $match: { ...scheduleTermFilter, entryType: "class" } },
           {
@@ -1044,26 +1052,8 @@ async function getAdminDashboardSummary(req, res) {
           { $group: { _id: "$room" } },
           { $count: "rooms" },
         ]),
-        ScheduleEntry.aggregate([
-          { $match: { ...scheduleTermFilter, entryType: "class", day: dashboardDay } },
-          {
-            $project: {
-              rooms: {
-                $setUnion: [
-                  ["$room"],
-                  { $map: { input: "$parallelSlots", as: "slot", in: "$$slot.room" } },
-                ],
-              },
-            },
-          },
-          { $unwind: "$rooms" },
-          { $project: { room: { $trim: { input: { $ifNull: ["$rooms", ""] } } } } },
-          { $match: { room: { $ne: "" } } },
-          { $group: { _id: "$room" } },
-          { $count: "rooms" },
-        ]),
-      ]).then(([totalResults, allocatedResults]) => ({
-        total: totalResults[0]?.rooms || 0,
+      ]).then(([total, allocatedResults]) => ({
+        total,
         allocated: allocatedResults[0]?.rooms || 0,
       })),
       ScheduleEntry.countDocuments({
@@ -1095,7 +1085,6 @@ async function getAdminDashboardSummary(req, res) {
         : Promise.resolve(0),
     ]);
 
-    // Debug log to help diagnose missing data in admin dashboard
     console.debug('getAdminDashboardSummary:', {
       requester: req.user ? { id: req.user.id, role: req.user.role } : null,
       availableTeachers,

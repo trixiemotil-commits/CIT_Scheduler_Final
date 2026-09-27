@@ -502,12 +502,131 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
   font-weight: 700;
 }
 
+@media (min-width: 480px) {
+  .mobile-app {
+    max-width: 470px;
+    padding-bottom: 126px;
+  }
+
+  .app-header {
+    padding: 18px 20px;
+  }
+
+  .header-title {
+    font-size: 1.2rem;
+  }
+
+  .profile-card,
+  .profile-section {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+
+  .profile-card {
+    padding: 24px 20px;
+  }
+
+  .profile-name {
+    font-size: 1.16rem;
+  }
+
+  .profile-email {
+    font-size: 0.82rem;
+  }
+
+  .profile-section {
+    padding: 18px 16px 16px;
+  }
+
+  .profile-menu-row {
+    min-height: 70px;
+    padding: 13px 12px;
+  }
+
+  .profile-menu-icon {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
+  .profile-menu-copy strong {
+    font-size: 0.9rem;
+  }
+
+  .profile-menu-copy small {
+    font-size: 0.73rem;
+  }
+
+  .profile-detail-grid > div {
+    padding: 10px;
+  }
+}
+
 @media (max-width: 380px) {
   .profile-card { padding-inline: 14px; }
   .profile-identity { gap: 11px; }
   .avatar-wrap, .avatar-lg, .avatar-img { width: 54px; height: 54px; }
   .profile-name { font-size: 1rem; }
   .profile-email { font-size: .72rem; }
+}
+
+@media (max-width: 360px) {
+  .mobile-app {
+    padding-bottom: 92px;
+  }
+
+  .app-header {
+    padding: 14px 14px 13px;
+  }
+
+  .header-title {
+    font-size: 1.04rem;
+  }
+
+  .profile-card {
+    margin-left: 12px;
+    margin-right: 12px;
+    padding: 18px 14px;
+  }
+
+  .profile-name {
+    font-size: 1.02rem;
+  }
+
+  .profile-email {
+    font-size: 0.72rem;
+  }
+
+  .profile-section {
+    margin-top: 16px;
+    margin-left: 12px;
+    margin-right: 12px;
+    padding: 14px 12px 12px;
+  }
+
+  .profile-menu-row {
+    min-height: 62px;
+    gap: 9px;
+    padding: 10px 9px;
+  }
+
+  .profile-menu-icon {
+    width: 31px;
+    height: 31px;
+    flex-basis: 31px;
+  }
+
+  .profile-menu-copy strong {
+    font-size: 0.8rem;
+  }
+
+  .profile-menu-copy small {
+    font-size: 0.66rem;
+  }
+
+  .profile-detail-grid {
+    gap: 0;
+  }
 }
 
 .profile-section { margin-top: 18px; padding: 16px 14px 14px; }
