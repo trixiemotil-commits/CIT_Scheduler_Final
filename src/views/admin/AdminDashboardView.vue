@@ -2568,9 +2568,26 @@ function confirmLogout() {
 .logout-confirm-btn:hover { background: #4b5259; }
 
 /* Responsive */
+@media (max-width: 1200px) {
+  .main { padding: 16px 20px 24px; }
+  .stat-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat-card { padding: 14px 12px 12px; border-radius: 12px; }
+  .stat-top { margin-bottom: 4px; }
+  .stat-label { font-size: .72rem; }
+  .stat-value { font-size: 2rem; }
+  .stat-sub { font-size: .66rem; }
+  .stat-icon svg { width: 20px; height: 20px; }
+  .today-teachers-section { margin-bottom: 16px; padding: 16px 18px 12px; }
+  .today-teachers-header { gap: 12px; margin-bottom: 10px; }
+  .today-teachers-header h2 { font-size: 1.05rem; }
+  .today-teachers-header p { font-size: .72rem; }
+  .today-teachers-empty { min-height: 90px; }
+  .charts-row { gap: 12px; margin-top: 8px; padding-bottom: 180px; }
+  .chart-card { min-height: 280px; padding: 14px 14px 12px; }
+}
+
 @media (max-width: 1100px) {
   .main { padding-inline: 28px; }
-  .stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 }
 
 @media (max-width: 900px) {
@@ -2578,7 +2595,7 @@ function confirmLogout() {
   .today-teachers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .charts-row { grid-template-columns: 1fr; }
 }
-@media (max-width: 1300px) {
+@media (max-width: 900px) {
   .charts-row { grid-template-columns: 1fr; }
   .chart-card { min-height: 360px; }
 }
