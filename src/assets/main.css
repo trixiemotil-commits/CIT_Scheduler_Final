@@ -512,6 +512,21 @@ select {
   box-shadow: 0 0 28px rgba(37,41,46,.18) !important;
 }
 
+@media (min-width: 431px) and (max-width: 520px) {
+  .student-app-shell,
+  .student-app-shell .mobile-app,
+  .student-app-shell .faqs-page,
+  .student-app-shell .change-password-page {
+    width: 100% !important;
+    max-width: 480px !important;
+  }
+
+  .student-tab-bar {
+    width: calc(100% - 24px) !important;
+    max-width: 456px !important;
+  }
+}
+
 .student-app-shell.student-notifications-active .student-tab-bar {
   display: none !important;
 }

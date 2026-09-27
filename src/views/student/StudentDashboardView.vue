@@ -626,6 +626,50 @@ function formatDate(dateStr) {
 .events-card .consult-row { padding: 11px 0; }
 .view-events-btn { border-radius: 999px; padding: 10px; font-size: .78rem; }
 
+@media (min-width: 768px) {
+  .mobile-app {
+    max-width: 470px;
+    padding-bottom: 28px;
+  }
+
+  .app-header {
+    min-height: 122px;
+    padding: 22px 20px 22px !important;
+  }
+
+  .header-title { font-size: 1.18rem; }
+  .header-sub { font-size: .81rem; }
+  .avatar-sm { width: 50px; height: 50px; }
+  .header-notif-btn { width: 42px; height: 42px; }
+
+  .stats-grid {
+    gap: 13px;
+    padding: 12px 18px 18px;
+  }
+
+  .stat-card {
+    min-height: 120px;
+    padding: 16px 16px 14px;
+  }
+
+  .stat-num { font-size: 2.15rem; }
+  .stat-desc { font-size: .7rem; }
+
+  .section-card {
+    margin-left: 18px;
+    margin-right: 18px;
+    padding: 18px 16px 14px;
+  }
+
+  .consultation-count-card { min-height: 40px; }
+  .consult-name { font-size: .85rem; }
+  .consult-teacher { font-size: .72rem; }
+  .consult-status-card { min-width: 76px; }
+
+  .cta-row { padding: 16px 18px 18px; }
+  .cta-btn { min-height: 50px; font-size: .9rem; }
+}
+
 @media (max-width: 360px) {
   .mobile-app { padding-bottom: 12px; }
   .app-header { min-height: 104px; padding: 19px 14px 22px !important; }
