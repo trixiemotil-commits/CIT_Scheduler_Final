@@ -200,23 +200,25 @@ npm install --save-dev concurrently
 ## Troubleshooting
 
 - ECONNREFUSED when frontend proxies `/api/*` to backend:
+
   - Ensure backend is running on `http://localhost:5000`.
   - Check backend health: `curl http://localhost:5000/api/health`.
-
 - Port 5000 already in use (Windows example):
+
   - Find the process: `netstat -ano | findstr :5000`
   - Get process details: `tasklist /FI "PID eq <pid>"`
   - Stop it: `taskkill /PID <pid> /F`
-
 - MongoDB connection errors:
-  - Verify `MONGODB_URI` and network access (Atlas IP whitelist, credentials).
 
+  - Verify `MONGODB_URI` and network access (Atlas IP whitelist, credentials).
 - Backend exits on startup with connection errors: ensure MongoDB is reachable and credentials are correct.
 - Approval email not received:
+
   - Confirm `SMTP_SERVICE` or `SMTP_HOST` is configured.
   - Confirm `SMTP_USER`, `SMTP_PASS`, and optionally `SMTP_FROM` are set in `backend/.env`.
   - Restart the backend after changing environment variables.
 - Account locked after incorrect passwords:
+
   - The first block lasts 1 minute, then escalates to 5 minutes, then 30 minutes.
   - After repeated failures, the account is permanently locked and the user should contact the administrator at `citscheduler@gmail.com`.
   - A successful login clears the failed-attempt counter and lockout state.
@@ -230,7 +232,6 @@ npm run build
 ```
 
 2. Serve built static files from a static host (Netlify, Vercel) or serve them via backend.
-
 3. Configure environment variables on your production host (MongoDB, SMTP, JWT secret, reCAPTCHA).
 
 ## Recommended workflow & tips

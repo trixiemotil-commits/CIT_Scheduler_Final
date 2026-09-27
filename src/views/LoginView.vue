@@ -42,8 +42,25 @@
         </div>
 
         <div v-if="isMobileApp" class="math-challenge">
-          <label :for="'login-math-answer'">Solve {{ loginMathChallenge.question }}</label>
-          <input id="login-math-answer" v-model="loginMathAnswer" type="number" inputmode="numeric" class="input-field" placeholder="Answer" autocomplete="off" />
+          <h2 class="math-challenge__title">Additional Security</h2>
+          <div class="math-challenge__equation" role="group" aria-label="Additional Security math challenge">
+            <span class="math-challenge__number">{{ loginMathChallenge.first }}</span>
+            <span aria-hidden="true">+</span>
+            <span class="math-challenge__number">{{ loginMathChallenge.second }}</span>
+            <span aria-hidden="true">=</span>
+            <input
+              v-model="loginMathAnswer"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              maxlength="3"
+              class="math-challenge__answer"
+              aria-label="Enter the answer"
+              autocomplete="off"
+              @input="sanitizeMathAnswer('login')"
+            />
+          </div>
+          <p v-if="loginError" class="math-challenge__error" role="alert">{{ loginError }}</p>
         </div>
 
         <!-- reCAPTCHA widget -->
@@ -109,8 +126,24 @@
         </div>
 
         <div v-if="isMobileApp" class="math-challenge">
-          <label :for="'signup-math-answer'">Solve {{ signUpMathChallenge.question }}</label>
-          <input id="signup-math-answer" v-model="signUpMathAnswer" type="number" inputmode="numeric" class="input-field" placeholder="Answer" autocomplete="off" />
+          <h2 class="math-challenge__title">Additional Security</h2>
+          <div class="math-challenge__equation" role="group" aria-label="Additional Security math challenge">
+            <span class="math-challenge__number">{{ signUpMathChallenge.first }}</span>
+            <span aria-hidden="true">+</span>
+            <span class="math-challenge__number">{{ signUpMathChallenge.second }}</span>
+            <span aria-hidden="true">=</span>
+            <input
+              v-model="signUpMathAnswer"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              maxlength="3"
+              class="math-challenge__answer"
+              aria-label="Enter the answer"
+              autocomplete="off"
+              @input="sanitizeMathAnswer('signup')"
+            />
+          </div>
         </div>
 
         <div v-if="signUpSuccess" class="success-msg">{{ signUpSuccess }}</div>
@@ -370,8 +403,8 @@ const signinWidgetId = ref(null)
 const signupWidgetId = ref(null)
 const loginMathAnswer = ref('')
 const signUpMathAnswer = ref('')
-const loginMathChallenge = ref({ question: '', answer: 0 })
-const signUpMathChallenge = ref({ question: '', answer: 0 })
+const loginMathChallenge = ref({ first: 0, second: 0, question: '', answer: 0 })
+const signUpMathChallenge = ref({ first: 0, second: 0, question: '', answer: 0 })
 const tronCanvas = ref(null)
 let disposeTronBackground = null
 const REMEMBERED_LOGIN_EMAIL_KEY = 'cit_remembered_login_email'
@@ -686,7 +719,7 @@ function resetRecaptcha(widgetRef) {
 function createMathChallenge() {
   const first = Math.floor(Math.random() * 90) + 10
   const second = Math.floor(Math.random() * 90) + 10
-  return { question: `${first} + ${second} =`, answer: first + second }
+  return { first, second, question: `${first} + ${second} =`, answer: first + second }
 }
 
 function resetMathChallenges() {
@@ -694,6 +727,21 @@ function resetMathChallenges() {
   signUpMathChallenge.value = createMathChallenge()
   loginMathAnswer.value = ''
   signUpMathAnswer.value = ''
+}
+
+function getMathAnswer(form) {
+  const answer = (form === 'login' ? loginMathAnswer.value : signUpMathAnswer.value).trim()
+  return answer ? Number(answer) : Number.NaN
+}
+
+function sanitizeMathAnswer(form) {
+  if (form === 'login') {
+    loginMathAnswer.value = loginMathAnswer.value.replace(/\D/g, '').slice(0, 3)
+    loginError.value = ''
+  } else {
+    signUpMathAnswer.value = signUpMathAnswer.value.replace(/\D/g, '').slice(0, 3)
+    signUpError.value = ''
+  }
 }
 const rememberedLoginEmail = localStorage.getItem(REMEMBERED_LOGIN_EMAIL_KEY) || ''
 const signIn = reactive({ email: rememberedLoginEmail, password: '', remember: Boolean(rememberedLoginEmail), showPw: false })
@@ -763,9 +811,8 @@ async function handleLogin() {
   isLoggingIn.value = true
   loginError.value = ''
   try {
-    if (isMobileApp && Number(loginMathAnswer.value) !== loginMathChallenge.value.answer) {
-      showLoginAlert('captcha', 'Verification required', 'Please enter the correct math answer.')
-      resetMathChallenges()
+    if (isMobileApp && getMathAnswer('login') !== loginMathChallenge.value.answer) {
+      loginError.value = 'Please enter the correct answer in Additional Security.'
       return
     }
 
@@ -781,7 +828,7 @@ async function handleLogin() {
       // ignore
     }
 
-    if (!recaptchaToken) {
+    if (!isMobileApp && !recaptchaToken) {
       showLoginAlert('captcha', 'Verification required', 'Please complete the “I’m not a robot” check before signing in.')
       return
     }
@@ -790,7 +837,7 @@ async function handleLogin() {
       signIn.email,
       signIn.password,
       isMobileApp ? null : recaptchaToken,
-      isMobileApp ? { question: loginMathChallenge.value.question.replace(' =', ''), answer: Number(loginMathAnswer.value) } : null,
+      isMobileApp ? { question: loginMathChallenge.value.question.replace(' =', ''), answer: getMathAnswer('login') } : null,
       signIn.remember
     )
     saveRememberedLogin(signIn.email, signIn.remember)
@@ -814,6 +861,10 @@ async function handleLogin() {
     continueAfterLogin(user)
   } catch (error) {
     loginError.value = error.message || 'Invalid email or password.'
+    if (isMobileApp) {
+      resetMathChallenges()
+      return
+    }
     const isCaptchaError = /recaptcha|captcha|verification/i.test(loginError.value)
     showLoginAlert(
       isCaptchaError ? 'captcha' : 'credentials',
@@ -922,9 +973,8 @@ async function handleSignUp() {
     return
   }
 
-  if (isMobileApp && Number(signUpMathAnswer.value) !== signUpMathChallenge.value.answer) {
+  if (isMobileApp && getMathAnswer('signup') !== signUpMathChallenge.value.answer) {
     signUpError.value = 'Please enter the correct math answer.'
-    resetMathChallenges()
     return
   }
 
@@ -954,7 +1004,7 @@ async function handleSignUp() {
       password: signUp.password,
       role: 'student',
       ...(isMobileApp
-        ? { client: 'mobile', mathChallenge: signUpMathChallenge.value.question.replace(' =', ''), mathAnswer: Number(signUpMathAnswer.value) }
+        ? { client: 'mobile', mathChallenge: signUpMathChallenge.value.question.replace(' =', ''), mathAnswer: getMathAnswer('signup') }
         : { recaptchaToken })
     })
     signUpSuccess.value = 'Account created successfully. Your account is pending admin approval.'
@@ -1148,6 +1198,71 @@ watch(activeTab, (val) => {
 
 /* Form */
 .form { display: flex; flex-direction: column; gap: 10px; }
+.math-challenge {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 14px;
+  border: 1px solid #c8ced6;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f2f5f7, #e5e9ec);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .9);
+}
+.math-challenge__title {
+  margin: 0;
+  color: #46515a;
+  font-size: .78rem;
+  font-weight: 700;
+}
+.math-challenge__equation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 2vw, 8px);
+  color: #4b5563;
+  font-size: .9rem;
+  font-weight: 600;
+}
+.math-challenge__number {
+  display: grid;
+  flex: 0 0 38px;
+  place-items: center;
+  height: 38px;
+  border: 1px solid #c4ccd2;
+  border-radius: 9px;
+  background: #fff;
+  color: #35414a;
+  font-size: .95rem;
+  font-weight: 700;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .9);
+}
+.math-challenge__answer {
+  box-sizing: border-box;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #b9c3ca;
+  border-radius: 8px;
+  outline: none;
+  background: #fff;
+  color: #35414a;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: inset 0 1px 2px rgba(42, 52, 58, .07);
+}
+.math-challenge__answer:focus {
+  border-color: #687780;
+  box-shadow: 0 0 0 3px rgba(90, 105, 114, .14);
+}
+.math-challenge__error {
+  margin: 0;
+  color: #a33c45;
+  font-size: .78rem;
+  line-height: 1.35;
+}
 
 /* Name row */
 .name-row { display: flex; gap: 12px; }
