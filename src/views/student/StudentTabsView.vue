@@ -250,4 +250,64 @@ ion-label {
     box-shadow: none;
   }
 }
+
+@media (max-width: 360px) {
+  .student-tab-bar {
+    width: calc(100% - 16px) !important;
+    height: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+    margin-bottom: 6px !important;
+    padding-inline: 3px !important;
+    border-radius: 30px !important;
+  }
+
+  .student-tab-bar ion-tab-button {
+    min-width: 0 !important;
+    min-height: 50px !important;
+  }
+
+  .student-tab-bar ion-tab-button::part(native) {
+    padding-inline: 1px;
+  }
+
+  .student-tab-bar ion-tab-button ion-icon,
+  .student-tab-bar ion-tab-button.tab-selected ion-icon {
+    width: 23px !important;
+    height: 23px !important;
+    flex-basis: 23px;
+  }
+
+  .student-tab-bar ion-tab-button.tab-selected::part(native) {
+    min-width: 80px;
+    height: 48px;
+    padding-inline: 12px;
+  }
+
+  .student-tab-bar ion-tab-button.tab-selected ion-label {
+    font-size: .58rem !important;
+    margin-left: 6px !important;
+  }
+
+  .student-tab-profile-avatar,
+  .student-tab-profile-image,
+  .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-avatar,
+  .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-image {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+}
+
+@media (max-width: 430px) and (max-height: 680px) {
+  .student-tab-bar {
+    height: calc(54px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .student-tab-bar ion-tab-button {
+    min-height: 46px !important;
+  }
+
+  .student-tab-bar ion-tab-button.tab-selected::part(native) {
+    height: 44px;
+  }
+}
 </style>

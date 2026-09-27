@@ -627,9 +627,41 @@ function formatDate(dateStr) {
 .view-events-btn { border-radius: 999px; padding: 10px; font-size: .78rem; }
 
 @media (max-width: 360px) {
-  .stats-grid { gap: 8px; padding-left: 12px; padding-right: 12px; }
+  .mobile-app { padding-bottom: 12px; }
+  .app-header { min-height: 104px; padding: 19px 14px 22px !important; }
+  .app-header::after { left: 14px; font-size: .54rem; }
+  .header-left { gap: 10px; }
+  .avatar-sm { width: 44px; height: 44px; }
+  .header-title { font-size: .98rem; }
+  .header-sub { font-size: .7rem; }
+  .header-notif-btn { width: 40px; height: 40px; }
+  .stats-grid { gap: 8px; padding: 8px 12px 14px; }
+  .stat-card { min-height: 96px; padding: 13px 12px 12px; border-radius: 15px; }
+  .stat-icon { top: 10px; right: 10px; width: 32px; height: 32px; }
+  .stat-icon svg { width: 19px; height: 19px; }
+  .stat-label { font-size: .66rem; }
+  .stat-num { margin-top: 6px; font-size: 1.8rem; }
+  .stat-desc { margin-top: 6px; font-size: .6rem; }
   .section-card, .events-card { margin-left: 12px; margin-right: 12px; }
-  .cta-row { padding-left: 12px; padding-right: 12px; }
-  .cta-btn { font-size: 0.78rem; }
+  .section-card { padding: 16px 13px 12px; border-radius: 18px; }
+  .section-card:not(.events-card) { padding-top: 18px; }
+  .section-card:not(.events-card) .section-title, .events-card .section-title { font-size: .92rem; }
+  .consultation-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin-top: 10px; }
+  .consultation-count-card { min-height: 32px; font-size: .58rem; }
+  .consult-row { gap: 7px; padding: 10px 0; }
+  .consult-name { font-size: .76rem; }
+  .consult-teacher { font-size: .64rem; }
+  .consult-status-card { min-width: 64px; padding: 5px 8px; font-size: .62rem; }
+  .cta-row { gap: 8px; padding: 14px 12px 16px; }
+  .cta-btn { min-height: 44px; padding-inline: 8px; font-size: .74rem; }
+}
+
+@media (max-width: 430px) and (max-height: 680px) {
+  .app-header { min-height: 102px; padding-top: 17px !important; }
+  .stats-grid { padding-top: 8px; padding-bottom: 12px; }
+  .stat-card { min-height: 98px; }
+  .section-card { padding-top: 16px; padding-bottom: 10px; }
+  .consult-row { padding-block: 9px; }
+  .cta-row { padding-top: 10px; padding-bottom: 12px; }
 }
 </style>
