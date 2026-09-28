@@ -2,11 +2,18 @@
   <IonApp>
     <RouterView />
     <div v-if="showNativeSplash" class="native-splash" aria-label="CITScheduler" role="status">
+      <div class="native-splash__lottie-art" aria-hidden="true">
+        <span class="native-splash__orbit native-splash__orbit--one"></span>
+        <span class="native-splash__orbit native-splash__orbit--two"></span>
+        <span class="native-splash__orbit native-splash__orbit--three"></span>
+      </div>
       <div class="native-splash__content">
-        <img src="/branding/cit-college-seal.png" alt="" class="native-splash__logo" />
-        <div class="native-splash__wordmark" aria-hidden="true">
-          <span class="native-splash__cit">CIT</span>
-          <span class="native-splash__scheduler">Scheduler</span>
+        <div class="native-splash__branding">
+          <img src="/branding/cit-college-seal.png" alt="" class="native-splash__logo" />
+          <div class="native-splash__wordmark" aria-hidden="true">
+            <span class="native-splash__cit">CIT</span>
+            <span class="native-splash__scheduler">Scheduler</span>
+          </div>
         </div>
       </div>
     </div>
@@ -64,7 +71,7 @@ onMounted(() => {
   if (showNativeSplash.value) {
     splashTimer = window.setTimeout(() => {
       showNativeSplash.value = false
-    }, 4500)
+    }, 5000)
   }
   securityPoll = window.setInterval(checkForNewLogin, 15000)
   document.addEventListener('visibilitychange', checkForNewLogin)
@@ -85,88 +92,146 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #12171b;
+  background:
+    radial-gradient(ellipse at 50% 120%, #f6f7f9 0%, #cfd3d8 20%, #9da4ad 42%, #5f6871 69%, #1a2128 100%);
   backface-visibility: hidden;
-  animation: native-splash-exit 450ms ease-in 4050ms forwards;
+  animation: native-splash-exit 450ms ease-in 5000ms forwards;
 }
 .native-splash::before {
   position: absolute;
-  inset: 32% -40% -25%;
+  inset: 30% -25% -18%;
   content: '';
-  opacity: .34;
+  opacity: .38;
   background-image:
-    linear-gradient(rgba(229, 236, 238, .16) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(229, 236, 238, .16) 1px, transparent 1px);
-  background-size: 52px 52px;
-  transform: perspective(420px) rotateX(58deg) scale(1.5);
+    linear-gradient(rgba(229, 236, 238, .17) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(229, 236, 238, .17) 1px, transparent 1px);
+  background-size: 42px 42px;
+  transform: perspective(480px) rotateX(62deg) scale(1.7);
   transform-origin: center bottom;
-  animation: native-splash-grid 4500ms linear infinite;
+  animation: native-splash-grid 5000ms linear infinite;
 }
 .native-splash::after {
   position: absolute;
   inset: 0;
   content: '';
-  background: linear-gradient(180deg, rgba(36, 43, 49, .76), rgba(13, 18, 22, .2) 45%, rgba(13, 18, 22, .82));
+  background: linear-gradient(180deg, rgba(17, 23, 28, .72), rgba(12, 17, 22, .18) 38%, rgba(11, 17, 21, .82));
   pointer-events: none;
 }
-.native-splash__content {
-  position: relative;
-  width: min(92vw, 430px);
-  height: 240px;
-  color: var(--ion-color-primary-contrast);
-  z-index: 1;
-  transform: translateZ(0);
-}
-.native-splash__logo {
+.native-splash__lottie-art {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: clamp(148px, 38vw, 196px);
-  height: clamp(148px, 38vw, 196px);
-  object-fit: contain;
-  backface-visibility: hidden;
-  transform: translateZ(0);
-  animation: native-splash-logo 1700ms cubic-bezier(.22, .8, .32, 1) forwards;
+  width: min(74vw, 380px);
+  aspect-ratio: 1;
+  opacity: .72;
+  transform: translate(-50%, -50%) rotate(-18deg);
+  animation: native-splash-art 5000ms ease-in-out infinite;
 }
-.native-splash__wordmark {
+.native-splash__orbit {
   position: absolute;
-  top: 50%;
-  left: calc(50% + 72px);
+  inset: 8%;
+  border: 2px solid rgba(220, 231, 235, .24);
+  border-radius: 45% 55% 48% 52%;
+  box-shadow: 0 0 18px rgba(206, 221, 226, .12);
+}
+.native-splash__orbit--one {
+  transform: rotate(28deg) scaleY(.42);
+  animation: native-splash-orbit-one 3400ms ease-in-out infinite;
+}
+.native-splash__orbit--two {
+  inset: 16% 2%;
+  border-color: rgba(184, 204, 212, .2);
+  transform: rotate(-34deg) scaleY(.56);
+  animation: native-splash-orbit-two 4100ms ease-in-out infinite reverse;
+}
+.native-splash__orbit--three {
+  inset: 1% 20%;
+  border-color: rgba(239, 245, 246, .16);
+  transform: rotate(76deg) scaleY(.42);
+  animation: native-splash-orbit-three 3000ms ease-in-out infinite;
+}
+.native-splash__content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: min(92vw, 520px);
+  color: var(--ion-color-primary-contrast);
+  transform: translateZ(0);
+}
+.native-splash__branding {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  letter-spacing: 0;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 3vw, 26px);
+  text-align: center;
+}
+.native-splash__logo {
+  display: block;
+  width: clamp(170px, 28vw, 250px);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 30px rgba(13, 20, 26, .34));
+  animation: native-splash-logo 1600ms cubic-bezier(.22, .8, .32, 1) forwards;
+}
+.native-splash__wordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   opacity: 0;
-  transform: translate(22px, -50%);
-  animation: native-splash-wordmark 900ms cubic-bezier(.22, .8, .32, 1) 850ms forwards;
+  transform: translateY(16px);
+  animation: native-splash-wordmark 850ms cubic-bezier(.22, .8, .32, 1) 820ms forwards;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  text-shadow: 0 0 14px rgba(115, 200, 255, .18);
 }
 .native-splash__cit {
-  font-size: clamp(2rem, 9vw, 3rem);
+  font-size: clamp(2.2rem, 6vw, 4rem);
   font-weight: 800;
-  line-height: .9;
+  line-height: .92;
+  color: #eaf4ff;
 }
 .native-splash__scheduler {
-  font-size: clamp(1rem, 4.8vw, 1.45rem);
+  font-size: clamp(1.05rem, 2.8vw, 1.8rem);
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.1;
+  color: #dfeef8;
+  letter-spacing: .12em;
 }
 @keyframes native-splash-logo {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
-  58% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
-  100% { opacity: 1; transform: translate(calc(-50% - 72px), -50%) scale(1); }
+  0% { opacity: 0; transform: scale(.72) translateY(16px); }
+  58% { opacity: 1; transform: scale(1.08) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 @keyframes native-splash-wordmark {
-  0% { opacity: 0; transform: translate(22px, -50%); }
-  100% { opacity: 1; transform: translate(0, -50%); }
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 @keyframes native-splash-exit {
   to { opacity: 0; visibility: hidden; }
 }
 @keyframes native-splash-grid {
   from { background-position: 0 0, 0 0; }
-  to { background-position: 0 52px, 52px 0; }
+  to { background-position: 0 42px, 42px 0; }
+}
+@keyframes native-splash-art {
+  0%, 100% { opacity: .38; transform: translate(-50%, -50%) rotate(-18deg) scale(.9); }
+  50% { opacity: .74; transform: translate(-50%, -50%) rotate(18deg) scale(1.08); }
+}
+@keyframes native-splash-orbit-one {
+  0%, 100% { transform: rotate(28deg) scaleY(.42) translateX(-7px); }
+  50% { transform: rotate(42deg) scaleY(.5) translateX(10px); }
+}
+@keyframes native-splash-orbit-two {
+  0%, 100% { transform: rotate(-34deg) scaleY(.56) translateY(8px); }
+  50% { transform: rotate(-12deg) scaleY(.44) translateY(-10px); }
+}
+@keyframes native-splash-orbit-three {
+  0%, 100% { transform: rotate(76deg) scaleY(.42); }
+  50% { transform: rotate(100deg) scaleY(.58); }
 }
 .security-warning-backdrop {
   position: fixed;
