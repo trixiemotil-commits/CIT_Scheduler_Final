@@ -168,7 +168,11 @@ function normalizeUser(rawUser) {
 const user = ref(normalizeUser(getUser()))
 const fullName = computed(() => user.value.name || '--')
 const initials = computed(() => fullName.value.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'S')
-const studentIdDisplay = computed(() => user.value.studentId || user.value.employeeId || '--')
+const studentIdDisplay = computed(() => {
+  const value = user.value.studentId || user.value.employeeId || user.value.studentID || user.value.id || ''
+  if (!value) return '--'
+  return String(value).trim()
+})
 const yearLevelDisplay = computed(() => user.value.yearLevel || user.value.grade || '--')
 const sectionDisplay = computed(() => user.value.section || '--')
 const roleLabel = computed(() => {
@@ -625,7 +629,8 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
   }
 
   .profile-detail-grid {
-    gap: 0;
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 }
 
@@ -636,17 +641,55 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
 .profile-menu-row:last-child { border-bottom: 0; }
 .profile-menu-row:active { background: rgba(207,213,217,.38); }
 .profile-menu-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 10px; color: #69747d; background: linear-gradient(145deg, #f8f9f9, #d7dde0); box-shadow: inset 0 1px rgba(255,255,255,.9); }
-.profile-menu-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.profile-menu-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
 .profile-menu-copy strong { color: #303940; font-size: .86rem; font-weight: 800; line-height: 1.25; }
-.profile-menu-copy small { color: #87919a; font-size: .7rem; line-height: 1.3; overflow-wrap: anywhere; }
+.profile-menu-copy small {
+  display: block;
+  color: #87919a;
+  font-size: .7rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+  max-width: 100%;
+}
 .profile-menu-chevron { flex: 0 0 auto; color: #89939b; }
 .profile-menu-row--danger .profile-menu-icon { color: #b5444f; background: linear-gradient(145deg, #fff8f8, #ead9da); }
 .profile-menu-row--danger .profile-menu-copy strong { color: #b5444f; }
-.profile-detail-grid { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 10px; background: rgba(104,112,120,.12); box-shadow: inset 0 1px rgba(255,255,255,.7), 0 8px 18px rgba(49,57,64,.05); }
-.profile-detail-grid > div { min-width: 0; padding: 10px 12px; background: rgba(255,255,255,.6); border-radius: 10px; box-shadow: inset 0 1px rgba(255,255,255,.8); }
+.profile-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  margin-top: 12px;
+  background: rgba(100, 109, 118, 0.09);
+  border: 1px solid rgba(96, 110, 120, 0.12);
+  border-radius: 14px;
+  box-shadow: inset 0 1px rgba(255,255,255,.7), 0 8px 18px rgba(49,57,64,.05);
+}
+.profile-detail-grid > div {
+  min-width: 0;
+  min-height: 74px;
+  padding: 12px 12px 10px;
+  background: rgba(255,255,255,.64);
+  border: 1px solid rgba(120, 129, 138, 0.12);
+  border-radius: 12px;
+  box-shadow: inset 0 1px rgba(255,255,255,.8);
+}
 .profile-detail-grid span, .profile-detail-grid strong { display: block; overflow-wrap: anywhere; }
-.profile-detail-grid span { color: #8a949c; font-size: .66rem; text-transform: uppercase; letter-spacing: .05em; }
-.profile-detail-grid strong { margin-top: 4px; color: #3c464e; font-size: .75rem; line-height: 1.25; }
+.profile-detail-grid span {
+  color: #8a949c;
+  font-size: .66rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.profile-detail-grid strong {
+  margin-top: 6px;
+  color: #3c464e;
+  font-size: .8rem;
+  line-height: 1.35;
+  font-weight: 700;
+}
 
 .action-row { display: flex; gap: 10px; padding: 16px 16px 0; }
 .action-row .act-btn:only-child { flex: 1; }

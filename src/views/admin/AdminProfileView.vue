@@ -82,16 +82,28 @@
           </div>
           <div class="info-grid">
             <div class="info-item">
-              <div class="info-label">Gender</div>
-              <div class="info-value">{{ profile.gender }}</div>
+              <div class="info-label">Name</div>
+              <div class="info-value">{{ profile.fullName }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Role</div>
+              <div class="info-value">{{ profile.role }}</div>
             </div>
             <div class="info-item">
               <div class="info-label">Employee ID</div>
               <div class="info-value">{{ profile.employeeId }}</div>
             </div>
             <div class="info-item">
-              <div class="info-label">Role</div>
-              <div class="info-value">{{ profile.role }}</div>
+              <div class="info-label">Email</div>
+              <div class="info-value">{{ profile.email }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Contact Number</div>
+              <div class="info-value">{{ profile.contact }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Status</div>
+              <div class="info-value">{{ profile.status }}</div>
             </div>
           </div>
         </div>
@@ -218,11 +230,11 @@ const navItems = [
   },
   {
     name: 'Events', to: '/admin/events',
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="5" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="18" r="1" fill="currentColor" stroke="none"/></svg>`
   },
   {
     name: 'Users', to: '/admin/users',
-    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
   },
   {
     name: 'Settings', to: '/admin/settings',
@@ -231,12 +243,20 @@ const navItems = [
 ]
 
 /* â”€â”€ Profile data â”€â”€ */
+const normalizeRoleLabel = (role) => {
+  const text = (role || '').toString().trim()
+  if (!text) return 'Admin'
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
+}
+
 const profile = ref({
-  fullName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-  email: user.email || '',
+  fullName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Admin',
+  email: user.email || 'admin@gmail.com',
   gender: user.gender || 'Not specified',
-  employeeId: user.employeeId || '',
-  role: user.role || 'admin',
+  employeeId: user.employeeId || 'N/A',
+  role: normalizeRoleLabel(user.role),
+  status: user.status || 'Active',
+  contact: user.phone || 'N/A',
   avatar: user.avatar || DEFAULT_AVATAR
 })
 
@@ -273,11 +293,13 @@ async function apiRequest(path, options = {}) {
 
 function setProfile(apiUser) {
   profile.value = {
-    fullName: `${apiUser.firstName || ''} ${apiUser.lastName || ''}`.trim(),
-    email: apiUser.email || '',
+    fullName: `${apiUser.firstName || ''} ${apiUser.lastName || ''}`.trim() || 'Admin',
+    email: apiUser.email || 'admin@gmail.com',
     gender: apiUser.gender || 'Not specified',
-    employeeId: apiUser.employeeId || '',
-    role: apiUser.role || 'admin',
+    employeeId: apiUser.employeeId || 'N/A',
+    role: normalizeRoleLabel(apiUser.role),
+    status: apiUser.status || 'Active',
+    contact: apiUser.phone || 'N/A',
     avatar: apiUser.avatar || DEFAULT_AVATAR,
   }
 }
@@ -423,27 +445,32 @@ onMounted(loadProfile)
 <style scoped>
 /* â”€â”€â”€ Design tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
-  --green-900: #4b5563;
-  --green-700: #6b7280;
-  --green-500: #9ca3af;
-  --green-200: #c4c9cd;
-  --green-50:  #f8fafc;
-  --red:       #e63946;
-  --red-dark:  #c1121f;
-  --bg:        #f0f2f5;
-  --surface:   #ffffff;
-  --border:    #e4e4e7;
-  --text-head: #0f172a;
-  --text-body: #475569;
-  --text-muted:#94a3b8;
+  --metal-950: #1f2329;
+  --metal-900: #2d3138;
+  --metal-800: #3a4048;
+  --metal-700: #4a525d;
+  --metal-600: #5e6772;
+  --metal-500: #7b838b;
+  --metal-300: #c7ccd2;
+  --metal-200: #dfe3e8;
+  --metal-100: #edf1f4;
+  --metal-50: #f5f7f9;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-strong: rgba(255, 255, 255, 0.9);
+  --border: rgba(99, 107, 118, 0.18);
+  --text-head: #171c22;
+  --text-body: #39424d;
+  --text-muted: #5d6974;
+  --shadow: 0 18px 36px rgba(34, 40, 46, 0.12);
 }
 
-/* â”€â”€â”€ Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .layout {
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background: #f5f6f8;
+  background:
+    radial-gradient(circle at top left, rgba(255,255,255,0.8), transparent 28%),
+    linear-gradient(135deg, #eceef0 0%, #dfe4e8 32%, #cfd5db 100%);
   font-family: 'Poppins', sans-serif;
 }
 
@@ -454,12 +481,12 @@ onMounted(loadProfile)
   font-family: inherit;
 }
 
-/* â”€â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .sidebar {
   width: 280px;
   min-width: 280px;
-  background: #fff;
-  border-right: 1px solid #ececec;
+  background: linear-gradient(180deg, rgba(255,255,255,0.56) 0%, rgba(244,246,248,0.86) 100%);
+  border-right: 1px solid rgba(96, 112, 124, 0.18);
+  backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -468,6 +495,7 @@ onMounted(loadProfile)
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  box-shadow: inset -1px 0 0 rgba(255,255,255,0.35);
 }
 
 .sidebar-profile {
@@ -485,16 +513,17 @@ onMounted(loadProfile)
   border-radius: 50%;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 3px solid #c4c9cd;
+  border: 3px solid rgba(120, 129, 138, 0.8);
+  box-shadow: 0 8px 18px rgba(62, 70, 77, 0.15);
   cursor: pointer;
-  transition: opacity 0.18s;
+  transition: transform 0.18s ease, opacity 0.18s ease;
 }
-.avatar-wrap:hover { opacity: 0.85; }
+.avatar-wrap:hover { opacity: 0.9; transform: translateY(-1px); }
 .avatar { width: 100%; height: 100%; object-fit: cover; }
 
-.brand { font-size: 1.05rem; font-weight: 600; color: #4b5563; }
-.role  { font-size: 0.88rem; color: #444; font-weight: 500; }
-.email { font-size: 0.82rem; color: #888; word-break: break-all; }
+.brand { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em; color: #2f3943; }
+.role { font-size: 0.8rem; color: #53606d; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.email { font-size: 0.81rem; color: #66737f; word-break: break-all; }
 
 .sidebar-nav {
   display: flex;
@@ -510,15 +539,23 @@ onMounted(loadProfile)
   gap: 10px;
   padding: 11px 16px;
   border-radius: 10px;
-  font-size: 0.88rem;
-  font-weight: 400;
-  color: #444;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #485663;
   text-decoration: none;
-  transition: background 0.18s, color 0.18s;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
   cursor: pointer;
 }
-.nav-item:hover { background: #f8fafc; color: #4b5563; }
-.nav-item.active { background: #4b5563; color: #fff; }
+.nav-item:hover {
+  background: rgba(255,255,255,0.42);
+  color: #27313a;
+  transform: translateX(1px);
+}
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(71,80,89,0.95), rgba(54,62,70,0.9));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+  color: #fff;
+}
 .nav-item.active .nav-icon { color: #fff; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
@@ -529,91 +566,101 @@ onMounted(loadProfile)
   gap: 8px;
   width: 100%;
   padding: 11px 12px;
-  background: #e63946;
-  color: #fff;
-  border: none;
+  background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(233,236,239,0.9));
+  color: #2f3943;
+  border: 1px solid rgba(96, 112, 124, 0.18);
   border-radius: 10px;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.88rem;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
   margin-top: 16px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
 }
-.logout-btn:hover { background: #c1121f; }
+.logout-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(62, 70, 77, 0.08);
+}
 
-/* â”€â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .main {
   flex: 1;
-  padding: 40px 44px;
+  padding: 24px 28px 40px;
   overflow-y: auto;
   min-width: 0;
   height: 100vh;
   box-sizing: border-box;
 }
 
-.main-header { margin-bottom: 32px; }
+.main-header { margin-bottom: 10px; }
 .page-title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #111827;
-  letter-spacing: -0.3px;
-  margin: 0 0 4px;
+  font-size: 2.15rem;
+  font-weight: 800;
+  color: #1d242d;
+  letter-spacing: -0.04em;
+  margin: 0 0 6px;
 }
 .page-sub {
-  font-size: 0.85rem;
-  color: #6b7280;
+  font-size: 0.88rem;
+  color: #5f6d79;
   margin: 0;
 }
 
 /* â”€â”€â”€ Profile Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .profile-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
+  background: rgba(255,255,255,0.58);
+  border: 1px solid rgba(118, 129, 140, 0.18);
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  box-shadow: var(--shadow);
   width: 100%;
   box-sizing: border-box;
   position: relative;
+  backdrop-filter: blur(4px);
+  margin: 0;
 }
 
 .card-banner {
-  height: 148px;
-  background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%);
+  height: 160px;
+  background: linear-gradient(135deg, #505963 0%, #697684 30%, #8c939b 100%);
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 0 24px;
+  padding: 0 20px;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.18);
+  border-radius: 18px 18px 0 0;
 }
 
 .edit-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   padding: 8px 15px;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.12);
   color: #fff;
-  border: 1px solid rgba(255,255,255,0.3);
-  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.26);
+  border-radius: 10px;
   font-size: 0.83rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   font-family: inherit;
-  transition: background 0.15s;
+  transition: background 0.2s ease, transform 0.2s ease;
   flex-shrink: 0;
   align-self: center;
 }
-.edit-btn:hover { background: rgba(255,255,255,0.25); }
+.edit-btn:hover {
+  background: rgba(255,255,255,0.2);
+  transform: translateY(-1px);
+}
 .edit-save-btn:disabled { cursor: not-allowed; opacity: 0.65; }
 
-.card-body { padding: 16px 28px 30px; }
+.card-body { padding: 18px 28px 28px; }
 
 .card-top {
   display: flex;
   align-items: flex-end;
   gap: 20px;
-  margin-bottom: 28px;
+  margin-bottom: 26px;
 }
 
 .hero-sub {
@@ -625,53 +672,48 @@ onMounted(loadProfile)
 .role-chip {
   display: inline-flex;
   align-items: center;
-  padding: 4px 12px;
-  background: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #c4c9cd;
-  border-radius: 20px;
-  font-size: 0.72rem;
-  font-weight: 600;
+  padding: 5px 12px;
+  background: rgba(120, 129, 138, 0.09);
+  color: #47525d;
+  border: 1px solid rgba(120, 129, 138, 0.2);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
-.hero-id {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.82rem;
-  color: #374151;
-  font-weight: 500;
-}
+.hero-id,
 .hero-email {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 0.82rem;
-  color: #374151;
+  color: #46535f;
   font-weight: 500;
 }
 
 .profile-avatar-wrap {
-  width: 120px;
-  height: 120px;
+  width: 126px;
+  height: 126px;
   border-radius: 50%;
   overflow: hidden;
-  border: 4px solid #fff;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+  border: 5px solid rgba(255,255,255,0.95);
+  box-shadow: 0 14px 26px rgba(35, 41, 49, 0.18);
   flex-shrink: 0;
-  margin-top: -88px;
+  margin-top: -92px;
   position: relative;
   z-index: 2;
+  background: linear-gradient(135deg, #e8edf1, #cdd5dc);
 }
 .profile-avatar { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .hero-name {
-  font-size: 1.32rem;
-  font-weight: 700;
-  color: #111827;
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: #171d22;
   line-height: 1.2;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  letter-spacing: -0.04em;
 }
 
 .profile-info {
@@ -680,30 +722,32 @@ onMounted(loadProfile)
 
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid rgba(126, 136, 146, 0.18);
+  border-radius: 14px;
   overflow: hidden;
+  background: rgba(255,255,255,0.26);
 }
 .info-item {
   padding: 16px 20px;
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid rgba(126, 136, 146, 0.15);
+  border-bottom: 1px solid rgba(126, 136, 146, 0.15);
+  background: rgba(255,255,255,0.08);
 }
 .info-item:nth-child(2n) { border-right: none; }
 .info-item:nth-last-child(-n+2) { border-bottom: none; }
 .info-label {
-  font-size: 0.69rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #9ca3af;
-  margin-bottom: 4px;
+  letter-spacing: 0.08em;
+  color: #7a8691;
+  margin-bottom: 6px;
 }
 .info-value {
-  font-size: 0.92rem;
-  font-weight: 500;
-  color: #111827;
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: #232d36;
 }
 
 /* â”€â”€â”€ Modals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
