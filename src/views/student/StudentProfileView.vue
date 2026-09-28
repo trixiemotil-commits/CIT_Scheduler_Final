@@ -631,7 +631,7 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
 
 .profile-section { margin-top: 18px; padding: 16px 14px 14px; }
 .profile-section-title { margin: 0 4px 9px; color: #68737c; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-.profile-menu { overflow: hidden; border-radius: 14px; background: rgba(255,255,255,.52); box-shadow: inset 0 1px rgba(255,255,255,.84); }
+.profile-menu { overflow: hidden; border-radius: 14px; background: rgba(255,255,255,.52); box-shadow: inset 0 1px rgba(255,255,255,.84), 0 8px 18px rgba(49,57,64,.08); }
 .profile-menu-row { width: 100%; min-height: 66px; display: flex; align-items: center; gap: 11px; padding: 12px 10px; border: 0; border-bottom: 1px solid rgba(104,112,120,.14); background: transparent; color: #303940; text-align: left; cursor: pointer; font-family: inherit; }
 .profile-menu-row:last-child { border-bottom: 0; }
 .profile-menu-row:active { background: rgba(207,213,217,.38); }
@@ -642,11 +642,11 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
 .profile-menu-chevron { flex: 0 0 auto; color: #89939b; }
 .profile-menu-row--danger .profile-menu-icon { color: #b5444f; background: linear-gradient(145deg, #fff8f8, #ead9da); }
 .profile-menu-row--danger .profile-menu-copy strong { color: #b5444f; }
-.profile-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; padding: 10px; background: rgba(104,112,120,.12); }
-.profile-detail-grid > div { min-width: 0; padding: 9px; background: rgba(255,255,255,.6); }
+.profile-detail-grid { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 10px; background: rgba(104,112,120,.12); box-shadow: inset 0 1px rgba(255,255,255,.7), 0 8px 18px rgba(49,57,64,.05); }
+.profile-detail-grid > div { min-width: 0; padding: 10px 12px; background: rgba(255,255,255,.6); border-radius: 10px; box-shadow: inset 0 1px rgba(255,255,255,.8); }
 .profile-detail-grid span, .profile-detail-grid strong { display: block; overflow-wrap: anywhere; }
 .profile-detail-grid span { color: #8a949c; font-size: .66rem; text-transform: uppercase; letter-spacing: .05em; }
-.profile-detail-grid strong { margin-top: 3px; color: #3c464e; font-size: .75rem; line-height: 1.25; }
+.profile-detail-grid strong { margin-top: 4px; color: #3c464e; font-size: .75rem; line-height: 1.25; }
 
 .action-row { display: flex; gap: 10px; padding: 16px 16px 0; }
 .action-row .act-btn:only-child { flex: 1; }

@@ -273,15 +273,18 @@ ion-tab-button {
 ion-tab-button::part(native) {
   background: transparent !important;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: center;
   align-items: center;
-  gap: 3px;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
   padding: 8px 8px 6px;
   border-radius: 18px;
 }
 
 ion-tab-button.tab-selected {
+  flex: 1.25 1 0;
   transform: translateY(-1px);
 }
 
@@ -293,6 +296,9 @@ ion-tab-button.tab-selected::part(native) {
     0 7px 12px rgba(15, 17, 20, 0.2),
     0 0 0 1px rgba(84, 88, 91, 0.28);
   border-radius: 28px;
+  width: auto;
+  min-width: 72px;
+  max-width: 100%;
   padding: 8px 12px 6px;
   margin-top: 2px;
 }

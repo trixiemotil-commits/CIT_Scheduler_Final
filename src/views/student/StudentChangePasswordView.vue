@@ -22,7 +22,10 @@
                 <span>Current password</span>
                 <div class="password-input-wrap">
                   <input v-model="currentPassword" :type="showCurrent ? 'text' : 'password'" placeholder="Enter current password" autocomplete="current-password" />
-                  <button type="button" class="password-eye" :aria-label="showCurrent ? 'Hide current password' : 'Show current password'" @click="showCurrent = !showCurrent"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                  <button type="button" class="password-eye" :aria-label="showCurrent ? 'Hide current password' : 'Show current password'" @click="showCurrent = !showCurrent">
+                    <svg v-if="showCurrent" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.58 10.58A2 2 0 0 0 13.42 13.42"/><path d="M9.88 5.08A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a16.82 16.82 0 0 1-4.71 6.12"/><path d="M6.61 6.61A16.82 16.82 0 0 0 2 12s3.5 7 10 7a10.94 10.94 0 0 0 5.39-1.61"/></svg>
+                  </button>
                 </div>
               </label>
 
@@ -33,12 +36,12 @@
 
               <label class="password-field">
                 <span>New password</span>
-                <div class="password-input-wrap"><input v-model="newPassword" :type="showNew ? 'text' : 'password'" placeholder="Enter new password" autocomplete="new-password" /><button type="button" class="password-eye" :aria-label="showNew ? 'Hide new password' : 'Show new password'" @click="showNew = !showNew"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+                <div class="password-input-wrap"><input v-model="newPassword" :type="showNew ? 'text' : 'password'" placeholder="Enter new password" autocomplete="new-password" /><button type="button" class="password-eye" :aria-label="showNew ? 'Hide new password' : 'Show new password'" @click="showNew = !showNew"><svg v-if="showNew" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.58 10.58A2 2 0 0 0 13.42 13.42"/><path d="M9.88 5.08A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a16.82 16.82 0 0 1-4.71 6.12"/><path d="M6.61 6.61A16.82 16.82 0 0 0 2 12s3.5 7 10 7a10.94 10.94 0 0 0 5.39-1.61"/></svg></button></div>
               </label>
 
               <label class="password-field">
                 <span>Confirm new password</span>
-                <div class="password-input-wrap"><input v-model="confirmPassword" :type="showConfirm ? 'text' : 'password'" placeholder="Re-enter new password" autocomplete="new-password" /><button type="button" class="password-eye" :aria-label="showConfirm ? 'Hide confirmation password' : 'Show confirmation password'" @click="showConfirm = !showConfirm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+                <div class="password-input-wrap"><input v-model="confirmPassword" :type="showConfirm ? 'text' : 'password'" placeholder="Re-enter new password" autocomplete="new-password" /><button type="button" class="password-eye" :aria-label="showConfirm ? 'Hide confirmation password' : 'Show confirmation password'" @click="showConfirm = !showConfirm"><svg v-if="showConfirm" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.58 10.58A2 2 0 0 0 13.42 13.42"/><path d="M9.88 5.08A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a16.82 16.82 0 0 1-4.71 6.12"/><path d="M6.61 6.61A16.82 16.82 0 0 0 2 12s3.5 7 10 7a10.94 10.94 0 0 0 5.39-1.61"/></svg></button></div>
               </label>
 
               <p v-if="passwordMessage" class="form-message" :class="{ error: passwordError }">{{ passwordMessage }}</p>
@@ -52,7 +55,10 @@
               <div class="verification-status"><button type="button" class="verification-toggle" :class="{ enabled: twoFactorEnabled }" :disabled="isSavingTwoFactor" :aria-pressed="twoFactorEnabled" aria-label="Toggle email verification" @click="toggleTwoFactor"><span></span></button><small>{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</small></div>
             </div>
             <p class="verification-copy">Send a verification code to your PHINMA Gmail address whenever you log in.</p>
-            <input v-model="twoFactorPassword" class="security-input" type="password" placeholder="Current password to confirm change" />
+            <div class="password-input-wrap verification-password-wrap">
+              <input v-model="twoFactorPassword" class="security-input" :class="{ 'security-input-error': twoFactorError && !twoFactorPassword.trim() }" :type="showTwoFactor ? 'text' : 'password'" placeholder="Current password to confirm change" @input="twoFactorError = false; twoFactorMessage = ''" />
+              <button type="button" class="password-eye" :aria-label="showTwoFactor ? 'Hide confirmation password' : 'Show confirmation password'" @click="showTwoFactor = !showTwoFactor"><svg v-if="showTwoFactor" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.58 10.58A2 2 0 0 0 13.42 13.42"/><path d="M9.88 5.08A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a16.82 16.82 0 0 1-4.71 6.12"/><path d="M6.61 6.61A16.82 16.82 0 0 0 2 12s3.5 7 10 7a10.94 10.94 0 0 0 5.39-1.61"/></svg></button>
+            </div>
             <p v-if="twoFactorMessage" class="form-message" :class="{ error: twoFactorError }">{{ twoFactorMessage }}</p>
           </section>
         </main>
@@ -85,6 +91,7 @@ const isChanging = ref(false)
 const otpCooldown = ref(0)
 const twoFactorEnabled = ref(Boolean(user.twoFactorEnabled))
 const twoFactorPassword = ref('')
+const showTwoFactor = ref(false)
 const twoFactorMessage = ref('')
 const twoFactorError = ref(false)
 const isSavingTwoFactor = ref(false)
@@ -192,7 +199,7 @@ onBeforeUnmount(() => { document.body.classList.remove('student-settings-active'
 .change-password-header h1 { color: #3e4851; font-size: 1.08rem; font-weight: 800; }
 .change-password-back, .header-spacer { width: 44px; height: 44px; }
 .change-password-back { display: grid; place-items: center; padding: 0; border: 1px solid rgba(255,255,255,.9); border-radius: 50%; color: #4d5860; background: linear-gradient(145deg,#fafbfb,#dfe3e5); box-shadow: inset 0 1px rgba(255,255,255,.95), 0 6px 14px rgba(48,57,64,.14); }
-.change-password-content { display: flex; flex-direction: column; gap: 16px; padding: 0 16px; }
+.change-password-content { display: flex; flex-direction: column; gap: 16px; padding: 18px 16px 0; }
 .security-card { padding: 19px 18px; border: 1px solid rgba(255,255,255,.98); border-radius: 22px; background: linear-gradient(145deg,rgba(255,255,255,.96),rgba(235,239,241,.9)); box-shadow: inset 0 1px rgba(255,255,255,.98), 0 12px 26px rgba(48,57,64,.13); }
 .card-heading { display: flex; align-items: flex-start; gap: 11px; min-width: 0; }
 .card-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 10px; color: #69747d; background: linear-gradient(145deg,#f8f9f9,#d7dde0); box-shadow: inset 0 1px rgba(255,255,255,.9); }
@@ -201,10 +208,13 @@ onBeforeUnmount(() => { document.body.classList.remove('student-settings-active'
 .password-form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
 .password-field { display: flex; flex-direction: column; gap: 6px; color: #5d6872; font-size: .76rem; font-weight: 800; }
 .password-input-wrap { position: relative; }
+.verification-password-wrap { margin-top: 12px; }
 .password-input-wrap input, .otp-input, .security-input { width: 100%; min-height: 52px; box-sizing: border-box; border: 1px solid #c5cdd2; border-radius: 14px; padding: 11px 44px 11px 14px; color: #303940; background: linear-gradient(180deg,rgba(250,251,251,.84),rgba(232,235,236,.84)); box-shadow: inset 2px 2px 5px rgba(61,67,73,.08), 0 1px rgba(255,255,255,.8); font: inherit; font-size: .84rem; font-weight: 400; }
 .password-input-wrap input::placeholder, .otp-input::placeholder, .security-input::placeholder { color: #7a838a; font-weight: 400; opacity: 1; }
 .password-input-wrap input:focus, .otp-input:focus, .security-input:focus { outline: none; border-color: #69747d; box-shadow: 0 0 0 3px rgba(83,91,100,.14), inset 2px 2px 5px rgba(61,67,73,.06); }
-.password-eye { position: absolute; top: 50%; right: 7px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; transform: translateY(-50%); border: 0; background: transparent; color: #77828f; }
+.password-eye { position: absolute; top: calc(50% + 3px); right: 7px; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; transform: translateY(-50%); border: 0; border-radius: 10px; background: transparent; color: #77828f; line-height: 0; cursor: pointer; transition: color .2s ease, background-color .2s ease; }
+.password-eye:hover { color: #4d5860; background: rgba(120, 130, 143, 0.08); }
+.password-eye svg { display: block; width: 18px; height: 18px; margin-top: 1px; }
 .otp-row { display: flex; align-items: flex-end; gap: 8px; }
 .otp-row .password-field { min-width: 0; flex: 1; }
 .otp-boxes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
@@ -212,8 +222,9 @@ onBeforeUnmount(() => { document.body.classList.remove('student-settings-active'
 .otp-button:disabled, .update-button:disabled { opacity: .6; }
 .otp-input { min-height: 52px !important; padding: 0 !important; text-align: center; font-size: 1rem !important; font-weight: 800; }
 .update-button { min-height: 54px; border: 1px solid #303940; border-radius: 15px; color: #fff; background: linear-gradient(145deg,#69747d,#303940); font: inherit; font-size: .86rem; font-weight: 800; box-shadow: inset 0 1px rgba(255,255,255,.2), 0 8px 16px rgba(39,44,49,.18); }
-.form-message { margin: 0; color: #4f6870; font-size: .72rem; line-height: 1.4; }
+.form-message { margin: 8px 0 0; color: #4f6870; font-size: .72rem; line-height: 1.4; }
 .form-message.error { color: #bd4650; }
+.security-input-error { border-color: #d66a6a !important; background: linear-gradient(180deg, rgba(255, 241, 241, 0.96), rgba(248, 226, 226, 0.92)) !important; box-shadow: 0 0 0 3px rgba(214, 106, 106, 0.18), inset 2px 2px 5px rgba(61,67,73,.06) !important; }
 .verification-card { padding-bottom: 18px; }
 .verification-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .verification-status { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 auto; }

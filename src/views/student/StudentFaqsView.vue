@@ -178,7 +178,7 @@ onBeforeUnmount(() => {
 .faqs-header h1 { color: #3e4851; font-size: 1.08rem; font-weight: 800; }
 .faqs-back, .faqs-spacer { width: 44px; height: 44px; }
 .faqs-back { display: grid; place-items: center; padding: 0; border: 1px solid rgba(255,255,255,.9); border-radius: 50%; color: #4d5860; background: linear-gradient(145deg,#fafbfb,#dfe3e5); box-shadow: inset 0 1px rgba(255,255,255,.95), 0 6px 14px rgba(48,57,64,.14); }
-.faqs-content { padding: 0 16px; }
+.faqs-content { padding: 18px 16px 0; }
 .faq-card { padding: 19px 16px; border: 1px solid rgba(255,255,255,.98); border-radius: 22px; background: linear-gradient(145deg,rgba(255,255,255,.96),rgba(235,239,241,.9)); box-shadow: inset 0 1px rgba(255,255,255,.98), 0 12px 26px rgba(48,57,64,.13); }
 .faq-intro { display: flex; align-items: flex-start; gap: 11px; padding: 2px 2px 18px; }
 .faq-icon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 10px; color: #69747d; background: linear-gradient(145deg,#f8f9f9,#d7dde0); box-shadow: inset 0 1px rgba(255,255,255,.9); }

@@ -6,10 +6,10 @@
     <!-- Header -->
     <div class="app-header">
       <div class="header-left">
-        <div class="avatar-sm">
+        <button type="button" class="avatar-sm" @click="$router.push('/student/profile')" aria-label="Open profile page">
           <img v-if="user.avatar" :src="user.avatar" alt="Profile picture" />
           <span v-else>{{ initials }}</span>
-        </div>
+        </button>
         <div>
           <div class="header-title">Student Dashboard</div>
           <div class="header-sub">{{ user.name }}</div>
@@ -54,10 +54,22 @@
       <div class="consultations-heading">
         <div class="section-title">Recent Consultations</div>
         <div class="consultation-counts" aria-label="Consultation status counts">
-          <div class="consultation-count-card count-approved"><span class="count-icon">✓</span><span>Approved</span><strong>{{ consultationStatusCounts.approved }}</strong></div>
-          <div class="consultation-count-card count-pending"><span class="count-icon">◷</span><span>Pending</span><strong>{{ consultationStatusCounts.pending }}</strong></div>
-          <div class="consultation-count-card count-reschedule"><span class="count-icon">↻</span><span>Reschedule</span><strong>{{ consultationStatusCounts.reschedule }}</strong></div>
-          <div class="consultation-count-card count-completed"><span class="count-icon">✓</span><span>Completed</span><strong>{{ consultationStatusCounts.completed }}</strong></div>
+          <div class="consultation-count-card count-approved">
+            <span class="count-icon" aria-hidden="true">✓</span>
+            <span class="count-text"><span class="count-label">Approved</span><strong>{{ consultationStatusCounts.approved }}</strong></span>
+          </div>
+          <div class="consultation-count-card count-pending">
+            <span class="count-icon" aria-hidden="true">◷</span>
+            <span class="count-text"><span class="count-label">Pending</span><strong>{{ consultationStatusCounts.pending }}</strong></span>
+          </div>
+          <div class="consultation-count-card count-reschedule">
+            <span class="count-icon" aria-hidden="true">↻</span>
+            <span class="count-text"><span class="count-label">Reschedule</span><strong>{{ consultationStatusCounts.reschedule }}</strong></span>
+          </div>
+          <div class="consultation-count-card count-completed">
+            <span class="count-icon" aria-hidden="true">✓</span>
+            <span class="count-text"><span class="count-label">Completed</span><strong>{{ consultationStatusCounts.completed }}</strong></span>
+          </div>
         </div>
       </div>
       <div v-for="c in recentConsultations" :key="c.id" class="consult-row">
@@ -203,10 +215,13 @@ async function loadRecentEvents() {
   try {
     const payload = await apiRequest('/events?status=active')
     const events = Array.isArray(payload.events) ? payload.events : []
-    recentEvents.value = events.slice(0, 2).map((event) => ({
-      ...event,
-      date: formatDate(event.date),
-    }))
+    recentEvents.value = [...events]
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+      .slice(0, 2)
+      .map((event) => ({
+        ...event,
+        date: formatDate(event.date),
+      }))
   } catch (_err) {
     recentEvents.value = []
   }
@@ -267,11 +282,17 @@ function formatDate(dateStr) {
   width: 42px; height: 42px;
   background: linear-gradient(145deg, #505860, #252a2f);
   color: #fff;
+  border: none;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 0.9rem; font-weight: 700;
   flex-shrink: 0;
   box-shadow: 0 4px 10px rgba(37, 42, 47, 0.2);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.avatar-sm:active {
+  transform: scale(0.96);
 }
 .avatar-sm img {
   width: 100%;
@@ -364,23 +385,63 @@ function formatDate(dateStr) {
 .consultations-heading .section-title { margin: 5px 0 0; }
 .consultation-counts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(52px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
-  width: 142px;
+  width: 100%;
   flex-shrink: 0;
 }
 .consultation-count-card {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 5px;
-  min-height: 28px;
-  padding: 4px 6px;
-  border-radius: 7px;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border-radius: 8px;
   font-size: 0.56rem;
   font-weight: 700;
 }
-.consultation-count-card strong { font-size: 0.76rem; color: #252a2f; }
+.consultation-count-card .count-text {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.consultation-count-card .count-label {
+  font-size: 0.58rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.consultation-count-card strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.38);
+  font-size: 0.76rem;
+  color: inherit;
+  margin-left: auto;
+}
+.count-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.35);
+  font-size: 0.96rem;
+  font-weight: 800;
+  line-height: 1;
+  flex-shrink: 0;
+}
 .count-approved { background: #e1eee6; color: #397051; }
 .count-pending { background: #fff3e0; color: #b35e00; }
 .count-reschedule { background: #ffeaea; color: #e63946; }
@@ -577,7 +638,7 @@ function formatDate(dateStr) {
 .consultations-heading .section-title { margin: 0; }
 .consultation-counts {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
   gap: 6px;
   margin-top: 13px;
@@ -585,19 +646,25 @@ function formatDate(dateStr) {
 
 .consultation-count-card {
   min-width: 0;
-  min-height: 38px;
-  justify-content: center;
-  gap: 3px;
-  padding: 5px 4px;
+  min-height: 42px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
   border: 1px solid rgba(255,255,255,.5);
   border-radius: 10px;
   font-size: .52rem;
 }
 
 .consultation-count-card .count-icon {
-  font-size: .72rem;
+  width: 22px;
+  height: 22px;
+  font-size: .9rem;
   font-weight: 800;
   line-height: 1;
+}
+
+.consultation-count-card .count-label {
+  font-size: .56rem;
 }
 
 .consultation-count-card strong { font-size: .72rem; }

@@ -554,6 +554,8 @@ select {
   --color-hover: var(--metal-700) !important;
   --color-selected: #fff !important;
   --ripple-color: transparent !important;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 50px !important;
   margin: 0 !important;
   border-radius: 18px !important;
@@ -582,11 +584,15 @@ select {
 
 .student-tab-bar ion-tab-button::part(native) {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   border-radius: 18px;
-  padding: 0 2px;
+  padding: 0 8px;
+  gap: 6px;
   box-sizing: border-box;
   transition: background .2s ease, box-shadow .2s ease, color .2s ease;
 }
@@ -596,24 +602,25 @@ select {
   --color: #fff !important;
   --color-selected: #fff !important;
   color: #fff !important;
+  flex: 1.25 1 0;
   transform: none !important;
 }
 
 .student-tab-bar ion-tab-button.tab-selected::part(native) {
   display: flex;
-  width: max-content;
-  min-width: 92px;
-  max-width: calc(100% - 8px);
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 72px;
+  max-width: 100%;
   height: 48px;
   min-height: 48px;
   align-self: center;
-  align-items: center;
-  justify-content: flex-start !important;
   flex-direction: row;
-  gap: 0;
+  gap: 6px;
   border-radius: 34px;
   margin: 0;
-  padding: 0 18px 0 15px;
+  padding: 0 12px;
   transform: translateY(2px) !important;
   box-sizing: border-box;
   text-align: left;
@@ -624,6 +631,26 @@ select {
 .student-tab-bar ion-tab-button ion-icon {
   width: 27px !important;
   height: 27px !important;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 390px) {
+  .student-tab-bar ion-tab-button::part(native) {
+    gap: 4px;
+    padding-inline: 4px;
+  }
+
+  .student-tab-bar ion-tab-button.tab-selected::part(native) {
+    min-width: 66px;
+    max-width: 102px;
+    padding-inline: 10px;
+  }
+
+  .student-tab-bar ion-tab-button.tab-selected ion-label {
+    font-size: .54rem !important;
+    margin-left: 0 !important;
+    white-space: nowrap;
+  }
 }
 
 .student-tab-profile-avatar {
