@@ -211,12 +211,10 @@ const activeIndex = computed(() => {
 
 const indicatorStyle = computed(() => {
   const count = navigation.length || 1
-  const gap = 8
-  const usableWidth = `calc(((100% - ${gap * (count + 1)}px) / ${count}) + 18px)`
-  const left = `calc(${activeIndex.value} * ((100% - ${gap * (count + 1)}px) / ${count}) + ${(activeIndex.value + 1) * gap}px - 9px)`
+  const itemWidthPercent = 100 / count
   return {
-    width: usableWidth,
-    left,
+    width: `calc(${itemWidthPercent}% - 6px)`,
+    left: `calc(${activeIndex.value * itemWidthPercent}% + 3px)`,
   }
 })
 </script>
@@ -236,8 +234,8 @@ const indicatorStyle = computed(() => {
 
 .student-tab-bar {
   position: relative;
-  height: calc(66px + env(safe-area-inset-bottom, 0px));
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  height: calc(62px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid #e5e7eb;
   --background: rgba(255, 255, 255, 0.96);
   --border: 0;
@@ -248,13 +246,12 @@ const indicatorStyle = computed(() => {
 
 .student-tab-indicator {
   position: absolute;
-  top: 5px;
-  bottom: 5px;
+  top: 7px;
+  bottom: 7px;
   left: 0;
   z-index: 0;
-  border-radius: 22px;
-  background: linear-gradient(180deg, #3d3f43 0%, #24272b 22%, #171b1f 55%, #2f3237 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -2px 5px rgba(0,0,0,0.23), 0 8px 16px rgba(14,16,19,0.2);
+  border-radius: 18px;
+  background: transparent;
   pointer-events: none;
   transition: left 0.28s cubic-bezier(0.22, 1, 0.36, 1), width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -279,13 +276,25 @@ ion-tab-button::part(native) {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 4px;
-  padding: 10px 12px 9px;
-  border-radius: 22px;
+  gap: 3px;
+  padding: 8px 8px 6px;
+  border-radius: 18px;
 }
 
 ion-tab-button.tab-selected {
   transform: translateY(-1px);
+}
+
+ion-tab-button.tab-selected::part(native) {
+  background: linear-gradient(180deg, #6a6e73 0%, #4b4f54 18%, #2a2d30 52%, #5d6166 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.26),
+    inset 0 -3px 6px rgba(0,0,0,0.28),
+    0 7px 12px rgba(15, 17, 20, 0.2),
+    0 0 0 1px rgba(84, 88, 91, 0.28);
+  border-radius: 28px;
+  padding: 8px 12px 6px;
+  margin-top: 2px;
 }
 
 ion-tab-button.tab-selected ion-icon,
