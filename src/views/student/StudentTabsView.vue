@@ -230,10 +230,16 @@ const indicatorStyle = computed(() => {
   overflow: hidden;
   background: #f3f5f7;
   box-shadow: 0 0 28px rgba(37, 41, 46, 0.14);
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
 }
 
 .student-tab-bar {
-  position: relative;
+  position: fixed;
+  left: 50%;
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: calc(100% - 16px);
+  max-width: 410px;
   height: calc(62px + env(safe-area-inset-bottom, 0px));
   padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid #e5e7eb;
@@ -242,6 +248,7 @@ const indicatorStyle = computed(() => {
   border-radius: 24px 24px 20px 20px;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
   overflow: hidden;
+  z-index: 20;
 }
 
 .student-tab-indicator {
