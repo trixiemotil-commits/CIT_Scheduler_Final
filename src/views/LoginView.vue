@@ -1076,12 +1076,13 @@ watch(activeTab, (val) => {
   min-height: 100svh;
   min-height: 100dvh;
   display: flex;
-  align-items: safe center;
+  align-items: center;
   justify-content: center;
   background: radial-gradient(ellipse at 50% 110%, #f6f7f9 0%, #cfd3d8 26%, #9da4ad 54%, #5f6871 75%, #2b3036 100%);
   padding: clamp(16px, 4vw, 32px);
   overflow-x: hidden;
   overflow-y: auto;
+  margin: 0;
 }
 
 .card {
@@ -1089,16 +1090,18 @@ watch(activeTab, (val) => {
   border: 1px solid rgba(255,255,255,0.8);
   border-radius: 24px;
   padding: 32px 40px 28px;
-  width: min(100%, 540px);
+  width: min(92vw, 500px);
   max-width: 460px;
+  margin: auto;
   box-shadow: 0 14px 40px rgba(24, 30, 36, 0.22);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  transition: max-width 0.25s;
+  transition: max-width 0.25s, width 0.25s;
 }
 
 .card.card--wide {
+  width: min(92vw, 560px);
   max-width: 540px;
 }
 
@@ -1672,33 +1675,146 @@ watch(activeTab, (val) => {
 @keyframes role-overlay-in { from { opacity: 0; } }
 @keyframes role-modal-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 
+@media (max-width: 980px) {
+  .page-bg { padding: clamp(12px, 2vw, 18px); }
+  .card {
+    width: min(76vw, 430px);
+    max-width: 430px;
+    padding: 22px 18px 18px;
+  }
+  .card.card--wide {
+    width: min(82vw, 470px);
+    max-width: 470px;
+    padding: 20px 16px 16px;
+  }
+  .title { font-size: 1.7rem; }
+  .login-brand__seal-wrap { width: 70px; height: 70px; flex-basis: 70px; }
+  .login-brand__seal { width: 62px; height: 62px; }
+  .login-brand__copy > span { font-size: .56rem; }
+  .input-field {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: .8rem;
+  }
+  .password-requirements li { font-size: .68rem; }
+  .student-signup-note { font-size: .68rem; }
+  .submit-btn { font-size: .88rem; }
+}
+
 @media (max-width: 520px) {
-  .page-bg { align-items: flex-start; padding-inline: 12px; }
-  .card { width: 100%; padding: 28px 20px 24px; margin: 0; }
-  .title { font-size: 1.65rem; }
-  .name-row { flex-direction: column; gap: 12px; }
-  .login-brand { gap: 11px; }
-  .login-brand__seal-wrap { width: 68px; height: 68px; flex-basis: 68px; }
-  .login-brand__seal { width: 60px; height: 60px; }
-  .login-brand__copy > span { max-width: 190px; font-size: .54rem; line-height: 1.3; }
+  .page-bg {
+    align-items: center;
+    justify-content: center;
+    padding: 12px 10px;
+  }
+  .card {
+    width: min(82vw, 360px);
+    max-width: 360px;
+    padding: 16px 12px 14px;
+    margin: auto;
+    gap: 10px;
+  }
+  .card.card--wide {
+    width: min(86vw, 380px);
+    max-width: 380px;
+    padding: 14px 10px 12px;
+  }
+  .title { font-size: 1.32rem; }
+  .login-brand { gap: 8px; margin: -2px 0 0; }
+  .login-brand__seal-wrap { width: 50px; height: 50px; flex-basis: 50px; }
+  .login-brand__seal { width: 42px; height: 42px; }
+  .login-brand__copy > span { max-width: 170px; font-size: .46rem; }
+  .tab-btn { font-size: .72rem; }
+  .form { gap: 7px; }
+  .name-row { flex-direction: column; gap: 7px; }
+  .input-field {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    font-size: 0.74rem;
+  }
+  .password-requirements {
+    gap: 3px;
+    margin: -1px 0 0;
+  }
+  .password-requirements li { font-size: .58rem; }
+  .student-signup-note {
+    padding: 6px 8px;
+    font-size: .58rem;
+  }
+  .submit-btn {
+    padding: 9px 10px;
+    font-size: .78rem;
+  }
+  .remember-label, .action-link { font-size: .64rem; }
   .role-modal-overlay { padding: 16px; }
   .role-modal { padding: 24px 18px; border-radius: 20px; }
-  .role-modal__title { font-size: 1.5rem; }
+  .role-modal__title { font-size: 1.2rem; }
   .role-selection__button { padding: 14px 12px; gap: 11px; }
   .role-selection__description { line-height: 1.35; }
 }
 
 @media (max-width: 360px) {
-  .page-bg { padding: 12px 8px; }
-  .card { padding: 22px 14px 18px; border-radius: 18px; }
-  .login-brand { align-items: flex-start; }
-  .login-brand__seal-wrap { width: 58px; height: 58px; flex-basis: 58px; }
-  .login-brand__seal { width: 51px; height: 51px; }
-  .login-brand__copy .title { font-size: 1.42rem; }
-  .login-brand__copy > span { max-width: 170px; }
-  .form-row { align-items: flex-start; gap: 10px; }
-  .remember-label { flex: 0 1 auto; }
-  .action-link { text-align: right; }
+  .page-bg {
+    padding: 8px 4px;
+  }
+  .card {
+    width: min(86vw, 290px);
+    padding: 10px 7px 8px;
+    border-radius: 12px;
+    gap: 6px;
+  }
+  .card.card--wide {
+    width: min(90vw, 310px);
+    padding: 10px 7px 8px;
+  }
+  .login-brand {
+    gap: 5px;
+    align-items: center;
+    margin: 0;
+  }
+  .login-brand__seal-wrap { width: 34px; height: 34px; flex-basis: 34px; }
+  .login-brand__seal { width: 28px; height: 28px; }
+  .login-brand__copy { align-items: center; }
+  .login-brand__copy .title { font-size: .82rem; }
+  .login-brand__copy > span { max-width: 120px; font-size: .32rem; letter-spacing: .08em; }
+  .tab-btn { font-size: .6rem; padding: 5px 0; }
+  .form-row { align-items: flex-start; gap: 8px; }
+  .remember-label, .action-link { font-size: .56rem; }
+  .input-field {
+    padding: 6px 26px 6px 8px;
+    font-size: .58rem;
+  }
+  .password-requirements {
+    gap: 2px;
+    margin: 0 0 1px;
+  }
+  .password-requirements li { font-size: .46rem; }
+  .student-signup-note {
+    padding: 5px 6px;
+    font-size: .46rem;
+  }
+  .submit-btn {
+    padding: 7px 8px;
+    font-size: .64rem;
+  }
+  .captcha-box { max-width: 180px; }
+}
+
+@media (max-width: 300px) {
+  .page-bg { padding: 7px 3px; }
+  .card,
+  .card.card--wide {
+    width: min(100%, 235px);
+    padding-left: 7px;
+    padding-right: 7px;
+  }
+  .login-brand__copy .title { font-size: .84rem; }
+  .login-brand__copy > span { font-size: .34rem; }
+  .input-field { font-size: .58rem; }
+  .student-signup-note { font-size: .46rem; }
+  .password-requirements li { font-size: .48rem; }
+  .submit-btn { font-size: .66rem; }
+  .remember-label, .action-link { font-size: .56rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
