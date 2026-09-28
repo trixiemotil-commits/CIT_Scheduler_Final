@@ -42,8 +42,7 @@
         </div>
 
         <div v-if="isMobileApp" class="math-challenge">
-          <h2 class="math-challenge__title">Additional Security</h2>
-          <div class="math-challenge__equation" role="group" aria-label="Additional Security math challenge">
+          <div class="math-challenge__equation" role="group" aria-label="Math challenge">
             <span class="math-challenge__number">{{ loginMathChallenge.first }}</span>
             <span aria-hidden="true">+</span>
             <span class="math-challenge__number">{{ loginMathChallenge.second }}</span>
@@ -55,6 +54,10 @@
               pattern="[0-9]*"
               maxlength="3"
               class="math-challenge__answer"
+              :class="{
+                'math-challenge__answer--correct': mathAnswerState('login') === 'correct',
+                'math-challenge__answer--incorrect': mathAnswerState('login') === 'incorrect'
+              }"
               aria-label="Enter the answer"
               autocomplete="off"
               @input="sanitizeMathAnswer('login')"
@@ -126,8 +129,7 @@
         </div>
 
         <div v-if="isMobileApp" class="math-challenge">
-          <h2 class="math-challenge__title">Additional Security</h2>
-          <div class="math-challenge__equation" role="group" aria-label="Additional Security math challenge">
+          <div class="math-challenge__equation" role="group" aria-label="Math challenge">
             <span class="math-challenge__number">{{ signUpMathChallenge.first }}</span>
             <span aria-hidden="true">+</span>
             <span class="math-challenge__number">{{ signUpMathChallenge.second }}</span>
@@ -139,6 +141,10 @@
               pattern="[0-9]*"
               maxlength="3"
               class="math-challenge__answer"
+              :class="{
+                'math-challenge__answer--correct': mathAnswerState('signup') === 'correct',
+                'math-challenge__answer--incorrect': mathAnswerState('signup') === 'incorrect'
+              }"
               aria-label="Enter the answer"
               autocomplete="off"
               @input="sanitizeMathAnswer('signup')"
@@ -734,6 +740,14 @@ function getMathAnswer(form) {
   return answer ? Number(answer) : Number.NaN
 }
 
+function mathAnswerState(form) {
+  const answer = getMathAnswer(form)
+  if (Number.isNaN(answer)) return ''
+
+  const challenge = form === 'login' ? loginMathChallenge.value : signUpMathChallenge.value
+  return answer === challenge.answer ? 'correct' : 'incorrect'
+}
+
 function sanitizeMathAnswer(form) {
   if (form === 'login') {
     loginMathAnswer.value = loginMathAnswer.value.replace(/\D/g, '').slice(0, 3)
@@ -812,7 +826,7 @@ async function handleLogin() {
   loginError.value = ''
   try {
     if (isMobileApp && getMathAnswer('login') !== loginMathChallenge.value.answer) {
-      loginError.value = 'Please enter the correct answer in Additional Security.'
+      loginError.value = 'Please enter the correct answer.'
       return
     }
 
@@ -1259,6 +1273,18 @@ watch(activeTab, (val) => {
 .math-challenge__answer:focus {
   border-color: #687780;
   box-shadow: 0 0 0 3px rgba(90, 105, 114, .14);
+}
+.math-challenge__answer--correct,
+.math-challenge__answer--correct:focus {
+  border-color: #2f9e68;
+  background: #effaf3;
+  box-shadow: 0 0 0 3px rgba(47, 158, 104, .16);
+}
+.math-challenge__answer--incorrect,
+.math-challenge__answer--incorrect:focus {
+  border-color: #c84b55;
+  background: #fff1f2;
+  box-shadow: 0 0 0 3px rgba(200, 75, 85, .16);
 }
 .math-challenge__error {
   margin: 0;

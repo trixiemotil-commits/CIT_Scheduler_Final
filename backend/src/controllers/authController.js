@@ -57,6 +57,11 @@ function getUserRoles(user) {
   return [...new Set(roles)].filter(Boolean);
 }
 
+function isStudentAccount(user) {
+  const roles = getUserRoles(user).map((role) => String(role).trim().toLowerCase());
+  return roles.length === 1 && roles[0] === "student";
+}
+
 function signToken(user, activeRole = user.role, sessionId = null) {
   return jwt.sign(
     {
@@ -374,6 +379,10 @@ async function login(req, res) {
       return res.status(403).json({ message: getAccountStatusMessage(user.account_status) });
     }
 
+    if (req.body?.client === "mobile" && !isStudentAccount(user)) {
+      return res.status(403).json({ message: "Only student accounts can log in to the student mobile app." });
+    }
+
     const roles = getUserRoles(user);
 
     if (user.twoFactorEnabled) {
@@ -398,7 +407,12 @@ async function login(req, res) {
       }
 
       const challengeToken = jwt.sign(
-        { id: user._id.toString(), email: user.email, purpose: "login-2fa" },
+        {
+          id: user._id.toString(),
+          email: user.email,
+          purpose: "login-2fa",
+          ...(req.body?.client === "mobile" ? { client: "mobile" } : {}),
+        },
         process.env.JWT_SECRET,
         { expiresIn: "5m" }
       );
@@ -446,6 +460,10 @@ async function verifyLoginOtp(req, res) {
     const user = await User.findById(challenge.id);
     if (!user || user.email !== challenge.email || !user.twoFactorEnabled) {
       return res.status(401).json({ message: "Invalid login verification request." });
+    }
+
+    if (challenge.client === "mobile" && !isStudentAccount(user)) {
+      return res.status(403).json({ message: "Only student accounts can log in to the student mobile app." });
     }
 
     if (!user.loginOtpHash || !user.loginOtpExpiresAt || user.loginOtpExpiresAt < new Date()) {

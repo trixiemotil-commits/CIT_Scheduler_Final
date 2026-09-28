@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core'
+
 const configuredApiBase = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '')
 const API_BASE = configuredApiBase || '/api'
 const isProductionBuild = Boolean(import.meta.env.PROD)
@@ -45,6 +47,11 @@ function getRoles(user) {
   return [...new Set(roles.map(role => String(role).trim().toLowerCase()).filter(Boolean))]
 }
 
+function isStudentAccount(user) {
+  const roles = getRoles(user)
+  return roles.length === 1 && roles[0] === 'student'
+}
+
 function validateAuthPayload(payload) {
   const user = payload?.user
   const token = payload?.token
@@ -59,6 +66,9 @@ function validateAuthPayload(payload) {
   const roles = getRoles(user)
   const role = String(user.role || roles[0] || '').toLowerCase()
   if (!role) throw new Error('This account does not have an assigned role.')
+  if (Capacitor.isNativePlatform() && !isStudentAccount(user)) {
+    throw new Error('Only student accounts can log in to the student mobile app.')
+  }
 
   return {
     ...payload,

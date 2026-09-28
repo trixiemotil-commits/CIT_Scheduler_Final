@@ -1,34 +1,34 @@
 import { getToken, getUser, isLoggedIn, setActiveRole } from '@/auth.js'
-import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
-import LoginView from '@/views/LoginView.vue'
-import AddScheduleView from '@/views/admin/AddScheduleView.vue'
-import AcademicTermsView from '@/views/admin/AcademicTermsView.vue'
-import AdminDashboardView from '@/views/admin/AdminDashboardView.vue'
-import ActivityLogsView from '@/views/admin/ActivityLogsView.vue'
-import AdminProfileView from '@/views/admin/AdminProfileView.vue'
-import EventsView from '@/views/admin/EventsView.vue'
-import NewScheduleWeekView from '@/views/admin/NewScheduleWeekView.vue'
-import ScheduleView from '@/views/admin/ScheduleView.vue'
-import SettingsView from '@/views/admin/SettingsView.vue'
-import TeacherAssignmentsView from '@/views/admin/TeacherAssignmentsView.vue'
-import UserManagementView from '@/views/admin/UserManagementView.vue'
-import ViewScheduleView from '@/views/admin/ViewScheduleView.vue'
-import StudentConsultationsView from '@/views/student/StudentConsultationsView.vue'
-import StudentChangePasswordView from '@/views/student/StudentChangePasswordView.vue'
-import StudentDashboardView from '@/views/student/StudentDashboardView.vue'
-import StudentEventsView from '@/views/student/StudentEventsView.vue'
-import StudentFaqsView from '@/views/student/StudentFaqsView.vue'
-import StudentNotificationsView from '@/views/student/StudentNotificationsView.vue'
-import StudentProfileView from '@/views/student/StudentProfileView.vue'
-import StudentSettingsView from '@/views/student/StudentSettingsView.vue'
-import StudentTeachersView from '@/views/student/StudentTeachersView.vue'
-import StudentTabsView from '@/views/student/StudentTabsView.vue'
-import TeacherConsultationView from '@/views/teacher/TeacherConsultationView.vue'
-import TeacherDashboardView from '@/views/teacher/TeacherDashboardView.vue'
-import TeacherEventsView from '@/views/teacher/TeacherEventsView.vue'
-import TeacherProfileView from '@/views/teacher/TeacherProfileView.vue'
-import TeacherScheduleView from '@/views/teacher/TeacherScheduleView.vue'
-import TeacherSettingsView from '@/views/teacher/TeacherSettingsView.vue'
+const ForgotPasswordView = () => import('@/views/ForgotPasswordView.vue')
+const LoginView = () => import('@/views/LoginView.vue')
+const AddScheduleView = () => import('@/views/admin/AddScheduleView.vue')
+const AcademicTermsView = () => import('@/views/admin/AcademicTermsView.vue')
+const AdminDashboardView = () => import('@/views/admin/AdminDashboardView.vue')
+const ActivityLogsView = () => import('@/views/admin/ActivityLogsView.vue')
+const AdminProfileView = () => import('@/views/admin/AdminProfileView.vue')
+const EventsView = () => import('@/views/admin/EventsView.vue')
+const NewScheduleWeekView = () => import('@/views/admin/NewScheduleWeekView.vue')
+const ScheduleView = () => import('@/views/admin/ScheduleView.vue')
+const SettingsView = () => import('@/views/admin/SettingsView.vue')
+const TeacherAssignmentsView = () => import('@/views/admin/TeacherAssignmentsView.vue')
+const UserManagementView = () => import('@/views/admin/UserManagementView.vue')
+const ViewScheduleView = () => import('@/views/admin/ViewScheduleView.vue')
+const StudentConsultationsView = () => import('@/views/student/StudentConsultationsView.vue')
+const StudentChangePasswordView = () => import('@/views/student/StudentChangePasswordView.vue')
+const StudentDashboardView = () => import('@/views/student/StudentDashboardView.vue')
+const StudentEventsView = () => import('@/views/student/StudentEventsView.vue')
+const StudentFaqsView = () => import('@/views/student/StudentFaqsView.vue')
+const StudentNotificationsView = () => import('@/views/student/StudentNotificationsView.vue')
+const StudentProfileView = () => import('@/views/student/StudentProfileView.vue')
+const StudentSettingsView = () => import('@/views/student/StudentSettingsView.vue')
+const StudentTeachersView = () => import('@/views/student/StudentTeachersView.vue')
+const StudentTabsView = () => import('@/views/student/StudentTabsView.vue')
+const TeacherConsultationView = () => import('@/views/teacher/TeacherConsultationView.vue')
+const TeacherDashboardView = () => import('@/views/teacher/TeacherDashboardView.vue')
+const TeacherEventsView = () => import('@/views/teacher/TeacherEventsView.vue')
+const TeacherProfileView = () => import('@/views/teacher/TeacherProfileView.vue')
+const TeacherScheduleView = () => import('@/views/teacher/TeacherScheduleView.vue')
+const TeacherSettingsView = () => import('@/views/teacher/TeacherSettingsView.vue')
 import { createRouter, createWebHistory } from '@ionic/vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'

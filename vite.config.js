@@ -50,5 +50,22 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true
       }
     }
+  },
+  build: {
+    chunkSizeWarningLimit: 1100,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('xlsx-js-style')) return 'xlsx'
+          if (id.includes('/vue/') || id.includes('/@vue/') || id.includes('/vue-router/')) return 'vue'
+          if (id.includes('/@ionic/')) return 'ionic'
+          if (id.includes('/@capacitor/')) return 'capacitor'
+          if (id.includes('/chart.js/')) return 'charts'
+          if (id.includes('/sweetalert2/')) return 'alerts'
+          return 'vendor'
+        }
+      }
+    }
   }
 }))
