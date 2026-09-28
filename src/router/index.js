@@ -1,4 +1,5 @@
 import { getToken, getUser, isLoggedIn, setActiveRole } from '@/auth.js'
+import { createRouter, createWebHistory } from '@ionic/vue-router'
 const ForgotPasswordView = () => import('@/views/ForgotPasswordView.vue')
 const LoginView = () => import('@/views/LoginView.vue')
 const AddScheduleView = () => import('@/views/admin/AddScheduleView.vue')
@@ -29,7 +30,6 @@ const TeacherEventsView = () => import('@/views/teacher/TeacherEventsView.vue')
 const TeacherProfileView = () => import('@/views/teacher/TeacherProfileView.vue')
 const TeacherScheduleView = () => import('@/views/teacher/TeacherScheduleView.vue')
 const TeacherSettingsView = () => import('@/views/teacher/TeacherSettingsView.vue')
-import { createRouter, createWebHistory } from '@ionic/vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
