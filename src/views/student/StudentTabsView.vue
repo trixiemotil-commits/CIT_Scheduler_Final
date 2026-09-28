@@ -230,18 +230,19 @@ const indicatorStyle = computed(() => {
   overflow: hidden;
   background: #f3f5f7;
   box-shadow: 0 0 28px rgba(37, 41, 46, 0.14);
-  padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px));
 }
 
 .student-tab-bar {
   position: fixed;
   left: 50%;
-  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  bottom: max(12px, env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   width: calc(100% - 16px);
   max-width: 410px;
   height: calc(62px + env(safe-area-inset-bottom, 0px));
-  padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 10px max(12px, env(safe-area-inset-bottom, 0px));
+  box-sizing: content-box;
   border-top: 1px solid #e5e7eb;
   --background: rgba(255, 255, 255, 0.96);
   --border: 0;
