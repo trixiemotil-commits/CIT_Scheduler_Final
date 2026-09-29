@@ -11,10 +11,14 @@ const NotificationSchema = new mongoose.Schema({
   read: { type: Boolean, default: false, index: true },
 }, { timestamps: true })
 
-// Broadcast newly saved notifications to connected SSE clients
+// Broadcast notifications only when they are first created.
 try {
   const stream = require('../services/notificationStream')
+  NotificationSchema.pre('save', function() {
+    this.$locals.isNewNotification = this.isNew
+  })
   NotificationSchema.post('save', function(doc) {
+    if (!doc.$locals.isNewNotification) return
     try {
       const payload = {
         id: doc._id.toString(),

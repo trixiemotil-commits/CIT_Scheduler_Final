@@ -72,6 +72,7 @@
               <button :class="['notif-tab', { active: notifTab === 'unread' }]" @click="notifTab = 'unread'">Unread</button>
               <button :class="['notif-tab', { active: notifTab === 'read' }]" @click="notifTab = 'read'">Read</button>
               <button class="notif-see-all" type="button" @click="markAllNotificationsRead">Mark all read</button>
+              <button class="notif-clear-all" type="button" :disabled="isClearingNotifications || !notifications.length" @click="openClearNotificationsDialog">Clear All</button>
             </div>
             <div class="notif-list-wrap">
               <!-- Unread tab: all unread items under a single New section -->
@@ -131,6 +132,22 @@
                 <div v-if="!newNotifs.length && !todayNotifs.length" class="notif-empty">No notifications</div>
               </template>
             </div>
+          </div>
+          <div v-if="showClearNotificationsDialog" class="notif-clear-overlay" role="presentation" @click.self="closeClearNotificationsDialog">
+            <section class="notif-clear-dialog" role="alertdialog" aria-modal="true" aria-labelledby="teacher-clear-notifications-title" aria-describedby="teacher-clear-notifications-description">
+              <div class="notif-clear-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-.8 14H5.8L5 6m4 4v6m6-6v6" /></svg>
+              </div>
+              <h2 id="teacher-clear-notifications-title">Clear all notifications?</h2>
+              <p id="teacher-clear-notifications-description">This will permanently delete all of your notifications.</p>
+              <p v-if="clearNotificationsError" class="notif-clear-error" role="alert">{{ clearNotificationsError }}</p>
+              <div class="notif-clear-actions">
+                <button type="button" class="notif-clear-cancel" :disabled="isClearingNotifications" @click="closeClearNotificationsDialog">Cancel</button>
+                <button type="button" class="notif-clear-confirm" :disabled="isClearingNotifications" @click="confirmClearNotifications">
+                  {{ isClearingNotifications ? 'Clearing...' : 'Clear all' }}
+                </button>
+              </div>
+            </section>
           </div>
         </div>
       </header>
@@ -415,6 +432,9 @@ const navItems = [
 const showNotif = ref(false)
 const notifTab = ref('all')
 const notifications = ref([])
+const showClearNotificationsDialog = ref(false)
+const isClearingNotifications = ref(false)
+const clearNotificationsError = ref('')
 const readNotificationIds = ref(new Set(JSON.parse(localStorage.getItem('cit_teacher_read_notifications') || '[]')))
 let notificationRefreshTimer
 const unreadNotifs = computed(() => notifications.value.filter(n => !n.read))
@@ -509,6 +529,33 @@ async function markAllNotificationsRead() {
     notifications.value = notifications.value.map(notification => ({ ...notification, read: true }))
   } catch (_) {
     // Keep the current notification state if the request fails.
+  }
+}
+
+function openClearNotificationsDialog() {
+  if (!notifications.value.length || isClearingNotifications.value) return
+  clearNotificationsError.value = ''
+  showClearNotificationsDialog.value = true
+}
+
+function closeClearNotificationsDialog() {
+  if (isClearingNotifications.value) return
+  showClearNotificationsDialog.value = false
+  clearNotificationsError.value = ''
+}
+
+async function confirmClearNotifications() {
+  if (!notifications.value.length || isClearingNotifications.value) return
+  isClearingNotifications.value = true
+  clearNotificationsError.value = ''
+  try {
+    await apiRequest('/notifications', { method: 'DELETE' })
+    notifications.value = []
+    showClearNotificationsDialog.value = false
+  } catch (error) {
+    clearNotificationsError.value = error.message || 'Unable to clear notifications.'
+  } finally {
+    isClearingNotifications.value = false
   }
 }
 
@@ -1649,6 +1696,20 @@ function confirmLogout() {
 .notif-see-all { margin-left: auto; padding: 6px 8px; border: 1px solid #a5adb2; border-radius: 6px; background: #d7dbdd; color: #4a555c; font-family: inherit; font-size: .72rem; font-weight: 600; cursor: pointer; transition: background .18s, border-color .18s, color .18s; }
 .notif-see-all:hover { background: #c8ced1; border-color: #858f96; color: #303940; }
 .notif-see-all:active { background: #bcc3c7; }
+.notif-clear-all { padding: 6px 8px; border: 1px solid #e5c8c8; border-radius: 6px; background: #fff; color: #a33f3f; font-family: inherit; font-size: .72rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.notif-clear-all:disabled { cursor: not-allowed; opacity: .5; }
+.notif-clear-overlay { position: fixed; inset: 0; z-index: 6000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(20, 28, 35, .48); }
+.notif-clear-dialog { width: min(100%, 360px); padding: 24px; border: 1px solid #e4e8eb; border-radius: 14px; background: #fff; box-shadow: 0 18px 48px rgba(19, 30, 39, .22); }
+.notif-clear-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 10px; background: #fff0f0; color: #a33f3f; }
+.notif-clear-icon svg { width: 21px; height: 21px; }
+.notif-clear-dialog h2 { margin: 16px 0 6px; color: #22272d; font-size: 1.08rem; font-weight: 700; }
+.notif-clear-dialog p { margin: 0; color: #697581; font-size: .84rem; line-height: 1.5; }
+.notif-clear-dialog .notif-clear-error { margin-top: 10px; color: #a33f3f; }
+.notif-clear-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.notif-clear-actions button { min-height: 40px; padding: 0 14px; border: 1px solid transparent; border-radius: 8px; font-family: inherit; font-size: .82rem; font-weight: 600; }
+.notif-clear-cancel { border-color: #d8dde3 !important; background: #fff; color: #4a525b; }
+.notif-clear-confirm { background: #a33f3f; color: #fff; }
+.notif-clear-actions button:disabled { cursor: wait; opacity: .65; }
 .notif-section-label {
   color: #596871;
   font-size: .66rem;

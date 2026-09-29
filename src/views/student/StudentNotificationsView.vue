@@ -7,7 +7,13 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <div class="header-title">Notifications</div>
-      <button class="mark-btn" @click="markAll">Mark all read</button>
+      <div class="header-actions">
+        <button class="mark-btn" type="button" @click="markAll">Mark all read</button>
+        <button class="clear-btn" type="button" :disabled="isClearing || !notifications.length" @click="clearAll">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-.8 14H5.8L5 6m4 4v6m6-6v6" /></svg>
+          {{ isClearing ? 'Clearing...' : 'Clear All' }}
+        </button>
+      </div>
     </div>
 
     <div class="unread-banner" v-if="unreadCount">
@@ -27,6 +33,23 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div v-if="showClearConfirm" class="clear-dialog-overlay" role="presentation" @click.self="closeClearConfirm">
+      <section class="clear-dialog" role="alertdialog" aria-modal="true" aria-labelledby="clear-dialog-title" aria-describedby="clear-dialog-description">
+        <div class="clear-dialog__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-.8 14H5.8L5 6m4 4v6m6-6v6" /></svg>
+        </div>
+        <h2 id="clear-dialog-title">Clear all notifications?</h2>
+        <p id="clear-dialog-description">This will permanently delete all of your notifications.</p>
+        <p v-if="clearError" class="clear-dialog__error" role="alert">{{ clearError }}</p>
+        <div class="clear-dialog__actions">
+          <button type="button" class="clear-dialog__cancel" :disabled="isClearing" @click="closeClearConfirm">Cancel</button>
+          <button type="button" class="clear-dialog__confirm" :disabled="isClearing" @click="confirmClearAll">
+            {{ isClearing ? 'Clearing...' : 'Clear all' }}
+          </button>
+        </div>
+      </section>
     </div>
 
       </div>
@@ -55,6 +78,9 @@ async function apiRequest(path, options = {}) {
 }
 
 const notifications = ref([])
+const isClearing = ref(false)
+const showClearConfirm = ref(false)
+const clearError = ref('')
 
 async function loadNotifications() {
   try {
@@ -117,6 +143,33 @@ async function markAll() {
     notifications.value.forEach((n) => { n.read = true })
   }
 }
+
+async function clearAll() {
+  if (!notifications.value.length || isClearing.value) return
+  clearError.value = ''
+  showClearConfirm.value = true
+}
+
+function closeClearConfirm() {
+  if (isClearing.value) return
+  showClearConfirm.value = false
+  clearError.value = ''
+}
+
+async function confirmClearAll() {
+  if (!notifications.value.length || isClearing.value) return
+  clearError.value = ''
+  isClearing.value = true
+  try {
+    await apiRequest('/notifications', { method: 'DELETE' })
+    notifications.value = []
+    showClearConfirm.value = false
+  } catch (error) {
+    clearError.value = error.message || 'Unable to clear notifications.'
+  } finally {
+    isClearing.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -135,6 +188,7 @@ async function markAll() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   background: #fff;
   padding: 16px 18px;
   border-bottom: 1px solid #e5e7eb;
@@ -157,6 +211,107 @@ async function markAll() {
   font-size: 0.74rem;
   font-weight: 600;
   padding: 5px 10px;
+  white-space: nowrap;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #e5c8c8;
+  border-radius: 8px;
+  background: #fff;
+  color: #a33f3f;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 5px 8px;
+  white-space: nowrap;
+}
+.clear-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.clear-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.clear-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 28, 35, 0.48);
+}
+.clear-dialog {
+  width: min(100%, 360px);
+  padding: 24px;
+  border: 1px solid #e4e8eb;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(19, 30, 39, 0.22);
+}
+.clear-dialog__icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 10px;
+  background: #fff0f0;
+  color: #a33f3f;
+}
+.clear-dialog__icon svg {
+  width: 21px;
+  height: 21px;
+}
+.clear-dialog h2 {
+  margin: 16px 0 6px;
+  color: #22272d;
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+.clear-dialog p {
+  margin: 0;
+  color: #697581;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+.clear-dialog .clear-dialog__error {
+  margin-top: 10px;
+  color: #a33f3f;
+}
+.clear-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}
+.clear-dialog__actions button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.clear-dialog__cancel {
+  border-color: #d8dde3 !important;
+  background: #fff;
+  color: #4a525b;
+}
+.clear-dialog__confirm {
+  background: #a33f3f;
+  color: #fff;
+}
+.clear-dialog__actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 .unread-banner {
   background: #e4e7e9;

@@ -89,4 +89,17 @@ async function markAllRead(req, res) {
   }
 }
 
-module.exports = { listNotifications, markAsRead, markAllRead }
+async function clearNotifications(req, res) {
+  try {
+    const result = await Notification.deleteMany({ recipientId: req.user.id })
+    return res.json({
+      message: 'Notifications cleared.',
+      deletedCount: result.deletedCount ?? result.n ?? 0,
+    })
+  } catch (error) {
+    console.error('clearNotifications error:', error)
+    return res.status(500).json({ message: 'Failed to clear notifications.', error: error.message })
+  }
+}
+
+module.exports = { listNotifications, markAsRead, markAllRead, clearNotifications }
