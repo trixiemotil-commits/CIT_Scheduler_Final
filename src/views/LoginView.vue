@@ -1,5 +1,6 @@
 <template>
-  <div class="page-bg">
+  <div class="page-bg" :class="{ 'page-bg--android': isAndroidBuild }">
+    <canvas v-if="!isAndroidBuild" ref="tronCanvas" class="tron-canvas" aria-hidden="true"></canvas>
     <!-- Hidden Admin Button -->
     <button class="hidden-admin-btn" @click="showAdminModal = true" title="Create Admin Account"></button>
     <div class="card" :class="{ 'card--wide': activeTab === 'signup' }">
@@ -297,7 +298,7 @@
 <script setup>
 import { login, logout, register, selectRole, verifyLoginOtp } from '@/auth.js'
 import { Capacitor } from '@capacitor/core'
-import { computed, defineComponent, h, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 // Hidden admin modal state
@@ -401,6 +402,7 @@ const signUpError = ref('')
 const signUpSuccess = ref('')
 const router = useRouter()
 const isMobileApp = Capacitor.isNativePlatform()
+const isAndroidBuild = import.meta.env.MODE === 'android'
 const siteKey = isMobileApp ? '' : (import.meta.env.VITE_RECAPTCHA_SITE_KEY || '')
 const signinCaptchaRef = ref(null)
 const signupCaptchaRef = ref(null)
@@ -410,6 +412,8 @@ const loginMathAnswer = ref('')
 const signUpMathAnswer = ref('')
 const loginMathChallenge = ref({ first: 0, second: 0, question: '', answer: 0 })
 const signUpMathChallenge = ref({ first: 0, second: 0, question: '', answer: 0 })
+const tronCanvas = ref(null)
+let disposeTronBackground = null
 const REMEMBERED_LOGIN_EMAIL_KEY = 'cit_remembered_login_email'
 
 function saveRememberedLogin(email, remember) {
@@ -450,6 +454,229 @@ function handleTwoFactorPaste(event) {
   pasted.split('').forEach((digit, index) => { twoFactorDigits.value[index] = digit })
   syncTwoFactorCode()
   twoFactorInputRefs[Math.min(pasted.length, 5)]?.focus()
+}
+
+function initialiseTronBackground() {
+  const canvas = tronCanvas.value
+  const context = canvas?.getContext('2d')
+  if (!canvas || !context) return
+
+  const gridSize = 52
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+  let width = 0
+  let height = 0
+  let animationFrame = null
+  let lastFrame = 0
+  let movement = 0
+  let circuits = []
+
+  const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum)
+  const randomBetween = (minimum, maximum) => minimum + Math.random() * (maximum - minimum)
+
+  const createCircuit = () => {
+    let currentX = -160 - Math.random() * 140
+    let currentY = randomBetween(38, Math.max(39, height - 38))
+    const segments = []
+
+    while (currentX < width + 240) {
+      const nextX = currentX + randomBetween(70, 180)
+      segments.push({ x1: currentX, y1: currentY, x2: nextX, y2: currentY })
+      currentX = nextX
+
+      if (Math.random() < 0.48) {
+        const direction = Math.random() > 0.5 ? 1 : -1
+        const nextY = clamp(currentY + direction * randomBetween(38, 96), 34, Math.max(34, height - 34))
+        segments.push({ x1: currentX, y1: currentY, x2: currentX, y2: nextY })
+        currentY = nextY
+      }
+    }
+
+    const totalLength = segments.reduce((total, segment) => (
+      total + Math.hypot(segment.x2 - segment.x1, segment.y2 - segment.y1)
+    ), 0)
+
+    return {
+      segments,
+      totalLength,
+      pulseOffset: Math.random() * totalLength,
+      pulseSpeed: randomBetween(0.22, 0.56),
+      pulseLength: randomBetween(48, 92)
+    }
+  }
+
+  const pointOnCircuit = (circuit, distance) => {
+    let covered = 0
+    const target = ((distance % circuit.totalLength) + circuit.totalLength) % circuit.totalLength
+
+    for (const segment of circuit.segments) {
+      const length = Math.hypot(segment.x2 - segment.x1, segment.y2 - segment.y1)
+      if (target <= covered + length) {
+        const ratio = length ? (target - covered) / length : 0
+        return {
+          x: segment.x1 + (segment.x2 - segment.x1) * ratio,
+          y: segment.y1 + (segment.y2 - segment.y1) * ratio
+        }
+      }
+      covered += length
+    }
+
+    const finalSegment = circuit.segments[circuit.segments.length - 1]
+    return { x: finalSegment.x2, y: finalSegment.y2 }
+  }
+
+  const strokeCircuitRange = (circuit, start, end) => {
+    let covered = 0
+    let hasPath = false
+    context.beginPath()
+
+    for (const segment of circuit.segments) {
+      const length = Math.hypot(segment.x2 - segment.x1, segment.y2 - segment.y1)
+      const segmentStart = Math.max(start, covered)
+      const segmentEnd = Math.min(end, covered + length)
+
+      if (segmentStart < segmentEnd) {
+        const startRatio = (segmentStart - covered) / length
+        const endRatio = (segmentEnd - covered) / length
+        const startX = segment.x1 + (segment.x2 - segment.x1) * startRatio
+        const startY = segment.y1 + (segment.y2 - segment.y1) * startRatio
+        const endX = segment.x1 + (segment.x2 - segment.x1) * endRatio
+        const endY = segment.y1 + (segment.y2 - segment.y1) * endRatio
+
+        if (!hasPath) {
+          context.moveTo(startX, startY)
+          hasPath = true
+        } else {
+          context.lineTo(startX, startY)
+        }
+        context.lineTo(endX, endY)
+      }
+      covered += length
+    }
+
+    if (hasPath) context.stroke()
+  }
+
+  const drawCircuit = (circuit) => {
+    context.save()
+    context.strokeStyle = 'rgba(213, 221, 225, 0.18)'
+    context.lineWidth = 1.15
+    context.lineJoin = 'round'
+    context.lineCap = 'round'
+    context.beginPath()
+    context.moveTo(circuit.segments[0].x1, circuit.segments[0].y1)
+    for (const segment of circuit.segments) context.lineTo(segment.x2, segment.y2)
+    context.stroke()
+
+    const pulseHead = (circuit.pulseOffset + movement * circuit.pulseSpeed) % circuit.totalLength
+    const pulseStart = pulseHead - circuit.pulseLength
+    context.strokeStyle = 'rgba(247, 250, 251, 0.94)'
+    context.shadowColor = 'rgba(217, 226, 230, 0.82)'
+    context.shadowBlur = 12
+    context.lineWidth = 2.1
+
+    if (pulseStart < 0) {
+      strokeCircuitRange(circuit, circuit.totalLength + pulseStart, circuit.totalLength)
+      strokeCircuitRange(circuit, 0, pulseHead)
+    } else {
+      strokeCircuitRange(circuit, pulseStart, pulseHead)
+    }
+
+    const pulsePoint = pointOnCircuit(circuit, pulseHead)
+    context.fillStyle = 'rgba(255, 255, 255, 0.96)'
+    context.beginPath()
+    context.arc(pulsePoint.x, pulsePoint.y, 2.4, 0, Math.PI * 2)
+    context.fill()
+    context.restore()
+  }
+
+  const drawFrame = (timestamp = 0) => {
+    const delta = lastFrame ? Math.min((timestamp - lastFrame) / 16.667, 3) : 1
+    lastFrame = timestamp
+    if (!reducedMotion.matches) movement += delta
+
+    const background = context.createLinearGradient(0, 0, 0, height)
+    background.addColorStop(0, '#242b31')
+    background.addColorStop(0.42, '#1a2025')
+    background.addColorStop(1, '#0d1216')
+    context.fillStyle = background
+    context.fillRect(0, 0, width, height)
+
+    const horizon = height * 0.34
+    const gridOffset = (movement * 0.72) % gridSize
+    context.save()
+    context.strokeStyle = 'rgba(229, 236, 238, 0.12)'
+    context.lineWidth = 1
+
+    for (let x = -width; x < width * 2; x += gridSize) {
+      context.beginPath()
+      context.moveTo(width / 2 + (x - width / 2) * 0.1, horizon)
+      context.lineTo(x, height)
+      context.stroke()
+    }
+
+    for (let index = 0; index < 20; index += 1) {
+      const depth = (index + gridOffset / gridSize) / 20
+      const y = horizon + Math.min(depth * depth, 1) * (height - horizon)
+      if (y <= height) {
+        context.beginPath()
+        context.moveTo(0, y)
+        context.lineTo(width, y)
+        context.stroke()
+      }
+    }
+
+    context.strokeStyle = 'rgba(244, 248, 249, 0.22)'
+    context.beginPath()
+    context.moveTo(0, horizon)
+    context.lineTo(width, horizon)
+    context.stroke()
+    context.restore()
+
+    circuits.forEach(drawCircuit)
+
+    const vignette = context.createRadialGradient(
+      width / 2,
+      height * 0.46,
+      Math.min(width, height) * 0.12,
+      width / 2,
+      height * 0.46,
+      Math.max(width, height) * 0.76
+    )
+    vignette.addColorStop(0, 'rgba(0, 0, 0, 0)')
+    vignette.addColorStop(1, 'rgba(0, 0, 0, 0.33)')
+    context.fillStyle = vignette
+    context.fillRect(0, 0, width, height)
+
+    if (!reducedMotion.matches) animationFrame = window.requestAnimationFrame(drawFrame)
+  }
+
+  const resizeCanvas = () => {
+    if (animationFrame !== null) {
+      window.cancelAnimationFrame(animationFrame)
+      animationFrame = null
+    }
+    const bounds = canvas.getBoundingClientRect()
+    width = Math.max(1, Math.round(bounds.width))
+    height = Math.max(1, Math.round(bounds.height))
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
+    canvas.width = Math.round(width * pixelRatio)
+    canvas.height = Math.round(height * pixelRatio)
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+    circuits = Array.from({ length: Math.max(7, Math.min(10, Math.round(width / 190))) }, createCircuit)
+    lastFrame = 0
+    drawFrame(performance.now())
+  }
+
+  const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resizeCanvas)
+  resizeObserver?.observe(canvas)
+  window.addEventListener('resize', resizeCanvas)
+  resizeCanvas()
+
+  disposeTronBackground = () => {
+    if (animationFrame !== null) window.cancelAnimationFrame(animationFrame)
+    resizeObserver?.disconnect()
+    window.removeEventListener('resize', resizeCanvas)
+  }
 }
 
 function renderRecaptcha(refEl, widgetRef) {
@@ -813,7 +1040,12 @@ function onStudentIdInput(event) {
 }
 
 onMounted(() => {
+  if (!isAndroidBuild) initialiseTronBackground()
   if (isMobileApp) resetMathChallenges()
+})
+
+onUnmounted(() => {
+  disposeTronBackground?.()
 })
 
 // Render captcha widgets when component mounts and when activeTab changes
@@ -851,11 +1083,31 @@ watch(activeTab, (val) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #edf1f3;
+  position: relative;
+  isolation: isolate;
+  background: #12171b;
   padding: clamp(16px, 4vw, 32px);
   overflow-x: hidden;
   overflow-y: auto;
   margin: 0;
+}
+
+.page-bg--android {
+  background: #edf1f3;
+}
+
+.tron-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.page-bg > .card {
+  position: relative;
+  z-index: 1;
 }
 
 .card {

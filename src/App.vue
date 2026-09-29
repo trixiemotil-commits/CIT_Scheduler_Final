@@ -108,6 +108,11 @@ function handleIonicScroll(event) {
 
 function updateBackToTopPosition() {
   const defaultRight = window.matchMedia('(max-width: 700px)').matches ? 16 : 24
+  if (route.path === '/admin/dashboard') {
+    backToTopRight.value = `${defaultRight}px`
+    backToTopBottom.value = '88px'
+    return
+  }
   const studentShell = route.path.startsWith('/student/')
     ? document.querySelector('.student-app-shell')
     : null

@@ -282,7 +282,25 @@
         <!-- Teacher Workload -->
         <div class="chart-card" :class="{ 'chart-expanded': expandedChart === 'bar', 'chart-hidden': expandedChart === 'line' }">
           <div class="chart-header">
-            <span class="chart-title">Teacher Workload<span v-if="publishedTermLabel"> · {{ publishedTermLabel }}</span></span>
+            <div class="workload-chart-heading">
+              <span class="chart-title">Teacher Workload<span v-if="publishedTermLabel"> · {{ publishedTermLabel }}</span></span>
+              <select
+                v-if="academicTerms.length"
+                v-model="selectedWorkloadTermId"
+                class="workload-term-filter"
+                aria-label="Filter teacher workload by semester"
+                @change="loadWorkloadTerm(selectedWorkloadTermId)"
+              >
+                <option v-for="term in academicTerms" :key="term._id || term.id" :value="String(term._id || term.id)">
+                  {{ term.schoolYear }} · {{ term.semester }}
+                </option>
+              </select>
+              <div class="workload-legend" aria-label="Workload thresholds">
+                <span><i class="workload-dot workload-dot--normal"></i>Normal &lt;10h</span>
+                <span><i class="workload-dot workload-dot--moderate"></i>Moderate 10–19h</span>
+                <span><i class="workload-dot workload-dot--overloaded"></i>Overloaded 20h+</span>
+              </div>
+            </div>
             <button class="expand-btn" @click="toggleExpand('bar')">
               <svg v-if="expandedChart === 'bar'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
@@ -938,8 +956,16 @@ const showConsultationDayModal = ref(false)
 const selectedConsultationPeriodLabel = ref('')
 const selectedConsultationPeriodRequests = ref([])
 const liveTeacherWorkloads = ref([])
+const workloadUsers = ref([])
+const academicTerms = ref([])
+const selectedWorkloadTermId = ref('')
 const publishedTermLabel = ref('')
 const workloadChartWidth = computed(() => Math.max(760, (liveTeacherWorkloads.value.length || 5) * 180))
+const workloadChartItems = computed(() => (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads)
+  .slice()
+  .sort((first, second) => second.totalHours - first.totalHours || first.name.localeCompare(second.name)))
+const workloadByTermCache = new Map()
+let workloadRequestId = 0
 
 function scrollWorkloadHorizontally(event) {
   const container = event.currentTarget
@@ -1015,7 +1041,7 @@ const teacherWorkloads = [
 ]
 
 function openWorkloadModal(index) {
-  selectedTeacher.value = (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads)[index]
+  selectedTeacher.value = workloadChartItems.value[index]
   showWorkloadModal.value = true
 }
 
@@ -1177,16 +1203,19 @@ function calculateWorkloads(users, scheduleEntries) {
 
 async function loadChartData() {
   try {
-    const [termPayload, requestsPayload, usersPayload] = await Promise.all([
+    const [termPayload, requestsPayload, usersPayload, termsPayload] = await Promise.all([
       apiRequest('/academic-terms/published'),
       apiRequest('/consultations/requests'),
       apiRequest('/users?role=teacher'),
+      apiRequest('/academic-terms'),
     ])
-    const termId = termPayload.term?._id || termPayload.term?.id
-    publishedTermLabel.value = termPayload.term
-      ? `${termPayload.term.schoolYear || ''} · ${termPayload.term.semester || ''}`.trim()
-      : ''
-    const schedulesPayload = await apiRequest(termId ? `/schedules?academicTermId=${encodeURIComponent(termId)}` : '/schedules')
+    const publishedTerm = termPayload.term
+    const termIdOf = term => String(term?._id || term?.id || '')
+    academicTerms.value = termsPayload.terms || []
+    const selectedTerm = academicTerms.value.find(term => termIdOf(term) === termIdOf(publishedTerm))
+      || publishedTerm
+      || academicTerms.value[0]
+    workloadUsers.value = usersPayload.users || []
     const teachersByEmployeeId = new Map((usersPayload.users || []).map(user => [
       String(user.employeeId || '').trim(),
       `${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -1197,13 +1226,39 @@ async function loadChartData() {
         || teachersByEmployeeId.get(String(request.employeeId || '').trim())
         || '',
     }))
-    liveTeacherWorkloads.value = calculateWorkloads(usersPayload.users || [], schedulesPayload.entries || [])
-    if (lineChartInstance || barChartInstance) {
-      createLineChart()
-      createBarChart()
-    }
+    await loadWorkloadTerm(termIdOf(selectedTerm))
+    if (lineChartInstance) createLineChart()
   } catch (error) {
     console.error('Failed to load dashboard chart data:', error)
+  }
+}
+
+async function loadWorkloadTerm(termId) {
+  const selectedId = String(termId || '')
+  selectedWorkloadTermId.value = selectedId
+  const term = academicTerms.value.find(item => String(item._id || item.id || '') === selectedId)
+  publishedTermLabel.value = term
+    ? `${term.schoolYear || ''} · ${term.semester || ''}`.trim()
+    : ''
+  const requestId = ++workloadRequestId
+
+  if (workloadByTermCache.has(selectedId)) {
+    liveTeacherWorkloads.value = workloadByTermCache.get(selectedId)
+    createBarChart()
+    return
+  }
+
+  try {
+    const schedulesPayload = await apiRequest(selectedId
+      ? `/schedules?academicTermId=${encodeURIComponent(selectedId)}`
+      : '/schedules')
+    if (requestId !== workloadRequestId) return
+    const workloads = calculateWorkloads(workloadUsers.value, schedulesPayload.entries || [])
+    workloadByTermCache.set(selectedId, workloads)
+    liveTeacherWorkloads.value = workloads
+    createBarChart()
+  } catch (error) {
+    if (requestId === workloadRequestId) console.error('Failed to load semester workload:', error)
   }
 }
 
@@ -1291,17 +1346,42 @@ function compactTeacherLabel(name) {
 }
 
 function workloadBarColor(hours) {
-  if (hours >= 20) return '#46535c'
-  if (hours >= 10) return '#68737b'
-  return '#aeb7bc'
+  if (hours >= 20) return '#3d4247'
+  if (hours >= 10) return '#78848d'
+  return '#c0c7cc'
 }
 
 function createBarChart() {
   if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null }
   const expanded = expandedChart.value === 'bar'
-  const workloadItems = (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads)
+  const workloadItems = workloadChartItems.value
   const labels = workloadItems.map(teacher => teacher.name)
   const yTickLabels = workloadItems.map(teacher => expanded ? teacher.name : compactTeacherLabel(teacher.name))
+  const workloadMaximumHours = 44
+  const workloadValueLabels = {
+    id: 'workloadValueLabels',
+    afterDatasetsDraw(chart) {
+      const context = chart.ctx
+      const elements = chart.getDatasetMeta(0).data
+      context.save()
+      context.fillStyle = '#3e4548'
+      context.font = '600 11px Segoe UI, sans-serif'
+      context.textBaseline = 'middle'
+      elements.forEach((element, index) => {
+        const hours = workloadItems[index]?.totalHours || 0
+        const exactHours = Number.isInteger(hours) ? String(hours) : hours.toFixed(1)
+        const label = `${exactHours}h`
+        const labelWidth = context.measureText(label).width
+        const isOverCap = hours > workloadMaximumHours
+        const labelX = isOverCap
+          ? Math.max(chart.chartArea.left + 4, element.x - labelWidth - 8)
+          : element.x + 8
+        context.fillStyle = isOverCap ? '#fff' : '#3e4548'
+        context.fillText(label, labelX, element.y)
+      })
+      context.restore()
+    },
+  }
 
   barChartInstance = new Chart(barChartRef.value, {
     type: 'bar',
@@ -1309,7 +1389,7 @@ function createBarChart() {
       labels,
       datasets: [{
         label: 'Teacher hours',
-        data: workloadItems.map(teacher => teacher.totalHours),
+        data: workloadItems.map(teacher => Math.min(teacher.totalHours, workloadMaximumHours)),
         backgroundColor: workloadItems.map(teacher => workloadBarColor(teacher.totalHours)),
         borderRadius: 12,
         borderSkipped: false,
@@ -1328,7 +1408,18 @@ function createBarChart() {
         tooltip: {
           callbacks: {
             title: (ctx) => ctx[0].label,
-            label: (ctx) => `Hours: ${ctx.parsed.x}`
+            label: (ctx) => `Hours: ${workloadItems[ctx.dataIndex]?.totalHours ?? ctx.parsed.x}h`,
+            afterLabel: (ctx) => {
+              const teacher = workloadItems[ctx.dataIndex]
+              const details = [...new Set((teacher?.schedule || []).map(entry =>
+                [entry.subject, entry.section].filter(Boolean).join(' · '),
+              ).filter(Boolean))]
+              return [
+                `Units: ${teacher?.units || 0}`,
+                'Subjects / sections:',
+                ...(details.length ? details : ['No subject assignments']),
+              ]
+            },
           },
           backgroundColor: '#30353a',
           titleColor: '#f4f5f5',
@@ -1345,7 +1436,7 @@ function createBarChart() {
       scales: {
         x: {
           beginAtZero: true,
-          max: 30,
+          max: workloadMaximumHours,
           grid: { color: 'rgba(83, 91, 100, 0.12)', lineWidth: 0.5 },
           ticks: {
             color: '#3e4548',
@@ -1385,7 +1476,8 @@ function createBarChart() {
           borderWidth: 0,
         }
       }
-    }
+    },
+    plugins: [workloadValueLabels],
   })
 }
 
@@ -2406,6 +2498,48 @@ function confirmLogout() {
   flex-shrink: 0;
   padding: 2px 2px 0;
 }
+.workload-chart-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+  flex: 1;
+}
+.workload-term-filter {
+  max-width: 190px;
+  min-height: 32px;
+  padding: 5px 28px 5px 9px;
+  border: 1px solid rgba(120, 127, 133, 0.24);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #465159;
+  font: 600 0.72rem 'Segoe UI', sans-serif;
+}
+.workload-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  color: #68727a;
+  font-size: 0.64rem;
+  font-weight: 600;
+}
+.workload-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.workload-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+}
+.workload-dot--normal { background: #c0c7cc; }
+.workload-dot--moderate { background: #78848d; }
+.workload-dot--overloaded { background: #3d4247; }
 .chart-heading-main {
   display: flex;
   align-items: center;
