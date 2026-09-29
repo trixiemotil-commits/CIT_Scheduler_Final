@@ -523,19 +523,13 @@ select {
     max-width: 460px;
   }
 
-  .bottom-nav-wrapper {
-    width: min(430px, calc(100vw - 48px));
-  }
+  .student-tab-bar { max-width: min(430px, calc(100vw - 48px)) !important; }
 }
 
 @media (min-width: 1024px) {
   .student-app-shell {
     width: min(100%, 430px);
     max-width: 430px;
-  }
-
-  .bottom-nav-wrapper {
-    width: min(400px, calc(100vw - 80px));
   }
 }
 
@@ -548,30 +542,21 @@ select {
     max-width: 480px !important;
   }
 
-  .student-tab-bar {
-    width: calc(100% - 24px) !important;
-    max-width: 456px !important;
-  }
+  .student-tab-bar { max-width: 456px !important; }
 }
 
 .student-app-shell.student-notifications-active .student-tab-bar {
   display: none !important;
 }
 
-.bottom-nav-wrapper {
-  position: fixed;
-  left: 50%;
-  bottom: max(12px, env(safe-area-inset-bottom));
-  z-index: 40;
-  width: min(420px, calc(100vw - 18px));
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
 .student-tab-bar {
-  position: relative !important;
-  width: 100% !important;
+  position: fixed !important;
+  left: 50% !important;
+  bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  z-index: 40 !important;
+  width: min(420px, calc(100vw - 18px)) !important;
   max-width: 420px !important;
+  transform: translateX(-50%) !important;
   height: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
   margin: 0 auto !important;
   padding: 0 4px env(safe-area-inset-bottom, 0px) !important;
@@ -585,20 +570,12 @@ select {
 }
 
 @media (min-width: 768px) {
-  .bottom-nav-wrapper {
-    width: min(430px, calc(100vw - 64px));
-  }
-
   .student-tab-bar {
     max-width: 430px !important;
   }
 }
 
 @media (min-width: 1024px) {
-  .bottom-nav-wrapper {
-    width: min(400px, calc(100vw - 100px));
-  }
-
   .student-tab-bar {
     max-width: 400px !important;
   }
@@ -694,13 +671,9 @@ select {
 }
 
 @media (max-width: 390px) {
-  .bottom-nav-wrapper {
-    width: min(100%, calc(100vw - 16px));
-    bottom: max(8px, env(safe-area-inset-bottom));
-  }
-
   .student-tab-bar {
     border-radius: 28px !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
     height: 54px !important;
     padding-bottom: max(0px, env(safe-area-inset-bottom)) !important;
   }

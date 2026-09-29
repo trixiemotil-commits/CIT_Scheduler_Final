@@ -4,25 +4,23 @@
       <IonTabs>
         <IonRouterOutlet />
 
-        <div class="bottom-nav-wrapper">
-          <IonTabBar slot="bottom" class="student-tab-bar bottom-nav-pill">
-            <div class="student-tab-indicator" :style="indicatorStyle" aria-hidden="true"></div>
-            <IonTabButton
-              v-for="(item, index) in navigation"
-              :key="item.tab"
-              :tab="item.tab"
-              :href="item.href"
-              :class="{ 'active-tab-item': activeIndex === index }"
-            >
-              <span v-if="item.tab === 'profile' && studentUser.avatar" class="student-tab-profile-avatar" aria-hidden="true">
-                <img :src="studentUser.avatar" class="student-tab-profile-image" alt="" />
-                <span class="student-tab-profile-status"></span>
-              </span>
-              <IonIcon v-else :icon="item.icon" aria-hidden="true" />
-              <IonLabel>{{ item.label }}</IonLabel>
-            </IonTabButton>
-          </IonTabBar>
-        </div>
+        <IonTabBar slot="bottom" class="student-tab-bar bottom-nav-pill">
+          <div class="student-tab-indicator" :style="indicatorStyle" aria-hidden="true"></div>
+          <IonTabButton
+            v-for="(item, index) in navigation"
+            :key="item.tab"
+            :tab="item.tab"
+            :href="item.href"
+            :class="{ 'active-tab-item': activeIndex === index }"
+          >
+            <span v-if="item.tab === 'profile' && studentUser.avatar" class="student-tab-profile-avatar" aria-hidden="true">
+              <img :src="studentUser.avatar" class="student-tab-profile-image" alt="" />
+              <span class="student-tab-profile-status"></span>
+            </span>
+            <IonIcon v-else :icon="item.icon" aria-hidden="true" />
+            <IonLabel>{{ item.label }}</IonLabel>
+          </IonTabButton>
+        </IonTabBar>
       </IonTabs>
 
       <div v-if="showTermPrompt" class="term-prompt-overlay">
@@ -233,20 +231,6 @@ const indicatorStyle = computed(() => {
   padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px));
 }
 
-.bottom-nav-wrapper {
-  position: fixed;
-  left: 50%;
-  bottom: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: min(92vw, 420px);
-  transform: translateX(-50%);
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
-  pointer-events: none;
-  z-index: 50;
-}
-
 .bottom-nav-pill {
   pointer-events: auto;
   position: relative;
@@ -268,8 +252,11 @@ const indicatorStyle = computed(() => {
 }
 
 .student-tab-bar {
-  position: relative;
-  width: calc(100% - 32px);
+  position: fixed;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 18px));
   max-width: 420px;
   height: 64px;
   padding: 0 12px;
@@ -375,8 +362,7 @@ ion-label {
   }
 
   .student-tab-bar {
-    width: calc(100% - 12px) !important;
-    max-width: 462px !important;
+    max-width: 430px !important;
     height: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
     margin: 0 auto !important;
     padding: 0 10px 2px !important;
@@ -440,10 +426,7 @@ ion-label {
 
 @media (max-width: 360px) {
   .student-tab-bar {
-    width: calc(100% - 16px) !important;
     height: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
-    margin-bottom: 6px !important;
-    padding-inline: 3px !important;
     border-radius: 30px !important;
   }
 
