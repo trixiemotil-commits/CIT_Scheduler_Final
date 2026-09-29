@@ -598,7 +598,7 @@ select {
 
 @media (max-width: 767px) {
   .student-tab-bar {
-    --student-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --student-safe-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
     position: absolute !important;
     bottom: -8px !important;
     margin-bottom: 0 !important;
@@ -609,6 +609,22 @@ select {
     transform: none !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
+  }
+
+  .student-tab-bar .student-tab-safe-area {
+    z-index: 1;
+    height: calc(var(--student-safe-bottom) + 36px);
+  }
+}
+
+@media (min-width: 391px) and (max-width: 767px) {
+  .student-tab-bar ion-tab-button.consultation-tab::before {
+    top: -12px;
+  }
+
+  .student-tab-bar ion-tab-button.consultation-tab ion-icon,
+  .student-tab-bar ion-tab-button.consultation-tab .student-tab-consultation-icon {
+    top: -4px !important;
   }
 }
 
@@ -861,6 +877,17 @@ select {
   z-index: 3 !important;
   align-self: center;
   transform: translateX(-50%) !important;
+}
+
+@media (min-width: 391px) and (max-width: 767px) {
+  .student-tab-bar ion-tab-button.consultation-tab::before {
+    top: -8px;
+  }
+
+  .student-tab-bar ion-tab-button.consultation-tab ion-icon,
+  .student-tab-bar ion-tab-button.consultation-tab .student-tab-consultation-icon {
+    top: 0 !important;
+  }
 }
 
 .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-image {

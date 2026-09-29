@@ -378,7 +378,7 @@ ion-label {
 
 @media (min-width: 391px) and (max-width: 767px) {
   .student-tab-bar {
-    height: calc(94px + var(--student-safe-bottom)) !important;
+    height: calc(100px + var(--student-safe-bottom)) !important;
   }
 
   .student-tab-bar ion-tab-button::part(native) {
