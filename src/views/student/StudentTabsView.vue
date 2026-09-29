@@ -246,7 +246,13 @@ const indicatorStyle = computed(() => {
   overflow: hidden;
   background: #f3f5f7;
   box-shadow: 0 0 28px rgba(37, 41, 46, 0.14);
-  padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 767px) {
+  .student-app-shell {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
 }
 
 .bottom-nav-pill {
@@ -371,7 +377,7 @@ ion-label {
 
 @media (min-width: 391px) and (max-width: 767px) {
   .student-tab-bar {
-    height: calc(86px + env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(94px + var(--student-safe-bottom)) !important;
   }
 
   .student-tab-bar ion-tab-button::part(native) {
@@ -381,20 +387,20 @@ ion-label {
 
   .student-tab-bar ion-tab-button ion-icon,
   .student-tab-bar ion-tab-button.tab-selected ion-icon {
-    width: 36px !important;
-    height: 36px !important;
-    flex-basis: 36px !important;
+    width: 38px !important;
+    height: 38px !important;
+    flex-basis: 38px !important;
   }
 
   .student-tab-bar ion-tab-button ion-label {
-    font-size: .68rem !important;
+    font-size: .7rem !important;
   }
 
   .student-tab-bar .student-tab-profile-avatar,
   .student-tab-bar .student-tab-profile-image {
-    width: 36px;
-    height: 36px;
-    flex-basis: 36px;
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
   }
 }
 
@@ -407,9 +413,9 @@ ion-label {
 
   .student-tab-bar {
     max-width: 430px !important;
-    height: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(76px + var(--student-safe-bottom)) !important;
     margin: 0 auto !important;
-    padding: 0 10px 2px !important;
+    padding: 0 10px calc(var(--student-safe-bottom) + 2px) !important;
     border-radius: 32px 32px 8px 8px !important;
   }
 
@@ -470,7 +476,7 @@ ion-label {
 
 @media (max-width: 360px) {
   .student-tab-bar {
-    height: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(76px + var(--student-safe-bottom)) !important;
     border-radius: 24px 24px 6px 6px !important;
   }
 
@@ -514,7 +520,7 @@ ion-label {
 
 @media (max-width: 430px) and (max-height: 680px) {
   .student-tab-bar {
-    height: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(76px + var(--student-safe-bottom)) !important;
   }
 
   .student-tab-bar ion-tab-button {
