@@ -506,10 +506,37 @@ select {
 }
 
 .student-app-shell {
+  position: relative;
+  width: min(100%, 440px);
+  max-width: 440px;
+  min-height: 100vh;
+  margin: 0 auto;
   background:
     radial-gradient(circle at 90% 0%, rgba(255,255,255,.78), transparent 18rem),
     linear-gradient(145deg, #dfe1e2 0%, #b9bec1 100%) !important;
   box-shadow: 0 0 28px rgba(37,41,46,.18) !important;
+}
+
+@media (min-width: 768px) {
+  .student-app-shell {
+    width: min(100%, 460px);
+    max-width: 460px;
+  }
+
+  .bottom-nav-wrapper {
+    width: min(430px, calc(100vw - 48px));
+  }
+}
+
+@media (min-width: 1024px) {
+  .student-app-shell {
+    width: min(100%, 430px);
+    max-width: 430px;
+  }
+
+  .bottom-nav-wrapper {
+    width: min(400px, calc(100vw - 80px));
+  }
 }
 
 @media (min-width: 431px) and (max-width: 520px) {
@@ -531,9 +558,20 @@ select {
   display: none !important;
 }
 
+.bottom-nav-wrapper {
+  position: fixed;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 40;
+  width: min(420px, calc(100vw - 18px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .student-tab-bar {
-  width: calc(100% - 24px) !important;
-  max-width: 406px !important;
+  position: relative !important;
+  width: 100% !important;
+  max-width: 420px !important;
   height: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
   margin: 0 auto !important;
   padding: 0 4px env(safe-area-inset-bottom, 0px) !important;
@@ -543,6 +581,27 @@ select {
   box-shadow: 0 14px 28px rgba(39,44,49,.22), inset 0 1px rgba(255,255,255,.95) !important;
   backdrop-filter: blur(16px);
   overflow: hidden;
+  pointer-events: auto;
+}
+
+@media (min-width: 768px) {
+  .bottom-nav-wrapper {
+    width: min(430px, calc(100vw - 64px));
+  }
+
+  .student-tab-bar {
+    max-width: 430px !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .bottom-nav-wrapper {
+    width: min(400px, calc(100vw - 100px));
+  }
+
+  .student-tab-bar {
+    max-width: 400px !important;
+  }
 }
 
 .student-tab-bar ion-tab-button {
@@ -635,6 +694,17 @@ select {
 }
 
 @media (max-width: 390px) {
+  .bottom-nav-wrapper {
+    width: min(100%, calc(100vw - 16px));
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .student-tab-bar {
+    border-radius: 28px !important;
+    height: 54px !important;
+    padding-bottom: max(0px, env(safe-area-inset-bottom)) !important;
+  }
+
   .student-tab-bar ion-tab-button::part(native) {
     gap: 4px;
     padding-inline: 4px;

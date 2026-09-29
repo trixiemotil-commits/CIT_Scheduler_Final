@@ -359,7 +359,7 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
 }
 
 .mobile-app {
-  max-width: 430px;
+  width: 100%;
   min-height: 100dvh;
   box-sizing: border-box;
   margin: 0 auto;

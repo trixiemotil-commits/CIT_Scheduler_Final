@@ -225,8 +225,6 @@ const indicatorStyle = computed(() => {
 .student-app-shell {
   position: relative;
   width: 100%;
-  max-width: 430px;
-  height: 100%;
   min-height: 100dvh;
   margin: 0 auto;
   overflow: hidden;
@@ -237,12 +235,13 @@ const indicatorStyle = computed(() => {
 
 .bottom-nav-wrapper {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: 50%;
   bottom: 0;
   display: flex;
   justify-content: center;
   align-items: center;
+  width: min(92vw, 420px);
+  transform: translateX(-50%);
   padding-bottom: max(16px, env(safe-area-inset-bottom));
   pointer-events: none;
   z-index: 50;
@@ -251,7 +250,7 @@ const indicatorStyle = computed(() => {
 .bottom-nav-pill {
   pointer-events: auto;
   position: relative;
-  width: calc(100% - 32px);
+  width: 100%;
   max-width: 420px;
   height: 64px;
   display: flex;

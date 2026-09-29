@@ -974,4 +974,85 @@ function confirmLogout() {
   .info-item:nth-last-child(-n+2) { border-bottom: 1px solid #e5e7eb; }
   .info-item:last-child { border-bottom: none; }
 }
+
+@media (max-width: 768px) {
+  .layout {
+    display: block;
+    height: 100dvh;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 120;
+    width: min(82vw, 280px) !important;
+    min-width: 0 !important;
+    transition: width .22s ease, min-width .22s ease, padding .22s ease;
+  }
+
+  .sidebar .admin-sidebar-toggle {
+    top: 14px !important;
+    left: auto !important;
+    right: 12px !important;
+    z-index: 2;
+  }
+
+  .main {
+    width: 100%;
+    height: 100dvh;
+    padding: max(22px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    overflow-x: hidden;
+  }
+
+  .main-header { margin: 0 0 20px; }
+  .page-title { font-size: 1.65rem; }
+  .profile-card { border-radius: 18px; }
+  .card-banner { height: 112px; padding-inline: 16px; }
+  .card-body { padding: 14px 16px 18px; }
+  .card-top { align-items: center; gap: 14px; margin-bottom: 18px; }
+  .profile-avatar-wrap {
+    width: 82px;
+    height: 82px;
+    margin-top: -48px;
+    border-width: 4px;
+  }
+  .hero-name { font-size: 1.35rem; overflow-wrap: anywhere; }
+  .hero-sub { align-items: flex-start; gap: 7px; }
+  .hero-id, .hero-email { min-width: 0; overflow-wrap: anywhere; }
+  .info-grid { grid-template-columns: minmax(0, 1fr); }
+  .info-item { padding: 12px 14px; }
+  .info-item:nth-last-child(-n+2) { border-bottom: 1px solid rgba(126, 136, 146, 0.15); }
+  .info-item:last-child { border-bottom: 0; }
+
+  .edit-modal {
+    width: min(500px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+  }
+  .edit-modal-body { padding: 18px 18px 8px; }
+  .edit-row.two-col { flex-direction: column; }
+}
+
+@media (max-width: 768px) {
+  :global(.teacher-sidebar-collapsed) .layout > .sidebar {
+    width: 56px !important;
+    min-width: 56px !important;
+    padding: 58px 7px 16px !important;
+    overflow: hidden !important;
+  }
+
+  :global(.teacher-sidebar-collapsed) .layout > .sidebar > :not(.admin-sidebar-toggle) {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  :global(.teacher-sidebar-collapsed) .layout > .sidebar .admin-sidebar-toggle {
+    left: 9px !important;
+    right: auto !important;
+  }
+
+  :global(.teacher-sidebar-collapsed) .layout > .main {
+    padding-left: 72px;
+  }
+}
 </style>
