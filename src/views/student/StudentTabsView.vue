@@ -306,7 +306,6 @@ ion-tab-button {
   max-width: none;
   height: 100%;
   font-family: 'Poppins', sans-serif;
-  transition: transform 0.22s ease;
 }
 
 ion-tab-button::part(native) {
@@ -325,7 +324,6 @@ ion-tab-button::part(native) {
 
 ion-tab-button.tab-selected {
   flex: 1.25 1 0;
-  transform: translateY(-1px);
 }
 
 ion-tab-button.tab-selected::part(native) {
@@ -350,7 +348,6 @@ ion-tab-button.tab-selected ion-label,
 ion-tab-button.tab-selected .student-tab-profile-avatar,
 ion-tab-button.tab-selected .student-tab-profile-image {
   transform: translateY(0);
-  transition: transform 0.22s ease;
 }
 
 ion-icon {
@@ -411,18 +408,18 @@ ion-label {
     height: 62px;
     padding: 0 20px 0 18px;
     border-radius: 32px;
-    transform: translateY(8px);
+    transform: none !important;
   }
 
   .student-tab-bar ion-tab-button.tab-selected {
-    transform: translateY(5px);
+    transform: none !important;
   }
 
   .student-tab-bar ion-tab-button.tab-selected ion-icon,
   .student-tab-bar ion-tab-button.tab-selected ion-label,
   .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-avatar,
   .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-image {
-    transform: translateY(4px);
+    transform: none !important;
   }
 
   .student-tab-profile-avatar,

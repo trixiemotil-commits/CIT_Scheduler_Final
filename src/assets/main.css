@@ -680,7 +680,7 @@ select {
   border-radius: 34px;
   margin: 0;
   padding: 0 12px;
-  transform: translateY(2px) !important;
+  transform: none !important;
   box-sizing: border-box;
   text-align: left;
   background: linear-gradient(145deg, #59636b, #303940);
