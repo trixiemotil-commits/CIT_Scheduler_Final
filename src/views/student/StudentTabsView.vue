@@ -378,7 +378,7 @@ ion-label {
 
 @media (min-width: 391px) and (max-width: 767px) {
   .student-tab-bar {
-    height: calc(100px + var(--student-safe-bottom)) !important;
+    height: calc(72px + var(--student-safe-bottom)) !important;
   }
 
   .student-tab-bar ion-tab-button::part(native) {
@@ -388,13 +388,13 @@ ion-label {
 
   .student-tab-bar ion-tab-button ion-icon,
   .student-tab-bar ion-tab-button.tab-selected ion-icon {
-    width: 38px !important;
-    height: 38px !important;
-    flex-basis: 38px !important;
+    width: 34px !important;
+    height: 34px !important;
+    flex-basis: 34px !important;
   }
 
-  .student-tab-bar ion-tab-button ion-label {
-    font-size: .7rem !important;
+  .student-tab-bar ion-tab-button:not(.consultation-tab) ion-label {
+    font-size: .64rem !important;
   }
 
   .student-tab-bar .student-tab-profile-avatar,
