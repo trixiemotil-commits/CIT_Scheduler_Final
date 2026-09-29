@@ -1,10 +1,14 @@
 <template>
   <IonPage>
-    <div class="student-app-shell" :class="{ 'student-notifications-active': route.path.startsWith('/student/notifications') }">
+    <div class="student-app-shell" :class="{ 'student-notifications-active': route.path.startsWith('/student/notifications'), 'consultation-choices-open': showConsultationChoices }">
       <IonTabs>
         <IonRouterOutlet />
 
-        <IonTabBar slot="bottom" class="student-tab-bar bottom-nav-pill">
+        <IonTabBar
+          v-if="!isConsultationSessionsPage"
+          slot="bottom"
+          class="student-tab-bar bottom-nav-pill"
+        >
           <div class="student-tab-surface" aria-hidden="true"></div>
           <div class="student-tab-safe-area" aria-hidden="true"></div>
           <div class="student-tab-indicator" :style="indicatorStyle" aria-hidden="true"></div>
@@ -13,6 +17,7 @@
             :key="item.tab"
             :tab="item.tab"
             :href="item.href"
+            @click.capture="handleNavigationClick($event, item)"
             :class="{ 'active-tab-item': activeIndex === index, 'consultation-tab': item.tab === 'consultations' }"
           >
             <span v-if="item.tab === 'profile' && studentUser.avatar" class="student-tab-profile-avatar" aria-hidden="true">
@@ -41,6 +46,56 @@
           </IonTabButton>
         </IonTabBar>
       </IonTabs>
+
+      <Teleport to="body">
+        <Transition name="consultation-choice">
+          <div
+            v-if="showConsultationChoices"
+            class="consultation-choice-overlay"
+            :style="{
+              '--consultation-choice-bottom': consultationChoiceBottomPadding,
+              '--consultation-modal-circle-overlap': `${CONSULTATION_MODAL_CIRCLE_OVERLAP}px`,
+              '--consultation-icon-circle-size': `${CONSULTATION_ICON_CIRCLE_RADIUS * 2}px`,
+            }"
+            role="presentation"
+            @click.self="showConsultationChoices = false"
+          >
+            <div class="consultation-choice-anchor" :style="consultationChoiceAnchorStyle" aria-hidden="true">
+              <svg
+                class="consultation-choice-anchor-icon"
+                viewBox="0 0 36 36"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M17 11.8a9.6 9.6 0 1 1 15 10.8l2 6.3-6.2-3.3a9.6 9.6 0 0 1-10.8-2.1" />
+                <path d="M22.5 17.5h7.2m-7.2 4h7.2m-7.2 4h5.1" />
+                <path d="M7.2 22.8 4.6 30l8.2-3.2a11.5 11.5 0 1 0-5.6-4Z" fill="rgba(250,250,250,.98)" />
+                <path stroke-width="3" d="M13.2 12a3 3 0 1 1 5.7 1.4c-.9 1.1-2.4 1.5-2.4 3.2" />
+                <circle cx="16.5" cy="20.8" r=".7" />
+              </svg>
+            </div>
+            <section class="consultation-choice-modal" role="dialog" aria-modal="true" aria-labelledby="consultation-choice-title">
+              <button class="consultation-choice-close" type="button" aria-label="Close" @click="showConsultationChoices = false">×</button>
+              <div class="consultation-choice-kicker">Student Services</div>
+              <h2 id="consultation-choice-title">Consultations</h2>
+              <p>What would you like to do?</p>
+              <button class="consultation-choice-action" type="button" @click="openConsultationSessions">
+                <span class="consultation-choice-icon"><IonIcon :icon="calendarOutline" /></span>
+                <span><strong>View Consultation Session</strong><small>Check your requests and scheduled sessions</small></span>
+                <span class="consultation-choice-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="consultation-choice-action" type="button" @click="openTeacherBooking">
+                <span class="consultation-choice-icon"><IonIcon :icon="peopleOutline" /></span>
+                <span><strong>Book Consultation</strong><small>Find a teacher and request a time</small></span>
+                <span class="consultation-choice-arrow" aria-hidden="true">›</span>
+              </button>
+            </section>
+          </div>
+        </Transition>
+      </Teleport>
 
       <div v-if="showTermPrompt" class="term-prompt-overlay">
         <form class="term-prompt" @submit.prevent="saveTermAssignment">
@@ -93,9 +148,18 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const CONSULTATION_ICON_CIRCLE_RADIUS = 28
+const CONSULTATION_MODAL_CIRCLE_OVERLAP = 10
 const route = useRoute()
 const router = useRouter()
 const studentUser = ref(getUser() || {})
+const showConsultationChoices = ref(false)
+const consultationChoiceBottomPadding = ref('116px')
+const consultationChoiceAnchorStyle = ref({ top: '0px', left: '0px' })
+const isConsultationSessionsPage = computed(() =>
+  route.path === '/student/consultations'
+  || (route.path === '/student/teachers' && route.query.mode === 'consultation-booking')
+)
 const showTermPrompt = ref(false)
 const publishedTerm = ref(null)
 const savingAssignment = ref(false)
@@ -217,6 +281,31 @@ const navigation = [
   { tab: 'profile', label: 'Profile', href: '/student/profile', icon: personOutline },
 ]
 
+function handleNavigationClick(event, item) {
+  if (item.tab !== 'consultations') return
+  event.preventDefault()
+  event.stopPropagation()
+  const icon = event.currentTarget?.querySelector('.student-tab-consultation-icon')
+  if (icon) {
+    const iconBounds = icon.getBoundingClientRect()
+    const circleTop = iconBounds.top + iconBounds.height / 2 - CONSULTATION_ICON_CIRCLE_RADIUS
+    const circleLeft = iconBounds.left + iconBounds.width / 2 - CONSULTATION_ICON_CIRCLE_RADIUS
+    consultationChoiceBottomPadding.value = `${Math.max(16, window.innerHeight - circleTop - CONSULTATION_MODAL_CIRCLE_OVERLAP)}px`
+    consultationChoiceAnchorStyle.value = { top: `${circleTop}px`, left: `${circleLeft}px` }
+  }
+  showConsultationChoices.value = true
+}
+
+async function openConsultationSessions() {
+  showConsultationChoices.value = false
+  await router.push('/student/consultations')
+}
+
+async function openTeacherBooking() {
+  showConsultationChoices.value = false
+  await router.push({ path: '/student/teachers', query: { mode: 'consultation-booking' } })
+}
+
 const activeIndex = computed(() => {
   const current = route.path || '/student/dashboard'
   const match = navigation.findIndex((item) => {
@@ -247,6 +336,184 @@ const indicatorStyle = computed(() => {
   overflow: hidden;
   background: #f3f5f7;
   box-shadow: 0 0 28px rgba(37, 41, 46, 0.14);
+}
+
+.consultation-choice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  --consultation-choice-surface: rgba(250, 250, 250, 0.98);
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding: 16px 16px var(--consultation-choice-bottom, calc(60px + env(safe-area-inset-bottom)));
+  background: rgba(24, 29, 33, 0.5);
+}
+
+.consultation-choice-anchor {
+  position: fixed;
+  z-index: 10003;
+  display: grid;
+  width: var(--consultation-icon-circle-size, 56px);
+  height: var(--consultation-icon-circle-size, 56px);
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--consultation-choice-surface);
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.consultation-choice-anchor-icon {
+  width: 40px;
+  height: 40px;
+  padding: 6px;
+  color: var(--metal-500);
+}
+
+.student-app-shell.consultation-choices-open .student-tab-bar {
+  z-index: 10002 !important;
+  pointer-events: none !important;
+}
+
+.student-app-shell.consultation-choices-open .student-tab-bar ion-tab-button.consultation-tab {
+  z-index: 10003 !important;
+}
+
+.student-app-shell.consultation-choices-open .student-tab-bar ion-tab-button.consultation-tab::before {
+  z-index: 10004 !important;
+  border: 0;
+  box-shadow: none;
+}
+
+.student-app-shell.consultation-choices-open .student-tab-bar ion-tab-button.consultation-tab .student-tab-consultation-icon {
+  z-index: 10005 !important;
+}
+
+.consultation-choice-modal {
+  position: relative;
+  width: min(100%, 420px);
+  padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 34px;
+  background: var(--consultation-choice-surface);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.24);
+  color: #252b30;
+}
+
+.consultation-choice-modal::after {
+  position: absolute;
+  top: calc(100% - var(--consultation-modal-circle-overlap, 10px));
+  left: 50%;
+  width: 25%;
+  height: var(--consultation-icon-circle-size, 56px);
+  background: var(--consultation-choice-surface);
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  content: '';
+  filter: drop-shadow(0 5px 3px rgba(0, 0, 0, 0.08));
+  transform: translateX(-50%);
+}
+
+.consultation-choice-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #e8ebed;
+  color: #4f585f;
+  font-size: 1.45rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.consultation-choice-kicker {
+  color: #68737a;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.consultation-choice-modal h2 {
+  margin: 5px 0 4px;
+  font-size: 1.2rem;
+}
+
+.consultation-choice-modal > p {
+  margin: 0 0 18px;
+  color: #707980;
+  font-size: 0.82rem;
+}
+
+.consultation-choice-action {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 68px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #dce1e4;
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.consultation-choice-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  background: #e9eef0;
+  color: #3e5966;
+  font-size: 1.2rem;
+}
+
+.consultation-choice-action strong,
+.consultation-choice-action small {
+  display: block;
+}
+
+.consultation-choice-action strong {
+  font-size: 0.83rem;
+}
+
+.consultation-choice-action small {
+  margin-top: 3px;
+  color: #717a80;
+  font-size: 0.69rem;
+  line-height: 1.35;
+}
+
+.consultation-choice-arrow {
+  color: #818a90;
+  font-size: 1.4rem;
+}
+
+.consultation-choice-enter-active,
+.consultation-choice-leave-active {
+  transition: opacity 0.18s ease;
+}
+
+.consultation-choice-enter-active .consultation-choice-modal,
+.consultation-choice-leave-active .consultation-choice-modal {
+  transition: transform 0.22s ease;
+}
+
+.consultation-choice-enter-from,
+.consultation-choice-leave-to {
+  opacity: 0;
+}
+
+.consultation-choice-enter-from .consultation-choice-modal,
+.consultation-choice-leave-to .consultation-choice-modal {
+  transform: translateY(18px);
 }
 
 @media (max-width: 767px) {
@@ -530,6 +797,33 @@ ion-label {
 
   .student-tab-bar ion-tab-button.tab-selected::part(native) {
     height: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-avatar,
+  .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-image {
+    width: 32px !important;
+    height: 32px !important;
+    flex-basis: 32px !important;
+  }
+}
+
+@media (min-width: 391px) and (max-width: 767px) {
+  .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-avatar,
+  .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-image {
+    width: 38px !important;
+    height: 38px !important;
+    flex-basis: 38px !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-avatar,
+  .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-image {
+    width: 40px !important;
+    height: 40px !important;
+    flex-basis: 40px !important;
   }
 }
 </style>

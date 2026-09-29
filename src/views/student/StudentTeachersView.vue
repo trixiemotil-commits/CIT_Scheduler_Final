@@ -8,14 +8,99 @@
       <button class="back-btn" @click="$router.back()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
-      <div class="header-title">Browse Teachers</div>
+      <div class="header-title">{{ isConsultationBooking ? 'Request Consultation' : 'Browse Teachers' }}</div>
       <div style="width:32px"></div>
     </div>
 
+    <form v-if="isConsultationBooking" class="booking-request-form" @submit.prevent="submitRequest">
+      <p class="booking-form-guidance">Choose a teacher type and teacher, complete the required details, then send your request.</p>
+      <div class="field-group">
+        <label class="field-label" for="booking-teacher-type">Teacher Type</label>
+        <select id="booking-teacher-type" v-model="bookingTeacherType" class="field-input" required @change="resetBookingTeacherSelection">
+          <option value="" disabled>Select teacher type</option>
+          <option value="Subject Teacher">Subject Teacher</option>
+          <option value="Available Teacher">Available Teacher</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="booking-teacher">Available Teacher</label>
+        <select
+          id="booking-teacher"
+          v-model="bookingTeacherId"
+          class="field-input"
+          required
+          :disabled="!bookingTeacherType || !bookingTeacherOptions.length"
+          @change="selectBookingTeacher"
+        >
+          <option value="" disabled>Select a teacher</option>
+          <option v-for="teacher in bookingTeacherOptions" :key="teacher.id" :value="String(teacher.id)">
+            {{ teacher.name }} · {{ displayedSubjects(teacher).join(', ') || 'Consultation' }}
+          </option>
+        </select>
+        <span v-if="bookingTeacherType && !bookingTeacherOptions.length && !loadingTeachers" class="booking-empty-note">
+          No {{ bookingTeacherType.toLowerCase() }} is currently available for consultation.
+        </span>
+      </div>
+
+      <div v-if="selectedTeacher" class="booking-selected-teacher">
+        <div class="teacher-avatar" :style="{ background: selectedTeacher.color }">
+          <img v-if="selectedTeacher.avatar" :src="selectedTeacher.avatar" :alt="`${selectedTeacher.name} profile`" />
+          <span v-else>{{ selectedTeacher.initials }}</span>
+        </div>
+        <div class="booking-selected-copy">
+          <strong>{{ selectedTeacher.name }}</strong>
+          <span>{{ bookingTeacherType }}</span>
+        </div>
+        <span :class="['status-pill', statusClass(selectedTeacher.status)]">{{ teacherStatusLabel(selectedTeacher.status) }}</span>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="booking-subject">Subject</label>
+        <select id="booking-subject" v-model="reqForm.subject" class="field-input" required :disabled="!selectedTeacher">
+          <option value="" disabled>Select subject</option>
+          <option v-if="selectedTeacher && !selectedTeacher.subjectList.length" value="General Consultation">General Consultation</option>
+          <option v-for="subject in selectedTeacher?.subjectList || []" :key="subject" :value="subject">{{ subject }}</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="booking-reason">Reason</label>
+        <select id="booking-reason" v-model="reqForm.reason" class="field-input" required>
+          <option v-for="reason in CONSULTATION_REASONS" :key="reason" :value="reason">{{ reason }}</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Consultation Schedule</label>
+        <select v-if="selectedTeacher?.isSubjectTeacher" v-model="reqForm.availabilityId" class="field-input" required>
+          <option value="" disabled>Select assigned availability</option>
+          <option v-for="slot in selectedTeacher.consultationSlots" :key="slot.id" :value="slot.id">
+            {{ formatSlotLabel(slot) }}
+          </option>
+        </select>
+        <template v-else>
+          <input v-model="reqForm.date" class="field-input" type="date" :min="today" required :disabled="!selectedTeacher" />
+          <input v-model="reqForm.time" class="field-input" type="time" min="07:00" max="17:00" required :disabled="!selectedTeacher" />
+        </template>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="booking-description">Short Description <span class="optional">(optional)</span></label>
+        <textarea id="booking-description" v-model="reqForm.description" class="field-input field-textarea" placeholder="Briefly describe your concern..." rows="3"></textarea>
+      </div>
+
+      <div v-if="reqError" class="msg-err">{{ reqError }}</div>
+      <button class="modal-submit booking-submit" type="submit" :disabled="!selectedTeacher || isSubmittingRequest">
+        {{ isSubmittingRequest ? 'Sending...' : 'Send Request' }}
+      </button>
+    </form>
+
+    <template v-else>
     <!-- Search -->
     <div class="search-wrap">
       <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input v-model="search" type="text" class="search-input" placeholder="Search by name or subject..." />
+      <input v-model="search" type="text" class="search-input" :placeholder="isConsultationBooking ? 'Search available teachers...' : 'Search by name or subject...'" />
     </div>
 
     <!-- Filters -->
@@ -55,11 +140,11 @@
         </div>
       </div>
       <div v-else-if="loadError" class="empty-state-card error">{{ loadError }}</div>
-      <div v-else-if="!visibleTeacherCount" class="empty-state-card">No teachers found.</div>
+      <div v-else-if="!visibleTeacherCount" class="empty-state-card">{{ isConsultationBooking ? 'No teachers are currently available for consultation.' : 'No teachers found.' }}</div>
 
-      <template v-if="(activeFilter === 'All' || activeFilter === 'Subject Teacher') && visibleSubjectTeachers.length">
-        <div v-if="activeFilter === 'Subject Teacher'" class="section-title">Subject Teachers</div>
-        <div v-for="t in visibleSubjectTeachers" :key="t.id" class="teacher-card">
+      <template v-if="teachersToDisplay.length">
+        <div class="section-title">{{ currentTeacherSectionTitle }}</div>
+        <div v-for="t in teachersToDisplay" :key="t.id" class="teacher-card">
           <div class="teacher-top">
             <div class="teacher-avatar" :style="{ background: t.color }">
               <img v-if="t.avatar" :src="t.avatar" :alt="`${t.name} profile`" />
@@ -67,12 +152,18 @@
             </div>
             <div class="teacher-meta">
               <div class="teacher-name">{{ t.name }}</div>
-              <div class="teacher-type-pill subject">Subject Teacher</div>
+              <div :class="['teacher-type-pill', t.isSubjectTeacher ? 'subject' : 'available']">
+                {{ t.isSubjectTeacher ? 'Subject Teacher' : 'Available Teacher' }}
+              </div>
+              <div :class="['consultation-availability', t.available ? 'is-open' : 'is-closed']">
+                <span class="consultation-availability-dot" aria-hidden="true"></span>
+                {{ t.available ? 'Open for consultations' : 'Closed for consultations' }}
+              </div>
               <div class="teacher-subjects-clean">
                 <span v-for="subject in displayedSubjects(t)" :key="subject" class="subject-chip">{{ subject }}</span>
                 <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
               </div>
-              <div v-if="t.status === 'In School' && t.consultationSlots.length" class="consultation-hours">
+              <div v-if="t.isSubjectTeacher && t.status === 'In School' && t.consultationSlots.length" class="consultation-hours">
                 <div class="hours-label">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                   Consultation hours
@@ -84,124 +175,13 @@
             </div>
             <span :class="['status-pill', statusClass(t.status)]">{{ teacherStatusLabel(t.status) }}</span>
           </div>
-          <div v-if="t.status === 'In School' && canBookTeacher(t)" class="teacher-footer">
-            <span class="price">&nbsp;</span>
-            <button
-              class="action-btn green"
-              @click="openRequest(t)"
-            >
-              {{ consultationButtonLabel(t) }}
-            </button>
-          </div>
-        </div>
-      </template>
-
-      <template v-if="(activeFilter === 'All' || activeFilter === 'Available Teacher') && visibleAvailableTeachers.length">
-        <div class="section-title">Available Teachers</div>
-        <div v-for="t in visibleAvailableTeachers" :key="t.id" class="teacher-card">
-          <div class="teacher-top">
-            <div class="teacher-avatar" :style="{ background: t.color }">
-              <img v-if="t.avatar" :src="t.avatar" :alt="`${t.name} profile`" />
-              <span v-else>{{ t.initials }}</span>
-            </div>
-            <div class="teacher-meta">
-              <div class="teacher-name">{{ t.name }}</div>
-              <div class="teacher-type-pill available">Available Teacher</div>
-              <div class="teacher-subjects-clean">
-                <span v-for="subject in displayedSubjects(t)" :key="subject" class="subject-chip">{{ subject }}</span>
-                <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
-              </div>
-            </div>
-            <span :class="['status-pill', statusClass(t.status)]">{{ teacherStatusLabel(t.status) }}</span>
-          </div>
-          <div v-if="t.status === 'In School' && canBookTeacher(t)" class="teacher-footer">
-            <span class="price">&nbsp;</span>
-            <button
-              class="action-btn green"
-              @click="openRequest(t)"
-            >
-              {{ consultationButtonLabel(t) }}
-            </button>
-          </div>
         </div>
       </template>
     </div>
+    </template>
 
     <!-- Toast notification -->
     <div v-if="toastMsg" class="toast">{{ toastMsg }}</div>
-
-    <!-- ══ REQUEST CONSULTATION MODAL ══ -->
-    <Teleport to="body">
-      <Transition name="consultation-modal">
-        <div v-if="showReqModal" class="modal-overlay" @click.self="showReqModal = false">
-      <div class="modal-sheet">
-        <div class="modal-handle"></div>
-        <div class="modal-header">
-          <span>Request Consultation</span>
-          <button class="modal-close" @click="showReqModal = false">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="teacher-pill">
-            <div class="tp-avatar" :style="{ background: selectedTeacher?.color }">
-              <img v-if="selectedTeacher?.avatar" :src="selectedTeacher.avatar" :alt="`${selectedTeacher.name} profile`" />
-              <span v-else>{{ selectedTeacher?.initials }}</span>
-            </div>
-            <div>
-              <div class="tp-name">{{ selectedTeacher?.name }}</div>
-              <div class="tp-subjects-clean">
-                <span v-for="subject in displayedSubjects(selectedTeacher)" :key="subject" class="subject-chip">{{ subject }}</span>
-                <span v-if="hiddenSubjectCount(selectedTeacher)" class="subject-chip more">+{{ hiddenSubjectCount(selectedTeacher) }} more</span>
-              </div>
-            </div>
-          </div>
-          <div class="field-group">
-            <label class="field-label">Subject</label>
-            <select v-model="reqForm.subject" class="field-input">
-              <option value="" disabled>Select subject</option>
-              <option v-for="subject in selectedTeacher?.subjectList || []" :key="subject" :value="subject">
-                {{ subject }}
-              </option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label class="field-label">Reason</label>
-            <select v-model="reqForm.reason" class="field-input">
-              <option v-for="reason in CONSULTATION_REASONS" :key="reason" :value="reason">
-                {{ reason }}
-              </option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label class="field-label">Consultation Schedule</label>
-            <template v-if="selectedTeacher?.isSubjectTeacher">
-              <select v-model="reqForm.availabilityId" class="field-input">
-                <option value="" disabled>Select assigned availability</option>
-                <option v-for="slot in selectedTeacher?.consultationSlots || []" :key="slot.id" :value="slot.id">
-                  {{ formatSlotLabel(slot) }}
-                </option>
-              </select>
-            </template>
-            <template v-else>
-              <input v-model="reqForm.date" class="field-input" type="date" :min="today" />
-              <input v-model="reqForm.time" class="field-input" type="time" min="07:00" max="17:00" />
-            </template>
-          </div>
-          <div class="field-group">
-            <label class="field-label">Short Description <span class="optional">(optional)</span></label>
-            <textarea v-model="reqForm.description" class="field-input field-textarea" placeholder="Briefly describe your concern..." rows="3"></textarea>
-          </div>
-          <div v-if="reqError" class="msg-err">{{ reqError }}</div>
-        </div>
-        <div class="modal-footer">
-          <button class="modal-cancel" :disabled="isSubmittingRequest" @click="showReqModal = false">Cancel</button>
-          <button class="modal-submit" :disabled="isSubmittingRequest" @click="submitRequest">
-            {{ isSubmittingRequest ? 'Sending...' : 'Send Request' }}
-          </button>
-        </div>
-      </div>
-        </div>
-      </Transition>
-    </Teleport>
 
     <!-- ══ VIEW PROFILE MODAL ══ -->
     <div v-if="showProfileModal" class="modal-overlay" @click.self="showProfileModal = false">
@@ -247,7 +227,6 @@
         </div>
         <div class="modal-footer">
           <button class="modal-cancel" @click="showProfileModal = false">Close</button>
-          <button v-if="selectedTeacher?.available" class="modal-submit" @click="requestFromProfile">Request Consultation</button>
         </div>
       </div>
     </div>
@@ -263,12 +242,19 @@ import StudentRefresher from '@/components/student/StudentRefresher.vue'
 import { notifyStudentDataChanged, useAutoRefresh } from '@/composables/useAutoRefresh.js'
 import useNotifications from '@/composables/useNotifications'
 import { IonContent, IonPage } from '@ionic/vue'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const route = useRoute()
+const isConsultationBooking = computed(() =>
+  route.path === '/student/teachers' && route.query.mode === 'consultation-booking'
+)
 
 const search       = ref('')
 const activeFilter = ref('All')
+const bookingTeacherType = ref('')
+const bookingTeacherId = ref('')
 const filters      = ['All', 'Subject Teacher', 'Available Teacher']
 const loadingTeachers = ref(false)
 const loadError = ref('')
@@ -322,15 +308,6 @@ function canBookTeacher(teacher) {
   if (!teacher?.available) return false
   if (!teacher?.isSubjectTeacher) return true
   return Boolean(scheduledSlotForToday(teacher))
-}
-
-function consultationButtonLabel(teacher) {
-  if (teacher?.isSubjectTeacher) {
-    const selectedSlot = scheduledSlotForToday(teacher)
-    if (selectedSlot) return `Book ${selectedSlot.dayOfWeek} • ${selectedSlot.startTime}`
-    return 'No hours on date'
-  }
-  return teacher?.available ? 'Book Consultation' : 'Request Consultation'
 }
 
 function initialsFor(name) {
@@ -516,7 +493,10 @@ function matchesSearch(teacher) {
 
 const subjectTeachers = computed(() => {
   return teachers.value
-    .filter((t) => isSubjectTeacher(t) && matchesSearch(t) && hasMatchingAssignment(t))
+    .filter((t) => isSubjectTeacher(t)
+      && matchesSearch(t)
+      && hasMatchingAssignment(t)
+      && (!isConsultationBooking.value || (t.status === 'In School' && canBookTeacher(t))))
     .sort((a, b) => {
       const bHasTodayHours = Boolean(scheduledSlotForToday(b))
       const aHasTodayHours = Boolean(scheduledSlotForToday(a))
@@ -529,8 +509,24 @@ const subjectTeachers = computed(() => {
 
 const availableTeachers = computed(() => {
   return teachers.value
-    .filter((t) => matchesSearch(t) && !isSubjectTeacher(t) && t.status === 'In School')
+    .filter((t) => matchesSearch(t)
+      && !isSubjectTeacher(t)
+      && t.status === 'In School'
+      && (!isConsultationBooking.value || canBookTeacher(t)))
     .sort((a, b) => a.name.localeCompare(b.name))
+})
+
+const allAvailableTeachers = computed(() => {
+  return teachers.value
+    .filter((t) => matchesSearch(t)
+      && !isSubjectTeacher(t)
+      && (!isConsultationBooking.value || (t.status === 'In School' && canBookTeacher(t))))
+})
+
+const bookingTeacherOptions = computed(() => {
+  if (bookingTeacherType.value === 'Subject Teacher') return subjectTeachers.value
+  if (bookingTeacherType.value === 'Available Teacher') return availableTeachers.value
+  return []
 })
 
 const visibleSubjectTeachers = computed(() => {
@@ -542,10 +538,36 @@ const visibleSubjectTeachers = computed(() => {
 
 const visibleAvailableTeachers = computed(() => availableTeachers.value)
 
+const allTeachers = computed(() => {
+  const statusOrder = { 'In School': 0, 'On Meeting': 1, 'On Event': 2, 'On Leave': 3, Offline: 4 }
+  return [...subjectTeachers.value, ...allAvailableTeachers.value].sort((a, b) => {
+    const aBookable = a.status === 'In School' && canBookTeacher(a)
+    const bBookable = b.status === 'In School' && canBookTeacher(b)
+    if (aBookable !== bBookable) return Number(bBookable) - Number(aBookable)
+
+    const statusDifference = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5)
+    if (statusDifference) return statusDifference
+
+    const availabilityDifference = Number(Boolean(b.available)) - Number(Boolean(a.available))
+    if (availabilityDifference) return availabilityDifference
+    return a.name.localeCompare(b.name)
+  })
+})
+
+const teachersToDisplay = computed(() => {
+  if (activeFilter.value === 'All') return allTeachers.value
+  if (activeFilter.value === 'Subject Teacher') return visibleSubjectTeachers.value
+  return visibleAvailableTeachers.value
+})
+
+const currentTeacherSectionTitle = computed(() => {
+  if (activeFilter.value === 'All') return 'All Teachers'
+  if (activeFilter.value === 'Subject Teacher') return 'Subject Teachers'
+  return 'Available Teachers'
+})
+
 const visibleTeacherCount = computed(() => {
-  if (activeFilter.value === 'Subject Teacher') return visibleSubjectTeachers.value.length
-  if (activeFilter.value === 'Available Teacher') return visibleAvailableTeachers.value.length
-  return visibleSubjectTeachers.value.length + visibleAvailableTeachers.value.length
+  return teachersToDisplay.value.length
 })
 
 function displayedSubjects(teacher) {
@@ -569,7 +591,6 @@ function statusClass(s) {
 }
 
 /* ── Modal state ── */
-const showReqModal     = ref(false)
 const showProfileModal = ref(false)
 const selectedTeacher  = ref(null)
 const toastMsg         = ref('')
@@ -577,6 +598,14 @@ const reqError         = ref('')
 const isSubmittingRequest = ref(false)
 const today = formatDateInput(new Date())
 const reqForm          = ref({ subject: '', reason: CONSULTATION_REASONS[0], availabilityId: '', date: '', time: '', description: '' })
+
+watch(isConsultationBooking, (isBooking) => {
+  if (!isBooking) return
+  search.value = ''
+  activeFilter.value = 'All'
+  bookingTeacherType.value = ''
+  resetBookingTeacherSelection()
+})
 
 function formatDateInput(date) {
   const year = date.getFullYear()
@@ -645,11 +674,27 @@ function nextDateForDay(dayOfWeek, startTime) {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function openRequest(t) {
+function resetBookingTeacherSelection() {
+  bookingTeacherId.value = ''
+  selectedTeacher.value = null
+  reqForm.value = { subject: '', reason: CONSULTATION_REASONS[0], availabilityId: '', date: '', time: '', description: '' }
+  reqError.value = ''
+}
+
+function selectBookingTeacher() {
+  const teacher = bookingTeacherOptions.value.find((item) => String(item.id) === bookingTeacherId.value)
+  if (!teacher) {
+    selectedTeacher.value = null
+    return
+  }
+  initializeRequestForm(teacher)
+}
+
+function initializeRequestForm(t) {
   const selectedSlot = scheduledSlotForToday(t)
   selectedTeacher.value = t
   reqForm.value = {
-    subject: t.subjectList?.[0] || '',
+    subject: t.subjectList?.[0] || (isConsultationBooking.value ? 'General Consultation' : ''),
     reason: CONSULTATION_REASONS[0],
     availabilityId: t.isSubjectTeacher ? selectedSlot?.id || '' : '',
     date: !t.isSubjectTeacher ? today : '',
@@ -657,7 +702,6 @@ function openRequest(t) {
     description: '',
   }
   reqError.value = ''
-  showReqModal.value = true
 }
 
 function openProfile(t) {
@@ -665,15 +709,11 @@ function openProfile(t) {
   showProfileModal.value = true
 }
 
-function requestFromProfile() {
-  showProfileModal.value = false
-  openRequest(selectedTeacher.value)
-}
-
 async function submitRequest() {
   if (isSubmittingRequest.value) return
 
   reqError.value = ''
+  if (!selectedTeacher.value) { reqError.value = 'Please select a teacher.'; return }
   if (!reqForm.value.subject) { reqError.value = 'Please select a subject.'; return }
   if (!reqForm.value.reason) { reqError.value = 'Please select a reason.'; return }
 
@@ -722,9 +762,13 @@ async function submitRequest() {
       method: 'POST',
       body: JSON.stringify(body),
     })
-    showReqModal.value = false
-    showToast(`Request sent to ${selectedTeacher.value.name}.`)
+    const requestedTeacherName = selectedTeacher.value.name
+    showToast(`Request sent to ${requestedTeacherName}.`)
     notifyStudentDataChanged('consultation-created')
+    if (isConsultationBooking.value) {
+      bookingTeacherType.value = ''
+      resetBookingTeacherSelection()
+    }
     await loadTeachers()
   } catch (error) {
     reqError.value = error.message || 'Failed to send request.'
@@ -892,7 +936,22 @@ onUnmounted(() => {
 .teacher-name    { font-weight: 800; font-size: 0.88rem; line-height: 1.25; color: #252a2f; }
 .teacher-type-pill { display: inline-flex; margin-top: 4px; padding: 3px 7px; border-radius: 6px; font-size: 0.66rem; font-weight: 700; line-height: 1.1; }
 .teacher-type-pill.subject { background: #e8eef8; color: #3d618d; }
-.teacher-type-pill.available { background: #e5f1e9; color: #34704d; }
+.teacher-type-pill.available { background: #fff1c2; color: #735900; }
+.consultation-availability {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.consultation-availability.is-open { background: #e4f1e7; color: #36724a; }
+.consultation-availability.is-closed { background: #f2e8e8; color: #885456; }
+.consultation-availability-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: currentColor; }
 .teacher-subjects-clean {
   margin-top: 7px;
   display: flex;
@@ -1084,7 +1143,7 @@ onUnmounted(() => {
 .teacher-avatar { width: 58px; height: 58px; border-radius: 17px; box-shadow: inset 0 1px rgba(255,255,255,.45), 0 5px 10px rgba(39,44,49,.14); }
 .teacher-name { font-size: .96rem; color: #252b31; }
 .teacher-type-pill { margin-top: 6px; padding: 4px 9px; border-radius: 999px; background: #e1e7ed !important; color: #4b6784 !important; }
-.teacher-type-pill.available { background: #dfeae4 !important; color: #397051 !important; }
+.teacher-type-pill.available { background: #fff1c2 !important; color: #735900 !important; }
 .subject-chip { border-color: #cdd4d9; border-radius: 999px; background: rgba(245,247,247,.7); color: #56616b; }
 .status-pill { border: 1px solid rgba(255,255,255,.7); border-radius: 999px; padding: 6px 10px; }
 .pill-green { background: #e0eee5; color: #397051; }
@@ -1189,6 +1248,69 @@ onUnmounted(() => {
 .field-textarea { resize: none; }
 .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .msg-err { color: #e63946; font-size: 0.8rem; font-weight: 500; }
+
+.booking-request-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 16px calc(36px + env(safe-area-inset-bottom));
+}
+
+.booking-form-guidance {
+  margin: 0;
+  color: #707980;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.booking-empty-note {
+  color: #707980;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.booking-selected-teacher {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px;
+  border: 1px solid rgba(61, 67, 73, 0.16);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #fafafa 0%, #e8eaeb 100%);
+}
+
+.booking-selected-teacher .teacher-avatar {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+}
+
+.booking-selected-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.booking-selected-copy strong {
+  overflow: hidden;
+  color: #252b30;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.booking-selected-copy span {
+  color: #707980;
+  font-size: 0.68rem;
+}
+
+.booking-submit {
+  width: 100%;
+  flex: none;
+  margin-top: 2px;
+}
 
 /* Teacher preview pill */
 .teacher-pill {

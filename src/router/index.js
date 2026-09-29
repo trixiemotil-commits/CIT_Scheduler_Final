@@ -64,6 +64,7 @@ const router = createRouter({
         { path: '', redirect: '/student/dashboard' },
         { path: 'dashboard',     name: 'student-dashboard',     component: StudentDashboardView },
         { path: 'teachers',      name: 'student-teachers',      component: StudentTeachersView },
+        { path: 'consultation-booking', name: 'student-consultation-booking', component: StudentTeachersView },
         { path: 'events',        name: 'student-events',        component: StudentEventsView },
         { path: 'consultations', name: 'student-consultations', component: StudentConsultationsView },
         { path: 'profile',       name: 'student-profile',       component: StudentProfileView },
