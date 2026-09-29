@@ -198,8 +198,8 @@
             </select>
           </div>
           <div class="field-group">
-            <label class="field-label">Short Description <span class="optional">(optional)</span></label>
-            <textarea v-model="editForm.description" class="field-input field-textarea" rows="3" placeholder="Briefly describe your concern..."></textarea>
+            <label class="field-label">Short Description <span v-if="editForm.reason === 'Other Academic Concern'" class="required">(required)</span><span v-else class="optional">(optional)</span></label>
+            <textarea v-model="editForm.description" class="field-input field-textarea" rows="3" placeholder="Briefly describe your concern..." :required="editForm.reason === 'Other Academic Concern'"></textarea>
           </div>
           <div v-if="editError" class="msg-err">{{ editError }}</div>
         </div>
@@ -613,6 +613,10 @@ async function saveEdit() {
   if (!editForm.value.subject.trim()) { editError.value = 'Please select a subject.'; return }
   if (!editForm.value.reason.trim()) { editError.value = 'Please select a reason.'; return }
   if (!editForm.value.availabilityId) { editError.value = 'Please select consultation availability.'; return }
+  if (editForm.value.reason === 'Other Academic Concern' && !editForm.value.description.trim()) {
+    editError.value = 'Please enter a short description for your other concern.'
+    return
+  }
 
   const hasDuplicatePending = sessions.value.some((item) => {
     if (String(item.id) === String(activeSession.value.id)) {

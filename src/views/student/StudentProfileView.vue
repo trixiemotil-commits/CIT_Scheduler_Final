@@ -109,7 +109,7 @@
           </div>
           <div class="field-group">
             <label class="field-label">Full Name</label>
-            <input v-model="form.name" class="field-input" type="text" />
+            <input v-model="form.name" class="field-input" type="text" maxlength="100" />
           </div>
           <div class="field-group">
             <label class="field-label">Email</label>
@@ -195,6 +195,8 @@ const form = ref({
 const avatarInput = ref(null)
 const isSaving = ref(false)
 const saveError = ref('')
+const VALID_NAME_REGEX = /^[\p{L}\p{M}]+(?:[ '\u2019.-][\p{L}\p{M}]+)*$/u
+const REPEATED_NAME_SEQUENCE_REGEX = /(\p{L}{3})\1{2,}/iu
 
 function splitFullName(fullName) {
   const normalized = String(fullName || '').trim().replace(/\s+/g, ' ')
@@ -252,19 +254,73 @@ function openAvatarPicker() {
   avatarInput.value?.click()
 }
 
-function onAvatarChange(event) {
+async function onAvatarChange(event) {
   const file = event.target?.files?.[0]
   if (!file) return
 
-  const reader = new FileReader()
-  reader.onload = () => {
+  const input = event.target
+  saveError.value = ''
+
+  try {
+    if (!file.type.startsWith('image/')) {
+      throw new Error('Please select a valid image file.')
+    }
+
+    if (file.size > 30 * 1024 * 1024) {
+      throw new Error('Please choose an image smaller than 30 MB.')
+    }
+
+    const source = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result || ''))
+      reader.onerror = () => reject(new Error('Could not read the selected image.'))
+      reader.readAsDataURL(file)
+    })
+    const image = await new Promise((resolve, reject) => {
+      const preview = new Image()
+      preview.onload = () => resolve(preview)
+      preview.onerror = () => reject(new Error('Could not decode the selected image.'))
+      preview.src = source
+    })
+
+    const maxDimension = 512
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Could not process the selected image.')
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    const avatar = canvas.toDataURL('image/jpeg', 0.82)
+
+    const token = getToken()
+    if (!token) throw new Error('Session expired. Please log in again.')
+
+    const response = await fetch(`${API_BASE}/auth/me`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ avatar }),
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(payload.message || 'Failed to save profile picture.')
+    }
+
     user.value = {
-      ...user.value,
-      avatar: String(reader.result || ''),
+      ...normalizeUser(payload.user || user.value),
+      avatar: payload.user?.avatar || avatar,
     }
     persistUser()
+    notifyStudentDataChanged('profile-updated')
+  } catch (error) {
+    saveError.value = error.message || 'Failed to save profile picture.'
+    if (!showModal.value) window.alert(saveError.value)
+  } finally {
+    input.value = ''
   }
-  reader.readAsDataURL(file)
 }
 
 function openEditModal() {
@@ -283,7 +339,13 @@ async function saveProfile() {
   if (isSaving.value) return
 
   saveError.value = ''
-  const { firstName, lastName } = splitFullName(form.value.name)
+  const normalizedFullName = String(form.value.name || '').trim().replace(/\s+/g, ' ')
+  if (!VALID_NAME_REGEX.test(normalizedFullName) || REPEATED_NAME_SEQUENCE_REGEX.test(normalizedFullName)) {
+    saveError.value = 'Please enter a valid name using letters, spaces, hyphens, apostrophes, or periods.'
+    return
+  }
+
+  const { firstName, lastName } = splitFullName(normalizedFullName)
   if (!firstName || !lastName) {
     saveError.value = 'Please enter your full name.'
     return

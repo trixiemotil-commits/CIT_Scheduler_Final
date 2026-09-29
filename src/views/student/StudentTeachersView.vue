@@ -86,8 +86,8 @@
       </div>
 
       <div class="field-group">
-        <label class="field-label" for="booking-description">Short Description <span class="optional">(optional)</span></label>
-        <textarea id="booking-description" v-model="reqForm.description" class="field-input field-textarea" placeholder="Briefly describe your concern..." rows="3"></textarea>
+        <label class="field-label" for="booking-description">Short Description <span v-if="reqForm.reason === 'Other Academic Concern'" class="required">(required)</span><span v-else class="optional">(optional)</span></label>
+        <textarea id="booking-description" v-model="reqForm.description" class="field-input field-textarea" placeholder="Briefly describe your concern..." rows="3" :required="reqForm.reason === 'Other Academic Concern'"></textarea>
       </div>
 
       <div v-if="reqError" class="msg-err">{{ reqError }}</div>
@@ -157,7 +157,7 @@
               </div>
               <div :class="['consultation-availability', t.available ? 'is-open' : 'is-closed']">
                 <span class="consultation-availability-dot" aria-hidden="true"></span>
-                {{ t.available ? 'Open for consultations' : 'Closed for consultations' }}
+                {{ consultationAvailabilityLabel(t) }}
               </div>
               <div class="teacher-subjects-clean">
                 <span v-for="subject in displayedSubjects(t)" :key="subject" class="subject-chip">{{ subject }}</span>
@@ -207,6 +207,10 @@
               <span class="rating">{{ selectedTeacher?.rating }} ({{ selectedTeacher?.reviews }} reviews)</span>
             </div>
             <span :class="['status-pill', statusClass(selectedTeacher?.status)]" style="margin-top:8px">{{ selectedTeacher?.status }}</span>
+            <div :class="['consultation-availability', selectedTeacher?.available ? 'is-open' : 'is-closed']">
+              <span class="consultation-availability-dot" aria-hidden="true"></span>
+              {{ consultationAvailabilityLabel(selectedTeacher) }}
+            </div>
           </div>
           <div class="prof-row">
             <span class="prof-label">Specializations</span>
@@ -302,6 +306,10 @@ function teacherStatusLabel(status) {
 
 function isAvailableTeacher(teacher) {
   return Boolean(teacher?.available)
+}
+
+function consultationAvailabilityLabel(teacher) {
+  return teacher?.available ? 'Open for Consultation' : 'Closed for Consultation'
 }
 
 function canBookTeacher(teacher) {
@@ -425,9 +433,14 @@ function mapTeacher(teacher) {
     ? [...new Set(studentSubjects.length ? studentSubjects : matchedSubjects)]
     : subjects
 
-  const isStatusAvailable = !['On Leave', 'Offline', 'On Event'].includes(resolvedStatus)
   const hasSlots = consultationSlots.length > 0
-  const isAvailable = hasSlots && teacherAvailability.toLowerCase() !== 'unavailable' && isStatusAvailable
+  const statusAllowsConsultation = resolvedStatus === 'In School'
+  const availabilityAllowsConsultation = typeof teacher.available === 'boolean'
+    ? teacher.available
+    : teacherAvailability.toLowerCase() !== 'unavailable'
+  const isAvailable = statusAllowsConsultation
+    && availabilityAllowsConsultation
+    && (!subjectTeacherMatch || hasSlots)
 
   return {
     id: teacher.id,
@@ -438,7 +451,7 @@ function mapTeacher(teacher) {
     initials: initialsFor(teacher.name),
     color: colorForName(teacher.name),
     status: resolvedStatus,
-    available: isStatusAvailable && teacherAvailability.toLowerCase() !== 'unavailable',
+    available: isAvailable,
     hasConsultationSlots: hasSlots,
     tags: resolvedSubjects.slice(0, 3),
     subjectList: resolvedSubjects,
@@ -716,6 +729,10 @@ async function submitRequest() {
   if (!selectedTeacher.value) { reqError.value = 'Please select a teacher.'; return }
   if (!reqForm.value.subject) { reqError.value = 'Please select a subject.'; return }
   if (!reqForm.value.reason) { reqError.value = 'Please select a reason.'; return }
+  if (reqForm.value.reason === 'Other Academic Concern' && !reqForm.value.description.trim()) {
+    reqError.value = 'Please enter a short description for your other concern.'
+    return
+  }
 
   const notes = [
     `Reason: ${reqForm.value.reason}`,
@@ -772,6 +789,9 @@ async function submitRequest() {
     await loadTeachers()
   } catch (error) {
     reqError.value = error.message || 'Failed to send request.'
+    if (reqError.value === 'You already have a consultation request during this time. Please choose a different time slot.') {
+      window.alert(reqError.value)
+    }
   } finally {
     isSubmittingRequest.value = false
   }

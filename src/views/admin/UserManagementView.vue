@@ -747,6 +747,7 @@ const isBulkApproving = ref(false)
 const selectedPendingIds = ref([])
 const approvalMode = ref('all')
 const PHINMA_EMAIL_REGEX = /^[a-z0-9._%+-]+\.au@phinmaed\.com$/i
+const VALID_LAST_NAME_REGEX = /^[\p{L}\p{M}]+(?:[ '\u2019.-][\p{L}\p{M}]+)*$/u
 const AUTO_REFRESH_MS = 10000
 let autoRefreshTimer = null
 let autoRefreshNoticeTimer = null
@@ -1161,6 +1162,12 @@ async function saveUser() {
   formError.value = ''
   const trimmedSchoolId = (userForm.value.schoolId || '').trim()
   const normalizedEmail = (userForm.value.email || '').trim().toLowerCase()
+  const normalizedLastName = trimValue(userForm.value.lastName).replace(/\s+/g, ' ')
+
+  if (!VALID_LAST_NAME_REGEX.test(normalizedLastName)) {
+    formError.value = 'Last name may contain letters, spaces, hyphens, apostrophes, and periods only.'
+    return
+  }
 
   if (!trimmedSchoolId) {
     formError.value = 'School ID Number is required.'

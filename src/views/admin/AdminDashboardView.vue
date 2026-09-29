@@ -234,7 +234,19 @@
         <!-- Consultation Trends -->
         <div class="chart-card" :class="{ 'chart-expanded': expandedChart === 'line', 'chart-hidden': expandedChart === 'bar' }">
           <div class="chart-header">
-            <span class="chart-title">Consultation Trends · Weekly</span>
+            <div class="chart-heading-main">
+              <span class="chart-title">Consultation Trends · {{ consultationTrendPeriodTitle }}</span>
+              <div class="chart-period-control" role="group" aria-label="Consultation trend period">
+                <button
+                  v-for="period in consultationTrendPeriods"
+                  :key="period.value"
+                  type="button"
+                  :class="{ 'is-active': consultationTrendPeriod === period.value }"
+                  :aria-pressed="consultationTrendPeriod === period.value"
+                  @click="setConsultationTrendPeriod(period.value)"
+                >{{ period.label }}</button>
+              </div>
+            </div>
             <button class="expand-btn" @click="toggleExpand('line')">
               <svg v-if="expandedChart === 'line'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
@@ -341,11 +353,11 @@
         <div class="modal-box consultation-day-modal">
           <button class="modal-close" @click="showConsultationDayModal = false">✕</button>
           <div class="modal-header">
-            <h2 class="modal-title">{{ selectedConsultationDay }} Consultations</h2>
-            <p class="modal-sub">{{ selectedConsultationDayRequests.length }} consultation{{ selectedConsultationDayRequests.length === 1 ? '' : 's' }} requested</p>
+            <h2 class="modal-title">{{ selectedConsultationPeriodLabel }} Consultations</h2>
+            <p class="modal-sub">{{ selectedConsultationPeriodRequests.length }} consultation{{ selectedConsultationPeriodRequests.length === 1 ? '' : 's' }} requested</p>
           </div>
-          <div v-if="selectedConsultationDayRequests.length" class="consultation-day-list">
-            <div v-for="request in selectedConsultationDayRequests" :key="request.id" class="consultation-day-item">
+          <div v-if="selectedConsultationPeriodRequests.length" class="consultation-day-list">
+            <div v-for="request in selectedConsultationPeriodRequests" :key="request.id" class="consultation-day-item">
               <div class="consultation-day-item-main">
                 <strong>{{ request.subject || 'Untitled subject' }}</strong>
                 <span>From {{ request.studentName || request.studentNumber || 'Unknown student' }}</span>
@@ -354,7 +366,7 @@
               <span v-if="request.status" class="consultation-status">{{ request.status }}</span>
             </div>
           </div>
-          <div v-else class="modal-empty-schedule">No consultations were recorded for this day.</div>
+          <div v-else class="modal-empty-schedule">No consultations were recorded for this period.</div>
         </div>
       </div>
     </Teleport>
@@ -708,7 +720,7 @@ const stats = ref([
     icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#626a72" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
   },
   {
-    label: 'Allocated Rooms', value: '0/0', sub: 'Published term rooms',
+    label: 'Allocated Rooms', value: '0/0', sub: 'Rooms Scheduled / Total Published Term Rooms',
     icon: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#626a72" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`
   },
   {
@@ -860,17 +872,22 @@ function openNotification(notification, event) {
 const lineChartRef = ref(null)
 const barChartRef = ref(null)
 const expandedChart = ref(null) // null | 'line' | 'bar'
+const consultationTrendPeriod = ref('week')
+const consultationTrendPeriods = [
+  { value: 'month', label: 'Month' },
+  { value: 'week', label: 'Week' },
+  { value: 'day', label: 'Day' },
+]
 let lineChartInstance = null
 let barChartInstance = null
 
 /* ── Workload Modal ── */
 const showWorkloadModal = ref(false)
 const selectedTeacher = ref(null)
-const consultationDayCounts = ref([0, 0, 0, 0, 0, 0])
 const consultationRequests = ref([])
 const showConsultationDayModal = ref(false)
-const selectedConsultationDay = ref('')
-const selectedConsultationDayRequests = ref([])
+const selectedConsultationPeriodLabel = ref('')
+const selectedConsultationPeriodRequests = ref([])
 const liveTeacherWorkloads = ref([])
 const publishedTermLabel = ref('')
 const workloadChartWidth = computed(() => Math.max(760, (liveTeacherWorkloads.value.length || 5) * 180))
@@ -953,12 +970,13 @@ function openWorkloadModal(index) {
   showWorkloadModal.value = true
 }
 
-function openConsultationDay(index) {
-  const week = chartWeeks.value[index]
-  selectedConsultationDay.value = week?.label || ''
-  selectedConsultationDayRequests.value = consultationRequests.value.filter(request => {
+function openConsultationPeriod(index) {
+  const period = chartPeriods.value[index]
+  if (!period) return
+  selectedConsultationPeriodLabel.value = period.label
+  selectedConsultationPeriodRequests.value = consultationRequests.value.filter(request => {
     const requestDate = parseRequestDate(request)
-    return requestDate >= week?.start && requestDate < week?.end
+    return requestDate >= period.start && requestDate < period.end
       && !['CANCELLED', 'ARCHIVED'].includes(request.status)
   })
   showConsultationDayModal.value = true
@@ -985,7 +1003,36 @@ function formatWeekLabel(start, end) {
   return `${startLabel}–${endLabel}`
 }
 
-const chartWeeks = computed(() => {
+const consultationTrendPeriodTitle = computed(() => ({
+  month: 'Monthly',
+  week: 'Weekly',
+  day: 'Daily',
+}[consultationTrendPeriod.value]))
+
+const chartPeriods = computed(() => {
+  if (consultationTrendPeriod.value === 'day') {
+    const today = new Date(currentDateTime.value)
+    today.setHours(0, 0, 0, 0)
+    return Array.from({ length: 7 }, (_, index) => {
+      const start = new Date(today)
+      start.setDate(start.getDate() - (6 - index))
+      const end = new Date(start)
+      end.setDate(end.getDate() + 1)
+      const label = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+      return { start, end, label }
+    })
+  }
+
+  if (consultationTrendPeriod.value === 'month') {
+    const currentMonth = new Date(currentDateTime.value.getFullYear(), currentDateTime.value.getMonth(), 1)
+    return Array.from({ length: 6 }, (_, index) => {
+      const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - (5 - index), 1)
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 1)
+      const label = start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      return { start, end, label }
+    })
+  }
+
   const currentWeek = startOfWeek(currentDateTime.value)
   return Array.from({ length: 6 }, (_, index) => {
     const start = new Date(currentWeek)
@@ -995,6 +1042,18 @@ const chartWeeks = computed(() => {
     return { start, end, label: formatWeekLabel(start, end) }
   })
 })
+
+const consultationPeriodCounts = computed(() => chartPeriods.value.map(period => consultationRequests.value.filter(request => {
+  const requestDate = parseRequestDate(request)
+  return requestDate >= period.start && requestDate < period.end
+    && !['CANCELLED', 'ARCHIVED'].includes(request.status)
+}).length))
+
+function setConsultationTrendPeriod(period) {
+  if (consultationTrendPeriod.value === period) return
+  consultationTrendPeriod.value = period
+  createLineChart()
+}
 
 function minutesFromTime(value) {
   const match = String(value || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
@@ -1079,11 +1138,6 @@ async function loadChartData() {
       ? `${termPayload.term.schoolYear || ''} · ${termPayload.term.semester || ''}`.trim()
       : ''
     const schedulesPayload = await apiRequest(termId ? `/schedules?academicTermId=${encodeURIComponent(termId)}` : '/schedules')
-    consultationDayCounts.value = chartWeeks.value.map(week => (requestsPayload.requests || []).filter(request => {
-      const requestDate = parseRequestDate(request)
-      return requestDate >= week.start && requestDate < week.end
-        && !['CANCELLED', 'ARCHIVED'].includes(request.status)
-    }).length)
     const teachersByEmployeeId = new Map((usersPayload.users || []).map(user => [
       String(user.employeeId || '').trim(),
       `${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -1132,9 +1186,9 @@ function createLineChart() {
   lineChartInstance = new Chart(lineChartRef.value, {
     type: 'line',
     data: {
-      labels: chartWeeks.value.map(week => week.label),
+      labels: chartPeriods.value.map(period => period.label),
       datasets: [{
-        data: consultationDayCounts.value,
+        data: consultationPeriodCounts.value,
         borderColor: '#4b5259',
         backgroundColor: 'transparent',
         pointBackgroundColor: '#7d858d',
@@ -1164,7 +1218,7 @@ function createLineChart() {
         }
       },
       onClick: (_event, elements) => {
-        if (elements.length) openConsultationDay(elements[0].index)
+        if (elements.length) openConsultationPeriod(elements[0].index)
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: '#69727c', font: { size: 12 } } },
@@ -2254,6 +2308,13 @@ function confirmLogout() {
   flex-shrink: 0;
   padding: 2px 2px 0;
 }
+.chart-heading-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  min-width: 0;
+}
 .chart-title {
   font-size: clamp(0.95rem, 1vw, 1.2rem);
   font-weight: 700;
@@ -2263,6 +2324,32 @@ function confirmLogout() {
   text-shadow: 0 1px 0 rgba(255,255,255,0.45);
   max-width: 100%;
   white-space: normal;
+}
+.chart-period-control {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(120, 127, 133, 0.16);
+  border-radius: 8px;
+  background: rgba(224, 228, 230, 0.7);
+}
+.chart-period-control button {
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #66717a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.chart-period-control button.is-active {
+  background: #fff;
+  color: #30353a;
+  box-shadow: 0 1px 3px rgba(48, 53, 58, 0.14);
 }
 .expand-btn {
   background: none;

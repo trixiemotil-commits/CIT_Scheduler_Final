@@ -260,7 +260,13 @@
                 <span><strong>{{ allRoomsSelected ? 'All rooms selected' : 'Select all rooms' }}</strong><small>{{ allRoomsSelected ? 'Uncheck to clear every room' : `Select all ${allRoomNames.length} available rooms` }}</small></span>
               </label>
               <div v-for="floor in roomFloors" :key="floor.label" class="room-group">
-                <strong>{{ floor.label }}</strong>
+                <div class="room-group-heading">
+                  <strong>{{ floor.label }}</strong>
+                  <label class="select-floor-rooms" :class="{ selected: areFloorRoomsSelected(floor), partial: areSomeFloorRoomsSelected(floor) }">
+                    <input type="checkbox" :checked="areFloorRoomsSelected(floor)" :indeterminate="areSomeFloorRoomsSelected(floor)" :aria-label="`Select all rooms on ${floor.label}`" @change="toggleFloorRooms(floor, $event)" />
+                    <span>Select all</span>
+                  </label>
+                </div>
                 <div class="room-grid">
                   <label v-for="room in floor.rooms" :key="room" :class="{ selected: selectedRooms.includes(room) }">
                     <input v-model="selectedRooms" type="checkbox" :value="room" />
@@ -356,6 +362,21 @@ const scheduleTypeOptions = [
 
 function toggleAllRooms(event) {
   selectedRooms.value = event.target.checked ? [...allRoomNames.value] : []
+}
+
+function areFloorRoomsSelected(floor) {
+  return floor.rooms.length > 0 && floor.rooms.every(room => selectedRooms.value.includes(room))
+}
+
+function areSomeFloorRoomsSelected(floor) {
+  return floor.rooms.some(room => selectedRooms.value.includes(room)) && !areFloorRoomsSelected(floor)
+}
+
+function toggleFloorRooms(floor, event) {
+  const floorRooms = new Set(floor.rooms)
+  selectedRooms.value = event.target.checked
+    ? [...new Set([...selectedRooms.value, ...floor.rooms])]
+    : selectedRooms.value.filter(room => !floorRooms.has(room))
 }
 
 const filteredWorkspaceEntries = computed(() => workspaceEntries.value.filter((entry) => {
@@ -1551,7 +1572,11 @@ loadPage()
 .inline-empty { margin-top: 18px; padding: 13px 15px; color: #707c85; border: 1px dashed #ccd5da; border-radius: 10px; background: #f8fafb; font-size: .76rem; }
 .room-group { margin-bottom: 18px; }
 .room-group:last-child { margin-bottom: 0; }
-.room-group > strong { margin-bottom: 9px; color: #3d4951; font-size: .79rem; }
+.room-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.room-group-heading > strong { color: #3d4951; font-size: .79rem; }
+.select-floor-rooms { display: inline-flex; align-items: center; gap: 6px; color: #63717a; cursor: pointer; font-size: .68rem; font-weight: 600; }
+.select-floor-rooms input { width: 15px; height: 15px; margin: 0; accent-color: #35684b; }
+.select-floor-rooms.selected,.select-floor-rooms.partial { color: #26543a; }
 .room-grid { gap: 8px; }
 .room-grid label { min-height: 39px; padding: 8px 10px; color: #536069; border-color: #dce2e5; background: #fafbfc; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
 .room-grid label:hover { border-color: #aebbc3; background: #fff; transform: translateY(-1px); }

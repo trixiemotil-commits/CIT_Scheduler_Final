@@ -39,6 +39,8 @@ async function verifyRecaptcha(token, remoteIp = null) {
 }
 
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+const VALID_NAME_REGEX = /^[\p{L}\p{M}]+(?:[ '\u2019.-][\p{L}\p{M}]+)*$/u;
+const REPEATED_NAME_SEQUENCE_REGEX = /(\p{L}{3})\1{2,}/iu;
 const PASSWORD_OTP_LIFETIME_MS = 5 * 60 * 1000;
 const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
 const PASSWORD_OTP_MAX_ATTEMPTS = 5;
@@ -598,8 +600,10 @@ async function updateMe(req, res) {
       user.twoFactorEnabled = req.body.twoFactorEnabled;
     }
 
-    const firstName = normalizeString(req.body.firstName) || user.firstName;
-    const lastName = normalizeString(req.body.lastName) || user.lastName;
+    const nameChanged = Object.prototype.hasOwnProperty.call(req.body, "firstName")
+      || Object.prototype.hasOwnProperty.call(req.body, "lastName");
+    const firstName = (normalizeString(req.body.firstName).replace(/\s+/g, " ") || user.firstName);
+    const lastName = (normalizeString(req.body.lastName).replace(/\s+/g, " ") || user.lastName);
     const email = normalizeString(req.body.email).toLowerCase() || user.email;
     const phone = normalizeString(req.body.phone);
     const employeeId = normalizeString(req.body.employeeId);
@@ -618,6 +622,15 @@ async function updateMe(req, res) {
 
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ message: "First name, last name, and email are required." });
+    }
+
+    if (nameChanged && (
+      !VALID_NAME_REGEX.test(firstName)
+      || !VALID_NAME_REGEX.test(lastName)
+      || REPEATED_NAME_SEQUENCE_REGEX.test(firstName)
+      || REPEATED_NAME_SEQUENCE_REGEX.test(lastName)
+    )) {
+      return res.status(400).json({ message: "Please enter a valid name using letters, spaces, hyphens, apostrophes, or periods." });
     }
 
     const emailOwner = await User.findOne({ email });

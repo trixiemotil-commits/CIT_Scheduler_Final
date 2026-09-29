@@ -14,6 +14,7 @@ const { sendConsultationApprovedEmail } = require("../config/mail");
 const MAX_WEEKLY_MINUTES = 240; // 4 hours
 const AVAILABLE_TEACHER_START_MINUTES = 7 * 60;
 const AVAILABLE_TEACHER_END_MINUTES = 18 * 60;
+const ACTIVE_STUDENT_REQUEST_STATUSES = ["PENDING", "APPROVED", "RESCHED"];
 
 function parseTimeToMinutes(timeStr) {
   const text = (timeStr || "").toString().trim();
@@ -40,6 +41,28 @@ function minutesTo24h(totalMinutes) {
   const hour = Math.floor(mins / 60) % 24;
   const minute = mins % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+async function hasStudentTimeConflict(studentId, consultationDate, startMinutes, endMinutes, excludeRequestId = null) {
+  const filter = {
+    studentId,
+    consultationDate,
+    status: { $in: ACTIVE_STUDENT_REQUEST_STATUSES },
+  };
+  if (excludeRequestId) {
+    filter._id = { $ne: excludeRequestId };
+  }
+
+  const requests = await ConsultationRequest.find(filter)
+    .select("consultationStartTime consultationEndTime")
+    .lean();
+
+  return requests.some((request) => {
+    const existingStart = parseTimeToMinutes(request.consultationStartTime);
+    if (existingStart === null) return false;
+    const existingEnd = parseTimeToMinutes(request.consultationEndTime) ?? existingStart + 60;
+    return startMinutes < existingEnd && existingStart < endMinutes;
+  });
 }
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -753,6 +776,18 @@ async function createConsultationRequest(req, res) {
       });
     }
 
+    const hasTimeConflict = await hasStudentTimeConflict(
+      req.user.id,
+      consultationDate,
+      requestMinutes,
+      requestMinutes + 60
+    );
+    if (hasTimeConflict) {
+      return res.status(409).json({
+        message: "You already have a consultation request during this time. Please choose a different time slot.",
+      });
+    }
+
     const requestDoc = await ConsultationRequest.create({
       studentId: req.user.id,
       employeeId: teacherKey,
@@ -1055,6 +1090,24 @@ async function updateConsultationRequestByStudent(req, res) {
       return res.status(409).json({ message: teacherClassConflict });
     }
 
+    const requestStartMinutes = parseTimeToMinutes(matchedSlot.startTime);
+    if (requestStartMinutes === null) {
+      return res.status(400).json({ message: "Selected consultation availability is invalid." });
+    }
+
+    const hasTimeConflict = await hasStudentTimeConflict(
+      req.user.id,
+      consultationDate,
+      requestStartMinutes,
+      requestStartMinutes + 60,
+      requestDoc._id
+    );
+    if (hasTimeConflict) {
+      return res.status(409).json({
+        message: "You already have a consultation request during this time. Please choose a different time slot.",
+      });
+    }
+
     const existingPending = await ConsultationRequest.findOne({
       _id: { $ne: requestDoc._id },
       studentId: req.user.id,
@@ -1076,6 +1129,8 @@ async function updateConsultationRequestByStudent(req, res) {
     requestDoc.employeeId = canonicalTeacherKey;
     requestDoc.availabilityId = matchedSlot._id;
     requestDoc.consultationDate = consultationDate;
+    requestDoc.consultationStartTime = minutesTo24h(requestStartMinutes);
+    requestDoc.consultationEndTime = minutesTo24h(requestStartMinutes + 60);
     requestDoc.status = "PENDING";
     await requestDoc.save();
 

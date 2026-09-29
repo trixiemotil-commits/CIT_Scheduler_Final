@@ -14,6 +14,7 @@ const ACCOUNT_STATUS_VALUES = ["Pending", "Active", "Inactive", "Denied", "Archi
 const TEACHER_STATUS_VALUES = ["On School", "On Meeting", "On Leave"];
 const DEFAULT_DEPARTMENT = "College of Information Technology";
 const PHINMA_EMAIL_REGEX = /^[a-z0-9._%+-]+\.au@phinmaed\.com$/i;
+const VALID_LAST_NAME_REGEX = /^[\p{L}\p{M}]+(?:[ '\u2019.-][\p{L}\p{M}]+)*$/u;
 
 function formatRole(role) {
   return ROLE_LABELS[role] || role;
@@ -300,6 +301,11 @@ async function updateUser(req, res) {
       return res.status(400).json({ message: "Missing required fields." });
     }
 
+    const normalizedLastName = normalizeString(lastName).replace(/\s+/g, " ");
+    if (!VALID_LAST_NAME_REGEX.test(normalizedLastName)) {
+      return res.status(400).json({ message: "Last name may contain letters, spaces, hyphens, apostrophes, and periods only." });
+    }
+
     if (!currentPassword) {
       return res.status(400).json({ message: "Your current password is required to save edits." });
     }
@@ -360,7 +366,7 @@ async function updateUser(req, res) {
     }
 
     user.firstName = normalizeString(firstName);
-    user.lastName = normalizeString(lastName);
+    user.lastName = normalizedLastName;
     user.email = normalizedEmail;
     user.role = normalizedRoles[0];
     user.roles = normalizedRoles;

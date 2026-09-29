@@ -1,6 +1,22 @@
 <template>
   <IonApp>
     <RouterView />
+    <Transition name="back-to-top">
+      <button
+        v-if="showBackToTop"
+        class="back-to-top"
+        :style="{ right: backToTopRight, bottom: backToTopBottom }"
+        type="button"
+        aria-label="Back to top"
+        @click="scrollBackToTop"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m5 12 7-7 7 7" />
+          <path d="M12 19V5" />
+        </svg>
+        <span>Back to top</span>
+      </button>
+    </Transition>
     <div v-if="showNativeSplash" class="native-splash" aria-label="CITScheduler" role="status">
       <div class="native-splash__lottie-art" aria-hidden="true">
         <span class="native-splash__orbit native-splash__orbit--one"></span>
@@ -34,14 +50,117 @@
 import { getToken } from '@/auth.js'
 import { Capacitor } from '@capacitor/core'
 import { IonApp } from '@ionic/vue'
-import { onMounted, onUnmounted, ref } from 'vue'
-import { RouterView } from 'vue-router'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const showNativeSplash = ref(Capacitor.isNativePlatform())
 const showSecurityWarning = ref(false)
+const showBackToTop = ref(false)
+const backToTopRight = ref('24px')
+const backToTopBottom = ref('max(24px, env(safe-area-inset-bottom))')
+const route = useRoute()
+let activeScrollTarget = null
+let ionicScrollContents = []
 let securityPoll = null
 let splashTimer = null
+
+function updateBackToTop(target, scrollTop, canScroll) {
+  if (!canScroll) {
+    if (activeScrollTarget === target) {
+      activeScrollTarget = null
+      showBackToTop.value = false
+    }
+    return
+  }
+
+  if (scrollTop <= 240) {
+    if (activeScrollTarget === target) {
+      activeScrollTarget = null
+      showBackToTop.value = false
+    }
+    return
+  }
+
+  activeScrollTarget = target
+  showBackToTop.value = true
+}
+
+function handleDocumentScroll(event) {
+  const target = event.target
+  if (target instanceof Element) {
+    updateBackToTop(target, target.scrollTop, target.scrollHeight > target.clientHeight + 1)
+  }
+}
+
+function handleWindowScroll() {
+  const target = document.scrollingElement
+  updateBackToTop(window, window.scrollY, Boolean(target && target.scrollHeight > target.clientHeight + 1))
+}
+
+function handleIonicScroll(event) {
+  const content = event.currentTarget
+  const scrollTop = Number(event.detail?.scrollTop || 0)
+  const scrollElement = content?.shadowRoot?.querySelector('.inner-scroll')
+  const target = scrollElement || content
+  updateBackToTop(target, scrollTop, Boolean(scrollElement && scrollElement.scrollHeight > scrollElement.clientHeight + 1))
+}
+
+function updateBackToTopPosition() {
+  const defaultRight = window.matchMedia('(max-width: 700px)').matches ? 16 : 24
+  const studentShell = route.path.startsWith('/student/')
+    ? document.querySelector('.student-app-shell')
+    : null
+
+  if (!studentShell) {
+    backToTopRight.value = `${defaultRight}px`
+    backToTopBottom.value = 'max(24px, env(safe-area-inset-bottom))'
+    return
+  }
+
+  const shellRight = studentShell.getBoundingClientRect().right
+  backToTopRight.value = `${Math.max(defaultRight, window.innerWidth - shellRight + defaultRight)}px`
+
+  const tabBar = studentShell.querySelector('.student-tab-bar')
+  if (tabBar) {
+    const tabBarTop = tabBar.getBoundingClientRect().top
+    backToTopBottom.value = `${Math.max(24, window.innerHeight - tabBarTop + 16)}px`
+  } else {
+    backToTopBottom.value = 'max(24px, env(safe-area-inset-bottom))'
+  }
+}
+
+function refreshIonicScrollListeners() {
+  ionicScrollContents.forEach((content) => {
+    content.removeEventListener('ionScroll', handleIonicScroll)
+  })
+  ionicScrollContents = [...document.querySelectorAll('ion-content')]
+  ionicScrollContents.forEach((content) => {
+    content.scrollEvents = true
+    content.addEventListener('ionScroll', handleIonicScroll)
+  })
+}
+
+async function refreshScrollTracking() {
+  activeScrollTarget = null
+  showBackToTop.value = false
+  await nextTick()
+  refreshIonicScrollListeners()
+  updateBackToTopPosition()
+}
+
+function scrollBackToTop() {
+  const target = activeScrollTarget
+  if (target === window) {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  } else if (target?.scrollTo) {
+    target.scrollTo({ top: 0, behavior: 'smooth' })
+  } else if (target?.scrollToTop) {
+    target.scrollToTop(500)
+  } else {
+    target?.scrollToTop?.(500)
+  }
+}
 
 async function checkForNewLogin() {
   const token = getToken()
@@ -75,16 +194,56 @@ onMounted(() => {
   }
   securityPoll = window.setInterval(checkForNewLogin, 15000)
   document.addEventListener('visibilitychange', checkForNewLogin)
+  document.addEventListener('scroll', handleDocumentScroll, true)
+  window.addEventListener('scroll', handleWindowScroll, { passive: true })
+  window.addEventListener('resize', updateBackToTopPosition, { passive: true })
+  refreshScrollTracking()
 })
+
+watch(() => route.fullPath, refreshScrollTracking)
 
 onUnmounted(() => {
   if (splashTimer) window.clearTimeout(splashTimer)
   if (securityPoll) window.clearInterval(securityPoll)
   document.removeEventListener('visibilitychange', checkForNewLogin)
+  document.removeEventListener('scroll', handleDocumentScroll, true)
+  window.removeEventListener('scroll', handleWindowScroll)
+  window.removeEventListener('resize', updateBackToTopPosition)
+  ionicScrollContents.forEach((content) => {
+    content.removeEventListener('ionScroll', handleIonicScroll)
+  })
 })
 </script>
 
 <style scoped>
+.back-to-top {
+  position: fixed;
+  right: 24px;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 9000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #343b42, #20252a);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(24, 30, 35, .3), inset 0 1px rgba(255, 255, 255, .16);
+  font: 600 .82rem Poppins, sans-serif;
+  cursor: pointer;
+}
+.back-to-top svg { width: 18px; height: 18px; }
+.back-to-top:hover { background: linear-gradient(145deg, #4b545d, #2c3339); }
+.back-to-top:focus-visible { outline: 3px solid #90c9dd; outline-offset: 3px; }
+.back-to-top-enter-active,
+.back-to-top-leave-active { transition: opacity 160ms ease, transform 160ms ease; }
+.back-to-top-enter-from,
+.back-to-top-leave-to { opacity: 0; transform: translateY(8px); }
+@media (max-width: 700px) {
+  .back-to-top { right: 16px; }
+}
 .native-splash {
   position: fixed;
   inset: 0;

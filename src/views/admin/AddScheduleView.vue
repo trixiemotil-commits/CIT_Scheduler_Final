@@ -269,40 +269,6 @@
             </button>
           </div>
         </div>
-        <div class="schedule-list-wrap">
-          <div class="schedule-list-table-wrap">
-            <table class="schedule-list-table">
-              <thead>
-                <tr>
-                  <th>Day</th>
-                  <th>Time</th>
-                  <th>Year</th>
-                  <th>Subject</th>
-                  <th>Teacher</th>
-                  <th>Room</th>
-                  <th>Section</th>
-                  <th>Schedule type</th>
-                  <th>Campus</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="!visibleScheduleEntries.length" class="empty-state-row">
-                  <td colspan="9" class="empty-state small-empty-state">No schedules are currently available.</td>
-                </tr>
-                <tr v-for="entry in visibleScheduleEntries" :key="entry._key" class="schedule-list-row" @click="openEditModal(entry.slot, entry.day, entry)">
-                  <td><span class="list-day">{{ entry.day }}</span></td>
-                  <td><span class="list-time">{{ entry.timeIn }} – {{ entry.timeOut }}</span></td>
-                  <td><span class="list-year">{{ entry.year }}</span></td>
-                  <td><span class="list-subject">{{ entry.subject }}</span></td>
-                  <td><span class="list-teacher">{{ entry.teacher }}</span></td>
-                  <td><span class="list-room">{{ entry.room }}</span></td>
-                  <td><span class="list-section">{{ entry.section }}</span></td>
-                  <td><span :class="['list-schedule-type', entry.parallel ? 'is-parallel' : 'is-single']">{{ entry.parallel ? `Parallel (${entry.parallelCount || 2})` : 'Not Parallel' }}</span></td>
-                  <td><span class="list-campus">{{ entry.campus }}</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
           <section ref="listAddSection" class="list-add-section" aria-labelledby="list-add-title">
             <div class="list-add-heading">
               <div>
@@ -340,13 +306,7 @@
               </label>
               <label class="list-field list-field-wide">
                 <span>Subject</span>
-                  <input
-                  v-if="listAddForm.campus === 'Main Campus'"
-                  v-model.trim="listAddForm.subject"
-                  type="text"
-                  class="form-input"
-                  placeholder="Enter Subject"
-                />
+                <input v-if="listAddForm.campus === 'Main Campus'" v-model.trim="listAddForm.subject" type="text" class="form-input" placeholder="Enter Subject" />
                 <select v-else v-model="listAddForm.subject" class="form-select" :class="{ 'list-placeholder': !listAddForm.subject }">
                   <option value="" disabled>Choose Subject</option>
                   <option v-for="subject in listSubjectOptions" :key="subject" :value="subject">{{ subject }}</option>
@@ -361,7 +321,7 @@
               </label>
               <label class="list-field">
                 <span>Room type</span>
-                <select v-model="listAddForm.roomType" class="form-select"><option value="Lecture">Lec</option><option value="Comlab/Laboratory">Lab</option></select>
+                <select v-model="listAddForm.roomType" class="form-select" :disabled="listAddForm.parallel"><option value="Lecture">Lec</option><option value="Comlab/Laboratory">Lab</option></select>
               </label>
               <div class="list-field list-campus-field">
                 <span>Campus</span>
@@ -375,7 +335,7 @@
               <div class="list-parallel-choice">
                 <span>Schedule type</span>
                 <div class="list-parallel-toggle">
-                  <button type="button" :class="{ active: listAddForm.parallel }" @click="listAddForm.parallel = true">
+                  <button type="button" :class="{ active: listAddForm.parallel }" :disabled="!listAddForm.parallel && listAddForm.roomType !== LAB_ROOM_TYPE" :title="listAddForm.roomType !== LAB_ROOM_TYPE ? 'Set Room Type to Laboratory to enable Parallel' : ''" @click="enableParallelSchedule(listAddForm)">
                     Parallel
                   </button>
                   <button type="button" :class="{ active: !listAddForm.parallel }" @click="listAddForm.parallel = false">
@@ -399,7 +359,7 @@
                     </select>
                     <select v-model="slot.room" class="form-select" :class="{ 'list-placeholder': !slot.room }">
                       <option value="" disabled>Room</option>
-                      <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
+                      <option v-for="r in listAddRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
                     </select>
                   </div>
                 </div>
@@ -416,7 +376,7 @@
                   <span>Room</span>
                   <select v-model="listAddForm.room" class="form-select" :class="{ 'list-placeholder': !listAddForm.room }">
                     <option value="" disabled>Choose Room</option>
-                    <option v-for="r in effectiveRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
+                    <option v-for="r in listAddRoomOptions" :key="r.name" :value="r.name">{{ r.label }}</option>
                   </select>
                 </label>
               </template>
@@ -428,6 +388,40 @@
               </button>
             </div>
           </section>
+        <div class="schedule-list-wrap">
+          <div class="schedule-list-table-wrap">
+            <table class="schedule-list-table">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Time</th>
+                  <th>Year</th>
+                  <th>Subject</th>
+                  <th>Teacher</th>
+                  <th>Room</th>
+                  <th>Section</th>
+                  <th>Schedule type</th>
+                  <th>Campus</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!visibleScheduleEntries.length" class="empty-state-row">
+                  <td colspan="9" class="empty-state small-empty-state">No schedules are currently available.</td>
+                </tr>
+                <tr v-for="entry in visibleScheduleEntries" :key="entry._key" class="schedule-list-row" @click="openEditModal(entry.slot, entry.day, entry)">
+                  <td><span class="list-day">{{ entry.day }}</span></td>
+                  <td><span class="list-time">{{ entry.timeIn }} – {{ entry.timeOut }}</span></td>
+                  <td><span class="list-year">{{ entry.year }}</span></td>
+                  <td><span class="list-subject">{{ entry.subject }}</span></td>
+                  <td><span class="list-teacher">{{ entry.teacher }}</span></td>
+                  <td><span class="list-room">{{ entry.room }}</span></td>
+                  <td><span class="list-section">{{ entry.section }}</span></td>
+                  <td><span :class="['list-schedule-type', entry.parallel ? 'is-parallel' : 'is-single']">{{ entry.parallel ? `Parallel (${entry.parallelCount || 2})` : 'Not Parallel' }}</span></td>
+                  <td><span class="list-campus">{{ entry.campus }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div v-if="visibleScheduleEntries.length" class="schedule-list-footer">
             <span>Showing all {{ visibleScheduleEntries.length }} schedule entries</span>
           </div>
@@ -676,8 +670,8 @@
                 <TypeaheadSelect v-model="form.teacher" :options="teacherSelectOptions" placeholder="Select Teacher" />
               </div>
             </div>
-            <template v-if="fromButton && !editMode">
-              <div class="form-row-inline">
+            <template v-if="!editMode">
+              <div class="form-row-inline schedule-day-field">
                 <label class="form-label">Day</label>
                 <div class="form-select-wrap">
                   <select v-model="form.day" class="form-select">
@@ -688,20 +682,6 @@
                 </div>
               </div>
             </template>
-            <div class="form-row-inline schedule-start-field">
-              <label class="form-label">Start of Class</label>
-              <div class="form-value-locked">{{ form.timeIn || 'Select a timetable slot' }}</div>
-            </div>
-            <div class="form-row-inline schedule-end-field">
-              <label class="form-label">End of Class</label>
-              <div class="form-select-wrap">
-                <select v-model="form.timeOut" class="form-select">
-                  <option value="" disabled>Select End of Class</option>
-                  <option v-for="t in endTimeOptionsAfter(form.timeIn)" :key="t" :value="t">{{ t }}</option>
-                </select>
-                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-              </div>
-            </div>
             <div class="form-row-inline schedule-year-field">
               <label class="form-label">Year</label>
               <div v-if="addMode === 'student' && studentYear" class="form-value-locked">{{ studentYear }}</div>
@@ -710,16 +690,6 @@
                   <option value="" disabled>Select Year</option>
                   <option v-for="y in effectiveYears" :key="y" :value="y">{{ y }}</option>
                 </select>
-                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-              </div>
-            </div>
-            <div class="form-row-inline" v-if="form.year === '3rd Year' || form.year === '4th Year'">
-              <label class="form-label">Major / Track</label>
-              <div class="form-select-wrap">
-                <select v-model="form.major" class="form-select">
-                    <option value="" disabled>Select Major</option>
-                    <option v-for="m in majorOptions" :key="m" :value="m">{{ m || 'None' }}</option>
-                  </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
             </div>
@@ -737,6 +707,16 @@
                 </div>
               </div>
             </div>
+            <div class="form-row-inline" v-if="form.year === '3rd Year' || form.year === '4th Year'">
+              <label class="form-label">Major / Track</label>
+              <div class="form-select-wrap">
+                <select v-model="form.major" class="form-select">
+                    <option value="" disabled>Select Major</option>
+                    <option v-for="m in majorOptions" :key="m" :value="m">{{ m || 'None' }}</option>
+                  </select>
+                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+            </div>
             <div class="form-row-inline schedule-subject-field">
               <label class="form-label">Subject</label>
               <div v-if="form.subject === 'Lunch Break'" class="lunch-subject-selected">
@@ -748,6 +728,20 @@
               </div>
               <div v-else class="form-select-wrap">
                 <TypeaheadSelect v-model="form.subject" :options="modalSubjectOptions" placeholder="Select Subject" />
+              </div>
+            </div>
+            <div class="form-row-inline schedule-start-field">
+              <label class="form-label">Start of Class</label>
+              <div class="form-value-locked">{{ form.timeIn || 'Select a timetable slot' }}</div>
+            </div>
+            <div class="form-row-inline schedule-end-field">
+              <label class="form-label">End of Class</label>
+              <div class="form-select-wrap">
+                <select v-model="form.timeOut" class="form-select">
+                  <option value="" disabled>Select End of Class</option>
+                  <option v-for="t in endTimeOptionsAfter(form.timeIn)" :key="t" :value="t">{{ t }}</option>
+                </select>
+                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
             </div>
             <template v-if="!form.parallel">
@@ -814,7 +808,7 @@
                 <div class="form-row-inline">
                   <label class="form-label">Room Type {{ i + 1 }}</label>
                   <div class="form-select-wrap">
-                    <select v-model="ps.roomType" class="form-select">
+                    <select v-model="ps.roomType" class="form-select" :disabled="!editMode">
                       <option value="Lecture">Lecture</option>
                       <option value="Comlab/Laboratory">Comlab/Laboratory</option>
                     </select>
@@ -831,7 +825,7 @@
               </div>
             </div>
             <div class="parallel-row">
-              <button class="parallel-btn" :class="{ active: form.parallel }" @click="form.parallel = true; form.parallelCount = 2">
+              <button class="parallel-btn" :class="{ active: form.parallel }" :disabled="!form.parallel && form.roomType !== LAB_ROOM_TYPE" :title="form.roomType !== LAB_ROOM_TYPE ? 'Set Room Type to Laboratory to enable Parallel' : ''" @click="enableParallelSchedule(form)">
                 <span class="par-radio" :class="{ checked: form.parallel }">
                   <svg v-if="form.parallel" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                 </span>
@@ -864,7 +858,7 @@
               Clear Slot
             </button>
             <button class="cancel-btn-text" @click="showSchedModal = false">Cancel</button>
-            <button class="save-btn" @click="saveEntry" :disabled="!form.teacher || !form.subject || !form.timeIn || !form.timeOut || (fromButton && !editMode && !form.day) || !!modalTimeError">
+            <button class="save-btn" @click="saveEntry" :disabled="!form.teacher || !form.subject || !form.timeIn || !form.timeOut || (!editMode && !form.day) || !!modalTimeError">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               {{ editMode ? 'Update' : 'Add' }}
             </button>
@@ -962,20 +956,6 @@
                 </div>
               </div>
               <div class="form-row-inline">
-                <label class="form-label">Start of Class</label>
-                <div class="form-value-locked">{{ addForm.timeIn || 'Select a timetable slot' }}</div>
-              </div>
-              <div class="form-row-inline">
-                <label class="form-label">End of Class</label>
-                <div class="form-select-wrap">
-                  <select v-model="addForm.timeOut" class="form-select">
-                    <option value="" disabled>Select End of Class</option>
-                    <option v-for="t in endTimeOptionsAfter(addForm.timeIn)" :key="t" :value="t">{{ t }}</option>
-                  </select>
-                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-              </div>
-              <div class="form-row-inline">
                 <label class="form-label">Year</label>
                 <div v-if="addMode === 'student' && studentYear" class="form-value-locked">{{ studentYear }}</div>
                 <div v-else class="form-select-wrap">
@@ -997,7 +977,7 @@
                 </div>
               </div>
               <div class="parallel-row">
-                <button class="parallel-btn" :class="{ active: addForm.parallel }" @click="addForm.parallel = true; addForm.parallelCount = 2">
+                <button class="parallel-btn" :class="{ active: addForm.parallel }" :disabled="!addForm.parallel && addForm.roomType !== LAB_ROOM_TYPE" :title="addForm.roomType !== LAB_ROOM_TYPE ? 'Set Room Type to Laboratory to enable Parallel' : ''" @click="enableParallelSchedule(addForm)">
                   <span class="par-radio" :class="{ checked: addForm.parallel }">
                     <svg v-if="addForm.parallel" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                   </span>
@@ -1034,6 +1014,20 @@
                 </div>
                 <div v-else class="form-select-wrap">
                   <TypeaheadSelect v-model="addForm.subject" :options="modalSubjectOptionsForAdd" placeholder="Select Subject" />
+                </div>
+              </div>
+              <div class="form-row-inline">
+                <label class="form-label">Start of Class</label>
+                <div class="form-value-locked">{{ addForm.timeIn || 'Select a timetable slot' }}</div>
+              </div>
+              <div class="form-row-inline">
+                <label class="form-label">End of Class</label>
+                <div class="form-select-wrap">
+                  <select v-model="addForm.timeOut" class="form-select">
+                    <option value="" disabled>Select End of Class</option>
+                    <option v-for="t in endTimeOptionsAfter(addForm.timeIn)" :key="t" :value="t">{{ t }}</option>
+                  </select>
+                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
               </div>
               <template v-if="!addForm.parallel">
@@ -1106,7 +1100,7 @@
                   <div class="form-row-inline">
                     <label class="form-label">Room Type {{ i + 1 }}</label>
                     <div class="form-select-wrap">
-                      <select v-model="ps.roomType" class="form-select">
+                      <select v-model="ps.roomType" class="form-select" disabled>
                         <option value="Lecture">Lecture</option>
                         <option value="Comlab/Laboratory">Comlab/Laboratory</option>
                       </select>
@@ -1319,6 +1313,15 @@ function endTimeOptionsAfter(startTime) {
 }
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
+const LAB_ROOM_TYPE = 'Comlab/Laboratory'
+
+function enableParallelSchedule(scheduleForm) {
+  if (scheduleForm.roomType !== LAB_ROOM_TYPE) return
+  scheduleForm.parallel = true
+  scheduleForm.parallelCount = 2
+  scheduleForm.parallelSlots.forEach(slot => { slot.roomType = LAB_ROOM_TYPE })
+}
+
 function isGenericTeacher(teacher) {
   return String(teacher || '').trim().toLowerCase() === 'cit faculty'
 }
@@ -1457,7 +1460,20 @@ const effectiveYears = computed(() => {
     .sort((a, b) => years.indexOf(a) - years.indexOf(b))
   return mapped.length ? mapped : years
 })
-const effectiveRoomOptions = computed(() => {
+function filterRoomOptionsForSchedule(options, day, timeIn, timeOut) {
+  const intervalStart = parseTime(timeIn)
+  if (!day || !timeIn || !Number.isFinite(intervalStart)) return options
+  const intervalEnd = timeOut ? parseTime(timeOut) : intervalStart + 30
+  if (!Number.isFinite(intervalEnd) || intervalEnd <= intervalStart) return options
+  const selectedTermId = getSelectedTermId()
+  return options.filter(room => !Object.values(entries).some(entry => {
+    if (selectedTermId && String(entry.academicTermId || '').trim() !== String(selectedTermId)) return false
+    if (entry.day !== day || !entryUsesRoom(entry, room.name)) return false
+    return intervalStart < parseTime(entry.timeOut) && intervalEnd > parseTime(entry.timeIn)
+  }))
+}
+
+const configuredRoomOptions = computed(() => {
   const term = selectedTerm.value || publishedTerm.value
   const configuredRooms = (Array.isArray(term?.rooms) ? term.rooms : [])
     .map(room => typeof room === 'string' ? room : room.name)
@@ -1471,9 +1487,14 @@ const effectiveRoomOptions = computed(() => {
     ))
     : availableRooms
   const filteredRooms = roomOptionsForContext.length ? roomOptionsForContext : (addMode.value === 'room' && contextRoom.value ? [contextRoom.value] : [])
-  return filteredRooms.map((room) => {
-    return { name: room, label: room }
-  })
+  return filteredRooms.map(room => ({ name: room, label: room }))
+})
+const effectiveRoomOptions = computed(() => {
+  if (!showSchedModal.value || editMode.value) return configuredRoomOptions.value
+  return filterRoomOptionsForSchedule(configuredRoomOptions.value, form.day, form.timeIn, form.timeOut)
+})
+const listAddRoomOptions = computed(() => {
+  return filterRoomOptionsForSchedule(configuredRoomOptions.value, listAddForm.day, listAddForm.timeIn, listAddForm.timeOut)
 })
 
 function getSectionsForYear(year) {
@@ -1747,6 +1768,8 @@ const visibleScheduleEntries = computed(() => {
       return true
     })
     .sort((a, b) => {
+      const addedAtDifference = (b.addedAtTimestamp || 0) - (a.addedAtTimestamp || 0)
+      if (addedAtDifference) return addedAtDifference
       if (a.day !== b.day) return days.indexOf(a.day) - days.indexOf(b.day)
       if (a.timeIn !== b.timeIn) return parseTime(a.timeIn) - parseTime(b.timeIn)
       return a.section.localeCompare(b.section || '')
@@ -1771,7 +1794,7 @@ const listAddFormValid = computed(() =>
 )
 
 watch(() => listAddForm.parallelCount, (count) => {
-  while (listAddForm.parallelSlots.length < count) listAddForm.parallelSlots.push({ section: '', room: '', roomType: 'Lecture' })
+  while (listAddForm.parallelSlots.length < count) listAddForm.parallelSlots.push({ section: '', room: '', roomType: listAddForm.parallel ? LAB_ROOM_TYPE : 'Lecture' })
   while (listAddForm.parallelSlots.length > count) listAddForm.parallelSlots.pop()
 })
 
@@ -1785,6 +1808,16 @@ watch([() => listAddForm.timeIn, () => listAddForm.timeOut], () => {
     listTimeError.value = ''
   } else { listTimeError.value = '' }
 })
+watch(
+  () => [listAddForm.day, listAddForm.timeIn, listAddForm.timeOut, listAddRoomOptions.value.map(room => room.name).join('|')],
+  () => {
+    const availableRooms = new Set(listAddRoomOptions.value.map(room => room.name))
+    if (listAddForm.room && !availableRooms.has(listAddForm.room)) listAddForm.room = ''
+    listAddForm.parallelSlots.forEach(slot => {
+      if (slot.room && !availableRooms.has(slot.room)) slot.room = ''
+    })
+  }
+)
 
 async function addListEntry() {
   if (!listAddFormValid.value) return
@@ -2107,6 +2140,7 @@ function syncEntriesFromApi(apiEntries) {
     const effectiveColor = isLunch
       ? 'color-gray'
       : (inferredCampus === 'Main Campus' ? 'color-orange' : (isGenericTeacher(entry.teacher) ? 'color-pink' : (roomBasedColor || entry.color || 'color-yellow')))
+    const addedAtTimestamp = new Date(entry.addedAt || entry.createdAt || '').getTime()
     entries[key] = {
       id: entry.id || '',
       academicTermId: entry.academicTermId || null,
@@ -2133,6 +2167,7 @@ function syncEntriesFromApi(apiEntries) {
       subbedLabel: entry.subbedLabel || '',
       color: effectiveColor,
       addedAt: formatAddedAt(entry.addedAt),
+      addedAtTimestamp: Number.isFinite(addedAtTimestamp) ? addedAtTimestamp : 0,
     }
   })
 }
@@ -2509,8 +2544,20 @@ watch([() => form.timeIn, () => form.timeOut], () => {
   } else { modalTimeError.value = '' }
 })
 
+watch(
+  () => [form.day, form.timeIn, form.timeOut, effectiveRoomOptions.value.map(room => room.name).join('|')],
+  () => {
+    if (!showSchedModal.value || editMode.value || form.campus !== 'South Campus' || (addMode.value === 'room' && contextRoom.value)) return
+    const availableRooms = new Set(effectiveRoomOptions.value.map(room => room.name))
+    if (form.room && !availableRooms.has(form.room)) form.room = ''
+    form.parallelSlots.forEach(slot => {
+      if (slot.room && !availableRooms.has(slot.room)) slot.room = ''
+    })
+  }
+)
+
 watch(() => form.parallelCount, (val) => {
-  while (form.parallelSlots.length < val)  form.parallelSlots.push({ section: '', room: '', roomType: 'Lecture' })
+  while (form.parallelSlots.length < val)  form.parallelSlots.push({ section: '', room: '', roomType: form.parallel ? LAB_ROOM_TYPE : 'Lecture' })
   while (form.parallelSlots.length > val)  form.parallelSlots.pop()
 })
 
@@ -3054,7 +3101,7 @@ watch([
 })
 
 watch(() => addForm.parallelCount, (val) => {
-  while (addForm.parallelSlots.length < val) addForm.parallelSlots.push({ section: '', room: '', roomType: 'Lecture' })
+  while (addForm.parallelSlots.length < val) addForm.parallelSlots.push({ section: '', room: '', roomType: addForm.parallel ? LAB_ROOM_TYPE : 'Lecture' })
   while (addForm.parallelSlots.length > val) addForm.parallelSlots.pop()
 })
 
@@ -3859,6 +3906,8 @@ onMounted(async () => {
 .list-parallel-toggle button { min-height: 32px; padding: 0 12px; color: #5e6a72; border: 0; border-radius: 6px; background: transparent; font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer; transition: color .15s ease, background .15s ease, box-shadow .15s ease; }
 .list-parallel-toggle button:hover { color: #354149; background: rgba(255,255,255,.65); }
 .list-parallel-toggle button.active { color: #fff; background: linear-gradient(145deg,#66727c,#3c4750); box-shadow: 0 3px 7px rgba(38,46,52,.17); }
+.list-parallel-toggle button:disabled,
+.parallel-btn:disabled { cursor: not-allowed; opacity: .48; }
 .list-parallel-single-field { width: 150px; flex: 0 1 150px; }
 .list-parallel-count { min-width: 170px; }
 .list-parallel-slots { display: grid; width: 100%; flex: 1 0 100%; gap: 10px; }
@@ -4105,12 +4154,15 @@ onMounted(async () => {
 }
 .schedule-entry-modal .form-row-inline { display: grid; grid-template-columns: 1fr; align-content: start; gap: 6px; }
 .schedule-entry-modal .form-row-inline.schedule-for-row,
+.schedule-entry-modal .form-row-inline.schedule-day-field,
 .schedule-entry-modal .parallel-row,
 .schedule-entry-modal .parallel-slot-divider { grid-column: 1 / -1; }
 .schedule-entry-modal .schedule-for-text { justify-content: flex-start; min-height: 48px; padding: 11px 14px; text-align: left; border-left: 4px solid #59666f; border-radius: 10px; background: linear-gradient(135deg,#f1f3f4,#e2ebe7); box-shadow: none; color: #354149; font-size: .78rem; font-weight: 650; }
 .schedule-entry-modal .form-label { color: #59666f; font-size: .69rem; font-weight: 680; }
 .schedule-entry-modal .form-select,
 .schedule-entry-modal .form-input { min-height: 43px; padding: 9px 34px 9px 11px; color: #344149; border-color: #cbd3d8; border-radius: 9px; background: #fff; font-size: .74rem; }
+.schedule-entry-modal .schedule-year-field .form-value-locked,
+.schedule-entry-modal .schedule-section-field .form-value-locked { min-height: 43px; }
 .schedule-entry-modal .form-select:focus,
 .schedule-entry-modal .form-input:focus { border-color: #7f8d96; box-shadow: 0 0 0 3px rgba(70,84,94,.09); }
 .schedule-entry-modal .campus-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 4px; border: 1px solid #cbd3d8; border-radius: 9px; background: #e9edef; }
