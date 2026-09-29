@@ -585,6 +585,17 @@ select {
   pointer-events: none;
 }
 
+.student-tab-bar .student-tab-safe-area {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  height: var(--student-safe-bottom);
+  background: #fff;
+  pointer-events: none;
+}
+
 @media (max-width: 767px) {
   .student-tab-bar {
     --student-safe-bottom: env(safe-area-inset-bottom, 0px);

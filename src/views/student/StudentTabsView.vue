@@ -6,6 +6,7 @@
 
         <IonTabBar slot="bottom" class="student-tab-bar bottom-nav-pill">
           <div class="student-tab-surface" aria-hidden="true"></div>
+          <div class="student-tab-safe-area" aria-hidden="true"></div>
           <div class="student-tab-indicator" :style="indicatorStyle" aria-hidden="true"></div>
           <IonTabButton
             v-for="(item, index) in navigation"
