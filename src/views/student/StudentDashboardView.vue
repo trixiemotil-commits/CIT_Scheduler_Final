@@ -262,7 +262,7 @@ function formatDate(dateStr) {
   background: #eef0f2;
   display: flex;
   flex-direction: column;
-  padding-bottom: 16px;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   padding-top: env(safe-area-inset-top, 0px);
   font-family: 'Poppins', sans-serif;
 }
@@ -519,7 +519,7 @@ function formatDate(dateStr) {
 .mobile-app {
   position: relative;
   gap: 0;
-  padding-bottom: 26px;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   background:
     radial-gradient(circle at 88% 2%, rgba(255,255,255,.82), transparent 15rem),
     linear-gradient(155deg, #eef0f1 0%, #d7dbdd 48%, #b8bec1 100%) !important;
@@ -696,7 +696,7 @@ function formatDate(dateStr) {
 @media (min-width: 768px) {
   .mobile-app {
     max-width: 470px;
-    padding-bottom: 28px;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
   .app-header {
@@ -738,7 +738,7 @@ function formatDate(dateStr) {
 }
 
 @media (max-width: 360px) {
-  .mobile-app { padding-bottom: 12px; }
+  .mobile-app { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
   .app-header { min-height: 104px; padding: 19px 14px 22px !important; }
   .app-header::after { left: 14px; font-size: .54rem; }
   .header-left { gap: 10px; }

@@ -5,18 +5,36 @@
         <IonRouterOutlet />
 
         <IonTabBar slot="bottom" class="student-tab-bar bottom-nav-pill">
+          <div class="student-tab-surface" aria-hidden="true"></div>
           <div class="student-tab-indicator" :style="indicatorStyle" aria-hidden="true"></div>
           <IonTabButton
             v-for="(item, index) in navigation"
             :key="item.tab"
             :tab="item.tab"
             :href="item.href"
-            :class="{ 'active-tab-item': activeIndex === index }"
+            :class="{ 'active-tab-item': activeIndex === index, 'consultation-tab': item.tab === 'consultations' }"
           >
             <span v-if="item.tab === 'profile' && studentUser.avatar" class="student-tab-profile-avatar" aria-hidden="true">
               <img :src="studentUser.avatar" class="student-tab-profile-image" alt="" />
               <span class="student-tab-profile-status"></span>
             </span>
+            <svg
+              v-else-if="item.tab === 'consultations'"
+              class="student-tab-consultation-icon"
+              viewBox="0 0 36 36"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M17 11.8a9.6 9.6 0 1 1 15 10.8l2 6.3-6.2-3.3a9.6 9.6 0 0 1-10.8-2.1" />
+              <path d="M22.5 17.5h7.2m-7.2 4h7.2m-7.2 4h5.1" />
+              <path d="M7.2 22.8 4.6 30l8.2-3.2a11.5 11.5 0 1 0-5.6-4Z" fill="rgba(250,250,250,.98)" />
+              <path class="student-tab-consultation-question" stroke-width="3" d="M13.2 12a3 3 0 1 1 5.7 1.4c-.9 1.1-2.4 1.5-2.4 3.2" />
+              <circle cx="16.5" cy="20.8" r=".7" />
+            </svg>
             <IonIcon v-else :icon="item.icon" aria-hidden="true" />
             <IonLabel>{{ item.label }}</IonLabel>
           </IonTabButton>
@@ -241,12 +259,11 @@ const indicatorStyle = computed(() => {
   align-items: center;
   justify-content: space-around;
   padding: 0 12px;
-  border-radius: 32px;
+  border-radius: 28px 28px 8px 8px;
   background: rgba(230, 230, 235, 0.85);
-  backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  overflow: visible !important;
   --background: transparent;
   --border: 0;
 }
@@ -254,7 +271,7 @@ const indicatorStyle = computed(() => {
 .student-tab-bar {
   position: fixed;
   left: 50%;
-  bottom: max(12px, env(safe-area-inset-bottom));
+  bottom: 0;
   transform: translateX(-50%);
   width: min(420px, calc(100vw - 18px));
   max-width: 420px;
@@ -263,9 +280,9 @@ const indicatorStyle = computed(() => {
   margin: 0 auto;
   box-sizing: border-box;
   border-top: 0;
-  border-radius: 32px;
+  border-radius: 28px 28px 8px 8px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  overflow: visible !important;
   z-index: 20;
 }
 
@@ -289,7 +306,7 @@ ion-tab-button {
   --background-hover: transparent;
   --background-activated: transparent;
   --color: #9aa0a6;
-  --color-selected: #ffffff;
+  --color-selected: #111111;
   max-width: none;
   height: 100%;
   font-family: 'Poppins', sans-serif;
@@ -298,35 +315,33 @@ ion-tab-button {
 ion-tab-button::part(native) {
   background: transparent !important;
   display: flex;
-  flex-direction: row;
-  justify-content: center;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
   align-items: center;
   gap: 6px;
   width: 100%;
   min-width: 0;
   height: 100%;
-  padding: 0 8px;
-  border-radius: 18px;
+  padding: 6px 2px 12px !important;
+  border-radius: 32px;
 }
 
 ion-tab-button.tab-selected {
-  flex: 1.25 1 0;
+  flex: 1 1 0;
 }
 
 ion-tab-button.tab-selected::part(native) {
-  background: linear-gradient(180deg, #6a6e73 0%, #4b4f54 18%, #2a2d30 52%, #5d6166 100%) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.26),
-    inset 0 -3px 6px rgba(0,0,0,0.28),
-    0 7px 12px rgba(15, 17, 20, 0.2),
-    0 0 0 1px rgba(84, 88, 91, 0.28);
-  border-radius: 28px;
-  width: auto;
-  min-width: 72px;
+  background: transparent !important;
+  box-shadow: none !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+  border-radius: 32px;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
-  padding: 0 12px;
+  padding: 6px 2px 12px !important;
   margin-top: 0;
-  height: 48px;
+  height: 100%;
   align-self: center;
 }
 
@@ -354,6 +369,35 @@ ion-label {
 
 .term-prompt-overlay{position:absolute;inset:0;z-index:10000;background:rgba(31,35,39,.62);backdrop-filter:blur(5px);display:grid;place-items:center;padding:20px}.term-prompt{width:100%;max-width:360px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.3)}.term-prompt-icon{width:50px;height:50px;border-radius:14px;background:#e8ebed;color:#30383f;display:grid;place-items:center;font-size:1.5rem}.term-prompt h2{margin:15px 0 6px;color:#252b30;font-size:1.25rem}.term-prompt>p{margin:0 0 18px;color:#687078;font-size:.82rem;line-height:1.5}.term-prompt label{display:block;margin-top:12px}.term-prompt label span{display:block;margin-bottom:5px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#454c53}.term-prompt select{width:100%;height:44px;border:1px solid #cdd2d6;border-radius:10px;padding:0 12px;background:#f7f8f9;font:inherit;font-size:.84rem}.term-prompt button{width:100%;height:44px;margin-top:20px;border:0;border-radius:10px;background:#4b5563;color:#fff;font:700 .85rem Poppins;cursor:pointer}.term-prompt button:disabled{opacity:.55}.term-prompt .term-prompt-error{color:#c1121f;margin:10px 0 0}
 
+@media (min-width: 391px) and (max-width: 767px) {
+  .student-tab-bar {
+    height: calc(86px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .student-tab-bar ion-tab-button::part(native) {
+    gap: 8px;
+    padding: 8px 2px 12px;
+  }
+
+  .student-tab-bar ion-tab-button ion-icon,
+  .student-tab-bar ion-tab-button.tab-selected ion-icon {
+    width: 36px !important;
+    height: 36px !important;
+    flex-basis: 36px !important;
+  }
+
+  .student-tab-bar ion-tab-button ion-label {
+    font-size: .68rem !important;
+  }
+
+  .student-tab-bar .student-tab-profile-avatar,
+  .student-tab-bar .student-tab-profile-image {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+}
+
 @media (min-width: 768px) {
   .student-app-shell {
     max-width: 480px;
@@ -366,7 +410,7 @@ ion-label {
     height: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
     margin: 0 auto !important;
     padding: 0 10px 2px !important;
-    border-radius: 42px !important;
+    border-radius: 32px 32px 8px 8px !important;
   }
 
   .student-tab-bar ion-tab-button {
@@ -380,9 +424,9 @@ ion-label {
 
   .student-tab-bar ion-tab-button ion-icon,
   .student-tab-bar ion-tab-button.tab-selected ion-icon {
-    width: 28px !important;
-    height: 28px !important;
-    flex-basis: 28px !important;
+    width: 32px !important;
+    height: 32px !important;
+    flex-basis: 32px !important;
   }
 
   .student-tab-bar ion-tab-button ion-label {
@@ -390,9 +434,9 @@ ion-label {
   }
 
   .student-tab-bar ion-tab-button.tab-selected::part(native) {
-    min-width: 108px;
-    height: 62px;
-    padding: 0 20px 0 18px;
+    min-width: 0;
+    height: 100%;
+    padding: 10px 2px;
     border-radius: 32px;
     transform: none !important;
   }
@@ -412,9 +456,9 @@ ion-label {
   .student-tab-profile-image,
   .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-avatar,
   .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-image {
-    width: 36px;
-    height: 36px;
-    flex-basis: 36px;
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
   }
 }
 
@@ -426,8 +470,8 @@ ion-label {
 
 @media (max-width: 360px) {
   .student-tab-bar {
-    height: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
-    border-radius: 30px !important;
+    height: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+    border-radius: 24px 24px 6px 6px !important;
   }
 
   .student-tab-bar ion-tab-button {
@@ -441,35 +485,36 @@ ion-label {
 
   .student-tab-bar ion-tab-button ion-icon,
   .student-tab-bar ion-tab-button.tab-selected ion-icon {
-    width: 23px !important;
-    height: 23px !important;
-    flex-basis: 23px;
+    width: 28px !important;
+    height: 28px !important;
+    flex-basis: 28px;
   }
 
   .student-tab-bar ion-tab-button.tab-selected::part(native) {
-    min-width: 80px;
-    height: 48px;
-    padding-inline: 12px;
+    min-width: 0;
+    height: 100%;
+    padding: 6px 1px 4px;
   }
 
   .student-tab-bar ion-tab-button.tab-selected ion-label {
     font-size: .58rem !important;
-    margin-left: 6px !important;
+    margin-left: 0 !important;
+    text-align: center !important;
   }
 
   .student-tab-profile-avatar,
   .student-tab-profile-image,
   .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-avatar,
   .student-tab-bar ion-tab-button.tab-selected .student-tab-profile-image {
-    width: 30px;
-    height: 30px;
-    flex-basis: 30px;
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
   }
 }
 
 @media (max-width: 430px) and (max-height: 680px) {
   .student-tab-bar {
-    height: calc(54px + env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .student-tab-bar ion-tab-button {
@@ -477,7 +522,7 @@ ion-label {
   }
 
   .student-tab-bar ion-tab-button.tab-selected::part(native) {
-    height: 44px;
+    height: 100%;
   }
 }
 </style>
