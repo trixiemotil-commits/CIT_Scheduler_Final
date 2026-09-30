@@ -1,6 +1,6 @@
 <template>
-  <div class="page-bg" :class="{ 'page-bg--android': isAndroidBuild }">
-    <canvas v-if="!isAndroidBuild" ref="tronCanvas" class="tron-canvas" aria-hidden="true"></canvas>
+  <div class="page-bg">
+    <canvas ref="tronCanvas" class="tron-canvas" aria-hidden="true"></canvas>
     <!-- Hidden Admin Button -->
     <button class="hidden-admin-btn" @click="showAdminModal = true" title="Create Admin Account"></button>
     <div class="card" :class="{ 'card--wide': activeTab === 'signup' }">
@@ -402,7 +402,9 @@ const signUpError = ref('')
 const signUpSuccess = ref('')
 const router = useRouter()
 const isMobileApp = Capacitor.isNativePlatform()
-const isAndroidBuild = import.meta.env.MODE === 'android'
+const mobileViewportQuery = window.matchMedia('(max-width: 768px)')
+const isCompactViewport = ref(mobileViewportQuery.matches)
+const useStaticBackground = computed(() => isMobileApp || isCompactViewport.value)
 const siteKey = isMobileApp ? '' : (import.meta.env.VITE_RECAPTCHA_SITE_KEY || '')
 const signinCaptchaRef = ref(null)
 const signupCaptchaRef = ref(null)
@@ -456,7 +458,7 @@ function handleTwoFactorPaste(event) {
   twoFactorInputRefs[Math.min(pasted.length, 5)]?.focus()
 }
 
-function initialiseTronBackground() {
+function initialiseTronBackground(animate = true) {
   const canvas = tronCanvas.value
   const context = canvas?.getContext('2d')
   if (!canvas || !context) return
@@ -592,7 +594,7 @@ function initialiseTronBackground() {
   const drawFrame = (timestamp = 0) => {
     const delta = lastFrame ? Math.min((timestamp - lastFrame) / 16.667, 3) : 1
     lastFrame = timestamp
-    if (!reducedMotion.matches) movement += delta
+    if (animate && !reducedMotion.matches) movement += delta
 
     const background = context.createLinearGradient(0, 0, 0, height)
     background.addColorStop(0, '#242b31')
@@ -647,7 +649,7 @@ function initialiseTronBackground() {
     context.fillStyle = vignette
     context.fillRect(0, 0, width, height)
 
-    if (!reducedMotion.matches) animationFrame = window.requestAnimationFrame(drawFrame)
+    if (animate && !reducedMotion.matches) animationFrame = window.requestAnimationFrame(drawFrame)
   }
 
   const resizeCanvas = () => {
@@ -1039,12 +1041,22 @@ function onStudentIdInput(event) {
   signUp.studentId = formatted
 }
 
+function updateBackgroundForViewport(event) {
+  const wasStatic = useStaticBackground.value
+  isCompactViewport.value = event.matches
+  if (wasStatic === useStaticBackground.value) return
+  disposeTronBackground?.()
+  nextTick(() => initialiseTronBackground(!useStaticBackground.value))
+}
+
 onMounted(() => {
-  if (!isAndroidBuild) initialiseTronBackground()
+  mobileViewportQuery.addEventListener('change', updateBackgroundForViewport)
+  initialiseTronBackground(!useStaticBackground.value)
   if (isMobileApp) resetMathChallenges()
 })
 
 onUnmounted(() => {
+  mobileViewportQuery.removeEventListener('change', updateBackgroundForViewport)
   disposeTronBackground?.()
 })
 
@@ -1090,10 +1102,6 @@ watch(activeTab, (val) => {
   overflow-x: hidden;
   overflow-y: auto;
   margin: 0;
-}
-
-.page-bg--android {
-  background: #edf1f3;
 }
 
 .tron-canvas {
@@ -1756,29 +1764,44 @@ watch(activeTab, (val) => {
     max-width: 380px;
     padding: 14px 10px 12px;
   }
-  .title { font-size: 1.32rem; }
+  .card:not(.card--wide) {
+    width: min(90vw, 360px);
+    padding: 14px 16px 12px;
+    gap: 10px;
+  }
+  .card:not(.card--wide) .login-brand { gap: 7px; margin-bottom: 8px; }
+  .card.card--wide .login-brand { margin-bottom: 8px; }
+  .card:not(.card--wide) .login-brand__seal-wrap { width: 64px; height: 64px; flex-basis: 64px; }
+  .card:not(.card--wide) .login-brand__seal { width: 56px; height: 56px; }
+  .card:not(.card--wide) .login-brand__copy .title { font-size: 1.7rem; }
+  .card:not(.card--wide) .tab-btn { font-size: .68rem; padding: 8px 0; }
+  .card:not(.card--wide) .form { gap: 8px; }
+  .card:not(.card--wide) .input-field { padding-top: 7px; padding-bottom: 7px; }
+  .card:not(.card--wide) .submit-btn { padding: 8px 10px; font-size: .74rem; }
+  .card.card--wide .title { font-size: 1.7rem; }
   .login-brand { gap: 8px; margin: -2px 0 0; }
   .login-brand__seal-wrap { width: 50px; height: 50px; flex-basis: 50px; }
   .login-brand__seal { width: 42px; height: 42px; }
   .login-brand__copy > span { max-width: 170px; font-size: .46rem; }
   .tab-btn { font-size: .72rem; }
-  .form { gap: 7px; }
+  .card.card--wide .tab-btn { font-size: .68rem; }
+  .card.card--wide .form { gap: 6px; }
   .name-row { flex-direction: column; gap: 7px; }
-  .input-field {
+  .card.card--wide .input-field {
     padding-top: 8px;
     padding-bottom: 8px;
-    font-size: 0.74rem;
+    font-size: .68rem;
   }
-  .password-requirements {
+  .card.card--wide .password-requirements {
     gap: 3px;
     margin: -1px 0 0;
   }
-  .password-requirements li { font-size: .58rem; }
-  .student-signup-note {
+  .card.card--wide .password-requirements li { font-size: .55rem; }
+  .card.card--wide .student-signup-note {
     padding: 6px 8px;
     font-size: .58rem;
   }
-  .submit-btn {
+  .card.card--wide .submit-btn {
     padding: 9px 10px;
     font-size: .78rem;
   }
@@ -1788,6 +1811,10 @@ watch(activeTab, (val) => {
   .role-modal__title { font-size: 1.2rem; }
   .role-selection__button { padding: 14px 12px; gap: 11px; }
   .role-selection__description { line-height: 1.35; }
+}
+
+@media (min-width: 301px) and (max-width: 330px) {
+  .card:not(.card--wide) { width: min(96vw, 360px); }
 }
 
 @media (max-width: 360px) {
@@ -1811,28 +1838,29 @@ watch(activeTab, (val) => {
   }
   .login-brand__seal-wrap { width: 34px; height: 34px; flex-basis: 34px; }
   .login-brand__seal { width: 28px; height: 28px; }
-  .login-brand__copy { align-items: center; }
-  .login-brand__copy .title { font-size: .82rem; }
+  .login-brand__copy { align-items: flex-start; }
+  .card:not(.card--wide) .login-brand__copy .title { font-size: 1.3rem; }
+  .card.card--wide .login-brand__copy .title { font-size: 1.3rem; }
   .login-brand__copy > span { max-width: 120px; font-size: .32rem; letter-spacing: .08em; }
   .tab-btn { font-size: .6rem; padding: 5px 0; }
   .form-row { align-items: flex-start; gap: 8px; }
   .remember-label, .action-link { font-size: .56rem; }
-  .input-field {
+  .card.card--wide .input-field {
     padding: 6px 26px 6px 8px;
-    font-size: .58rem;
+    font-size: .56rem;
   }
   .password-requirements {
     gap: 2px;
     margin: 0 0 1px;
   }
-  .password-requirements li { font-size: .46rem; }
-  .student-signup-note {
+  .card.card--wide .password-requirements li { font-size: .5rem; }
+  .card.card--wide .student-signup-note {
     padding: 5px 6px;
-    font-size: .46rem;
+    font-size: .52rem;
   }
-  .submit-btn {
+  .card.card--wide .submit-btn {
     padding: 7px 8px;
-    font-size: .64rem;
+    font-size: .62rem;
   }
   .captcha-box { max-width: 180px; }
 }
@@ -1845,12 +1873,13 @@ watch(activeTab, (val) => {
     padding-left: 7px;
     padding-right: 7px;
   }
-  .login-brand__copy .title { font-size: .84rem; }
+  .card:not(.card--wide) .login-brand__copy .title,
+  .card.card--wide .login-brand__copy .title { font-size: 1.1rem; }
   .login-brand__copy > span { font-size: .34rem; }
-  .input-field { font-size: .58rem; }
-  .student-signup-note { font-size: .46rem; }
-  .password-requirements li { font-size: .48rem; }
-  .submit-btn { font-size: .66rem; }
+  .card.card--wide .input-field { font-size: .54rem; }
+  .card.card--wide .student-signup-note { font-size: .5rem; }
+  .card.card--wide .password-requirements li { font-size: .48rem; }
+  .card.card--wide .submit-btn { font-size: .6rem; }
   .remember-label, .action-link { font-size: .56rem; }
 }
 
