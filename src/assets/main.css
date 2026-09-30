@@ -2675,7 +2675,7 @@ body,
     padding: 16px !important;
   }
 
-  .layout:has(> .admin-sidebar) > .main :is(button, .btn, input, select, textarea, label, th, td) {
+  .layout:has(> .admin-sidebar) > .main :is(button:not(.faq-question), .btn, input, select, textarea, label, th, td) {
     font-size: .74rem !important;
   }
 }

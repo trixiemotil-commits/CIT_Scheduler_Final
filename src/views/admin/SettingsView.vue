@@ -165,6 +165,7 @@
             </div>
             <div>
               <h2 class="settings-card-title">Email verification</h2>
+              <p class="settings-card-sub verification-card-sub">Add a one-time verification step whenever you sign in.</p>
             </div>
             <div class="tfa-control">
               <span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span>
@@ -173,7 +174,6 @@
               </button>
             </div>
           </div>
-          <p class="settings-card-sub verification-card-sub">Add a one-time verification step whenever you sign in.</p>
           <div class="verification-content">
             <div class="verification-intro">
               <span class="verification-badge">
@@ -830,7 +830,7 @@ function highlightFaqText(text) {
 .settings-body {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: 18px;
+  gap: 12px;
   max-width: none;
   width: 100%;
 }
@@ -843,15 +843,15 @@ function highlightFaqText(text) {
   background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(235,239,242,.9));
   border: 1px solid rgba(133, 145, 153, .42);
   border-radius: 18px;
-  padding: 25px 30px 28px;
+  padding: 12px 14px 14px;
   box-shadow: inset 0 1px rgba(255,255,255,.92), 0 12px 30px rgba(47, 58, 66, .1);
 }
 .settings-card-header {
   display: flex;
   align-items: center;
-  gap: 13px;
-  margin-bottom: 22px;
-  padding-bottom: 18px;
+  gap: 8px;
+  margin-bottom: 11px;
+  padding-bottom: 9px;
   border-bottom: 1px solid rgba(129, 140, 148, .25);
 }
 .settings-card-header--between {
@@ -864,8 +864,8 @@ function highlightFaqText(text) {
   gap: 12px;
 }
 .settings-card-icon {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border: 1px solid #aab4ba;
   border-radius: 11px;
   background: linear-gradient(145deg, #f9fafb, #dce2e5);
@@ -876,7 +876,7 @@ function highlightFaqText(text) {
   flex-shrink: 0;
 }
 .settings-card-title {
-  font-size: 1.05rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: #263139;
   margin: 0;
@@ -1022,7 +1022,7 @@ function highlightFaqText(text) {
   background: rgba(255,255,255,.9);
   color: #35434b;
   font-family: inherit;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -1166,7 +1166,7 @@ function highlightFaqText(text) {
   margin-bottom: 6px;
 }
 .swal-title {
-  font-size: 1.35rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #111;
   margin: 0;
@@ -1226,16 +1226,18 @@ function highlightFaqText(text) {
 .verification-card .settings-row { grid-template-columns: minmax(0, 520px); }
 .verification-card { position: relative; }
 .verification-card .settings-card-header { margin-bottom: 18px; }
-.verification-card .settings-card-header { padding-right: 118px; }
-.verification-card .settings-card-header .tfa-control { position: absolute; top: 30px; right: 20px; }
+.verification-card .settings-card-header { padding-right: 76px; }
+.verification-card .settings-card-header .tfa-control { position: absolute; top: 20px; right: 20px; }
 .verification-card .tfa-control {
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 60px;
   gap: 5px;
   margin-left: auto;
   padding-left: 0;
 }
+.verification-card .tfa-status { width: 100%; }
 .verification-card {
   display: flex;
   flex-direction: column;
@@ -1251,7 +1253,7 @@ function highlightFaqText(text) {
   min-width: 0;
 }
 .verification-card-sub {
-  margin: -8px 0 18px;
+  margin: 3px 0 0;
   max-width: none;
   color: #738089;
   font-size: .75rem;
@@ -1262,7 +1264,7 @@ function highlightFaqText(text) {
   border-color: #aab4ba;
   background: linear-gradient(145deg, #f9fafb, #dce2e5);
 }
-.verification-card .settings-card-title { max-width: 210px; }
+.verification-card .settings-card-title { max-width: none; font-size: .72rem; white-space: nowrap; }
 .verification-content {
   display: flex;
   flex-direction: column;
@@ -1502,7 +1504,7 @@ function highlightFaqText(text) {
   justify-content: center;
 }
 .faq-title {
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: #2b363e;
   margin: 0;
@@ -1546,15 +1548,17 @@ function highlightFaqText(text) {
   width: 100%;
   background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
   border: none;
-  padding: 18px 20px;
+  padding: 15px 18px;
   font-family: inherit;
-  font-size: 1.03rem;
+  font-size: .95rem;
   font-weight: 600;
+  line-height: 1.4;
   color: #222;
   text-align: left;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
+.faq-question > span { min-width: 0; }
 .faq-question:hover { background: #f1f3f4; color: #202a31; }
 .faq-chevron {
   flex-shrink: 0;
@@ -1567,9 +1571,9 @@ function highlightFaqText(text) {
 }
 .faq-answer {
   padding: 0 20px 18px;
-  font-size: 0.98rem;
+  font-size: .95rem;
   color: #4a4f57;
-  line-height: 1.7;
+  line-height: 1.65;
   border-top: 1px solid #f0f0f0;
 }
 .faq-bullets {
@@ -1674,12 +1678,24 @@ function highlightFaqText(text) {
 .logout-confirm-btn:hover { background: #6b7280; }
 
 /* ── Responsive ── */
-@media (max-width: 800px) {
+@media (min-width: 1440px) {
+  .settings-card-icon { width: 40px; height: 40px; }
+  .settings-card-icon svg { width: 24px; height: 24px; }
+  .settings-card-title { font-size: 1.05rem; }
+  .verification-card .settings-card-title { font-size: 1.05rem; }
+  .faq-title { font-size: 1.55rem; }
+}
+@media (max-width: 1100px) {
   .settings-body { grid-template-columns: 1fr; }
   .settings-row { grid-template-columns: 1fr; }
   .main { padding: 24px 18px 32px; }
 }
 @media (max-width: 520px) {
+  .settings-card { padding: 10px 12px 12px; }
+  .settings-card-title { font-size: 0.78rem; }
+  .verification-card .settings-card-title { font-size: .68rem; }
+  .faq-question { font-size: 0.82rem; padding: 14px; }
+  .faq-answer { font-size: 0.88rem; padding: 0 14px 14px; }
   .otp-wrap { flex-direction: column; }
   .otp-boxes { width: 100%; }
   .otp-btn { width: 100%; }

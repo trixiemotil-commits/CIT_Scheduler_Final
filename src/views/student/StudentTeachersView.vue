@@ -177,17 +177,17 @@
                 <span v-for="subject in displayedSubjects(t)" :key="subject" class="subject-chip">{{ subject }}</span>
                 <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
               </div>
-              <div v-if="t.isSubjectTeacher && t.status === 'In School' && t.consultationSlots.length" class="consultation-hours">
-                <div class="hours-label">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                  Consultation hours
-                </div>
-                <div class="hours-list">
-                  <span v-for="slot in t.consultationSlots" :key="slot.id" class="hours-chip">{{ formatSlotLabel(slot) }}</span>
-                </div>
-              </div>
             </div>
             <span :class="['status-pill', statusClass(t.status)]">{{ teacherStatusLabel(t.status) }}</span>
+          </div>
+          <div v-if="t.isSubjectTeacher && t.status === 'In School' && t.consultationSlots.length" class="consultation-hours">
+            <div class="hours-label">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              Consultation hours
+            </div>
+            <div class="hours-list">
+              <span v-for="slot in t.consultationSlots" :key="slot.id" class="hours-chip">{{ formatSlotLabel(slot) }}</span>
+            </div>
           </div>
         </div>
       </template>
@@ -830,7 +830,7 @@ onUnmounted(() => {
   width: 100%; max-width: 430px; min-height: 100%; box-sizing: border-box;
   margin: 0 auto; background: #f5f6f8;
   display: flex; flex-direction: column;
-  padding-bottom: 16px;
+  padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
   padding-top: env(safe-area-inset-top, 0px);
   font-family: 'Poppins', sans-serif;
 }
@@ -1017,7 +1017,9 @@ onUnmounted(() => {
   color: #586572;
 }
 .consultation-hours {
-  margin-top: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0;
   padding: 9px 10px;
   border: 1px solid #d9e7de;
   border-radius: 10px;
@@ -1293,7 +1295,7 @@ onUnmounted(() => {
 
 .schedule-input-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   min-width: 0;
 }
@@ -1338,10 +1340,6 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px rgba(83, 99, 109, .12), inset 0 1px 2px rgba(50, 60, 66, .04);
 }
 .schedule-input-wrap .field-input:disabled { opacity: .58; }
-
-@media (max-width: 360px) {
-  .schedule-input-grid { grid-template-columns: minmax(0, 1fr); }
-}
 
 .booking-form-guidance {
   margin: 0;

@@ -110,7 +110,7 @@
     <!-- ══ VIEW DETAILS MODAL ══ -->
     <Teleport to="body">
       <div v-if="showDetails" class="modal-overlay" @click.self="showDetails = false">
-      <div class="modal-sheet">
+      <div class="modal-sheet session-details-sheet">
         <div class="modal-handle"></div>
         <div class="modal-header"><span>Session Details</span><button class="modal-close" @click="showDetails = false">✕</button></div>
         <div class="modal-body" v-if="activeSession">
@@ -1281,6 +1281,18 @@ onMounted(() => {
 .queue-ticket-line { color: #68747d; }
 .queue-ticket-line { min-width: 0; }
 .queue-ticket-line strong { min-width: 0; color: #303940; overflow-wrap: anywhere; }
+
+.session-details-sheet .modal-header { font-size: 0.96rem; }
+.session-details-sheet .detail-subject { font-size: 0.84rem; }
+.session-details-sheet .detail-teacher,
+.session-details-sheet .detail-label { font-size: 0.72rem; }
+.session-details-sheet .detail-val { font-size: 0.76rem; }
+.session-details-sheet .status-pill { font-size: 0.62rem; }
+.session-details-sheet .queue-card-title { font-size: 0.82rem; }
+.session-details-sheet .queue-card-subtitle,
+.session-details-sheet .queue-ticket-line { font-size: 0.68rem; }
+.session-details-sheet .queue-ticket-badge { font-size: 0.64rem; }
+.session-details-sheet .modal-submit { font-size: 0.82rem; }
 
 @media (max-width: 360px) {
   .modal-header { padding-right: 16px; padding-left: 16px; }
