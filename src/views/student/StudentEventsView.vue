@@ -417,7 +417,7 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 18px;
+  padding: 10px 18px 12px;
   border-bottom: 1px solid #eee;
   position: sticky;
   top: 0;
@@ -446,7 +446,7 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 }
 
 .app-header .header-title {
-  font-size: 1.25rem !important;
+  font-size: 1rem !important;
   line-height: normal;
   font-weight: 700;
   color: #4b5563;

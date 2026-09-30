@@ -195,7 +195,7 @@ onBeforeUnmount(() => { document.body.classList.remove('student-settings-active'
 :global(body.student-settings-active .student-tab-bar) { display: none !important; }
 :global(ion-content) { --background: linear-gradient(145deg, #eef0f1 0%, #dfe3e5 52%, #c7cdd1 100%); }
 .change-password-page { width: 100%; max-width: 430px; min-height: 100dvh; margin: 0 auto; padding-bottom: calc(34px + env(safe-area-inset-bottom, 0px)); color: #252b31; background: radial-gradient(circle at 100% 0%, rgba(255,255,255,.78), transparent 34%), linear-gradient(145deg, #f1f3f4 0%, #dfe3e5 52%, #c7cdd1 100%); font-family: 'Poppins', sans-serif; }
-.change-password-header { min-height: 68px; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; }
+.change-password-header { min-height: 68px; display: flex; align-items: center; justify-content: space-between; padding: calc(14px + env(safe-area-inset-top, 0px)) 18px 14px; }
 .change-password-header h1 { color: #3e4851; font-size: 1.08rem; font-weight: 800; }
 .change-password-back, .header-spacer { width: 44px; height: 44px; }
 .change-password-back { display: grid; place-items: center; padding: 0; border: 1px solid rgba(255,255,255,.9); border-radius: 50%; color: #4d5860; background: linear-gradient(145deg,#fafbfb,#dfe3e5); box-shadow: inset 0 1px rgba(255,255,255,.95), 0 6px 14px rgba(48,57,64,.14); }

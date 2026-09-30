@@ -73,15 +73,29 @@
 
       <div class="field-group">
         <label class="field-label">Consultation Schedule</label>
-        <select v-if="selectedTeacher?.isSubjectTeacher" v-model="reqForm.availabilityId" class="field-input" required>
+        <select v-if="bookingTeacherType === 'Subject Teacher'" v-model="reqForm.availabilityId" class="field-input" required :disabled="!selectedTeacher">
           <option value="" disabled>Select assigned availability</option>
-          <option v-for="slot in selectedTeacher.consultationSlots" :key="slot.id" :value="slot.id">
+          <option v-for="slot in selectedTeacher?.consultationSlots || []" :key="slot.id" :value="slot.id">
             {{ formatSlotLabel(slot) }}
           </option>
         </select>
         <template v-else>
-          <input v-model="reqForm.date" class="field-input" type="date" :min="today" required :disabled="!selectedTeacher" />
-          <input v-model="reqForm.time" class="field-input" type="time" min="07:00" max="17:00" required :disabled="!selectedTeacher" />
+          <div class="schedule-input-grid">
+            <label class="schedule-subfield" for="booking-date">
+              <span>Date</span>
+              <span class="schedule-input-wrap">
+                <IonIcon :icon="calendarOutline" aria-hidden="true" />
+                <input id="booking-date" v-model="reqForm.date" class="field-input" type="date" :min="today" required :disabled="!selectedTeacher" />
+              </span>
+            </label>
+            <label class="schedule-subfield" for="booking-time">
+              <span>Time</span>
+              <span class="schedule-input-wrap">
+                <IonIcon :icon="timeOutline" aria-hidden="true" />
+                <input id="booking-time" v-model="reqForm.time" class="field-input" type="time" min="07:00" max="17:00" required :disabled="!selectedTeacher" />
+              </span>
+            </label>
+          </div>
         </template>
       </div>
 
@@ -180,9 +194,6 @@
     </div>
     </template>
 
-    <!-- Toast notification -->
-    <div v-if="toastMsg" class="toast">{{ toastMsg }}</div>
-
     <!-- ══ VIEW PROFILE MODAL ══ -->
     <div v-if="showProfileModal" class="modal-overlay" @click.self="showProfileModal = false">
       <div class="modal-sheet">
@@ -245,12 +256,14 @@ import { getToken, getUser } from '@/auth.js'
 import StudentRefresher from '@/components/student/StudentRefresher.vue'
 import { notifyStudentDataChanged, useAutoRefresh } from '@/composables/useAutoRefresh.js'
 import useNotifications from '@/composables/useNotifications'
-import { IonContent, IonPage } from '@ionic/vue'
+import { IonContent, IonIcon, IonPage } from '@ionic/vue'
+import { calendarOutline, timeOutline } from 'ionicons/icons'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const route = useRoute()
+const router = useRouter()
 const isConsultationBooking = computed(() =>
   route.path === '/student/teachers' && route.query.mode === 'consultation-booking'
 )
@@ -315,7 +328,7 @@ function consultationAvailabilityLabel(teacher) {
 function canBookTeacher(teacher) {
   if (!teacher?.available) return false
   if (!teacher?.isSubjectTeacher) return true
-  return Boolean(scheduledSlotForToday(teacher))
+  return Boolean(teacher.consultationSlots?.length)
 }
 
 function initialsFor(name) {
@@ -440,7 +453,6 @@ function mapTeacher(teacher) {
     : teacherAvailability.toLowerCase() !== 'unavailable'
   const isAvailable = statusAllowsConsultation
     && availabilityAllowsConsultation
-    && (!subjectTeacherMatch || hasSlots)
 
   return {
     id: teacher.id,
@@ -524,8 +536,16 @@ const availableTeachers = computed(() => {
   return teachers.value
     .filter((t) => matchesSearch(t)
       && !isSubjectTeacher(t)
-      && t.status === 'In School'
       && (!isConsultationBooking.value || canBookTeacher(t)))
+    .sort((a, b) => a.name.localeCompare(b.name))
+})
+
+const bookingAvailableTeachers = computed(() => {
+  return teachers.value
+    .filter((t) => matchesSearch(t)
+      && !isSubjectTeacher(t)
+      && t.status === 'In School'
+      && t.available)
     .sort((a, b) => a.name.localeCompare(b.name))
 })
 
@@ -538,7 +558,7 @@ const allAvailableTeachers = computed(() => {
 
 const bookingTeacherOptions = computed(() => {
   if (bookingTeacherType.value === 'Subject Teacher') return subjectTeachers.value
-  if (bookingTeacherType.value === 'Available Teacher') return availableTeachers.value
+  if (bookingTeacherType.value === 'Available Teacher') return bookingAvailableTeachers.value
   return []
 })
 
@@ -606,7 +626,6 @@ function statusClass(s) {
 /* ── Modal state ── */
 const showProfileModal = ref(false)
 const selectedTeacher  = ref(null)
-const toastMsg         = ref('')
 const reqError         = ref('')
 const isSubmittingRequest = ref(false)
 const today = formatDateInput(new Date())
@@ -705,12 +724,13 @@ function selectBookingTeacher() {
 
 function initializeRequestForm(t) {
   const selectedSlot = scheduledSlotForToday(t)
+  const usesSubjectAvailability = bookingTeacherType.value === 'Subject Teacher'
   selectedTeacher.value = t
   reqForm.value = {
     subject: t.subjectList?.[0] || (isConsultationBooking.value ? 'General Consultation' : ''),
     reason: CONSULTATION_REASONS[0],
-    availabilityId: t.isSubjectTeacher ? selectedSlot?.id || '' : '',
-    date: !t.isSubjectTeacher ? today : '',
+    availabilityId: usesSubjectAvailability ? selectedSlot?.id || '' : '',
+    date: !usesSubjectAvailability ? today : '',
     time: '',
     description: '',
   }
@@ -744,11 +764,11 @@ async function submitRequest() {
   const body = {
     teacherId: selectedTeacher.value.id,
     topic: reqForm.value.subject,
-    consultationType: selectedTeacher.value?.isSubjectTeacher ? 'subject' : 'available',
+    consultationType: bookingTeacherType.value === 'Subject Teacher' ? 'subject' : 'available',
     notes,
   }
 
-  if (selectedTeacher.value?.isSubjectTeacher) {
+  if (bookingTeacherType.value === 'Subject Teacher') {
     if (!reqForm.value.availabilityId) { reqError.value = 'Please select consultation availability.'; return }
 
     const slot = (selectedTeacher.value?.consultationSlots || []).find((item) => item.id === reqForm.value.availabilityId)
@@ -779,27 +799,17 @@ async function submitRequest() {
       method: 'POST',
       body: JSON.stringify(body),
     })
-    const requestedTeacherName = selectedTeacher.value.name
-    showToast(`Request sent to ${requestedTeacherName}.`)
-    notifyStudentDataChanged('consultation-created')
-    if (isConsultationBooking.value) {
-      bookingTeacherType.value = ''
-      resetBookingTeacherSelection()
-    }
-    await loadTeachers()
   } catch (error) {
     reqError.value = error.message || 'Failed to send request.'
     if (reqError.value === 'You already have a consultation request during this time. Please choose a different time slot.') {
       window.alert(reqError.value)
     }
+    return
   } finally {
     isSubmittingRequest.value = false
   }
-}
-
-function showToast(msg) {
-  toastMsg.value = msg
-  setTimeout(() => { toastMsg.value = '' }, 3000)
+  notifyStudentDataChanged('consultation-created')
+  await router.replace('/student/consultations')
 }
 
 onMounted(() => {
@@ -815,7 +825,7 @@ onUnmounted(() => {
 
 <style scoped>
 .mobile-app {
-  max-width: 430px; min-height: 100%;
+  width: 100%; max-width: 430px; min-height: 100%; box-sizing: border-box;
   margin: 0 auto; background: #f5f6f8;
   display: flex; flex-direction: column;
   padding-bottom: 16px;
@@ -1080,8 +1090,8 @@ onUnmounted(() => {
 }
 
 .mobile-app .app-header {
-  min-height: 84px;
-  padding: 22px 20px 18px !important;
+  min-height: 68px;
+  padding: 10px 20px 12px !important;
   background: transparent !important;
   border-bottom: 0 !important;
   box-shadow: none !important;
@@ -1089,7 +1099,7 @@ onUnmounted(() => {
 
 .mobile-app .header-title {
   color: #46515d !important;
-  font-size: 1.16rem !important;
+  font-size: 1rem !important;
   letter-spacing: -.02em;
 }
 
@@ -1258,7 +1268,7 @@ onUnmounted(() => {
 .field-label  { font-size: 0.76rem; font-weight: 800; color: #4b555e; letter-spacing: .03em; text-transform: uppercase; }
 .optional     { font-weight: 400; color: #89939a; text-transform: none; letter-spacing: 0; }
 .field-input  {
-  width: 100%; min-height: 46px; padding: 10px 13px; border: 1px solid #cbd2d6;
+  width: 100%; min-width: 0; max-width: 100%; min-height: 46px; padding: 10px 13px; border: 1px solid #cbd2d6;
   border-radius: 13px; font-family: inherit; font-size: 0.87rem;
   color: #303940; background: rgba(248,249,249,.78);
   outline: none; box-sizing: border-box;
@@ -1270,10 +1280,61 @@ onUnmounted(() => {
 .msg-err { color: #e63946; font-size: 0.8rem; font-weight: 500; }
 
 .booking-request-form {
+  width: 100%; max-width: 430px; min-width: 0; box-sizing: border-box; margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 8px 16px calc(36px + env(safe-area-inset-bottom));
+  padding: 8px clamp(12px, 4vw, 16px) calc(36px + env(safe-area-inset-bottom));
+}
+
+.booking-request-form .field-group { min-width: 0; }
+
+.schedule-input-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.schedule-subfield {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: #69747d;
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.schedule-input-wrap { position: relative; display: block; min-width: 0; }
+.schedule-input-wrap ion-icon {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  color: #71808a;
+  font-size: 17px;
+  pointer-events: none;
+}
+.schedule-input-wrap .field-input {
+  min-height: 48px;
+  padding: 10px 8px 10px 36px;
+  border-color: #c4cdd2;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #fbfcfc, #e9edef);
+  box-shadow: inset 0 1px 2px rgba(50, 60, 66, .06), 0 1px rgba(255, 255, 255, .8);
+  color: #36424a;
+  font-size: .82rem;
+}
+.schedule-input-wrap .field-input:focus {
+  border-color: #71808a;
+  box-shadow: 0 0 0 3px rgba(83, 99, 109, .12), inset 0 1px 2px rgba(50, 60, 66, .04);
+}
+.schedule-input-wrap .field-input:disabled { opacity: .58; }
+
+@media (max-width: 360px) {
+  .schedule-input-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 .booking-form-guidance {

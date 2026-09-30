@@ -1285,8 +1285,8 @@ onMounted(() => {
 }
 
 .mobile-app .app-header {
-  min-height: 84px;
-  padding: 22px 20px 18px !important;
+  min-height: 68px;
+  padding: 10px 20px 12px !important;
   background: transparent !important;
   border-bottom: 0 !important;
   box-shadow: none !important;
@@ -1294,7 +1294,7 @@ onMounted(() => {
 
 .mobile-app .header-title {
   color: #46515d !important;
-  font-size: 1.16rem !important;
+  font-size: 1rem !important;
   letter-spacing: -.02em;
 }
 

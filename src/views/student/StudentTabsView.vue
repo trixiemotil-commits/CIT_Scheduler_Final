@@ -54,13 +54,14 @@
             class="consultation-choice-overlay"
             :style="{
               '--consultation-choice-bottom': consultationChoiceBottomPadding,
-              '--consultation-modal-circle-overlap': `${CONSULTATION_MODAL_CIRCLE_OVERLAP}px`,
               '--consultation-icon-circle-size': `${CONSULTATION_ICON_CIRCLE_RADIUS * 2}px`,
+              '--consultation-modal-origin-offset': `${CONSULTATION_ICON_CIRCLE_RADIUS + CONSULTATION_MODAL_LIFT}px`,
+              '--consultation-modal-connector-length': `${CONSULTATION_MODAL_LIFT - CONSULTATION_BUTTON_GAP}px`,
             }"
             role="presentation"
             @click.self="showConsultationChoices = false"
           >
-            <div class="consultation-choice-anchor" :style="consultationChoiceAnchorStyle" aria-hidden="true">
+            <button class="consultation-choice-anchor" :style="consultationChoiceAnchorStyle" type="button" aria-label="Close consultations menu" @click.stop="showConsultationChoices = false">
               <svg
                 class="consultation-choice-anchor-icon"
                 viewBox="0 0 36 36"
@@ -76,7 +77,7 @@
                 <path stroke-width="3" d="M13.2 12a3 3 0 1 1 5.7 1.4c-.9 1.1-2.4 1.5-2.4 3.2" />
                 <circle cx="16.5" cy="20.8" r=".7" />
               </svg>
-            </div>
+            </button>
             <section class="consultation-choice-modal" role="dialog" aria-modal="true" aria-labelledby="consultation-choice-title">
               <button class="consultation-choice-close" type="button" aria-label="Close" @click="showConsultationChoices = false">×</button>
               <div class="consultation-choice-kicker">Student Services</div>
@@ -149,7 +150,8 @@ import { useRoute, useRouter } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const CONSULTATION_ICON_CIRCLE_RADIUS = 28
-const CONSULTATION_MODAL_CIRCLE_OVERLAP = 10
+const CONSULTATION_BUTTON_GAP = 8
+const CONSULTATION_MODAL_LIFT = 26
 const route = useRoute()
 const router = useRouter()
 const studentUser = ref(getUser() || {})
@@ -281,16 +283,30 @@ const navigation = [
   { tab: 'profile', label: 'Profile', href: '/student/profile', icon: personOutline },
 ]
 
-function handleNavigationClick(event, item) {
+async function handleNavigationClick(event, item) {
+  if (item.tab === 'teachers') {
+    event.preventDefault()
+    event.stopPropagation()
+    showConsultationChoices.value = false
+    if (route.path !== item.href || Object.keys(route.query).length) {
+      await router.push(item.href)
+    }
+    return
+  }
+
   if (item.tab !== 'consultations') return
   event.preventDefault()
   event.stopPropagation()
+  if (showConsultationChoices.value) {
+    showConsultationChoices.value = false
+    return
+  }
   const icon = event.currentTarget?.querySelector('.student-tab-consultation-icon')
   if (icon) {
     const iconBounds = icon.getBoundingClientRect()
     const circleTop = iconBounds.top + iconBounds.height / 2 - CONSULTATION_ICON_CIRCLE_RADIUS
     const circleLeft = iconBounds.left + iconBounds.width / 2 - CONSULTATION_ICON_CIRCLE_RADIUS
-    consultationChoiceBottomPadding.value = `${Math.max(16, window.innerHeight - circleTop - CONSULTATION_MODAL_CIRCLE_OVERLAP)}px`
+    consultationChoiceBottomPadding.value = `${Math.max(16, window.innerHeight - circleTop + CONSULTATION_MODAL_LIFT)}px`
     consultationChoiceAnchorStyle.value = { top: `${circleTop}px`, left: `${circleLeft}px` }
   }
   showConsultationChoices.value = true
@@ -352,7 +368,7 @@ const indicatorStyle = computed(() => {
 
 .consultation-choice-anchor {
   position: fixed;
-  z-index: 10003;
+  z-index: 10006;
   display: grid;
   width: var(--consultation-icon-circle-size, 56px);
   height: var(--consultation-icon-circle-size, 56px);
@@ -361,7 +377,15 @@ const indicatorStyle = computed(() => {
   border-radius: 50%;
   background: var(--consultation-choice-surface);
   box-shadow: none;
-  pointer-events: none;
+  padding: 0;
+  appearance: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.consultation-choice-anchor:focus-visible {
+  outline: 3px solid #69747d;
+  outline-offset: 3px;
 }
 
 .consultation-choice-anchor-icon {
@@ -373,11 +397,16 @@ const indicatorStyle = computed(() => {
 
 .student-app-shell.consultation-choices-open .student-tab-bar {
   z-index: 10002 !important;
+  pointer-events: auto !important;
+}
+
+.student-app-shell.consultation-choices-open .student-tab-bar ion-tab-button:not(.consultation-tab) {
   pointer-events: none !important;
 }
 
 .student-app-shell.consultation-choices-open .student-tab-bar ion-tab-button.consultation-tab {
   z-index: 10003 !important;
+  pointer-events: auto !important;
 }
 
 .student-app-shell.consultation-choices-open .student-tab-bar ion-tab-button.consultation-tab::before {
@@ -393,6 +422,7 @@ const indicatorStyle = computed(() => {
 .consultation-choice-modal {
   position: relative;
   width: min(100%, 420px);
+  transform-origin: 50% calc(100% + var(--consultation-modal-origin-offset, 54px));
   padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
   border-radius: 34px;
   background: var(--consultation-choice-surface);
@@ -402,14 +432,13 @@ const indicatorStyle = computed(() => {
 
 .consultation-choice-modal::after {
   position: absolute;
-  top: calc(100% - var(--consultation-modal-circle-overlap, 10px));
+  top: calc(100% - 1px);
   left: 50%;
-  width: 25%;
-  height: var(--consultation-icon-circle-size, 56px);
-  background: var(--consultation-choice-surface);
-  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  width: 42px;
+  height: var(--consultation-modal-connector-length, 18px);
+  background: inherit;
   content: '';
-  filter: drop-shadow(0 5px 3px rgba(0, 0, 0, 0.08));
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
   transform: translateX(-50%);
 }
 
@@ -503,7 +532,7 @@ const indicatorStyle = computed(() => {
 
 .consultation-choice-enter-active .consultation-choice-modal,
 .consultation-choice-leave-active .consultation-choice-modal {
-  transition: transform 0.22s ease;
+  transition: transform 0.32s cubic-bezier(.18, .85, .32, 1), opacity 0.16s ease;
 }
 
 .consultation-choice-enter-from,
@@ -513,7 +542,17 @@ const indicatorStyle = computed(() => {
 
 .consultation-choice-enter-from .consultation-choice-modal,
 .consultation-choice-leave-to .consultation-choice-modal {
-  transform: translateY(18px);
+  transform: scale(.12);
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consultation-choice-enter-active,
+  .consultation-choice-leave-active,
+  .consultation-choice-enter-active .consultation-choice-modal,
+  .consultation-choice-leave-active .consultation-choice-modal {
+    transition: none;
+  }
 }
 
 @media (max-width: 767px) {
@@ -536,7 +575,7 @@ const indicatorStyle = computed(() => {
   border-radius: 28px 28px 8px 8px;
   background: rgba(230, 230, 235, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 16px rgba(0, 0, 0, 0.06);
   overflow: visible !important;
   --background: transparent;
   --border: 0;
@@ -555,7 +594,7 @@ const indicatorStyle = computed(() => {
   box-sizing: border-box;
   border-top: 0;
   border-radius: 28px 28px 8px 8px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 16px rgba(0, 0, 0, 0.06);
   overflow: visible !important;
   z-index: 20;
 }
