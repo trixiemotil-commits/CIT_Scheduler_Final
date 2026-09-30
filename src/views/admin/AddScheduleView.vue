@@ -1131,9 +1131,10 @@
             <div class="panel-footer">
               <button class="reset-btn" @click="resetAddForm">Reset</button>
               <div v-if="!addFormWithinUnitLimit" class="time-error">This teacher cannot exceed 30 units.</div>
-              <button class="save-btn" @click="addEntry" :disabled="!addFormValid || !addFormWithinUnitLimit">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Add to Schedule
+              <button class="save-btn" @click="addEntry" :disabled="!addFormValid || !addFormWithinUnitLimit || addingSchedule" :aria-busy="addingSchedule">
+                <svg v-if="addingSchedule" class="spin-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                {{ addingSchedule ? 'Adding...' : 'Add to Schedule' }}
               </button>
             </div>
           </div>
@@ -3073,6 +3074,7 @@ const showAddPanel  = ref(false)
 const addSavedCount = ref(0)
 const addShowFlash  = ref(false)
 const addTimeError  = ref('')
+const addingSchedule = ref(false)
 
 const addForm = reactive({
   day: '', timeIn: '', timeOut: '',
@@ -3158,9 +3160,11 @@ const addFormUnits = computed(() => {
 const addFormWithinUnitLimit = computed(() => isGenericTeacher(addForm.teacher) || addFormUnits.value <= 30)
 
 async function addEntry() {
+  if (addingSchedule.value) return
   if (!addFormValid.value) return
   if (!addFormWithinUnitLimit.value) return
   if (addForm.parallel && addForm.parallelSlots.every(ps => !ps.section)) return
+  addingSchedule.value = true
   try {
     const payload = buildSchedulePayload(addForm)
     const conflicts = checkScheduleConflict(payload)
@@ -3176,6 +3180,7 @@ async function addEntry() {
     addShowFlash.value = true
     setTimeout(() => { addShowFlash.value = false }, 2200)
   } catch (error) { await showScheduleError(error) }
+  finally { addingSchedule.value = false }
 }
 
 /* ── Consultation modal ── */
