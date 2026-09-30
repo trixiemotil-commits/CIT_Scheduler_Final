@@ -267,34 +267,28 @@
                 <div class="um-actions">
                   <template v-if="activeView === 'active'">
                     <div class="um-actions-row">
-                      <button class="um-btn um-btn--edit" @click="openEditUser(user)" title="Edit">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        Edit
+                      <button class="um-btn um-btn--edit" @click="openEditUser(user)" title="Edit" aria-label="Edit user">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
-                      <button class="um-btn um-btn--archive" @click="openArchiveUser(user)" title="Archive">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-                        Archive
+                      <button class="um-btn um-btn--archive" @click="openArchiveUser(user)" title="Archive" aria-label="Archive user">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                       </button>
-                      <button v-if="user.isLoginLocked" class="um-btn um-btn--unlock" @click="unlockUser(user)" title="Unlock login">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/><circle cx="12" cy="16" r="1"/></svg>
-                        Unlock
+                      <button v-if="user.isLoginLocked" class="um-btn um-btn--unlock" @click="unlockUser(user)" title="Unlock login" aria-label="Unlock user login">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/><circle cx="12" cy="16" r="1"/></svg>
                       </button>
                     </div>
                     <div v-if="user.status === 'Pending'" class="um-actions-row">
-                      <button class="um-btn um-btn--approve" @click="approveUser(user)" title="Approve">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        Approve
+                      <button class="um-btn um-btn--approve" @click="approveUser(user)" title="Approve" aria-label="Approve user">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                       </button>
-                      <button class="um-btn um-btn--deny" @click="denyUser(user)" title="Deny">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        Deny
+                      <button class="um-btn um-btn--deny" @click="denyUser(user)" title="Deny" aria-label="Deny user">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                       </button>
                     </div>
                   </template>
                   <template v-else>
-                    <button class="um-btn um-btn--restore" @click="openRestoreUser(user)" title="Restore">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
-                      Restore
+                    <button class="um-btn um-btn--restore" @click="openRestoreUser(user)" title="Restore" aria-label="Restore user">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
                     </button>
                   </template>
                 </div>
@@ -2756,7 +2750,7 @@ function confirmRestoreUser() {
 .um-table th:nth-child(6),
 .um-table td:nth-child(6) { width: 10%; }
 .um-table th:nth-child(7),
-.um-table td:nth-child(7) { width: 88px; }
+.um-table td:nth-child(7) { width: 104px; }
 .um-user-info { min-width: 0; }
 .um-table th:nth-child(2),
 .um-table td:nth-child(2) { padding-left: 10px; }
@@ -2771,15 +2765,19 @@ function confirmRestoreUser() {
 .um-user-name,
 .um-user-dept,
 .um-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; }
-.um-actions { width: 64px; }
-.um-actions-row { display: flex; justify-content: flex-end; gap: 4px; }
+.um-actions { width: 100%; align-items: flex-end; }
+.um-actions-row {
+  display: grid;
+  grid-template-columns: repeat(2, 28px);
+  justify-content: end;
+  gap: 4px;
+}
 .um-actions .um-btn {
-  width: 30px !important;
-  height: 30px;
-  min-height: 30px;
+  width: 28px !important;
+  height: 28px;
+  min-height: 28px;
   padding: 0;
-  font-size: 0;
-  flex: 0 0 34px;
+  flex: 0 0 28px;
 }
 .um-actions .um-btn svg { width: 14px; height: 14px; flex: 0 0 auto; }
 .um-actions .um-btn:hover { transform: translateY(-1px); }
@@ -2826,6 +2824,12 @@ function confirmRestoreUser() {
 .um-add-btn:hover,
 .um-approve-all-btn:hover,
 .um-approve-selected-btn:hover { background: #35424d; }
+.um-approve-all-btn {
+  border-color: #176b3a;
+  background: #21834b;
+  color: #fff;
+}
+.um-approve-all-btn:hover { background: #176b3a; }
 .um-search-input,
 .um-filter-select,
 .um-print-btn { background: #fff; box-shadow: none; }
@@ -3006,4 +3010,21 @@ function confirmRestoreUser() {
 }
 .swal-cancel:hover { background: #eef2f4; }
 .swal-continue:hover { background: #35424d; }
+
+@media (min-width: 901px) {
+  .um-view-tabs { flex: 0 0 160px; }
+  .um-filter-select--status {
+    box-sizing: border-box;
+    width: 160px;
+    min-width: 160px;
+    flex: 0 0 160px;
+  }
+}
+.um-approve-all-btn {
+  min-width: 160px;
+  justify-content: center;
+  border-color: #0f3d22;
+  background: #14532d;
+}
+.um-approve-all-btn:hover { background: #0f3d22; }
 </style>
