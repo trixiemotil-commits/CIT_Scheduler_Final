@@ -9,9 +9,8 @@
       <div class="header-title">Notifications</div>
       <div class="header-actions">
         <button class="mark-btn" type="button" @click="markAll">Mark all read</button>
-        <button class="clear-btn" type="button" :disabled="isClearing || !notifications.length" @click="clearAll">
+        <button class="clear-btn" type="button" :aria-label="isClearing ? 'Clearing notifications' : 'Clear all notifications'" title="Clear all notifications" :disabled="isClearing || !notifications.length" @click="clearAll">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-.8 14H5.8L5 6m4 4v6m6-6v6" /></svg>
-          {{ isClearing ? 'Clearing...' : 'Clear All' }}
         </button>
       </div>
     </div>
@@ -221,19 +220,19 @@ async function confirmClearAll() {
 .clear-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: 1px solid #e5c8c8;
   border-radius: 8px;
   background: #fff;
   color: #a33f3f;
-  font-size: 0.74rem;
-  font-weight: 600;
-  padding: 5px 8px;
-  white-space: nowrap;
+  cursor: pointer;
 }
 .clear-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 .clear-btn:disabled {
   cursor: not-allowed;

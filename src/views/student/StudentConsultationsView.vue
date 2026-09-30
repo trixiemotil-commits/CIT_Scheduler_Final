@@ -1245,7 +1245,8 @@ onMounted(() => {
   z-index: 30001;
   margin: 0;
   transform: translateX(-50%);
-  width: 100%;
+  box-sizing: border-box;
+  width: min(100%, 430px);
   max-width: 430px;
   max-height: 92dvh;
   overflow-y: auto;
@@ -1258,24 +1259,35 @@ onMounted(() => {
 .modal-handle { width: 48px; height: 5px; margin: 12px auto 2px; border-radius: 999px; background: #aeb6bc; }
 .modal-header { padding: 17px 22px 16px; border-bottom-color: rgba(104,112,120,.18); color: #252b30; font-size: 1.08rem; font-weight: 800; }
 .modal-close { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(255,255,255,.8); border-radius: 50%; background: linear-gradient(145deg,#f8f9f9,#d8dde0); color: #69747d; box-shadow: inset 0 1px rgba(255,255,255,.9); }
-.modal-body { padding: 18px 20px 6px; gap: 16px; }
+.modal-body { box-sizing: border-box; min-width: 0; padding: 18px 20px 6px; gap: 16px; }
 .modal-footer { gap: 10px; padding: 14px 20px 24px; }
 .modal-cancel, .modal-submit, .modal-danger { min-height: 46px; border-radius: 13px; }
 .modal-cancel { border: 1px solid #cbd2d6; background: linear-gradient(145deg,#f3f4f4,#dfe2e3); color: #59646d; }
 .modal-submit { border: 1px solid #303940; background: linear-gradient(145deg,#59636b,#303940); box-shadow: inset 0 1px rgba(255,255,255,.18), 0 6px 13px rgba(39,44,49,.2); }
-.detail-hero { padding: 6px 0 14px; border-bottom-color: rgba(104,112,120,.18); }
+.detail-hero { min-width: 0; flex-wrap: wrap; padding: 6px 0 14px; border-bottom-color: rgba(104,112,120,.18); }
+.detail-main { flex: 1 1 120px; min-width: 0; }
 .detail-subject { color: #252b31; }
 .detail-teacher { color: #68747d; }
-.detail-row { padding: 13px 0; border-bottom-color: rgba(104,112,120,.16); }
+.detail-subject, .detail-teacher { overflow-wrap: anywhere; }
+.detail-row { display: grid; grid-template-columns: minmax(50px, .55fr) minmax(0, 1fr); gap: 12px; align-items: start; min-width: 0; padding: 13px 0; border-bottom-color: rgba(104,112,120,.16); }
 .detail-label { color: #68747d; }
-.detail-val { color: #303940; }
-.queue-card { border-color: #ccd5dc; border-radius: 16px; background: linear-gradient(145deg,#f1f4f5,#e0e5e8); box-shadow: inset 0 1px rgba(255,255,255,.82); }
+.detail-val { max-width: none; min-width: 0; color: #303940; overflow-wrap: anywhere; }
+.queue-card { box-sizing: border-box; min-width: 0; border-color: #ccd5dc; border-radius: 16px; background: linear-gradient(145deg,#f1f4f5,#e0e5e8); box-shadow: inset 0 1px rgba(255,255,255,.82); }
+.queue-card-header { min-width: 0; flex-wrap: wrap; }
 .queue-card-title { color: #303940; }
 .queue-card-subtitle { color: #68747d; }
-.queue-ticket-badge { border-radius: 12px; background: linear-gradient(145deg,#59636b,#303940); }
+.queue-ticket-badge { max-width: 100%; overflow-wrap: anywhere; border-radius: 12px; background: linear-gradient(145deg,#59636b,#303940); }
 .queue-qr-panel { border-color: #d1d8dc; background: #f8f9f9; }
 .queue-ticket-line { color: #68747d; }
-.queue-ticket-line strong { color: #303940; }
+.queue-ticket-line { min-width: 0; }
+.queue-ticket-line strong { min-width: 0; color: #303940; overflow-wrap: anywhere; }
+
+@media (max-width: 360px) {
+  .modal-header { padding-right: 16px; padding-left: 16px; }
+  .modal-body { padding-right: 14px; padding-left: 14px; }
+  .modal-footer { padding-right: 14px; padding-left: 14px; }
+  .detail-row { grid-template-columns: minmax(44px, .45fr) minmax(0, 1fr); gap: 8px; }
+}
 
 /* Metallic consultation workspace */
 .mobile-app {

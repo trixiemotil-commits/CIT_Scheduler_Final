@@ -23,30 +23,30 @@
 
     <!-- Stats Grid -->
     <div class="stats-grid">
-      <div class="stat-card green">
+      <button type="button" class="stat-card green" @click="$router.push('/student/teachers')">
         <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 19V6l6-3 6 3v13M9 19v-4h6v4M8 9h1M15 9h1M8 12h1M15 12h1" /></svg></span>
-        <div class="stat-label">On School</div>
-        <div class="stat-num">{{ teacherStats.inSchool }}</div>
-        <div class="stat-desc">teachers on campus</div>
-      </div>
-      <div class="stat-card red">
+        <span class="stat-label">On School</span>
+        <span class="stat-num">{{ teacherStats.inSchool }}</span>
+        <span class="stat-desc">teachers on campus</span>
+      </button>
+      <button type="button" class="stat-card red" @click="$router.push('/student/teachers')">
         <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3" /><path d="M5 20a7 7 0 0 1 14 0M16 4l4 4M20 4l-4 4" /></svg></span>
-        <div class="stat-label">Offline</div>
-        <div class="stat-num">{{ teacherStats.offline }}</div>
-        <div class="stat-desc">teachers offline</div>
-      </div>
-      <div class="stat-card blue">
+        <span class="stat-label">Offline</span>
+        <span class="stat-num">{{ teacherStats.offline }}</span>
+        <span class="stat-desc">teachers offline</span>
+      </button>
+      <button type="button" class="stat-card blue" @click="$router.push('/student/teachers')">
         <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="m8 12 2.5 2.5L16 9" /></svg></span>
-        <div class="stat-label">Available Teacher</div>
-        <div class="stat-num">{{ teacherStats.available }}</div>
-        <div class="stat-desc">ready for consultation</div>
-      </div>
-      <div class="stat-card orange">
+        <span class="stat-label">Available Teacher</span>
+        <span class="stat-num">{{ teacherStats.available }}</span>
+        <span class="stat-desc">ready for consultation</span>
+      </button>
+      <button type="button" class="stat-card orange" @click="$router.push('/student/teachers')">
         <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M8 8l8 8M16 8l-8 8" /></svg></span>
-        <div class="stat-label">Not Available</div>
-        <div class="stat-num">{{ teacherStats.notAvailable }}</div>
-        <div class="stat-desc">not accepting requests</div>
-      </div>
+        <span class="stat-label">Not Available</span>
+        <span class="stat-num">{{ teacherStats.notAvailable }}</span>
+        <span class="stat-desc">not accepting requests</span>
+      </button>
     </div>
 
     <!-- Recent Consultations -->
@@ -338,14 +338,23 @@ function formatDate(dateStr) {
 }
 .stat-card {
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.94);
   border-radius: 14px;
   padding: 14px 14px 13px;
+  border: 0;
   border-left: 4px solid;
   box-shadow: 0 5px 14px rgba(45, 50, 55, 0.1), inset 0 1px rgba(255, 255, 255, 0.9);
   min-height: 82px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
+.stat-card:focus-visible { outline: 3px solid #344e67; outline-offset: 2px; }
+.stat-card:active { transform: translateY(1px); }
 .stat-card::after {
   content: '';
   position: absolute;
@@ -361,9 +370,9 @@ function formatDate(dateStr) {
 .stat-card.red   { border-color: #e63946; }
 .stat-card.blue  { border-color: #3a86ff; }
 .stat-card.orange{ border-color: #f4a261; }
-.stat-label { font-size: 0.72rem; font-weight: 600; color: #737b82; margin-bottom: 5px; }
-.stat-num   { font-size: 1.72rem; font-weight: 800; color: #252a2f; line-height: 1; }
-.stat-desc  { font-size: 0.68rem; color: #9aa1a7; margin-top: 5px; }
+.stat-label { display: block; font-size: 0.72rem; font-weight: 600; color: #737b82; margin-bottom: 5px; }
+.stat-num   { display: block; font-size: 1.72rem; font-weight: 800; color: #252a2f; line-height: 1; }
+.stat-desc  { display: block; font-size: 0.68rem; color: #9aa1a7; margin-top: 5px; }
 
 /* Section card */
 .section-card {
@@ -599,7 +608,7 @@ function formatDate(dateStr) {
 .stat-card.red .stat-icon { color: #a95159; background: rgba(239,224,226,.78); }
 .stat-card.blue .stat-icon { color: #566f8c; background: rgba(222,231,240,.82); }
 .stat-card.orange .stat-icon { color: #a87543; background: rgba(239,230,215,.82); }
-.stat-label { font-size: .7rem; letter-spacing: .02em; }
+.stat-label { box-sizing: border-box; width: 100%; padding-right: 44px; font-size: .7rem; line-height: 1.2; letter-spacing: .02em; overflow-wrap: anywhere; }
 .stat-num { margin-top: 8px; font-size: 2rem; }
 .stat-desc { margin-top: 8px; font-size: .66rem; }
 

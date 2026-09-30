@@ -516,6 +516,14 @@ function matchesSearch(teacher) {
     || String(teacher.subject || '').toLowerCase().includes(query))
 }
 
+const teacherStatusOrder = { 'In School': 0, 'On Meeting': 1, 'On Event': 2, 'On Leave': 3, Offline: 4 }
+
+function compareTeacherStatusAndConsultation(a, b) {
+  const statusDifference = (teacherStatusOrder[a.status] ?? 5) - (teacherStatusOrder[b.status] ?? 5)
+  if (statusDifference) return statusDifference
+  return Number(!a.available) - Number(!b.available)
+}
+
 const subjectTeachers = computed(() => {
   return teachers.value
     .filter((t) => isSubjectTeacher(t)
@@ -523,6 +531,8 @@ const subjectTeachers = computed(() => {
       && hasMatchingAssignment(t)
       && (!isConsultationBooking.value || (t.status === 'In School' && canBookTeacher(t))))
     .sort((a, b) => {
+      const availabilityDifference = compareTeacherStatusAndConsultation(a, b)
+      if (availabilityDifference) return availabilityDifference
       const bHasTodayHours = Boolean(scheduledSlotForToday(b))
       const aHasTodayHours = Boolean(scheduledSlotForToday(a))
       if (Number(bHasTodayHours) !== Number(aHasTodayHours)) {
@@ -537,7 +547,7 @@ const availableTeachers = computed(() => {
     .filter((t) => matchesSearch(t)
       && !isSubjectTeacher(t)
       && (!isConsultationBooking.value || canBookTeacher(t)))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => compareTeacherStatusAndConsultation(a, b) || a.name.localeCompare(b.name))
 })
 
 const bookingAvailableTeachers = computed(() => {
@@ -572,16 +582,8 @@ const visibleSubjectTeachers = computed(() => {
 const visibleAvailableTeachers = computed(() => availableTeachers.value)
 
 const allTeachers = computed(() => {
-  const statusOrder = { 'In School': 0, 'On Meeting': 1, 'On Event': 2, 'On Leave': 3, Offline: 4 }
   return [...subjectTeachers.value, ...allAvailableTeachers.value].sort((a, b) => {
-    const aBookable = a.status === 'In School' && canBookTeacher(a)
-    const bBookable = b.status === 'In School' && canBookTeacher(b)
-    if (aBookable !== bBookable) return Number(bBookable) - Number(aBookable)
-
-    const statusDifference = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5)
-    if (statusDifference) return statusDifference
-
-    const availabilityDifference = Number(Boolean(b.available)) - Number(Boolean(a.available))
+    const availabilityDifference = compareTeacherStatusAndConsultation(a, b)
     if (availabilityDifference) return availabilityDifference
     return a.name.localeCompare(b.name)
   })
@@ -1293,6 +1295,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  min-width: 0;
 }
 
 .schedule-subfield {
@@ -1306,7 +1309,7 @@ onUnmounted(() => {
   text-transform: uppercase;
 }
 
-.schedule-input-wrap { position: relative; display: block; min-width: 0; }
+.schedule-input-wrap { position: relative; display: block; width: 100%; min-width: 0; }
 .schedule-input-wrap ion-icon {
   position: absolute;
   z-index: 1;
@@ -1318,6 +1321,9 @@ onUnmounted(() => {
   pointer-events: none;
 }
 .schedule-input-wrap .field-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
   min-height: 48px;
   padding: 10px 8px 10px 36px;
   border-color: #c4cdd2;

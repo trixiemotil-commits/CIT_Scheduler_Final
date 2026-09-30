@@ -2,7 +2,7 @@
   <IonPage>
     <div class="student-app-shell" :class="{ 'student-notifications-active': route.path.startsWith('/student/notifications'), 'consultation-choices-open': showConsultationChoices }">
       <IonTabs>
-        <IonRouterOutlet />
+        <IonRouterOutlet :animated="!['student-teachers', 'student-consultation-booking'].includes(route.name)" />
 
         <IonTabBar
           v-if="!isConsultationSessionsPage"

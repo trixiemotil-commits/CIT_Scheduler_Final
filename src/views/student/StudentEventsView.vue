@@ -446,7 +446,7 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 }
 
 .app-header .header-title {
-  font-size: 1rem !important;
+  font-size: 1.1rem !important;
   line-height: normal;
   font-weight: 700;
   color: #4b5563;

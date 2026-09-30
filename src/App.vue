@@ -8,13 +8,13 @@
         :style="{ right: backToTopRight, bottom: backToTopBottom }"
         type="button"
         aria-label="Back to top"
+        title="Back to top"
         @click="scrollBackToTop"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="m5 12 7-7 7 7" />
           <path d="M12 19V5" />
         </svg>
-        <span>Back to top</span>
       </button>
     </Transition>
     <div v-if="showNativeSplash" class="native-splash" aria-label="CITScheduler" role="status">
@@ -228,15 +228,15 @@ onUnmounted(() => {
   z-index: 9000;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  width: 46px;
   min-height: 46px;
-  padding: 0 16px;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, .72);
-  border-radius: 999px;
+  border-radius: 50%;
   background: linear-gradient(145deg, #343b42, #20252a);
   color: #fff;
   box-shadow: 0 8px 22px rgba(24, 30, 35, .3), inset 0 1px rgba(255, 255, 255, .16);
-  font: 600 .82rem Poppins, sans-serif;
   cursor: pointer;
 }
 .back-to-top svg { width: 18px; height: 18px; }
