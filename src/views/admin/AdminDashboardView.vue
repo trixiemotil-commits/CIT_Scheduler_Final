@@ -296,6 +296,16 @@
               <strong>Loading consultation trends</strong>
               <span>Fetching the latest consultation activity…</span>
             </div>
+            <div v-else-if="consultationLoadError" class="chart-empty-overlay" role="status">
+              <span class="chart-empty-icon" aria-hidden="true">!</span>
+              <strong>Consultation data couldn’t load</strong>
+              <span>Check your connection and refresh the dashboard to try again.</span>
+            </div>
+            <div v-else-if="consultationPeriodTotal === 0" class="chart-empty-overlay" role="status">
+              <span class="chart-empty-icon" aria-hidden="true">—</span>
+              <strong>No consultations in this period</strong>
+              <span>Choose another time range or check again after consultation requests are submitted.</span>
+            </div>
             <canvas ref="lineChartRef"></canvas>
           </div>
         </div>
@@ -356,8 +366,17 @@
               <strong>Loading teacher workload</strong>
               <span>Calculating scheduled hours for this term…</span>
             </div>
-            <div v-else-if="!workloadChartItems.length" class="workload-empty-state">No teachers match these filters.</div>
-            <canvas v-else ref="barChartRef" :style="{ cursor: 'pointer', width: '100%', maxWidth: '100%', minWidth: '100%' }"></canvas>
+            <div v-else-if="workloadLoadError" class="chart-empty-overlay" role="status">
+              <span class="chart-empty-icon" aria-hidden="true">!</span>
+              <strong>Teacher workload couldn’t load</strong>
+              <span>Check your connection and try selecting the academic term again.</span>
+            </div>
+            <div v-else-if="!workloadHasAssignments || !workloadChartItems.length" class="chart-empty-overlay" role="status">
+              <span class="chart-empty-icon" aria-hidden="true">—</span>
+              <strong>{{ workloadEmptyTitle }}</strong>
+              <span>{{ workloadEmptyDescription }}</span>
+            </div>
+            <canvas ref="barChartRef" :style="{ cursor: 'pointer', width: '100%', maxWidth: '100%', minWidth: '100%' }"></canvas>
           </div>
         </div>
       </section>
@@ -366,15 +385,15 @@
 
     <!-- ═══ Teacher Workload Modal ═══ -->
     <Teleport to="body">
-      <div v-if="showWorkloadModal" class="modal-overlay" @click.self="showWorkloadModal = false">
-        <div class="modal-box">
+      <div v-if="showWorkloadModal" class="modal-overlay workload-modal-overlay" @click.self="showWorkloadModal = false">
+        <div class="modal-box workload-modal" role="dialog" aria-modal="true" aria-labelledby="workload-modal-title">
           <!-- Close -->
-          <button class="modal-close" @click="showWorkloadModal = false">✕</button>
+          <button type="button" class="modal-close" aria-label="Close workload details" @click="showWorkloadModal = false">✕</button>
 
           <!-- Header -->
           <div class="modal-header">
-            <h2 class="modal-title">Teacher Workload Details</h2>
-            <p class="modal-sub">View their complete schedule breakdown</p>
+            <h2 id="workload-modal-title" class="modal-title">Teacher workload details</h2>
+            <p class="modal-sub">Review weekly classes, scheduled hours, and units.</p>
           </div>
 
           <template v-if="selectedTeacher">
@@ -384,16 +403,28 @@
               <div class="modal-teacher-info">
                 <span class="modal-teacher-name">{{ selectedTeacher.name }}</span>
               </div>
-              <span class="modal-hours-badge">{{ selectedTeacher.totalHours }} Hours/Week · {{ selectedTeacher.units || 0 }} Units</span>
+              <div class="modal-teacher-metrics">
+                <span class="modal-hours-badge"><strong>{{ selectedTeacher.totalHours }}h</strong><small>per week</small></span>
+                <span class="modal-units-badge">{{ selectedTeacher.units || 0 }} units</span>
+              </div>
             </div>
 
             <!-- Schedule cards grid -->
+            <div class="modal-section-heading">
+              <div>
+                <h3>Weekly schedule</h3>
+                <p>Class meetings, times, and assigned sections</p>
+              </div>
+              <span>{{ selectedTeacher.schedule.length }} classes</span>
+            </div>
             <div v-if="selectedTeacher.schedule.length" class="modal-schedule-grid">
               <div v-for="(sc, i) in selectedTeacher.schedule" :key="i" class="modal-sched-card">
                 <div class="modal-sched-top">
                   <span class="modal-day-badge">{{ sc.day }}</span>
-                  <span class="modal-sched-time">{{ sc.time }}</span>
-                  <span class="modal-sched-dur">{{ sc.duration }}</span>
+                  <span class="modal-sched-time-meta">
+                    <span class="modal-sched-time">{{ sc.time }}</span>
+                    <span class="modal-sched-dur">{{ sc.duration }}</span>
+                  </span>
                 </div>
                 <div class="modal-sched-subject">{{ sc.subject }}</div>
                 <div class="modal-sched-section">{{ sc.section }}</div>
@@ -994,6 +1025,8 @@ const selectedTeacher = ref(null)
 const consultationRequests = ref([])
 const isConsultationLoading = ref(true)
 const isWorkloadLoading = ref(true)
+const consultationLoadError = ref(false)
+const workloadLoadError = ref(false)
 const showConsultationDayModal = ref(false)
 const selectedConsultationPeriodLabel = ref('')
 const selectedConsultationPeriodRequests = ref([])
@@ -1003,7 +1036,7 @@ const academicTerms = ref([])
 const selectedWorkloadTermId = ref('')
 const publishedTermLabel = ref('')
 const workloadChartWidth = computed(() => Math.max(760, (liveTeacherWorkloads.value.length || 5) * 180))
-const workloadChartItems = computed(() => (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads)
+const workloadChartItems = computed(() => liveTeacherWorkloads.value
   .filter(teacher => {
     const query = workloadSearch.value.trim().toLocaleLowerCase()
     const hours = Number(teacher.totalHours) || 0
@@ -1016,6 +1049,17 @@ const workloadChartItems = computed(() => (liveTeacherWorkloads.value.length ? l
   })
   .slice()
   .sort((first, second) => second.totalHours - first.totalHours || first.name.localeCompare(second.name)))
+const workloadHasAssignments = computed(() => liveTeacherWorkloads.value.some(teacher => Number(teacher.totalHours) > 0))
+const workloadEmptyTitle = computed(() => {
+  if (!liveTeacherWorkloads.value.length) return 'No workload data for this term'
+  if (!workloadHasAssignments.value) return 'No classes scheduled for this term'
+  return 'No teachers match these filters'
+})
+const workloadEmptyDescription = computed(() => {
+  if (!liveTeacherWorkloads.value.length) return 'Check that active teacher accounts and schedule records are available, or choose another term.'
+  if (!workloadHasAssignments.value) return 'Weekly workload appears here after classes are added to the selected academic term.'
+  return 'Try another teacher name or workload level to see matching results.'
+})
 const workloadByTermCache = new Map()
 let workloadRequestId = 0
 
@@ -1256,6 +1300,7 @@ function calculateWorkloads(users, scheduleEntries) {
 
 async function loadChartData() {
   isConsultationLoading.value = true
+  consultationLoadError.value = false
   try {
     const [termPayload, requestsPayload, usersPayload, termsPayload] = await Promise.all([
       apiRequest('/academic-terms/published'),
@@ -1283,6 +1328,8 @@ async function loadChartData() {
     await loadWorkloadTerm(termIdOf(selectedTerm))
   } catch (error) {
     console.error('Failed to load dashboard chart data:', error)
+    consultationLoadError.value = true
+    workloadLoadError.value = true
     isWorkloadLoading.value = false
     await nextTick()
     createBarChart()
@@ -1302,10 +1349,12 @@ async function loadWorkloadTerm(termId) {
     : ''
   const requestId = ++workloadRequestId
   isWorkloadLoading.value = true
+  workloadLoadError.value = false
 
   if (workloadByTermCache.has(selectedId)) {
     liveTeacherWorkloads.value = workloadByTermCache.get(selectedId)
     isWorkloadLoading.value = false
+    workloadLoadError.value = false
     await nextTick()
     createBarChart()
     return
@@ -1320,11 +1369,13 @@ async function loadWorkloadTerm(termId) {
     workloadByTermCache.set(selectedId, workloads)
     liveTeacherWorkloads.value = workloads
     isWorkloadLoading.value = false
+    workloadLoadError.value = false
     await nextTick()
     createBarChart()
   } catch (error) {
     if (requestId === workloadRequestId) {
       console.error('Failed to load semester workload:', error)
+      workloadLoadError.value = true
       isWorkloadLoading.value = false
       await nextTick()
       createBarChart()
@@ -1423,7 +1474,7 @@ function workloadBarColor(hours) {
 
 function createBarChart() {
   if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null }
-  if (!barChartRef.value || !workloadChartItems.value.length) return
+  if (!barChartRef.value || !workloadHasAssignments.value || !workloadChartItems.value.length) return
   const expanded = expandedChart.value === 'bar'
   const workloadItems = workloadChartItems.value
   const labels = workloadItems.map(teacher => teacher.name)
@@ -1465,8 +1516,8 @@ function createBarChart() {
         borderRadius: 5,
         borderSkipped: false,
         borderWidth: 0,
-        barThickness: 7,
-        maxBarThickness: 7
+        barThickness: 10,
+        maxBarThickness: 10
       }]
     },
     options: {
@@ -1542,8 +1593,8 @@ function createBarChart() {
         bar: {
           borderRadius: 5,
           borderSkipped: false,
-          barThickness: 7,
-          maxBarThickness: 7,
+          barThickness: 10,
+          maxBarThickness: 10,
           borderWidth: 0,
         }
       }
@@ -1730,7 +1781,7 @@ function confirmLogout() {
 /* Header */
 .main-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 28px;
 }
@@ -1759,7 +1810,7 @@ function confirmLogout() {
 /* Notification */
 .notif-wrap {
   position: relative;
-  padding-top: 6px;
+  padding-top: 0;
 }
 .notif-btn {
   position: relative;
@@ -2386,6 +2437,18 @@ function confirmLogout() {
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(25, 35, 45, 0.04);
 }
+.today-schedule-track.single-teacher-layout .schedule-entry {
+  align-items: center;
+  text-align: center;
+}
+.today-schedule-track.single-teacher-layout .schedule-entry .schedule-details {
+  flex: 0 1 auto;
+  width: 100%;
+}
+.today-schedule-track.single-teacher-layout .schedule-entry .schedule-time,
+.today-schedule-track.single-teacher-layout .schedule-entry .schedule-label {
+  align-self: center;
+}
 .schedule-entry::before {
   content: '';
   position: absolute;
@@ -2475,6 +2538,15 @@ function confirmLogout() {
   gap: 3px;
   flex: 1;
   justify-content: center;
+}
+.today-schedule-track.single-teacher-layout .schedule-details {
+  align-items: center;
+  text-align: center;
+}
+.today-schedule-track.single-teacher-layout .schedule-subject,
+.today-schedule-track.single-teacher-layout .schedule-section {
+  width: 100%;
+  text-align: center;
 }
 .schedule-subject { 
   display: block; 
@@ -2682,7 +2754,7 @@ function confirmLogout() {
   min-width: 0;
 }
 .chart-title {
-  font-size: clamp(0.95rem, 1vw, 1.2rem);
+  font-size: clamp(1.08rem, 1.3vw, 1.45rem);
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
@@ -2752,8 +2824,37 @@ function confirmLogout() {
   text-align: center;
   backdrop-filter: blur(3px);
 }
+.chart-empty-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 9px;
+  padding: 24px;
+  border-radius: 12px;
+  background: rgba(247, 249, 249, .94);
+  color: #58656c;
+  text-align: center;
+}
+.chart-empty-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid #d6dfda;
+  border-radius: 50%;
+  background: #edf3ef;
+  color: #54745f;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
 .chart-loading-overlay strong { color: #35413f; font-size: .84rem; font-weight: 700; }
 .chart-loading-overlay > span:last-child { color: #849097; font-size: .7rem; font-weight: 500; }
+.chart-empty-overlay strong { max-width: 360px; color: #35413f; font-size: .84rem; font-weight: 700; }
+.chart-empty-overlay > span:last-child { max-width: 390px; color: #849097; font-size: .7rem; font-weight: 500; line-height: 1.5; }
 .chart-loading-spinner {
   width: 27px;
   height: 27px;
@@ -2982,6 +3083,137 @@ function confirmLogout() {
   font-size: 2rem;
   font-weight: 700;
   line-height: 1;
+}
+.workload-modal {
+  --workload-modal-pad-inline: clamp(22px, 3vw, 38px);
+  box-sizing: border-box;
+  width: min(1320px, calc(100vw - 48px));
+  max-width: 1320px;
+  max-height: min(90dvh, 960px);
+  padding: clamp(22px, 3vw, 38px) clamp(22px, 3vw, 38px) 0;
+  border: 1px solid rgba(255,255,255,.86);
+  border-radius: 22px;
+  background: linear-gradient(155deg, #fff 0%, #fafbfb 58%, #f2f4f5 100%);
+  box-shadow: 0 28px 80px rgba(17,27,23,.32), inset 0 1px rgba(255,255,255,.95);
+  scrollbar-color: #aab6b0 transparent;
+  scrollbar-width: thin;
+}
+.workload-modal .modal-close {
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #d5ddda;
+  border-radius: 11px;
+  background: rgba(255,255,255,.86);
+  color: #53615a;
+  font-size: 1.05rem;
+  transition: background .18s ease, color .18s ease, transform .18s ease;
+}
+.workload-modal .modal-close:hover { background: #fff; color: #30383d; transform: translateY(-1px); }
+.workload-modal .modal-header { margin-bottom: 22px; padding-right: 48px; }
+.workload-modal .modal-title { margin: 0 0 5px; color: #252c31; font-size: clamp(1.35rem, 2.2vw, 1.8rem); letter-spacing: -.035em; }
+.workload-modal .modal-sub { margin: 0; color: #687279; font-size: .9rem; line-height: 1.5; }
+.workload-modal .modal-teacher-row {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  margin-bottom: 25px;
+  margin-left: calc(0px - var(--workload-modal-pad-inline));
+  margin-right: calc(0px - var(--workload-modal-pad-inline));
+  padding: 15px 17px;
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #000;
+  box-shadow: inset 0 1px rgba(255,255,255,.1);
+}
+.workload-modal .modal-teacher-avatar { width: 58px; height: 58px; border-color: #cdd3d7; }
+.workload-modal .modal-teacher-name { color: #fff; font-size: clamp(1.05rem, 1.8vw, 1.3rem); overflow-wrap: anywhere; }
+.modal-teacher-metrics { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.workload-modal .modal-hours-badge,
+.modal-units-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 9px 13px;
+  border: 1px solid #d8dde0;
+  border-radius: 11px;
+  background: #f5f6f7;
+  color: #4a5359;
+  font-size: .76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.workload-modal .modal-hours-badge strong { color: #111; font-size: 1rem; }
+.workload-modal .modal-hours-badge small { color: #111; font-size: .68rem; font-weight: 600; }
+.modal-units-badge { border-color: #d9dee1; background: #f5f6f7; color: #111; text-transform: capitalize; }
+.modal-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.modal-section-heading h3 { margin: 0; color: #2d3439; font-size: 1rem; font-weight: 750; }
+.modal-section-heading p { margin: 3px 0 0; color: #788188; font-size: .76rem; }
+.modal-section-heading > span { flex: 0 0 auto; padding: 6px 10px; border-radius: 999px; background: #eceff1; color: #58636a; font-size: .7rem; font-weight: 700; }
+.workload-modal .modal-schedule-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; margin-bottom: 22px; }
+.workload-modal .modal-sched-card {
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid #dce1e4;
+  border-radius: 14px;
+  background: rgba(255,255,255,.85);
+  box-shadow: 0 4px 12px rgba(36,53,44,.045);
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.workload-modal .modal-sched-card:hover { border-color: #c5cdd1; box-shadow: 0 8px 18px rgba(36,43,48,.08); transform: translateY(-1px); }
+.workload-modal .modal-sched-top { justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+.workload-modal .modal-day-badge { padding: 5px 10px; background: #eceff1; color: #4d5960; font-size: .7rem; font-weight: 750; }
+.modal-sched-time-meta { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+.workload-modal .modal-sched-time { color: #4d565c; font-size: .74rem; font-weight: 650; }
+.workload-modal .modal-sched-dur { color: #788188; font-size: .68rem; font-weight: 600; }
+.workload-modal .modal-sched-subject { margin: 0 0 7px; color: #293035; font-size: .93rem; line-height: 1.45; overflow-wrap: anywhere; }
+.workload-modal .modal-sched-section { color: #737d83; font-size: .76rem; line-height: 1.45; overflow-wrap: anywhere; }
+.workload-modal .modal-empty-schedule { margin: 0 0 22px; border-color: #d0d6d9; background: rgba(255,255,255,.72); color: #626d73; line-height: 1.5; }
+.workload-modal .modal-summary { box-sizing: border-box; width: auto; margin-left: calc(0px - var(--workload-modal-pad-inline)); margin-right: calc(0px - var(--workload-modal-pad-inline)); padding: 18px 20px; border: 1px solid #000; border-radius: 0; background: #000; box-shadow: inset 0 1px rgba(255,255,255,.12); }
+.workload-modal .modal-summary-label { margin-bottom: 15px; color: #fff; font-size: .9rem; }
+.workload-modal .modal-summary-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.workload-modal .modal-summary-item { min-width: 0; align-items: flex-start; gap: 7px; padding: 0 14px; border-left: 1px solid rgba(255,255,255,.2); }
+.workload-modal .modal-summary-item:first-child { padding-left: 0; border-left: 0; }
+.workload-modal .modal-summary-key { color: rgba(255,255,255,.78); font-size: .72rem; line-height: 1.35; }
+.workload-modal .modal-summary-val { color: #fff; font-size: 1.7rem; }
+@media (max-width: 760px) {
+  .workload-modal-overlay { box-sizing: border-box; padding: 14px; }
+  .workload-modal { --workload-modal-pad-inline: 20px; width: 100%; max-width: 100%; max-height: 92dvh; padding: 24px 20px 0; }
+  .workload-modal .modal-schedule-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+  .workload-modal .modal-summary-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 18px; }
+  .workload-modal .modal-summary-item:nth-child(3) { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 480px) {
+  .workload-modal-overlay { align-items: flex-end; padding: 0; }
+  .workload-modal {
+    --workload-modal-pad-inline: 16px;
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 94dvh;
+    padding: 22px 16px 0;
+    border-radius: 20px 20px 0 0;
+  }
+  .workload-modal .modal-close { top: 13px; right: 13px; width: 34px; height: 34px; }
+  .workload-modal .modal-header { margin-bottom: 17px; }
+  .workload-modal .modal-title { max-width: calc(100% - 26px); font-size: 1.28rem; }
+  .workload-modal .modal-sub { font-size: .8rem; }
+  .workload-modal .modal-teacher-row { flex-wrap: wrap; gap: 10px; margin-bottom: 20px; padding: 12px; }
+  .workload-modal .modal-teacher-avatar { width: 48px; height: 48px; }
+  .workload-modal .modal-teacher-info { flex: 1 1 calc(100% - 68px); }
+  .modal-teacher-metrics { width: 100%; flex-wrap: wrap; padding-left: 58px; }
+  .workload-modal .modal-hours-badge,
+  .modal-units-badge { padding: 7px 10px; font-size: .7rem; }
+  .modal-section-heading { align-items: flex-start; }
+  .modal-section-heading p { max-width: 230px; line-height: 1.4; }
+  .workload-modal .modal-schedule-grid { grid-template-columns: 1fr; gap: 9px; }
+  .workload-modal .modal-sched-card { padding: 13px; }
+  .workload-modal .modal-summary { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+  .workload-modal .modal-summary-item { padding-inline: 10px; }
+  .workload-modal .modal-summary-key { font-size: .67rem; }
+  .workload-modal .modal-summary-val { font-size: 1.45rem; }
 }
 
 /* Logout Modal */

@@ -2697,3 +2697,125 @@ body,
     font-size: clamp(1.9rem, 3vw, 2.5rem) !important;
   }
 }
+
+/* Admin dashboard viewport and content sizing */
+.layout.admin-dashboard {
+  width: 100%;
+  min-width: 0;
+  min-height: 100dvh;
+}
+
+.layout.admin-dashboard > .main {
+  flex: 1 1 0%;
+  width: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.layout.admin-dashboard > .main > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (min-width: 1601px) {
+  .layout.admin-dashboard > .main {
+    padding: 32px clamp(34px, 3vw, 76px) 44px !important;
+  }
+
+  .layout.admin-dashboard .stat-cards {
+    gap: clamp(18px, 1.4vw, 30px);
+    margin-bottom: clamp(24px, 2vw, 38px);
+  }
+
+  .layout.admin-dashboard .today-teachers-section {
+    padding: clamp(24px, 2vw, 38px);
+    margin-bottom: clamp(24px, 2vw, 38px);
+  }
+
+  .layout.admin-dashboard .today-schedule-track {
+    grid-auto-columns: clamp(260px, 17vw, 360px);
+  }
+
+  .layout.admin-dashboard .teacher-schedule-column,
+  .layout.admin-dashboard .today-schedule-table-wrap.manual-carousel-scroll .teacher-schedule-column {
+    width: clamp(260px, 17vw, 360px);
+    min-width: clamp(260px, 17vw, 360px);
+  }
+
+  .layout.admin-dashboard .charts-row { gap: clamp(22px, 1.7vw, 34px); }
+  .layout.admin-dashboard .chart-card { min-height: clamp(600px, 38vw, 780px); padding: clamp(20px, 1.5vw, 30px); }
+  .layout.admin-dashboard .chart-wrap { height: clamp(460px, 29vw, 650px); min-height: 440px; }
+  .layout.admin-dashboard .workload-chart-wrap { height: clamp(480px, 30vw, 660px); min-height: 460px; }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  .layout.admin-dashboard .stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .layout.admin-dashboard .charts-row { grid-template-columns: minmax(0, 1fr); }
+  .layout.admin-dashboard .chart-card { min-height: 560px; }
+  .layout.admin-dashboard .workload-filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .layout.admin-dashboard .workload-term-field { grid-column: 1 / -1; }
+}
+
+@media (max-width: 768px) {
+  .layout.admin-dashboard {
+    min-height: 100dvh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .layout.admin-dashboard > .main {
+    box-sizing: border-box;
+    width: 100%;
+    flex: 1 1 auto;
+    padding: 18px 16px 30px !important;
+  }
+
+  .layout.admin-dashboard .main-header { align-items: flex-start; gap: 12px; }
+  .layout.admin-dashboard .stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .layout.admin-dashboard .stat-card { min-width: 0; padding: 18px 16px; }
+  .layout.admin-dashboard .stat-value { font-size: clamp(1.7rem, 6vw, 2.3rem); }
+  .layout.admin-dashboard .today-teachers-section { padding: 18px 16px 16px !important; }
+  .layout.admin-dashboard .today-teachers-header { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .layout.admin-dashboard .today-carousel-controls { max-width: 100%; }
+  .layout.admin-dashboard .charts-row { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .layout.admin-dashboard .chart-card { min-height: 0; padding: 18px 16px 16px !important; }
+  .layout.admin-dashboard .chart-header { align-items: flex-start; gap: 12px; }
+  .layout.admin-dashboard .chart-title { font-size: clamp(1.15rem, 4vw, 1.4rem); }
+  .layout.admin-dashboard .chart-wrap { height: 390px; min-height: 360px; }
+  .layout.admin-dashboard .workload-chart-wrap { height: 430px; min-height: 400px; }
+  .layout.admin-dashboard .workload-filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .layout.admin-dashboard .workload-term-field { grid-column: 1 / -1; }
+  .layout.admin-dashboard .workload-result-count { margin-left: 0; }
+}
+
+@media (max-width: 480px) {
+  .layout.admin-dashboard > .main { padding: 16px 12px 24px !important; }
+  .layout.admin-dashboard .stat-cards { gap: 9px; }
+  .layout.admin-dashboard .stat-card { padding: 14px 12px; border-radius: 13px; }
+  .layout.admin-dashboard .stat-label { font-size: .67rem; }
+  .layout.admin-dashboard .stat-sub { font-size: .62rem; line-height: 1.35; }
+  .layout.admin-dashboard .stat-icon svg { width: 19px; height: 19px; }
+  .layout.admin-dashboard .today-teachers-section { padding: 15px 12px 12px !important; border-radius: 15px; }
+  .layout.admin-dashboard .today-teachers-header h2 { font-size: 1.12rem; }
+  .layout.admin-dashboard .today-teachers-header p span { display: block; margin: 3px 0 0; padding: 0; border: 0; }
+  .layout.admin-dashboard .today-schedule-table-wrap { margin-inline: -2px; }
+  .layout.admin-dashboard .teacher-col-header { padding: 16px 12px; }
+  .layout.admin-dashboard .teacher-header-name { overflow-wrap: anywhere; }
+  .layout.admin-dashboard .charts-row { gap: 12px; margin-top: 12px; }
+  .layout.admin-dashboard .chart-card { padding: 15px 12px 12px !important; border-radius: 15px; }
+  .layout.admin-dashboard .chart-wrap { height: 340px; min-height: 320px; }
+  .layout.admin-dashboard .workload-chart-wrap { height: 390px; min-height: 360px; padding-inline: 2px; }
+  .layout.admin-dashboard .workload-filter-row { grid-template-columns: minmax(0, 1fr); }
+  .layout.admin-dashboard .workload-term-field { grid-column: auto; }
+  .layout.admin-dashboard .workload-legend { gap: 7px 10px; }
+  .layout.admin-dashboard .workload-result-count { flex-basis: 100%; }
+  .layout.admin-dashboard .consultation-filter-row { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .layout.admin-dashboard .chart-period-control { max-width: 100%; }
+}
+
+@media (max-width: 360px) {
+  .layout.admin-dashboard .stat-cards { grid-template-columns: minmax(0, 1fr); }
+  .layout.admin-dashboard .main-header { flex-wrap: wrap; }
+  .layout.admin-dashboard .stat-card { min-height: 112px; }
+}

@@ -47,6 +47,20 @@
 
     <!-- ═══════════════════ MAIN ═══════════════════ -->
     <main class="main">
+      <Teleport to="body">
+        <Transition name="schedule-toast">
+          <div
+            v-if="statusToast"
+            class="schedule-status-toast"
+            :class="`is-${statusToast.type}`"
+            :role="statusToast.type === 'error' ? 'alert' : 'status'"
+            aria-live="polite"
+          >
+            <span class="schedule-status-toast__icon" aria-hidden="true">{{ statusToast.type === 'success' ? '✓' : '!' }}</span>
+            <span>{{ statusToast.message }}</span>
+          </div>
+        </Transition>
+      </Teleport>
       <!-- Page Header -->
       <header class="main-header">
         <div>
@@ -83,7 +97,7 @@
               <svg class="sched-select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
             <!-- Consultation hours button (visible when a teacher is selected) -->
-            <button v-if="selectedTeacher" class="icon-btn consult-btn" title="Manage Consultation Hours" @click="openConsultModal">
+            <button v-if="selectedTeacher" class="icon-btn consult-btn" :class="{ 'is-loading': loadingConsultModal }" :disabled="loadingConsultModal" :title="loadingConsultModal ? 'Loading consultation hours…' : 'Manage Consultation Hours'" @click="openConsultModal">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>
               </svg>
@@ -96,13 +110,13 @@
                 <rect x="6" y="14" width="12" height="8"/>
               </svg>
             </button>
-            <button class="schedule-export-btn" type="button" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
+            <button class="schedule-export-btn" :class="{ 'is-loading': exportingSchedule }" :disabled="exportingSchedule" type="button" :title="exportingSchedule ? 'Preparing Excel…' : 'Download Excel'" :aria-label="exportingSchedule ? 'Preparing Excel' : 'Download Excel'" @click="exportScheduleExcel">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
                 <path d="M8 13h8M8 17h8" />
               </svg>
-              Excel
+              {{ exportingSchedule ? 'Preparing…' : 'Excel' }}
             </button>
           </div>
         </div>
@@ -429,14 +443,14 @@
           </div>
 
           <div class="sched-modal-actions">
-            <button v-if="editMode" class="clear-slot-btn" @click="clearSlot">
+            <button v-if="editMode" class="clear-slot-btn" :disabled="clearingSchedule || savingSchedule" @click="clearSlot">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-              Clear Slot
+              {{ clearingSchedule ? 'Clearing…' : 'Clear Slot' }}
             </button>
             <button class="cancel-btn-text" @click="showSchedModal = false">Cancel</button>
-            <button class="save-btn" @click="saveEntry" :disabled="!form.teacher || !form.subject || !form.timeIn || !form.timeOut || (fromButton && !editMode && !form.day) || !!modalTimeError">
+            <button class="save-btn" :aria-busy="savingSchedule" @click="saveEntry" :disabled="!form.teacher || !form.subject || !form.timeIn || !form.timeOut || (fromButton && !editMode && !form.day) || !!modalTimeError || savingSchedule || clearingSchedule">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              {{ editMode ? 'Update' : 'Add' }}
+              {{ savingSchedule ? (editMode ? 'Updating…' : 'Adding…') : editMode ? 'Update' : 'Add' }}
             </button>
           </div>
         </div>
@@ -682,10 +696,11 @@
               <button
                 class="save-btn"
                 @click="addEntry"
-                :disabled="!addFormValid"
+                :disabled="!addFormValid || addingSchedule"
+                :aria-busy="addingSchedule"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Add to Schedule
+                {{ addingSchedule ? 'Adding…' : 'Add to Schedule' }}
               </button>
             </div>
           </div>
@@ -720,8 +735,9 @@
               <div class="consult-slot-dur">{{ cslot.durationMinutes }} min</div>
               <div class="consult-slot-actions">
                 <button class="consult-edit-btn" @click="editConsultSlot(cslot)">Edit</button>
-                <button class="consult-del-btn" @click="deleteConsultSlot(cslot.id)">
+                <button class="consult-del-btn" :disabled="!!deletingConsultSlotId || savingConsultation" :title="deletingConsultSlotId === cslot.id ? 'Deleting…' : 'Delete consultation slot'" @click="deleteConsultSlot(cslot.id)">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                  <span v-if="deletingConsultSlotId === cslot.id">Deleting…</span>
                 </button>
               </div>
             </div>
@@ -778,10 +794,11 @@
             <button
               class="save-btn"
               @click="saveConsultSlot"
-              :disabled="!consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || !!consultTimeError"
+              :aria-busy="savingConsultation"
+              :disabled="!consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || !!consultTimeError || savingConsultation || !!deletingConsultSlotId"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              {{ consultEditId ? 'Update' : 'Save Slot' }}
+              {{ savingConsultation ? (consultEditId ? 'Updating…' : 'Saving…') : consultEditId ? 'Update' : 'Save Slot' }}
             </button>
           </div>
         </div>
@@ -829,7 +846,7 @@ import {
 } from '@/composables/useSchedule.js'
 import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -842,6 +859,30 @@ const teacherSelectOptions = computed(() => [
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const teacherUserMap = ref({})
+const statusToast = ref(null)
+const savingSchedule = ref(false)
+const clearingSchedule = ref(false)
+const addingSchedule = ref(false)
+const savingConsultation = ref(false)
+const deletingConsultSlotId = ref(null)
+const loadingConsultModal = ref(false)
+const exportingSchedule = ref(false)
+let statusToastTimer = null
+let statusToastId = 0
+
+function showStatusToast(type, message) {
+  statusToast.value = { type, message }
+  const toastId = ++statusToastId
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+  statusToastTimer = window.setTimeout(() => {
+    if (toastId === statusToastId) statusToast.value = null
+    statusToastTimer = null
+  }, 5000)
+}
+
+onBeforeUnmount(() => {
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+})
 
 // Schedules are entered in 30-minute increments. Render the same increments
 // in this grid so every saved start/end time has an exact label on the left.
@@ -979,15 +1020,22 @@ watch([() => consultForm.startTime, () => consultForm.endTime], () => {
 })
 
 async function openConsultModal() {
+  if (loadingConsultModal.value) return
+  loadingConsultModal.value = true
   try {
     const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
     consultWeeklyMins.value = res.weeklyUsedMinutes || 0
-  } catch (_) { consultWeeklyMins.value = 0 }
-  await fetchConsultationsForTeacher()
-  consultEditId.value = null
-  Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
-  consultTimeError.value = ''
-  showConsultModal.value = true
+    await fetchConsultationsForTeacher()
+    consultEditId.value = null
+    Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
+    consultTimeError.value = ''
+    showConsultModal.value = true
+  } catch (error) {
+    consultWeeklyMins.value = 0
+    showStatusToast('error', error?.message || 'Unable to load consultation hours.')
+  } finally {
+    loadingConsultModal.value = false
+  }
 }
 
 function editConsultSlot(slot) {
@@ -1000,6 +1048,9 @@ function editConsultSlot(slot) {
 
 async function saveConsultSlot() {
   if (!consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || consultTimeError.value) return
+  if (savingConsultation.value || deletingConsultSlotId.value) return
+  const isEditing = Boolean(consultEditId.value)
+  savingConsultation.value = true
   try {
     const teacherUser = teacherUserMap.value[selectedTeacher.value]
     const employeeId  = teacherUser?.employeeId || selectedTeacher.value
@@ -1021,17 +1072,16 @@ async function saveConsultSlot() {
     await fetchConsultationsForTeacher()
     const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
     consultWeeklyMins.value = res.weeklyUsedMinutes || 0
+    showStatusToast('success', isEditing ? 'Consultation hours updated.' : 'Consultation hours saved.')
   } catch (error) {
-    await Swal.fire({
-      icon: 'error', title: 'Cannot Save Consultation',
-      html: `<span style="font-size:0.95rem;color:#444">${error?.message || 'Failed to save consultation slot.'}</span>`,
-      confirmButtonText: 'OK', confirmButtonColor: '#4b5563', background: '#fff',
-      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
-    })
+    showStatusToast('error', error?.message || 'Unable to save consultation hours.')
+  } finally {
+    savingConsultation.value = false
   }
 }
 
 async function deleteConsultSlot(id) {
+  if (deletingConsultSlotId.value || savingConsultation.value) return
   const ok = await Swal.fire({
     icon: 'warning', title: 'Remove Consultation Slot?', text: 'This slot will be permanently deleted.',
     showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#e63946',
@@ -1039,6 +1089,7 @@ async function deleteConsultSlot(id) {
     customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title' },
   })
   if (!ok.isConfirmed) return
+  deletingConsultSlotId.value = id
   try {
     await apiRequest(`/consultations/${id}`, { method: 'DELETE' })
     if (consultEditId.value === id) {
@@ -1048,8 +1099,11 @@ async function deleteConsultSlot(id) {
     await fetchConsultationsForTeacher()
     const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}`)
     consultWeeklyMins.value = res.weeklyUsedMinutes || 0
+    showStatusToast('success', 'Consultation slot deleted.')
   } catch (error) {
-    await Swal.fire({ icon: 'error', title: 'Error', text: error?.message || 'Failed to delete.', confirmButtonColor: '#4b5563', background: '#fff' })
+    showStatusToast('error', error?.message || 'Unable to delete this consultation slot.')
+  } finally {
+    deletingConsultSlotId.value = null
   }
 }
 
@@ -1329,20 +1383,8 @@ async function refreshScheduleData(preferredLabel = '') {
 
 async function showScheduleError(error, fallbackTitle = 'Unable to save schedule') {
   const isConflict = error?.status === 409
-
-  await Swal.fire({
-    icon: isConflict ? 'error' : 'warning',
-    title: isConflict ? 'Schedule Conflict' : fallbackTitle,
-    html: `<span style="font-size:0.95rem;color:#444">${error?.message || 'Something went wrong. Please try again.'}</span>`,
-    confirmButtonText: 'Got it',
-    confirmButtonColor: isConflict ? '#e63946' : '#4b5563',
-    background: '#fff',
-    customClass: {
-      popup: 'swal-cit-popup',
-      title: 'swal-cit-title',
-      confirmButton: 'swal-cit-btn',
-    },
-  })
+  const prefix = isConflict ? 'Schedule conflict' : fallbackTitle
+  showStatusToast('error', `${prefix}: ${error?.message || 'Something went wrong. Please try again.'}`)
 }
 
 // ── Get entries for a specific cell ──
@@ -1704,6 +1746,9 @@ async function saveEntry() {
 }
 
 async function proceedWithSave(payload) {
+  if (savingSchedule.value || clearingSchedule.value) return
+  const isEditing = editMode.value
+  savingSchedule.value = true
   try {
     if (editMode.value && form._oldDay) {
       payload.day = form._oldDay
@@ -1729,8 +1774,11 @@ async function proceedWithSave(payload) {
     yearDropdown.value   = 'All'
     filterSection.value  = 'All'
     showSchedModal.value = false
+    showStatusToast('success', isEditing ? 'Schedule updated.' : 'Schedule added.')
   } catch (error) {
     await showScheduleError(error)
+  } finally {
+    savingSchedule.value = false
   }
 }
 
@@ -1755,6 +1803,8 @@ async function clearSlot() {
     return
   }
 
+  if (clearingSchedule.value || savingSchedule.value) return
+  clearingSchedule.value = true
   try {
     await apiRequest('/schedules/delete', {
       method: 'POST',
@@ -1767,8 +1817,11 @@ async function clearSlot() {
     yearDropdown.value   = 'All'
     filterSection.value  = 'All'
     showSchedModal.value = false
+    showStatusToast('success', 'Schedule removed.')
   } catch (error) {
     await showScheduleError(error, 'Unable to remove schedule')
+  } finally {
+    clearingSchedule.value = false
   }
 }
 
@@ -1837,7 +1890,9 @@ const addFormValid = computed(() =>
 async function addEntry() {
   if (!addFormValid.value) return
   if (addForm.parallel && addForm.parallelSlots.every(ps => !ps.section)) return
+  if (addingSchedule.value) return
 
+  addingSchedule.value = true
   try {
     const payload = buildSchedulePayload(addForm)
 
@@ -1860,8 +1915,11 @@ async function addEntry() {
     resetAddForm()
     addShowFlash.value = true
     setTimeout(() => { addShowFlash.value = false }, 2200)
+    showStatusToast('success', 'Schedule added.')
   } catch (error) {
     await showScheduleError(error)
+  } finally {
+    addingSchedule.value = false
   }
 }
 
@@ -1891,7 +1949,11 @@ onMounted(async () => {
 })
 
 /* ── Print ── */
-function exportScheduleExcel() {
+async function exportScheduleExcel() {
+  if (exportingSchedule.value) return
+  exportingSchedule.value = true
+  await nextTick()
+  try {
   const esc = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -1933,6 +1995,12 @@ function exportScheduleExcel() {
   link.click()
   link.remove()
   URL.revokeObjectURL(url)
+    showStatusToast('success', 'Schedule Excel file downloaded.')
+  } catch (error) {
+    showStatusToast('error', error?.message || 'Unable to export this schedule.')
+  } finally {
+    exportingSchedule.value = false
+  }
 }
 
 function printSchedule() {
@@ -2866,5 +2934,54 @@ function confirmLogout() {
   border-radius: 10px !important;
   padding: 9px 28px !important;
   letter-spacing: 0.02em !important;
+}
+
+.schedule-status-toast {
+  position: fixed;
+  z-index: 2000;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  display: flex;
+  width: min(380px, calc(100vw - 32px));
+  align-items: center;
+  gap: 11px;
+  padding: 13px 16px;
+  border: 1px solid #d8dee2;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .97);
+  box-shadow: 0 12px 34px rgba(27, 37, 45, .18);
+  color: #303a42;
+  font: 600 .82rem/1.45 'Poppins', sans-serif;
+}
+.schedule-status-toast__icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf0f2;
+  color: #303a42;
+  font-size: .82rem;
+  font-weight: 800;
+}
+.schedule-status-toast.is-success { border-left: 3px solid #547b66; }
+.schedule-status-toast.is-error { border-left: 3px solid #a84c4c; }
+.schedule-toast-enter-active,
+.schedule-toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.schedule-toast-enter-from,
+.schedule-toast-leave-to { opacity: 0; transform: translateY(-8px); }
+.schedule-export-btn.is-loading { cursor: progress; }
+.consult-btn.is-loading svg { animation: schedule-button-spin .8s linear infinite; }
+.consult-del-btn:disabled { cursor: wait; opacity: .7; }
+@keyframes schedule-button-spin { to { transform: rotate(360deg); } }
+@media (max-width: 600px) {
+  .schedule-status-toast {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    padding: 12px 14px;
+    font-size: .78rem;
+  }
 }
 </style>

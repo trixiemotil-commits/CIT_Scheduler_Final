@@ -28,6 +28,20 @@
     </aside>
 
     <main class="main">
+      <Teleport to="body">
+        <Transition name="term-toast">
+          <div
+            v-if="statusToast"
+            class="term-status-toast"
+            :class="`is-${statusToast.type}`"
+            :role="statusToast.type === 'error' ? 'alert' : 'status'"
+            aria-live="polite"
+          >
+            <span class="term-status-toast__icon" aria-hidden="true">{{ statusToast.type === 'success' ? '✓' : '!' }}</span>
+            <span>{{ statusToast.message }}</span>
+          </div>
+        </Transition>
+      </Teleport>
       <header class="page-header">
         <div>
           <span class="page-eyebrow">Schedule management</span>
@@ -189,17 +203,17 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v15H4zM4 9h16M8 3v4M16 3v4M12 12v5M9.5 14.5h5"/></svg>
                 <span>Add schedule</span>
               </button>
-              <button class="excel-btn" title="Download all schedules for this term" @click="downloadTermExcel(term)">
+              <button class="excel-btn" :class="{ 'is-loading': isTermActionLoading(term, 'download') }" :disabled="!!activeTermAction" title="Download all schedules for this term" @click="downloadTermExcel(term)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/></svg>
-                <span>Download Excel</span>
+                <span>{{ isTermActionLoading(term, 'download') ? 'Downloading…' : 'Download Excel' }}</span>
               </button>
               <button class="edit-btn" title="Edit this term's details" @click="openTermModal(term)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-.7L19 7.8 16.2 5 4.7 16.5 4 20Z"/></svg>
                 <span>Edit details</span>
               </button>
-              <button class="publish-btn" :disabled="term.isPublished" :title="term.isPublished ? 'This is the current published term' : 'Make this term visible to teachers and students'" @click="publishTerm(term)">
+              <button class="publish-btn" :class="{ 'is-loading': isTermActionLoading(term, 'publish') }" :disabled="term.isPublished || !!activeTermAction" :title="term.isPublished ? 'This is the current published term' : 'Make this term visible to teachers and students'" @click="publishTerm(term)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 14v6h14v-6"/></svg>
-                <span>{{ term.isPublished ? 'Currently published' : 'Publish term' }}</span>
+                <span>{{ isTermActionLoading(term, 'publish') ? 'Publishing…' : term.isPublished ? 'Currently published' : 'Publish term' }}</span>
               </button>
             </div>
           </article>
@@ -276,7 +290,7 @@
               </div>
             </section>
           </div>
-          <footer><span class="footer-help">Step {{ modalStep }} of 3 · You can edit these details later.</span><button v-if="modalStep > 1" class="cancel-btn step-back-btn" @click="modalStep--">Back</button><button v-if="modalStep < 3" class="primary-btn save-term-btn" @click="nextModalStep">Continue</button><button v-else class="primary-btn save-term-btn" :disabled="saving" @click="saveTerm">{{ saving ? 'Saving term…' : editingTermId ? 'Save changes' : 'Create term' }}</button></footer>
+          <footer><span class="footer-help">Step {{ modalStep }} of 3 · You can edit these details later.</span><button v-if="modalStep > 1" class="cancel-btn step-back-btn" @click="modalStep--">Back</button><button v-if="modalStep < 3" class="primary-btn save-term-btn" @click="nextModalStep">Continue</button><button v-else class="primary-btn save-term-btn" :class="{ 'is-loading': saving }" :aria-busy="saving" :disabled="saving" @click="saveTerm">{{ saving ? (editingTermId ? 'Updating term…' : 'Creating term…') : editingTermId ? 'Save changes' : 'Create term' }}</button></footer>
         </div>
       </div>
     </Teleport>
@@ -289,7 +303,7 @@ import PublishedTermScheduleLink from '@/components/PublishedTermScheduleLink.vu
 import RoleSwitchButton from '@/components/RoleSwitchButton.vue'
 import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -343,6 +357,10 @@ const showTermModal = ref(false)
 const editingTermId = ref('')
 const modalStep = ref(1)
 const saving = ref(false)
+const activeTermAction = ref('')
+const statusToast = ref(null)
+let statusToastTimer = null
+let statusToastId = 0
 const selectedRooms = ref([])
 const form = reactive({ schoolYear: '', semester: '', sectionCounts: {}, sectionNames: {} })
 const isCurrentTermSource = computed(() => route.query.source === 'current')
@@ -359,6 +377,24 @@ const scheduleTypeOptions = [
   { value: 'parallel', label: 'Parallel' },
   { value: 'non-parallel', label: 'Non-Parallel' },
 ]
+
+function isTermActionLoading(term, action) {
+  return activeTermAction.value === `${termId(term)}:${action}`
+}
+
+function showStatusToast(type, message) {
+  statusToast.value = { type, message }
+  const toastId = ++statusToastId
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+  statusToastTimer = window.setTimeout(() => {
+    if (toastId === statusToastId) statusToast.value = null
+    statusToastTimer = null
+  }, 5000)
+}
+
+onBeforeUnmount(() => {
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+})
 
 function toggleAllRooms(event) {
   selectedRooms.value = event.target.checked ? [...allRoomNames.value] : []
@@ -502,8 +538,10 @@ async function loadPage() {
       const requestedMode = String(route.query.mode || '')
       if (['teacher', 'room', 'student'].includes(requestedMode)) await chooseWorkspaceMode(requestedMode)
     }
+    return true
   } catch (error) {
-    await Swal.fire({ icon: 'error', title: 'Unable to load terms', text: error.message })
+    showStatusToast('error', error.message || 'Unable to load academic terms.')
+    return false
   } finally { loading.value = false }
 }
 function openWorkspace(term, action) {
@@ -532,16 +570,17 @@ async function chooseWorkspaceMode(mode) {
     workspaceEntries.value = response.entries || []
   } catch (error) {
     workspaceEntries.value = []
-    await Swal.fire({ icon: 'error', title: 'Unable to load schedules', text: error.message })
+    showStatusToast('error', error.message || 'Unable to load schedules for this term.')
   } finally { workspaceLoading.value = false }
 }
 
 async function downloadTermExcel(term) {
   const academicTermId = termId(term)
   if (!academicTermId) return
+  if (activeTermAction.value) return
 
+  activeTermAction.value = `${academicTermId}:download`
   try {
-    Swal.fire({ title: 'Preparing Excel file', text: 'Loading this term\'s faculty loading…', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() })
     const XLSX = await import('xlsx-js-style')
     const [scheduleResponse, consultationResponse] = await Promise.all([
       apiRequest(`/schedules?academicTermId=${encodeURIComponent(academicTermId)}`),
@@ -803,10 +842,11 @@ async function downloadTermExcel(term) {
     XLSX.utils.book_append_sheet(workbook, studentScheduleSheet, 'Student Schedule')
     const safeTermLabel = termLabel(term).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()
     XLSX.writeFile(workbook, `faculty-loading-${safeTermLabel || 'academic-term'}.xlsx`)
-    Swal.close()
+    showStatusToast('success', 'Excel workbook downloaded.')
   } catch (error) {
-    Swal.close()
-    await Swal.fire({ icon: 'error', title: 'Unable to download faculty loading', text: error.message })
+    showStatusToast('error', error.message || 'Unable to download the Excel workbook.')
+  } finally {
+    activeTermAction.value = ''
   }
 }
 
@@ -1039,15 +1079,28 @@ async function saveTerm() {
   }
   try {
     await apiRequest(editingTermId.value ? `/academic-terms/${editingTermId.value}` : '/academic-terms', { method: editingTermId.value ? 'PATCH' : 'POST', body: JSON.stringify(payload) })
-    closeTermModal(); await loadPage()
-    await Swal.fire({ icon: 'success', title: 'Term saved', timer: 1300, showConfirmButton: false })
-  } catch (error) { await Swal.fire({ icon: 'error', title: 'Unable to save term', text: error.message }) } finally { saving.value = false }
+    const successMessage = editingTermId.value ? 'Academic term updated.' : 'Academic term created.'
+    closeTermModal()
+    const refreshed = await loadPage()
+    if (!refreshed) showStatusToast('error', `${successMessage} The term list could not be refreshed.`)
+    else showStatusToast('success', successMessage)
+  } catch (error) { showStatusToast('error', error.message || 'Unable to save this academic term.') } finally { saving.value = false }
 }
 async function publishTerm(term) {
+  if (activeTermAction.value) return
   const result = await Swal.fire({ icon: 'question', title: `Publish ${termLabel(term)}?`, text: 'This becomes the current schedule for teachers and students.', showCancelButton: true, confirmButtonText: 'Publish' })
   if (!result.isConfirmed) return
-  try { await apiRequest(`/academic-terms/${termId(term)}/publish`, { method: 'POST' }); await loadPage() }
-  catch (error) { await Swal.fire({ icon: 'error', title: 'Unable to publish term', text: error.message }) }
+  activeTermAction.value = `${termId(term)}:publish`
+  try {
+    await apiRequest(`/academic-terms/${termId(term)}/publish`, { method: 'POST' })
+    const refreshed = await loadPage()
+    if (!refreshed) showStatusToast('error', 'Term published, but the term list could not be refreshed.')
+    else showStatusToast('success', `${termLabel(term)} is now published.`)
+  } catch (error) {
+    showStatusToast('error', error.message || 'Unable to publish this academic term.')
+  } finally {
+    activeTermAction.value = ''
+  }
 }
 function logoutAndLeave() { logout(); router.push('/') }
 
@@ -1603,5 +1656,55 @@ loadPage()
   .setup-section { padding: 17px 14px; }
   .count-grid,.name-grid,.room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .footer-help { display: none; }
+}
+
+.term-status-toast {
+  position: fixed;
+  z-index: 2000;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  display: flex;
+  width: min(380px, calc(100vw - 32px));
+  align-items: center;
+  gap: 11px;
+  padding: 13px 16px;
+  border: 1px solid #d8dee2;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .97);
+  box-shadow: 0 12px 34px rgba(27, 37, 45, .18);
+  color: #303a42;
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.term-status-toast__icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf0f2;
+  color: #303a42;
+  font-size: .82rem;
+  font-weight: 800;
+}
+.term-status-toast.is-success { border-left: 3px solid #547b66; }
+.term-status-toast.is-error { border-left: 3px solid #a84c4c; }
+.term-toast-enter-active,
+.term-toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.term-toast-enter-from,
+.term-toast-leave-to { opacity: 0; transform: translateY(-8px); }
+.term-actions button.is-loading { cursor: progress; opacity: .78; }
+.term-actions button:disabled { cursor: wait; }
+
+@media (max-width: 600px) {
+  .term-status-toast {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    padding: 12px 14px;
+    font-size: .78rem;
+  }
 }
 </style>
