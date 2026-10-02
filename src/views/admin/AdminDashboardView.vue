@@ -184,7 +184,11 @@
             <p>{{ todayDateLabel }} <span>Updated {{ currentTimeLabel }}</span></p>
           </div>
           <div class="today-carousel-controls" v-if="todayTeachers.length > teachersPerSlide">
-            <span><i></i> {{ carouselAutoStopped ? `Showing ${carouselPageStart + 1}–${carouselPageEnd} of ${todayTeachers.length} teachers` : 'Auto-sliding schedule · swipe to pause' }}</span>
+            <span><i :class="{ 'is-paused': carouselAutoStopped }"></i> {{ carouselAutoStopped ? 'Paused · drag to browse' : 'Auto-sliding · swipe to pause' }}</span>
+            <template v-if="carouselAutoStopped">
+              <button type="button" aria-label="Previous teachers" @pointerdown.stop @click.stop="previousTodayTeachers">‹</button>
+              <button type="button" aria-label="Next teachers" @pointerdown.stop @click.stop="nextTodayTeachers">›</button>
+            </template>
           </div>
         </div>
 
@@ -196,7 +200,11 @@
           v-else-if="todayTeachers.length"
           ref="todayScheduleWrap"
           class="today-schedule-table-wrap"
-          :class="{ 'carousel-enabled': shouldAnimateTodaySchedule && !carouselAutoStopped }"
+          :class="{
+            'carousel-enabled': shouldAnimateTodaySchedule && !carouselAutoStopped,
+            'manual-carousel-scroll': shouldAnimateTodaySchedule && carouselAutoStopped,
+            'is-dragging': carouselIsDragging,
+          }"
           @pointerdown="beginCarouselGesture"
           @pointermove="moveCarouselGesture"
           @pointerup="endCarouselGesture"
@@ -205,7 +213,7 @@
         >
           <div
             class="today-schedule-track"
-            :class="{ 'carousel-table': shouldAnimateTodaySchedule && !carouselAutoStopped }"
+            :class="{ 'carousel-table': shouldAnimateTodaySchedule }"
             :style="{ '--teacher-columns': visibleTodayTeachers.length }"
           >
             <section v-for="(teacher, teacherIndex) in visibleTodayTeachers" :key="`${teacher.name}-${teacherIndex}`" class="teacher-schedule-column">
@@ -253,16 +261,9 @@
         <div class="chart-card" :class="{ 'chart-expanded': expandedChart === 'line', 'chart-hidden': expandedChart === 'bar' }">
           <div class="chart-header">
             <div class="chart-heading-main">
-              <span class="chart-title">Consultation Trends · {{ consultationTrendPeriodTitle }}</span>
-              <div class="chart-period-control" role="group" aria-label="Consultation trend period">
-                <button
-                  v-for="period in consultationTrendPeriods"
-                  :key="period.value"
-                  type="button"
-                  :class="{ 'is-active': consultationTrendPeriod === period.value }"
-                  :aria-pressed="consultationTrendPeriod === period.value"
-                  @click="setConsultationTrendPeriod(period.value)"
-                >{{ period.label }}</button>
+              <div class="chart-heading-copy">
+                <span class="chart-title">Consultation trends</span>
+                <span class="chart-caption">{{ consultationTrendPeriodTitle }} activity · {{ consultationPeriodTotal }} consultations</span>
               </div>
             </div>
             <button class="expand-btn" @click="toggleExpand('line')">
@@ -276,29 +277,36 @@
               </svg>
             </button>
           </div>
-          <div class="chart-wrap"><canvas ref="lineChartRef"></canvas></div>
+          <div class="consultation-filter-row">
+            <span class="filter-row-label">View by</span>
+            <div class="chart-period-control" role="group" aria-label="Filter consultation trends by period">
+              <button
+                v-for="period in consultationTrendPeriods"
+                :key="period.value"
+                type="button"
+                :class="{ 'is-active': consultationTrendPeriod === period.value }"
+                :aria-pressed="consultationTrendPeriod === period.value"
+                @click="setConsultationTrendPeriod(period.value)"
+              >{{ period.label }}</button>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div v-if="isConsultationLoading" class="chart-loading-overlay" role="status">
+              <span class="chart-loading-spinner" aria-hidden="true"></span>
+              <strong>Loading consultation trends</strong>
+              <span>Fetching the latest consultation activity…</span>
+            </div>
+            <canvas ref="lineChartRef"></canvas>
+          </div>
         </div>
 
         <!-- Teacher Workload -->
         <div class="chart-card" :class="{ 'chart-expanded': expandedChart === 'bar', 'chart-hidden': expandedChart === 'line' }">
           <div class="chart-header">
             <div class="workload-chart-heading">
-              <span class="chart-title">Teacher Workload<span v-if="publishedTermLabel"> · {{ publishedTermLabel }}</span></span>
-              <select
-                v-if="academicTerms.length"
-                v-model="selectedWorkloadTermId"
-                class="workload-term-filter"
-                aria-label="Filter teacher workload by semester"
-                @change="loadWorkloadTerm(selectedWorkloadTermId)"
-              >
-                <option v-for="term in academicTerms" :key="term._id || term.id" :value="String(term._id || term.id)">
-                  {{ term.schoolYear }} · {{ term.semester }}
-                </option>
-              </select>
-              <div class="workload-legend" aria-label="Workload thresholds">
-                <span><i class="workload-dot workload-dot--normal"></i>Normal &lt;10h</span>
-                <span><i class="workload-dot workload-dot--moderate"></i>Moderate 10–19h</span>
-                <span><i class="workload-dot workload-dot--overloaded"></i>Overloaded 20h+</span>
+              <div class="chart-heading-copy">
+                <span class="chart-title">Teacher workload</span>
+                <span class="chart-caption">Weekly scheduled hours<span v-if="publishedTermLabel"> · {{ publishedTermLabel }}</span></span>
               </div>
             </div>
             <button class="expand-btn" @click="toggleExpand('bar')">
@@ -312,8 +320,44 @@
               </svg>
             </button>
           </div>
+          <div class="workload-filter-row">
+            <label class="workload-filter-field workload-term-field">
+              <span>Academic term</span>
+              <select v-if="academicTerms.length" v-model="selectedWorkloadTermId" class="workload-term-filter" aria-label="Filter workload by academic term" @change="loadWorkloadTerm(selectedWorkloadTermId)">
+                <option v-for="term in academicTerms" :key="term._id || term.id" :value="String(term._id || term.id)">
+                  {{ term.schoolYear }} · {{ term.semester }}
+                </option>
+              </select>
+              <span v-else class="workload-term-empty">No terms available</span>
+            </label>
+            <label class="workload-filter-field">
+              <span>Find teacher</span>
+              <input v-model="workloadSearch" type="search" placeholder="Search name" aria-label="Search teachers by name" />
+            </label>
+            <label class="workload-filter-field">
+              <span>Workload</span>
+              <select v-model="workloadLevelFilter" aria-label="Filter teachers by workload level">
+                <option value="all">All levels</option>
+                <option value="normal">Normal · under 10h</option>
+                <option value="moderate">Moderate · 10–19h</option>
+                <option value="overloaded">Overloaded · 20h+</option>
+              </select>
+            </label>
+          </div>
+          <div class="workload-legend" aria-label="Workload thresholds">
+            <span><i class="workload-dot workload-dot--normal"></i>Normal &lt;10h</span>
+            <span><i class="workload-dot workload-dot--moderate"></i>Moderate 10–19h</span>
+            <span><i class="workload-dot workload-dot--overloaded"></i>Overloaded 20h+</span>
+            <span class="workload-result-count">{{ workloadChartItems.length }} teachers shown</span>
+          </div>
           <div class="chart-wrap workload-chart-wrap" @wheel="scrollWorkloadHorizontally">
-            <canvas ref="barChartRef" :style="{ cursor: 'pointer', width: '100%', maxWidth: '100%', minWidth: '100%' }"></canvas>
+            <div v-if="isWorkloadLoading" class="chart-loading-overlay" role="status">
+              <span class="chart-loading-spinner" aria-hidden="true"></span>
+              <strong>Loading teacher workload</strong>
+              <span>Calculating scheduled hours for this term…</span>
+            </div>
+            <div v-else-if="!workloadChartItems.length" class="workload-empty-state">No teachers match these filters.</div>
+            <canvas v-else ref="barChartRef" :style="{ cursor: 'pointer', width: '100%', maxWidth: '100%', minWidth: '100%' }"></canvas>
           </div>
         </div>
       </section>
@@ -436,7 +480,7 @@ import { getToken, getUser, logout } from '@/auth.js'
 import useNotifications from '@/composables/useNotifications.js'
 import { initialsAvatar } from '@/utils/avatar.js'
 import Chart from 'chart.js/auto'
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 // v-click-outside directive
@@ -480,14 +524,13 @@ const todayScheduleEntries = ref([])
 const teacherDirectory = ref([])
 const todayScheduleLoading = ref(true)
 const currentDateTime = ref(new Date())
-const teachersPerSlide = computed(() => todayTeachers.value.length <= 5
-  ? Math.max(1, todayTeachers.value.length)
-  : Math.ceil(todayTeachers.value.length / 2))
+const teachersPerSlide = computed(() => Math.min(5, Math.max(1, todayTeachers.value.length)))
 const todayScheduleWrap = ref(null)
-const todayCarouselPage = ref(0)
 const carouselAutoStopped = ref(false)
+const carouselIsDragging = ref(false)
 const carouselGestureStartX = ref(0)
 const carouselGestureCurrentX = ref(0)
+const carouselGestureStartScrollLeft = ref(0)
 const carouselWheelLocked = ref(false)
 let dashboardRealtimeTimer = null
 
@@ -618,63 +661,57 @@ const infiniteTeachers = computed(() => {
   const teachers = todayTeachers.value
   return shouldAnimateTodaySchedule.value ? [...teachers, ...teachers, ...teachers] : teachers
 })
-const todayCarouselPages = computed(() => Array.from(
-  { length: Math.ceil(todayTeachers.value.length / teachersPerSlide.value) },
-  (_, index) => ({ index, start: index * teachersPerSlide.value })
-))
-const visibleTodayTeachers = computed(() => carouselAutoStopped.value
-  ? todayTeachers.value.slice(
-    todayCarouselPage.value * teachersPerSlide.value,
-    (todayCarouselPage.value + 1) * teachersPerSlide.value,
-  )
-  : infiniteTeachers.value)
-const carouselPageStart = computed(() => todayCarouselPage.value * teachersPerSlide.value)
-const carouselPageEnd = computed(() => Math.min(carouselPageStart.value + visibleTodayTeachers.value.length, todayTeachers.value.length))
+const visibleTodayTeachers = computed(() => carouselAutoStopped.value ? todayTeachers.value : infiniteTeachers.value)
 
 function previousTodayTeachers() {
-  if (!todayCarouselPages.value.length) return
   carouselAutoStopped.value = true
-  todayCarouselPage.value = (todayCarouselPage.value + todayCarouselPages.value.length - 1) % todayCarouselPages.value.length
+  const container = todayScheduleWrap.value
+  if (container) container.scrollBy({ left: -container.clientWidth * 0.8, behavior: 'smooth' })
 }
 
 function nextTodayTeachers() {
-  if (!todayCarouselPages.value.length) return
   carouselAutoStopped.value = true
-  todayCarouselPage.value = (todayCarouselPage.value + 1) % todayCarouselPages.value.length
+  const container = todayScheduleWrap.value
+  if (container) container.scrollBy({ left: container.clientWidth * 0.8, behavior: 'smooth' })
 }
 
 function beginCarouselGesture(event) {
+  if (!shouldAnimateTodaySchedule.value) return
+  carouselAutoStopped.value = true
+  carouselIsDragging.value = true
   carouselGestureStartX.value = event.clientX || 0
   carouselGestureCurrentX.value = carouselGestureStartX.value
+  carouselGestureStartScrollLeft.value = todayScheduleWrap.value?.scrollLeft || 0
   event.currentTarget?.setPointerCapture?.(event.pointerId)
 }
 
 function moveCarouselGesture(event) {
+  if (!carouselIsDragging.value) return
   carouselGestureCurrentX.value = event.clientX || carouselGestureCurrentX.value
+  const distance = carouselGestureCurrentX.value - carouselGestureStartX.value
+  if (Math.abs(distance) > 3 && todayScheduleWrap.value) {
+    todayScheduleWrap.value.scrollLeft = carouselGestureStartScrollLeft.value - distance
+  }
 }
 
 function endCarouselGesture(event) {
   event.currentTarget?.releasePointerCapture?.(event.pointerId)
-  if (!shouldAnimateTodaySchedule.value) return
-
-  const endX = event.clientX || carouselGestureCurrentX.value
-  const distance = endX - carouselGestureStartX.value
-  if (Math.abs(distance) < 40) return
-
-  if (distance < 0) nextTodayTeachers()
-  else previousTodayTeachers()
+  carouselIsDragging.value = false
   carouselGestureStartX.value = 0
   carouselGestureCurrentX.value = 0
 }
 
 function cancelCarouselGesture(event) {
   event.currentTarget?.releasePointerCapture?.(event.pointerId)
+  carouselIsDragging.value = false
   carouselGestureStartX.value = 0
   carouselGestureCurrentX.value = 0
 }
 
 function handleCarouselWheel(event) {
   if (!shouldAnimateTodaySchedule.value || carouselWheelLocked.value) return
+  const container = event.currentTarget
+  if (!container) return
 
   const horizontalDistance = Math.abs(event.deltaX) >= Math.abs(event.deltaY)
     ? event.deltaX
@@ -682,9 +719,9 @@ function handleCarouselWheel(event) {
   if (Math.abs(horizontalDistance) < 20) return
 
   event.preventDefault()
+  carouselAutoStopped.value = true
+  container.scrollLeft += horizontalDistance
   carouselWheelLocked.value = true
-  if (horizontalDistance > 0) nextTodayTeachers()
-  else previousTodayTeachers()
   window.setTimeout(() => {
     carouselWheelLocked.value = false
   }, 450)
@@ -945,6 +982,9 @@ const consultationTrendPeriods = [
   { value: 'week', label: 'Week' },
   { value: 'day', label: 'Day' },
 ]
+const workloadSearch = ref('')
+const workloadLevelFilter = ref('all')
+let workloadFilterRedrawTimer = null
 let lineChartInstance = null
 let barChartInstance = null
 
@@ -952,6 +992,8 @@ let barChartInstance = null
 const showWorkloadModal = ref(false)
 const selectedTeacher = ref(null)
 const consultationRequests = ref([])
+const isConsultationLoading = ref(true)
+const isWorkloadLoading = ref(true)
 const showConsultationDayModal = ref(false)
 const selectedConsultationPeriodLabel = ref('')
 const selectedConsultationPeriodRequests = ref([])
@@ -962,6 +1004,16 @@ const selectedWorkloadTermId = ref('')
 const publishedTermLabel = ref('')
 const workloadChartWidth = computed(() => Math.max(760, (liveTeacherWorkloads.value.length || 5) * 180))
 const workloadChartItems = computed(() => (liveTeacherWorkloads.value.length ? liveTeacherWorkloads.value : teacherWorkloads)
+  .filter(teacher => {
+    const query = workloadSearch.value.trim().toLocaleLowerCase()
+    const hours = Number(teacher.totalHours) || 0
+    const matchesName = !query || String(teacher.name || '').toLocaleLowerCase().includes(query)
+    const matchesLevel = workloadLevelFilter.value === 'all'
+      || (workloadLevelFilter.value === 'normal' && hours < 10)
+      || (workloadLevelFilter.value === 'moderate' && hours >= 10 && hours < 20)
+      || (workloadLevelFilter.value === 'overloaded' && hours >= 20)
+    return matchesName && matchesLevel
+  })
   .slice()
   .sort((first, second) => second.totalHours - first.totalHours || first.name.localeCompare(second.name)))
 const workloadByTermCache = new Map()
@@ -1123,6 +1175,7 @@ const consultationPeriodCounts = computed(() => chartPeriods.value.map(period =>
   return requestDate >= period.start && requestDate < period.end
     && !['CANCELLED', 'ARCHIVED'].includes(request.status)
 }).length))
+const consultationPeriodTotal = computed(() => consultationPeriodCounts.value.reduce((sum, count) => sum + count, 0))
 
 function setConsultationTrendPeriod(period) {
   if (consultationTrendPeriod.value === period) return
@@ -1202,6 +1255,7 @@ function calculateWorkloads(users, scheduleEntries) {
 }
 
 async function loadChartData() {
+  isConsultationLoading.value = true
   try {
     const [termPayload, requestsPayload, usersPayload, termsPayload] = await Promise.all([
       apiRequest('/academic-terms/published'),
@@ -1227,9 +1281,15 @@ async function loadChartData() {
         || '',
     }))
     await loadWorkloadTerm(termIdOf(selectedTerm))
-    if (lineChartInstance) createLineChart()
   } catch (error) {
     console.error('Failed to load dashboard chart data:', error)
+    isWorkloadLoading.value = false
+    await nextTick()
+    createBarChart()
+  } finally {
+    isConsultationLoading.value = false
+    await nextTick()
+    createLineChart()
   }
 }
 
@@ -1241,9 +1301,12 @@ async function loadWorkloadTerm(termId) {
     ? `${term.schoolYear || ''} · ${term.semester || ''}`.trim()
     : ''
   const requestId = ++workloadRequestId
+  isWorkloadLoading.value = true
 
   if (workloadByTermCache.has(selectedId)) {
     liveTeacherWorkloads.value = workloadByTermCache.get(selectedId)
+    isWorkloadLoading.value = false
+    await nextTick()
     createBarChart()
     return
   }
@@ -1256,9 +1319,16 @@ async function loadWorkloadTerm(termId) {
     const workloads = calculateWorkloads(workloadUsers.value, schedulesPayload.entries || [])
     workloadByTermCache.set(selectedId, workloads)
     liveTeacherWorkloads.value = workloads
+    isWorkloadLoading.value = false
+    await nextTick()
     createBarChart()
   } catch (error) {
-    if (requestId === workloadRequestId) console.error('Failed to load semester workload:', error)
+    if (requestId === workloadRequestId) {
+      console.error('Failed to load semester workload:', error)
+      isWorkloadLoading.value = false
+      await nextTick()
+      createBarChart()
+    }
   }
 }
 
@@ -1353,6 +1423,7 @@ function workloadBarColor(hours) {
 
 function createBarChart() {
   if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null }
+  if (!barChartRef.value || !workloadChartItems.value.length) return
   const expanded = expandedChart.value === 'bar'
   const workloadItems = workloadChartItems.value
   const labels = workloadItems.map(teacher => teacher.name)
@@ -1391,11 +1462,11 @@ function createBarChart() {
         label: 'Teacher hours',
         data: workloadItems.map(teacher => Math.min(teacher.totalHours, workloadMaximumHours)),
         backgroundColor: workloadItems.map(teacher => workloadBarColor(teacher.totalHours)),
-        borderRadius: 12,
+        borderRadius: 5,
         borderSkipped: false,
         borderWidth: 0,
-        barThickness: 18,
-        maxBarThickness: 22
+        barThickness: 7,
+        maxBarThickness: 7
       }]
     },
     options: {
@@ -1469,10 +1540,10 @@ function createBarChart() {
       },
       datasets: {
         bar: {
-          borderRadius: 14,
+          borderRadius: 5,
           borderSkipped: false,
-          barThickness: 18,
-          maxBarThickness: 22,
+          barThickness: 7,
+          maxBarThickness: 7,
           borderWidth: 0,
         }
       }
@@ -1480,6 +1551,15 @@ function createBarChart() {
     plugins: [workloadValueLabels],
   })
 }
+
+watch([workloadSearch, workloadLevelFilter], async () => {
+  if (workloadFilterRedrawTimer) window.clearTimeout(workloadFilterRedrawTimer)
+  await nextTick()
+  workloadFilterRedrawTimer = window.setTimeout(() => {
+    workloadFilterRedrawTimer = null
+    createBarChart()
+  }, 90)
+})
 
 onMounted(() => {
   loadDashboardSummary()
@@ -1498,6 +1578,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (workloadFilterRedrawTimer) window.clearTimeout(workloadFilterRedrawTimer)
   if (dashboardRealtimeTimer) window.clearInterval(dashboardRealtimeTimer)
   window.removeEventListener('focus', refreshTodayTeacherSchedules)
   document.removeEventListener('visibilitychange', refreshTodayTeacherSchedules)
@@ -2021,6 +2102,21 @@ function confirmLogout() {
   background: #59656d;
   box-shadow: 0 0 0 3px rgba(89,101,109,.12);
 }
+.today-carousel-controls i.is-paused { background: #b88638; box-shadow: 0 0 0 3px rgba(184,134,56,.14); }
+.today-carousel-controls button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid #d0d6d9;
+  border-radius: 7px;
+  background: rgba(255,255,255,.8);
+  color: #45534d;
+  cursor: pointer;
+  font: 700 1.15rem/1 'Segoe UI', sans-serif;
+}
+.today-carousel-controls button:hover { background: #fff; border-color: #9aaba2; }
+.today-carousel-controls button:focus-visible { outline: 2px solid #658977; outline-offset: 2px; }
 /* Table format styles */
 .today-schedule-table-wrap { 
   overflow: hidden;
@@ -2032,6 +2128,30 @@ function confirmLogout() {
   animation: tableSlideIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   user-select: none;
   touch-action: pan-y;
+}
+.today-schedule-table-wrap.manual-carousel-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  cursor: grab;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+}
+.today-schedule-table-wrap.manual-carousel-scroll::-webkit-scrollbar { display: none; }
+.today-schedule-table-wrap.manual-carousel-scroll.is-dragging { cursor: grabbing; }
+.today-schedule-table-wrap.manual-carousel-scroll .today-schedule-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 240px;
+  grid-template-columns: none;
+  width: max-content;
+  min-width: 0;
+  transform: none;
+}
+.today-schedule-table-wrap.manual-carousel-scroll .teacher-schedule-column {
+  width: 240px;
+  min-width: 240px;
+  scroll-snap-align: start;
 }
 @keyframes tableSlideIn {
   from {
@@ -2461,13 +2581,13 @@ function confirmLogout() {
 /* Charts */
 .charts-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
-  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  flex: 0 0 auto;
   min-height: 0;
-  margin-top: 12px;
-  margin-bottom: 0;
-  padding-bottom: 400px;
+  margin-top: 18px;
+  margin-bottom: 28px;
+  padding-bottom: 0;
 }
 .chart-card {
   background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(240,240,239,0.82) 100%);
@@ -2477,7 +2597,7 @@ function confirmLogout() {
   box-shadow: 0 10px 18px rgba(30, 36, 42, 0.04), inset 0 1px 0 rgba(255,255,255,0.7);
   display: flex;
   flex-direction: column;
-  min-height: 380px;
+  min-height: 600px;
   min-width: 0;
   overflow: hidden;
   transition: box-shadow 0.2s ease, opacity 0.2s ease;
@@ -2485,7 +2605,7 @@ function confirmLogout() {
 }
 .chart-card.chart-expanded {
   grid-column: 1 / -1;
-  min-height: 500px;
+  min-height: 700px;
 }
 .chart-card.chart-hidden {
   display: none;
@@ -2498,24 +2618,36 @@ function confirmLogout() {
   flex-shrink: 0;
   padding: 2px 2px 0;
 }
+.chart-heading-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.chart-caption { color: #7a858d; font-size: .68rem; font-weight: 600; letter-spacing: .015em; }
+.consultation-filter-row { display: flex; align-items: center; gap: 9px; margin: 0 2px 12px; }
+.filter-row-label { color: #77818a; font-size: .63rem; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
 .workload-chart-heading {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px 12px;
   min-width: 0;
   flex: 1;
 }
 .workload-term-filter {
-  max-width: 190px;
-  min-height: 32px;
-  padding: 5px 28px 5px 9px;
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 30px 7px 10px;
   border: 1px solid rgba(120, 127, 133, 0.24);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.78);
+  border-radius: 9px;
+  background: #fff;
   color: #465159;
-  font: 600 0.72rem 'Segoe UI', sans-serif;
+  font: 600 0.74rem 'Segoe UI', sans-serif;
 }
+.workload-filter-row { display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(120px, .9fr) minmax(140px, 1fr); gap: 9px; margin: 0 2px 10px; }
+.workload-filter-field { display: flex; min-width: 0; flex-direction: column; gap: 5px; color: #77818a; font-size: .62rem; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
+.workload-filter-field input,
+.workload-filter-field select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 38px; padding: 7px 10px; border: 1px solid rgba(120,127,133,.22); border-radius: 9px; background: #fff; color: #465159; font: 600 .72rem 'Segoe UI',sans-serif; letter-spacing: normal; text-transform: none; transition: border-color .18s,box-shadow .18s; }
+.workload-filter-field input::placeholder { color: #a0a8ad; font-weight: 500; }
+.workload-term-filter:focus,
+.workload-filter-field input:focus,
+.workload-filter-field select:focus { border-color: #658977; box-shadow: 0 0 0 3px rgba(58,112,83,.12); outline: none; }
+.workload-term-empty { display: flex; min-height: 38px; align-items: center; padding: 7px 10px; border: 1px solid rgba(120,127,133,.16); border-radius: 9px; background: rgba(255,255,255,.55); color: #858e94; font-size: .72rem; letter-spacing: normal; text-transform: none; }
 .workload-legend {
   display: flex;
   align-items: center;
@@ -2524,6 +2656,7 @@ function confirmLogout() {
   color: #68727a;
   font-size: 0.64rem;
   font-weight: 600;
+  margin: 0 2px 10px;
 }
 .workload-legend span {
   display: inline-flex;
@@ -2531,6 +2664,7 @@ function confirmLogout() {
   gap: 4px;
   white-space: nowrap;
 }
+.workload-result-count { margin-left: auto; color: #8a9399; font-weight: 600; }
 .workload-dot {
   width: 8px;
   height: 8px;
@@ -2563,11 +2697,13 @@ function confirmLogout() {
   gap: 2px;
   padding: 3px;
   border: 1px solid rgba(120, 127, 133, 0.16);
-  border-radius: 8px;
-  background: rgba(224, 228, 230, 0.7);
+  border-radius: 10px;
+  background: rgba(232, 235, 235, 0.72);
 }
 .chart-period-control button {
-  padding: 5px 8px;
+  min-width: 52px;
+  min-height: 32px;
+  padding: 6px 10px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -2580,9 +2716,11 @@ function confirmLogout() {
 }
 .chart-period-control button.is-active {
   background: #fff;
-  color: #30353a;
+  color: #245b40;
   box-shadow: 0 1px 3px rgba(48, 53, 58, 0.14);
 }
+.chart-period-control button:focus-visible,
+.expand-btn:focus-visible { outline: 2px solid #658977; outline-offset: 2px; }
 .expand-btn {
   background: none;
   border: none;
@@ -2595,15 +2733,44 @@ function confirmLogout() {
 .expand-btn:hover { color: #30353a; }
 .chart-wrap {
   flex: 1;
-  min-height: 0;
-  height: 320px;
+  min-height: 440px;
+  height: 460px;
   position: relative;
 }
+.chart-loading-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 12px;
+  background: rgba(247, 249, 249, .88);
+  color: #58656c;
+  text-align: center;
+  backdrop-filter: blur(3px);
+}
+.chart-loading-overlay strong { color: #35413f; font-size: .84rem; font-weight: 700; }
+.chart-loading-overlay > span:last-child { color: #849097; font-size: .7rem; font-weight: 500; }
+.chart-loading-spinner {
+  width: 27px;
+  height: 27px;
+  border: 3px solid rgba(67, 112, 89, .18);
+  border-top-color: #437159;
+  border-radius: 50%;
+  animation: chartLoadingSpin .75s linear infinite;
+}
+@keyframes chartLoadingSpin { to { transform: rotate(360deg); } }
 .workload-chart-wrap {
+  position: relative;
   width: 100%;
   min-width: 0;
-  height: 330px;
-  overflow: hidden;
+  height: 480px;
+  min-height: 440px;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 10px 12px 10px 8px;
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
@@ -2612,13 +2779,14 @@ function confirmLogout() {
   justify-content: center;
   border: 1px solid rgba(90,98,104,0.08);
 }
+.workload-empty-state { display: grid; width: 100%; min-height: 220px; place-items: center; color: #7a858d; font-size: .82rem; font-weight: 600; }
 .workload-chart-wrap::-webkit-scrollbar { display: none; }
 .workload-chart-wrap canvas {
   display: block;
   width: 100% !important;
   max-width: 100% !important;
   height: 100% !important;
-  min-height: 290px;
+  min-height: 430px;
   flex: 1;
   border-radius: 12px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
@@ -2901,8 +3069,12 @@ function confirmLogout() {
   .today-teachers-header h2 { font-size: 1.05rem; }
   .today-teachers-header p { font-size: .72rem; }
   .today-teachers-empty { min-height: 90px; }
-  .charts-row { gap: 12px; margin-top: 8px; padding-bottom: 180px; }
-  .chart-card { min-height: 280px; padding: 14px 14px 12px; }
+  .charts-row { gap: 14px; margin-top: 12px; margin-bottom: 22px; padding-bottom: 0; }
+  .chart-card { min-height: 540px; padding: 14px 14px 12px; }
+  .chart-wrap { height: 430px; min-height: 410px; }
+  .workload-chart-wrap { height: 450px; min-height: 410px; }
+  .workload-filter-row { grid-template-columns: minmax(130px, 1.15fr) minmax(105px, .85fr) minmax(125px, 1fr); gap: 7px; }
+  .workload-legend { gap: 5px 8px; font-size: .6rem; }
 }
 
 @media (max-width: 1100px) {
@@ -2916,7 +3088,11 @@ function confirmLogout() {
 }
 @media (max-width: 900px) {
   .charts-row { grid-template-columns: 1fr; }
-  .chart-card { min-height: 360px; }
+  .chart-card { min-height: 570px; }
+  .chart-wrap { height: 440px; min-height: 420px; }
+  .workload-chart-wrap { height: 460px; min-height: 430px; }
+  .workload-filter-row { grid-template-columns: 1fr 1fr; }
+  .workload-term-field { grid-column: 1 / -1; }
 }
 @media (max-width: 600px) {
   .main { padding: 20px 16px 32px; }
@@ -2929,6 +3105,13 @@ function confirmLogout() {
   .today-stage-arrow.previous { left: 0; }
   .today-stage-arrow.next { right: 0; }
   .sidebar { width: 200px; min-width: 200px; }
+  .workload-filter-row { grid-template-columns: 1fr; }
+  .workload-term-field { grid-column: auto; }
+  .workload-result-count { margin-left: 0; width: 100%; }
+  .consultation-filter-row { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .chart-card { min-height: 540px; }
+  .chart-wrap { height: 420px; min-height: 400px; }
+  .workload-chart-wrap { height: 440px; min-height: 420px; padding-inline: 4px; }
 }
 
 @media (max-width: 768px) {
