@@ -2359,10 +2359,11 @@ function printSchedule() {
 .free-time-cell {
   position: relative;
   vertical-align: middle !important;
-  background: linear-gradient(135deg, rgba(238, 232, 255, 0.88), rgba(245, 241, 255, 0.74)) !important;
+  /* Keep empty slots filled even when a neighboring event spans several rows. */
+  background: linear-gradient(135deg, #eee8ff, #f5f1ff) !important;
 }
 .free-time-cell:hover {
-  background: linear-gradient(135deg, rgba(230, 220, 255, 0.94), rgba(240, 235, 255, 0.82)) !important;
+  background: linear-gradient(135deg, #e6dcff, #f0ebff) !important;
 }
 .free-time-label {
   position: absolute;

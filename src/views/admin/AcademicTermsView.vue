@@ -37,7 +37,7 @@
             :role="statusToast.type === 'error' ? 'alert' : 'status'"
             aria-live="polite"
           >
-            <span class="term-status-toast__icon" aria-hidden="true">{{ statusToast.type === 'success' ? '✓' : '!' }}</span>
+            <span class="term-status-toast__icon" aria-hidden="true">{{ statusToast.type === 'success' ? '✓' : statusToast.type === 'info' ? 'i' : '!' }}</span>
             <span>{{ statusToast.message }}</span>
           </div>
         </Transition>
@@ -65,38 +65,28 @@
         </div>
 
           <div v-if="!workspaceMode" class="mode-grid">
-          <button class="mode-card" @click="chooseWorkspaceMode('student')">
+          <button class="mode-card" :class="{ 'is-loading': workspacePendingMode === 'student' }" :disabled="workspaceLoading" :aria-busy="workspacePendingMode === 'student'" @click="chooseWorkspaceMode('student')">
             <span class="mode-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M4 22v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg></span>
             <span class="mode-copy"><strong>Student</strong><small>{{ workspaceAction === 'add' ? 'Choose a year and section to manage schedules' : 'Browse schedules by student group' }}</small></span>
-            <span class="mode-arrow" aria-hidden="true">&rarr;</span>
+            <span class="mode-arrow" aria-hidden="true">{{ workspacePendingMode === 'student' ? 'Loading…' : '→' }}</span>
           </button>
-          <button class="mode-card" @click="chooseWorkspaceMode('room')">
+          <button class="mode-card" :class="{ 'is-loading': workspacePendingMode === 'room' }" :disabled="workspaceLoading" :aria-busy="workspacePendingMode === 'room'" @click="chooseWorkspaceMode('room')">
             <span class="mode-icon" v-html="roomIcon"></span>
             <span class="mode-copy"><strong>Room</strong><small>{{ workspaceAction === 'add' ? 'Choose a room to manage its schedule' : 'See the classes assigned to each room' }}</small></span>
-            <span class="mode-arrow" aria-hidden="true">&rarr;</span>
+            <span class="mode-arrow" aria-hidden="true">{{ workspacePendingMode === 'room' ? 'Loading…' : '→' }}</span>
           </button>
-          <button class="mode-card" @click="chooseWorkspaceMode('teacher')">
+          <button class="mode-card" :class="{ 'is-loading': workspacePendingMode === 'teacher' }" :disabled="workspaceLoading" :aria-busy="workspacePendingMode === 'teacher'" @click="chooseWorkspaceMode('teacher')">
             <span class="mode-icon" v-html="teacherIcon"></span>
             <span class="mode-copy"><strong>Faculty</strong><small>{{ workspaceAction === 'add' ? 'Choose a faculty member to manage their schedule' : 'See each faculty member’s complete schedule' }}</small></span>
-            <span class="mode-arrow" aria-hidden="true">&rarr;</span>
+            <span class="mode-arrow" aria-hidden="true">{{ workspacePendingMode === 'teacher' ? 'Loading…' : '→' }}</span>
           </button>
+          <p v-if="workspaceLoading" class="mode-loading-note" role="status">Loading {{ workspacePendingMode === 'teacher' ? 'faculty' : workspacePendingMode }} schedules…</p>
         </div>
 
         <template v-else>
           <div class="preview-toolbar">
             <div class="preview-toolbar__intro">
               <button class="back-btn" @click="workspaceMode = ''; previewPage = 1"><span aria-hidden="true">&larr;</span> Choose another mode</button>
-            </div>
-            <div class="schedule-type-filter" role="tablist" aria-label="Schedule type filter">
-              <button
-                v-for="option in scheduleTypeOptions"
-                :key="option.value"
-                type="button"
-                :class="{ active: scheduleTypeFilter === option.value }"
-                role="tab"
-                :aria-selected="scheduleTypeFilter === option.value"
-                @click="scheduleTypeFilter = option.value; previewPage = 1"
-              >{{ option.label }}</button>
             </div>
             <label class="preview-search">
               <span>Search {{ workspaceMode === 'room' ? 'room' : (workspaceMode === 'teacher' ? 'teacher' : 'student') }}</span>
@@ -123,13 +113,13 @@
               <button class="back-btn" @click="studentYearSelection = null"><span aria-hidden="true">&larr;</span> Choose another year</button>
               <div style="margin-left:12px"><strong>{{ studentYearSelection }}</strong><small style="display:block;color:#6b7680">Select a section to manage schedules</small></div>
             </div>
-            <div v-if="!filteredWorkspaceEntries.length" class="empty-state">No {{ scheduleTypeFilter === 'all' ? '' : `${scheduleTypeFilter} ` }}schedules found for this term.</div>
+            <div v-if="!filteredWorkspaceEntries.length" class="empty-state">No schedules found for this term.</div>
             <div v-else class="section-grid">
-              <button v-for="s in (workspaceTerm.sectionNames?.[studentYearSelection] || [])" :key="s" class="preview-card" @click="openSchedule({ value: { year: studentYearSelection, section: s } })">
+              <button v-for="s in (workspaceTerm.sectionNames?.[studentYearSelection] || [])" :key="s" class="preview-card" :disabled="!!openingScheduleKey" :aria-busy="openingScheduleKey === `student:${studentYearSelection}:${s}`" @click="openSchedule({ value: { year: studentYearSelection, section: s } }, `student:${studentYearSelection}:${s}`)">
                 <div class="preview-card-head">
                   <span class="preview-avatar"><span>{{ studentYearSelection.slice(0,1) }}</span></span>
                   <div><strong>{{ studentYearSelection }} · {{ s }}</strong><small>{{ filteredWorkspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length }} scheduled class{{ filteredWorkspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length === 1 ? '' : 'es' }}</small></div>
-                  <span class="open-arrow" aria-hidden="true">&rarr;</span>
+                  <span class="open-arrow" aria-hidden="true">{{ openingScheduleKey === `student:${studentYearSelection}:${s}` ? 'Opening…' : '→' }}</span>
                 </div>
               </button>
             </div>
@@ -138,14 +128,14 @@
           <div v-else-if="!pagedPreviewTargets.length" class="empty-state">No matching {{ workspaceMode === 'room' ? 'rooms' : (workspaceMode === 'teacher' ? 'teachers' : 'student groups') }} found.</div>
 
           <div v-else class="preview-grid">
-            <button v-for="target in pagedPreviewTargets" :key="target.key" class="preview-card" @click="openSchedule(target)">
+            <button v-for="target in pagedPreviewTargets" :key="target.key" class="preview-card" :disabled="!!openingScheduleKey" :aria-busy="openingScheduleKey === target.key" @click="openSchedule(target, target.key)">
               <div class="preview-card-head">
                 <span class="preview-avatar">
                   <span>{{ target.initials }}</span>
                   <img v-if="target.avatar" :src="target.avatar" :alt="`${target.label} profile photo`" @error="hideBrokenAvatar" />
                 </span>
                 <div><strong>{{ target.label }}</strong><small>{{ target.entries.length }} scheduled class{{ target.entries.length === 1 ? '' : 'es' }}</small></div>
-                <span class="open-arrow" aria-hidden="true">&rarr;</span>
+                <span class="open-arrow" aria-hidden="true">{{ openingScheduleKey === target.key ? 'Opening…' : '→' }}</span>
               </div>
               <div class="mini-schedule">
                 <div v-for="day in weekdays" :key="day" class="mini-day">
@@ -189,7 +179,7 @@
               </div>
               <p class="term-guidance">{{ term.isPublished ? 'Visible to teachers and students' : 'Only visible in the admin workspace' }}</p>
               <div class="term-metrics" aria-label="Term summary">
-                <span v-for="year in yearOptions" :key="year" class="term-metric"><b>{{ sectionCount(term, year) }}</b>{{ year.replace(' Year', '') }} year sections</span>
+                <span v-for="(year, index) in yearOptions" :key="year" class="term-metric" :class="`section-metric--year-${index + 1}`"><b>{{ sectionCount(term, year) }}</b>{{ year.replace(' Year', '') }} year sections</span>
                 <span class="term-metric room-metric"><b>{{ roomCount(term) }}</b>rooms</span>
               </div>
             </div>
@@ -246,14 +236,14 @@
             <section v-if="modalStep === 1" class="form-section setup-section">
               <div class="setup-section__heading"><span class="step-number">1</span><div><h3>Term details</h3><p>Name the school year and semester.</p></div></div>
               <div class="two-columns">
-                <label><span>School year</span><select v-model="form.schoolYear" required><option value="">Choose a school year</option><option v-for="schoolYear in schoolYearOptions" :key="schoolYear" :value="schoolYear">{{ schoolYear }}</option></select></label>
-                <label><span>Semester</span><select v-model="form.semester"><option value="">Choose a semester</option><option>1st Semester</option><option>2nd Semester</option></select></label>
+                <label :class="{ 'is-invalid': termDetailsAttempted && !form.schoolYear }"><span>School year</span><select v-model="form.schoolYear" :aria-invalid="termDetailsAttempted && !form.schoolYear" required><option value="">Choose a school year</option><option v-for="schoolYear in schoolYearOptions" :key="schoolYear" :value="schoolYear">{{ schoolYear }}</option></select><small v-if="termDetailsAttempted && !form.schoolYear" class="field-error-hint">Please select a school year.</small></label>
+                <label :class="{ 'is-invalid': termDetailsAttempted && !form.semester }"><span>Semester</span><select v-model="form.semester" :aria-invalid="termDetailsAttempted && !form.semester"><option value="">Choose a semester</option><option>1st Semester</option><option>2nd Semester</option></select><small v-if="termDetailsAttempted && !form.semester" class="field-error-hint">Please select a semester.</small></label>
               </div>
             </section>
             <section v-else-if="modalStep === 2" class="form-section setup-section">
               <div class="setup-section__heading"><span class="step-number">2</span><div><h3>Sections</h3><p>Enter how many sections each year level will have.</p></div></div>
               <div class="count-grid">
-                <label v-for="year in yearOptions" :key="year"><span>{{ year }}</span><input :value="form.sectionCounts[year] ?? ''" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{0,2}" placeholder="0" @input="limitSectionCountInput($event, year)" /></label>
+                <label v-for="year in yearOptions" :key="year" :class="{ 'is-invalid': sectionCountsAttempted && (form.sectionCounts[year] === undefined || form.sectionCounts[year] === '') }"><span>{{ year }}</span><input :value="form.sectionCounts[year] ?? ''" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]{0,2}" placeholder="0" :aria-invalid="sectionCountsAttempted && (form.sectionCounts[year] === undefined || form.sectionCounts[year] === '')" @input="limitSectionCountInput($event, year)" /><small v-if="sectionCountsAttempted && (form.sectionCounts[year] === undefined || form.sectionCounts[year] === '')" class="field-error-hint">Enter a count, or 0 if none.</small></label>
               </div>
               <div v-if="yearOptions.some(year => form.sectionNames[year]?.length)" class="name-groups">
                 <div v-for="year in yearOptions.filter(item => form.sectionNames[item]?.length)" :key="year" class="name-group">
@@ -268,11 +258,12 @@
               <div v-else class="inline-empty">Section-name fields will appear after you enter section counts above.</div>
             </section>
             <section v-else class="form-section setup-section">
-              <div class="setup-section__heading room-heading"><span class="step-number">3</span><div><h3>Available rooms</h3><p>Select rooms that schedulers may use during this term.</p></div><span class="selection-count">{{ selectedRooms.length }} selected</span></div>
+              <div class="setup-section__heading room-heading"><span class="step-number">3</span><div><h3>Available rooms</h3><p>Select rooms that schedulers may use during this term.</p></div><span class="selection-count" :class="{ 'is-invalid': roomSelectionAttempted && !selectedRooms.length }">{{ selectedRooms.length }} selected</span></div>
               <label class="select-all-rooms" :class="{ selected: allRoomsSelected }">
                 <input type="checkbox" :checked="allRoomsSelected" :indeterminate="someRoomsSelected" @change="toggleAllRooms" />
                 <span><strong>{{ allRoomsSelected ? 'All rooms selected' : 'Select all rooms' }}</strong><small>{{ allRoomsSelected ? 'Uncheck to clear every room' : `Select all ${allRoomNames.length} available rooms` }}</small></span>
               </label>
+              <p v-if="roomSelectionAttempted && !selectedRooms.length" class="room-selection-error" role="alert">Please select at least one room before creating the term.</p>
               <div v-for="floor in roomFloors" :key="floor.label" class="room-group">
                 <div class="room-group-heading">
                   <strong>{{ floor.label }}</strong>
@@ -349,19 +340,24 @@ const workspaceMode = ref('')
 const workspaceEntries = ref([])
 const studentYearSelection = ref(null)
 const workspaceLoading = ref(false)
+const workspacePendingMode = ref('')
+const openingScheduleKey = ref('')
 const previewSearch = ref('')
-const scheduleTypeFilter = ref('all')
 const previewPage = ref(1)
 const previewPageSize = 4
 const showTermModal = ref(false)
 const editingTermId = ref('')
+const editingTermSnapshot = ref('')
 const modalStep = ref(1)
+const termDetailsAttempted = ref(false)
+const sectionCountsAttempted = ref(false)
 const saving = ref(false)
 const activeTermAction = ref('')
 const statusToast = ref(null)
 let statusToastTimer = null
 let statusToastId = 0
 const selectedRooms = ref([])
+const roomSelectionAttempted = ref(false)
 const form = reactive({ schoolYear: '', semester: '', sectionCounts: {}, sectionNames: {} })
 const isCurrentTermSource = computed(() => route.query.source === 'current')
 const pageTitle = computed(() => isCurrentTermSource.value ? 'Current Term Schedule' : 'Academic Terms')
@@ -372,12 +368,6 @@ const workspaceEyebrowBase = computed(() => isCurrentTermSource.value ? 'Current
 const allRoomNames = computed(() => roomFloors.flatMap(floor => floor.rooms))
 const allRoomsSelected = computed(() => allRoomNames.value.length > 0 && allRoomNames.value.every(room => selectedRooms.value.includes(room)))
 const someRoomsSelected = computed(() => selectedRooms.value.length > 0 && !allRoomsSelected.value)
-const scheduleTypeOptions = [
-  { value: 'all', label: 'All schedules' },
-  { value: 'parallel', label: 'Parallel' },
-  { value: 'non-parallel', label: 'Non-Parallel' },
-]
-
 function isTermActionLoading(term, action) {
   return activeTermAction.value === `${termId(term)}:${action}`
 }
@@ -415,11 +405,7 @@ function toggleFloorRooms(floor, event) {
     : selectedRooms.value.filter(room => !floorRooms.has(room))
 }
 
-const filteredWorkspaceEntries = computed(() => workspaceEntries.value.filter((entry) => {
-  if (scheduleTypeFilter.value === 'parallel') return Boolean(entry.parallel)
-  if (scheduleTypeFilter.value === 'non-parallel') return !entry.parallel
-  return true
-}))
+const filteredWorkspaceEntries = computed(() => workspaceEntries.value)
 
 const filteredTerms = computed(() => terms.value
   .filter(term => {
@@ -550,14 +536,14 @@ function openWorkspace(term, action) {
   workspaceMode.value = ''
   studentYearSelection.value = null
   previewSearch.value = ''
-  scheduleTypeFilter.value = 'all'
   previewPage.value = 1
   workspaceEntries.value = []
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 function closeWorkspace() { workspaceTerm.value = null; workspaceMode.value = ''; workspaceEntries.value = [] }
 async function chooseWorkspaceMode(mode) {
-  workspaceMode.value = mode
+  if (workspaceLoading.value) return
+  workspacePendingMode.value = mode
   if (mode === 'student') {
     const requestedYear = String(route.query.year || '')
     studentYearSelection.value = yearOptions.includes(requestedYear) ? requestedYear : null
@@ -568,10 +554,15 @@ async function chooseWorkspaceMode(mode) {
   try {
     const response = await apiRequest(`/schedules?academicTermId=${encodeURIComponent(termId(workspaceTerm.value))}`)
     workspaceEntries.value = response.entries || []
+    workspaceMode.value = mode
   } catch (error) {
     workspaceEntries.value = []
+    workspaceMode.value = mode
     showStatusToast('error', error.message || 'Unable to load schedules for this term.')
-  } finally { workspaceLoading.value = false }
+  } finally {
+    workspaceLoading.value = false
+    workspacePendingMode.value = ''
+  }
 }
 
 async function downloadTermExcel(term) {
@@ -1019,7 +1010,9 @@ async function downloadScheduleWorkbook(term) {
   }
 }
 
-function openSchedule(target) {
+async function openSchedule(target, targetKey = '') {
+  if (openingScheduleKey.value) return
+  openingScheduleKey.value = targetKey || String(target?.value || target?.key || 'schedule')
   const query = {
     academicTermId: termId(workspaceTerm.value),
     mode: workspaceMode.value,
@@ -1033,32 +1026,52 @@ function openSchedule(target) {
     query.year = v.year || ''
     query.section = v.section || ''
   }
-  router.push({ path: workspaceAction.value === 'add' ? '/admin/schedule/add' : '/admin/schedule/view', query })
+  try {
+    await router.push({ path: workspaceAction.value === 'add' ? '/admin/schedule/add' : '/admin/schedule/view', query })
+  } catch (error) {
+    showStatusToast('error', error?.message || 'Unable to open this schedule.')
+  } finally {
+    openingScheduleKey.value = ''
+  }
 }
 function resetForm() {
   form.schoolYear = ''; form.semester = ''; form.sectionCounts = {}; form.sectionNames = {}
   selectedRooms.value = []
   ensureSectionNames()
 }
+function getTermFormSnapshot() {
+  return JSON.stringify({
+    schoolYear: form.schoolYear,
+    semester: form.semester,
+    sectionCounts: yearOptions.map(year => [year, String(form.sectionCounts[year] ?? '')]),
+    sectionNames: yearOptions.map(year => [year, (form.sectionNames[year] || []).map(name => String(name ?? '').trim())]),
+    rooms: [...new Set(selectedRooms.value)].sort(),
+  })
+}
 function openTermModal(term = null) {
   refreshSchoolYearOptions()
   resetForm()
   modalStep.value = 1
+  termDetailsAttempted.value = false
+  sectionCountsAttempted.value = false
+  roomSelectionAttempted.value = false
   editingTermId.value = termId(term)
+  editingTermSnapshot.value = ''
   if (term) {
     form.schoolYear = term.schoolYear || ''; form.semester = term.semester || ''
     form.sectionCounts = { ...(term.sectionCounts || {}) }
     form.sectionNames = Object.fromEntries(yearOptions.map(year => [year, [...(term.sectionNames?.[year] || [])]]))
     selectedRooms.value = termRooms(term)
     ensureSectionNames()
+    editingTermSnapshot.value = getTermFormSnapshot()
   }
   showTermModal.value = true
 }
-function closeTermModal() { showTermModal.value = false; editingTermId.value = ''; modalStep.value = 1 }
+function closeTermModal() { showTermModal.value = false; editingTermId.value = ''; editingTermSnapshot.value = ''; modalStep.value = 1; termDetailsAttempted.value = false; sectionCountsAttempted.value = false; roomSelectionAttempted.value = false }
 async function nextModalStep() {
   if (modalStep.value === 1) {
+    termDetailsAttempted.value = true
     if (!form.schoolYear || !form.semester) {
-      await Swal.fire({ icon: 'warning', title: 'Complete term details', text: 'School year and semester are required before continuing.' })
       return
     }
     if (!schoolYearOptions.value.includes(form.schoolYear)) {
@@ -1066,13 +1079,24 @@ async function nextModalStep() {
       return
     }
   }
-  if (modalStep.value === 2) ensureSectionNames()
+  if (modalStep.value === 2) {
+    sectionCountsAttempted.value = true
+    if (yearOptions.some(year => form.sectionCounts[year] === undefined || form.sectionCounts[year] === '')) return
+    ensureSectionNames()
+  }
   modalStep.value = Math.min(3, modalStep.value + 1)
 }
 async function saveTerm() {
   if (!form.schoolYear || !form.semester) return Swal.fire({ icon: 'warning', title: 'Missing details', text: 'School year and semester are required.' })
   if (!schoolYearOptions.value.includes(form.schoolYear)) return Swal.fire({ icon: 'warning', title: 'Invalid school year', text: 'Choose the current school year or a future school year.' })
-  ensureSectionNames(); saving.value = true
+  roomSelectionAttempted.value = true
+  if (!selectedRooms.value.length) return
+  ensureSectionNames()
+  if (editingTermId.value && getTermFormSnapshot() === editingTermSnapshot.value) {
+    showStatusToast('info', 'No changes made.')
+    return
+  }
+  saving.value = true
   const payload = {
     schoolYear: form.schoolYear, semester: form.semester, sectionCounts: form.sectionCounts, sectionNames: form.sectionNames,
     rooms: selectedRooms.value.map(name => ({ name, type: 'Lecture' })), createdBy: user.name || user.email || 'Admin',
@@ -1088,7 +1112,25 @@ async function saveTerm() {
 }
 async function publishTerm(term) {
   if (activeTermAction.value) return
-  const result = await Swal.fire({ icon: 'question', title: `Publish ${termLabel(term)}?`, text: 'This becomes the current schedule for teachers and students.', showCancelButton: true, confirmButtonText: 'Publish' })
+  const result = await Swal.fire({
+    icon: 'question',
+    title: `Publish ${termLabel(term)}?`,
+    text: 'This becomes the current schedule for teachers and students.',
+    showCancelButton: true,
+    reverseButtons: true,
+    confirmButtonText: 'Publish',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#2f704b',
+    cancelButtonColor: '#6c757d',
+    background: '#fff',
+    customClass: {
+      popup: 'publish-confirm-popup',
+      title: 'publish-confirm-title',
+      icon: 'publish-confirm-icon',
+      confirmButton: 'publish-confirm-button',
+      cancelButton: 'publish-cancel-button',
+    },
+  })
   if (!result.isConfirmed) return
   activeTermAction.value = `${termId(term)}:publish`
   try {
@@ -1139,9 +1181,14 @@ loadPage()
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #238354; box-shadow: 0 0 0 3px rgba(35, 131, 84, .12); }
 .term-guidance { margin: 7px 0 17px !important; color: #717c85 !important; font-size: .76rem !important; }
 .term-metrics { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
-.term-metric { display: inline-flex; align-items: baseline; gap: 5px; padding: 7px 10px; color: #64707a; border: 1px solid #e2e6e9; border-radius: 9px; background: linear-gradient(180deg, #f9fafb, #f0f3f5); font-size: .68rem; white-space: nowrap; }
-.term-metric b { color: #26313a; font-size: .84rem; }
-.room-metric { color: #476579; background: linear-gradient(180deg, #f3f8fb, #eaf3f8); }
+.term-metric { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 6px; color: #64707a; border: 1px solid #e2e6e9; border-radius: 999px; background: #f8fafb; font-size: .68rem; white-space: nowrap; }
+.term-metric b { display: inline-grid; width: 25px; height: 25px; flex: 0 0 25px; place-items: center; color: #47545e; border-radius: 50%; background: #e8ecef; font-size: .72rem; font-weight: 800; }
+.section-metric--year-1 b { color: #286647; background: #dff0e6; }
+.section-metric--year-2 b { color: #285f85; background: #e0edf6; }
+.section-metric--year-3 b { color: #8a5a16; background: #f8eedb; }
+.section-metric--year-4 b { color: #8f3e5b; background: #f5e4eb; }
+.room-metric { color: #476579; border-color: #cddfe8; background: #f1f7fa; }
+.room-metric b { color: #375e70; background: #e0ebf0; }
 .term-actions { display: grid; width: min(330px, 36%); grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: center; align-items: center; justify-content: flex-end; }
 .term-actions__label { grid-column: 1 / -1; margin: 0 0 2px 2px; color: #818b93; font-size: .62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .term-actions button { display: inline-flex; min-height: 42px; padding: 9px 12px; align-items: center; justify-content: flex-start; gap: 8px; color: #39444d; border: 1px solid #d7dde1; border-radius: 10px; background: linear-gradient(180deg, #f8f9fa, #eef1f3); font-size: .7rem; font-weight: 600; text-align: left; transition: transform .15s ease, background .15s ease, border-color .15s ease; }
@@ -1392,6 +1439,8 @@ loadPage()
   box-shadow: 0 11px 23px rgba(38, 47, 53, .12), inset 0 1px 0 #fff;
   transform: translateY(-2px);
 }
+.preview-card:disabled { cursor: progress; opacity: .72; transform: none; }
+.preview-card:disabled:hover { border-color: #d6dde1; box-shadow: 0 5px 14px rgba(41, 49, 55, .055), inset 0 1px 0 #fff; }
 .preview-card:focus-visible { outline: 3px solid rgba(49, 72, 86, .19); outline-offset: 2px; }
 .preview-card-head {
   display: flex;
@@ -1607,6 +1656,8 @@ loadPage()
 .step-number { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; color: #fff; border-radius: 10px; background: linear-gradient(145deg, #687985, #344957); box-shadow: 0 5px 12px rgba(52,73,87,.18); font-size: .82rem; font-weight: 800; }
 .room-heading .selection-count { margin-left: auto; }
 .selection-count { padding: 6px 9px; color: #356047; border: 1px solid #c8ddd0; border-radius: 999px; background: #edf7f1; font-size: .64rem; font-weight: 700; white-space: nowrap; }
+.selection-count.is-invalid { color: #a51f1f; border-color: #d98a8a; background: #fff0f0; }
+.room-selection-error { margin: -8px 0 16px; padding: 9px 12px; color: #a51f1f; border: 1px solid #e2a0a0; border-radius: 8px; background: #fff4f4; font-size: .72rem; font-weight: 650; }
 .select-all-rooms { display: flex; align-items: center; gap: 11px; margin: -2px 0 18px; padding: 12px 14px; color: #46535c; border: 1px solid #d7dfe3; border-radius: 11px; background: #f7f9fa; cursor: pointer; transition: border-color .15s, background .15s; }
 .select-all-rooms:hover { border-color: #aebdc5; background: #fff; }
 .select-all-rooms.selected { color: #26543a; border-color: #9fc6ae; background: #eaf6ee; }
@@ -1616,6 +1667,11 @@ loadPage()
 .select-all-rooms small { color: #7b858d; font-size: .65rem; }
 .two-columns label,.count-grid label,.name-grid label { gap: 7px; color: #3d4850; font-size: .75rem; font-weight: 650; }
 .two-columns input,.two-columns select,.count-grid input,.name-grid input { min-height: 43px; padding: 10px 12px; color: #202830; border-color: #cfd7dc; background: #fbfcfc; font-size: .78rem; font-weight: 500; transition: border-color .15s, box-shadow .15s, background .15s; }
+.two-columns label.is-invalid { color: #3d4850; }
+.two-columns label.is-invalid select { border-color: #b52222; background: #fff5f5; box-shadow: 0 0 0 3px rgba(181, 34, 34, .2); }
+.count-grid label.is-invalid { color: #3d4850; }
+.count-grid label.is-invalid input { border-color: #b52222; background: #fff5f5; box-shadow: 0 0 0 3px rgba(181, 34, 34, .2); }
+.field-error-hint { margin-top: -2px; color: #a51f1f; font-size: .68rem; font-weight: 650; }
 .two-columns input:focus,.two-columns select:focus,.count-grid input:focus,.name-grid input:focus { outline: none; border-color: #708592; background: #fff; box-shadow: 0 0 0 3px rgba(73, 99, 114, .12); }
 .two-columns input::placeholder,.count-grid input::placeholder,.name-grid input::placeholder { color: #a0a8ae; }
 .count-grid { gap: 10px; }
@@ -1689,7 +1745,16 @@ loadPage()
   font-size: .82rem;
   font-weight: 800;
 }
+.term-status-toast.is-info .term-status-toast__icon,
+.term-status-toast.is-error .term-status-toast__icon {
+  color: #c97818;
+}
+.mode-card:disabled { cursor: wait; }
+.mode-card.is-loading { border-color: #c8d0d5; background: linear-gradient(145deg, #f7f8f9, #e3e7e9); }
+.mode-card.is-loading .mode-arrow { color: #53616b; font-size: .78rem; font-weight: 700; }
+.mode-loading-note { grid-column: 1 / -1; margin: -19px 0 25px; color: #69757d; text-align: center; font-size: .78rem; font-weight: 600; }
 .term-status-toast.is-success { border-left: 3px solid #547b66; }
+.term-status-toast.is-info { border-left: 3px solid #7b8790; }
 .term-status-toast.is-error { border-left: 3px solid #a84c4c; }
 .term-toast-enter-active,
 .term-toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
@@ -1706,5 +1771,357 @@ loadPage()
     padding: 12px 14px;
     font-size: .78rem;
   }
+}
+:global(.publish-confirm-popup) {
+  width: min(460px, calc(100vw - 32px)) !important;
+  padding: 22px 30px 20px !important;
+  border-radius: 20px !important;
+  box-shadow: 0 16px 48px rgba(24, 30, 36, .2) !important;
+}
+:global(.publish-confirm-popup .swal2-icon) {
+  width: 76px !important;
+  height: 76px !important;
+  margin: 4px auto 6px !important;
+}
+:global(.publish-confirm-popup .swal2-title) {
+  margin: 0 0 4px !important;
+  color: #34383d !important;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+}
+:global(.publish-confirm-popup .swal2-html-container) {
+  margin: .25em 0 .65em !important;
+  color: #45494e !important;
+  font-size: 1rem !important;
+  line-height: 1.5 !important;
+}
+:global(.publish-confirm-popup .swal2-actions) {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  gap: 10px;
+  margin-top: .5em;
+}
+:global(.publish-confirm-button),
+:global(.publish-cancel-button) {
+  flex: 1 1 0;
+  min-height: 42px;
+  margin: 0 !important;
+  padding: 8px 12px !important;
+  border-radius: 9px !important;
+  font-size: .88rem !important;
+  font-weight: 600 !important;
+}
+:global(.publish-confirm-button) {
+  border: 1px solid #24583b !important;
+  background: #2f704b !important;
+  color: #fff !important;
+  box-shadow: 0 4px 10px rgba(36, 88, 59, .22) !important;
+}
+:global(.publish-confirm-button:hover) { background: #24583b !important; filter: none !important; }
+:global(.publish-cancel-button) {
+  border: 1px solid #e2e3e5 !important;
+  background: #e9eaec !important;
+  color: #363a3e !important;
+  box-shadow: none !important;
+}
+:global(.publish-cancel-button:hover) { background: #dcdfe1 !important; filter: none !important; }
+
+/* Keep the terms workspace usable from compact phones through large displays. */
+@media (min-width: 1600px) {
+  .main { padding: clamp(36px, 2.5vw, 64px) clamp(48px, 3vw, 88px) 72px; }
+  .page-header { margin-bottom: clamp(30px, 2vw, 44px); }
+  .terms-card, .workspace-card { padding: clamp(30px, 2vw, 42px); }
+  .term-row { padding: clamp(24px, 1.7vw, 34px); }
+  .term-title h3 { font-size: clamp(1.08rem, 1.1vw, 1.35rem); }
+  .term-actions { width: clamp(330px, 25vw, 430px); }
+  .term-actions button { min-height: 48px; font-size: .82rem; }
+}
+
+@media (min-width: 2200px) {
+  .main { padding-inline: max(88px, calc((100vw - 1900px) / 2)); }
+}
+
+@media (max-width: 900px) {
+  .layout { height: auto; min-height: 100vh; min-height: 100dvh; }
+  .main { width: 100%; min-width: 0; height: auto; min-height: 100vh; min-height: 100dvh; overflow: visible; }
+  .terms-card, .workspace-card { min-width: 0; }
+  .term-row { width: 100%; min-width: 0; }
+  .term-summary { width: 100%; }
+  .term-actions { max-width: none; }
+  .term-metrics { row-gap: 7px; }
+  .workspace-heading { flex-wrap: wrap; }
+  .workspace-heading__context { min-width: 0; }
+}
+
+@media (max-width: 700px) {
+  .main { padding: 20px 14px 32px; }
+  .page-header { gap: 14px; margin-bottom: 20px; }
+  .page-header h1 { font-size: clamp(1.8rem, 8vw, 2.35rem); overflow-wrap: anywhere; }
+  .page-header p { max-width: 100%; font-size: .86rem; }
+  .terms-card, .workspace-card { padding: 16px; border-radius: 16px; }
+  .section-heading { gap: 14px; }
+  .section-heading > div:first-child { min-width: 0; }
+  .term-filter { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .term-filter button { min-width: 0; padding-inline: 7px; font-size: .7rem; }
+  .term-row { gap: 16px; padding: 17px 14px; }
+  .term-title { align-items: flex-start; }
+  .term-title h3 { min-width: 0; overflow-wrap: anywhere; }
+  .term-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .term-actions button { min-width: 0; min-height: 42px; justify-content: center; padding: 8px 7px; white-space: normal; }
+  .term-metric { max-width: 100%; white-space: normal; }
+  .term-metric b { flex: 0 0 25px; }
+  .mode-grid { width: 100%; margin: 22px 0; }
+  .preview-grid { min-width: 0; }
+  .preview-card { min-width: 0; }
+  .mini-schedule { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .term-modal { max-height: 100dvh; }
+  .modal-body { max-height: none; }
+}
+
+@media (max-width: 420px) {
+  .main { padding: 16px 10px 26px; }
+  .terms-card, .workspace-card { padding: 13px; }
+  .section-heading h2 { font-size: 1.15rem; }
+  .term-filter button { min-height: 38px; padding-inline: 4px; font-size: .64rem; }
+  .term-row { padding: 15px 12px; }
+  .term-actions { grid-template-columns: 1fr; }
+  .term-actions__label { grid-column: 1; }
+  .term-actions button { justify-content: flex-start; padding-inline: 12px; }
+  .term-title { gap: 7px; }
+  .term-title h3 { font-size: .98rem; }
+  .term-metric { gap: 5px; padding-right: 8px; font-size: .64rem; }
+  .workspace-heading { gap: 10px; padding: 15px; }
+  .preview-toolbar, .preview-grid { padding-inline: 12px; }
+  .preview-card { padding: 12px; }
+  .two-columns, .count-grid, .name-grid, .room-grid { grid-template-columns: minmax(0, 1fr); }
+  .setup-section { padding: 15px 12px; }
+  .setup-section__heading { gap: 9px; }
+  .room-heading, .room-group-heading { flex-wrap: wrap; }
+  .selection-count { margin-left: 0 !important; }
+  .term-modal > header, .modal-body, .term-modal > footer { padding-inline: 14px; }
+  .term-modal > footer { flex-wrap: wrap; }
+  .term-modal > footer button { flex: 1 1 auto; }
+}
+
+@media (min-width: 701px) and (max-width: 1200px) {
+  .main { padding: 20px clamp(18px, 2.2vw, 28px) 36px; }
+  .page-header { gap: 14px; margin-bottom: 20px; }
+  .page-header h1 { font-size: clamp(1.75rem, 2.4vw, 2.1rem); }
+  .page-header p { margin-top: 6px; font-size: .78rem; line-height: 1.45; }
+  .new-term-btn { min-height: 39px; padding-inline: 12px; border-radius: 9px; font-size: .72rem; }
+  .terms-card, .workspace-card { padding: 18px; border-radius: 15px; }
+  .section-heading { gap: 12px; padding-bottom: 14px; }
+  .section-heading h2 { font-size: 1.18rem; }
+  .section-heading p { font-size: .73rem; }
+  .term-filter { padding: 3px; }
+  .term-filter button { min-height: 31px; padding: 5px 9px; font-size: .66rem; }
+  .term-row { min-height: 0; gap: 12px; padding: 15px; border-radius: 13px; }
+  .term-title h3 { font-size: .96rem; }
+  .term-guidance { margin: 5px 0 12px !important; font-size: .7rem !important; }
+  .term-metric { gap: 5px; padding: 4px 8px 4px 5px; font-size: .62rem; }
+  .term-metric b { width: 22px; height: 22px; flex-basis: 22px; font-size: .65rem; }
+  .term-actions { width: min(100%, 500px); gap: 6px; }
+  .term-actions__label { font-size: .58rem; }
+  .term-actions button { min-height: 34px; padding: 6px 8px; gap: 6px; border-radius: 7px; font-size: .62rem; }
+  .term-actions button svg { width: 14px; height: 14px; flex-basis: 14px; }
+  .mode-grid { gap: 12px; margin-block: 24px; }
+  .mode-card { min-height: 125px; padding: 14px; gap: 10px; }
+  .mode-card strong { font-size: .88rem; }
+  .mode-card .mode-copy small { font-size: .66rem; }
+  .preview-toolbar { margin-block: 12px; }
+  .preview-card { padding: 12px; }
+  .preview-card-head strong { font-size: .78rem; }
+  .preview-card-head small { font-size: .61rem; }
+  .mini-day { min-height: 62px; }
+  .mini-day b { font-size: .5rem; }
+  .mini-day span { font-size: .42rem; }
+  .term-modal { width: min(900px, 94vw); max-height: 90dvh; border-radius: 18px; }
+  .term-modal > header { padding: 18px 22px 16px; }
+  .term-modal > header h2 { font-size: 1.3rem; }
+  .term-modal > header p { font-size: .76rem; }
+  .term-stepper { gap: 10px; padding: 13px 22px; }
+  .term-stepper__item { gap: 7px; font-size: .7rem; }
+  .term-stepper__item b { width: 30px; height: 30px; font-size: .7rem; }
+  .term-progress-summary { padding: 6px 22px; font-size: .66rem; }
+  .modal-body { max-height: calc(90dvh - 190px); padding: 18px 22px 24px; }
+  .setup-section { margin-bottom: 14px; padding: 19px; border-radius: 14px; }
+  .setup-section__heading { margin-bottom: 13px; }
+  .setup-section__heading h3 { font-size: 1rem; }
+  .setup-section__heading p { font-size: .74rem; }
+  .two-columns label, .count-grid label, .name-grid label { font-size: .69rem; }
+  .two-columns input, .two-columns select, .count-grid input, .name-grid input { min-height: 38px; padding: 8px 10px; font-size: .72rem; }
+  .room-grid { gap: 6px; }
+  .room-grid label { min-height: 34px; padding: 6px 8px; font-size: .65rem; }
+  .term-modal > footer { padding: 12px 22px; }
+  .term-modal > footer button { min-height: 36px; padding: 7px 13px; font-size: .72rem; }
+  .footer-help { font-size: .68rem; }
+  .term-metrics { align-items: flex-start; }
+  .term-filter { flex: 0 0 auto; }
+}
+
+@media (min-width: 901px) and (max-width: 1200px) {
+  .layout { height: 100vh; }
+  .sidebar { width: 220px; min-width: 220px; padding: 18px 12px; }
+  .main { height: 100vh; overflow: auto; }
+  .nav-item { gap: 9px; padding: 10px 11px; font-size: .76rem; }
+  .avatar-wrap { width: 62px; height: 62px; }
+  .brand { font-size: .86rem; }
+  .role, .email { font-size: .68rem; }
+}
+
+@media (min-width: 901px) and (max-width: 1200px) {
+  .term-row { flex-direction: row; align-items: center; gap: 12px; padding: 14px; }
+  .term-summary { width: auto; min-width: 0; flex: 1 1 auto; }
+  .term-actions { width: clamp(250px, 29vw, 310px); flex: 0 0 clamp(250px, 29vw, 310px); margin: 0 0 0 auto; justify-content: end; }
+  .term-actions__label { text-align: right; }
+  .term-actions button { min-height: 31px; padding: 5px 7px; gap: 5px; font-size: .57rem; }
+  .term-actions button svg { width: 12px; height: 12px; flex-basis: 12px; }
+  .term-metrics { gap: 5px; }
+  .term-metric { padding: 3px 6px 3px 4px; font-size: .56rem; }
+  .term-metric b { width: 20px; height: 20px; flex-basis: 20px; font-size: .6rem; }
+  .term-title h3 { font-size: .88rem; }
+  .term-guidance { margin-bottom: 9px !important; font-size: .64rem !important; }
+}
+
+@media (max-width: 700px) {
+  .page-header h1 { font-size: clamp(1.55rem, 6.5vw, 1.9rem); }
+  .page-header p { font-size: .78rem; }
+  .terms-card, .workspace-card { padding: 14px; }
+  .section-heading h2 { font-size: 1.1rem; }
+  .section-heading p { font-size: .7rem; }
+  .term-row { padding: 14px 12px; }
+  .term-title h3 { font-size: .9rem; }
+  .pill { padding: 4px 7px; font-size: .59rem; }
+  .term-guidance { font-size: .68rem !important; }
+  .term-metric { font-size: .59rem; }
+  .term-actions button { min-height: 37px; font-size: .61rem; }
+  .mode-card { min-height: 116px; padding: 15px; }
+  .mode-icon { width: 48px; height: 48px; }
+  .mode-icon :deep(svg) { width: 24px; height: 24px; }
+  .mode-card strong { font-size: .9rem; }
+  .mode-card .mode-copy small { font-size: .67rem; }
+  .preview-card-head strong { font-size: .76rem; }
+  .preview-card-head small { font-size: .6rem; }
+  .term-modal { max-height: 100dvh; }
+  .term-modal > header { padding-block: 16px 13px; }
+  .term-modal > header h2 { font-size: 1.2rem; }
+  .term-modal > header p { font-size: .72rem; }
+  .term-stepper { padding-block: 12px; }
+  .modal-body { padding-block: 15px 20px; }
+  .setup-section { padding: 14px 12px; }
+  .setup-section__heading h3 { font-size: .94rem; }
+  .setup-section__heading p { font-size: .7rem; }
+  .two-columns label, .count-grid label, .name-grid label { font-size: .68rem; }
+  .two-columns input, .two-columns select, .count-grid input, .name-grid input { min-height: 38px; font-size: .72rem; }
+  .room-grid label { min-height: 34px; padding: 6px; font-size: .63rem; }
+  .term-modal > footer { padding-block: 11px; }
+  .term-modal > footer button { min-height: 36px; padding: 7px 12px; font-size: .7rem; }
+  :global(.publish-confirm-popup) { padding: 18px 20px 16px !important; }
+  :global(.publish-confirm-popup .swal2-title) { font-size: 1.12rem !important; }
+  :global(.publish-confirm-popup .swal2-html-container) { font-size: .88rem !important; }
+  :global(.publish-confirm-button), :global(.publish-cancel-button) { min-height: 38px; font-size: .78rem !important; }
+}
+
+@media (max-width: 420px) {
+  .main { padding: 14px 9px 24px; }
+  .page-header h1 { font-size: 1.5rem; }
+  .new-term-btn { min-height: 36px; font-size: .68rem; }
+  .terms-card, .workspace-card { padding: 11px; }
+  .section-heading h2 { font-size: 1rem; }
+  .section-heading p { font-size: .66rem; }
+  .term-filter button { min-height: 34px; font-size: .59rem; }
+  .term-row { padding: 12px 10px; }
+  .term-title h3 { font-size: .83rem; }
+  .term-actions button { min-height: 35px; font-size: .59rem; }
+  .term-metric { font-size: .56rem; }
+  .mode-card { min-height: 102px; padding: 12px; }
+  .mode-card strong { font-size: .84rem; }
+  .mode-card .mode-copy small { font-size: .62rem; }
+  .term-modal > header, .modal-body, .term-modal > footer { padding-inline: 12px; }
+  .term-modal > header h2 { font-size: 1.05rem; }
+  .term-stepper { gap: 6px; padding-inline: 12px; }
+  .term-stepper__item b { width: 27px; height: 27px; }
+  .term-progress-summary { flex-wrap: wrap; padding-inline: 12px; font-size: .62rem; }
+  .setup-section { padding: 12px 10px; }
+  .setup-section__heading { gap: 7px; }
+  .step-number { width: 30px; height: 30px; flex-basis: 30px; border-radius: 8px; font-size: .72rem; }
+  .setup-section__heading h3 { font-size: .86rem; }
+  .setup-section__heading p { font-size: .65rem; }
+  .two-columns input, .two-columns select, .count-grid input, .name-grid input { min-height: 35px; padding: 7px 8px; font-size: .68rem; }
+  .room-grid label { min-height: 32px; font-size: .6rem; }
+  .selection-count { font-size: .58rem; }
+  .term-modal > footer button { min-height: 34px; font-size: .66rem; }
+}
+
+@media (max-width: 350px) {
+  .term-filter button { font-size: .54rem; }
+  .term-actions { grid-template-columns: 1fr; }
+  .term-metric { gap: 4px; padding-inline: 4px 6px; }
+  .term-metric b { width: 20px; height: 20px; flex-basis: 20px; }
+  .term-stepper__item b { width: 24px; height: 24px; }
+  .term-modal > footer { gap: 6px; }
+}
+
+@media (max-height: 620px) and (min-width: 701px) {
+  .term-modal { max-height: 96dvh; }
+  .modal-body { max-height: calc(96dvh - 190px); }
+}
+
+@media (min-width: 701px) and (max-width: 1200px) and (max-height: 700px) {
+  .main { padding-top: 14px; padding-bottom: 24px; }
+  .page-header { margin-bottom: 14px; }
+  .page-header h1 { font-size: 1.72rem; }
+  .page-header p { margin-top: 4px; font-size: .68rem; }
+  .new-term-btn { min-height: 34px; padding-inline: 10px; font-size: .66rem; }
+  .terms-card, .workspace-card { padding: 14px; }
+  .section-heading { padding-bottom: 10px; }
+  .section-heading h2 { font-size: 1.08rem; }
+  .section-heading p { font-size: .66rem; }
+  .term-list { gap: 9px; }
+  .term-row { gap: 10px; padding: 12px; }
+  .term-title h3 { font-size: .88rem; }
+  .pill { padding: 3px 7px; font-size: .57rem; }
+  .term-guidance { margin: 4px 0 8px !important; font-size: .63rem !important; }
+  .term-metrics { gap: 5px; }
+  .term-metric { gap: 4px; padding: 3px 7px 3px 4px; font-size: .56rem; }
+  .term-metric b { width: 19px; height: 19px; flex-basis: 19px; font-size: .59rem; }
+  .term-actions { gap: 4px; }
+  .term-actions__label { margin-bottom: 0; font-size: .52rem; }
+  .term-actions button { min-height: 29px; padding: 4px 6px; gap: 5px; border-radius: 6px; font-size: .56rem; }
+  .term-actions button svg { width: 12px; height: 12px; flex-basis: 12px; }
+
+  .term-modal { width: min(820px, 92vw); max-height: 94dvh; border-radius: 16px; }
+  .term-modal > header { padding: 13px 18px 11px; }
+  .term-modal > header h2 { font-size: 1.12rem; }
+  .term-modal > header p { margin-top: 4px; font-size: .67rem; }
+  .modal-eyebrow { margin-bottom: 3px; font-size: .57rem; }
+  .modal-close { width: 30px; height: 30px; }
+  .term-stepper { gap: 8px; padding: 9px 18px; }
+  .term-stepper__item { gap: 6px; font-size: .62rem; }
+  .term-stepper__item b { width: 26px; height: 26px; font-size: .62rem; }
+  .term-progress-summary { min-height: 28px; padding: 5px 18px; font-size: .59rem; }
+  .modal-body { max-height: calc(94dvh - 150px); padding: 12px 18px 16px; }
+  .setup-section { margin-bottom: 10px; padding: 14px; border-radius: 11px; }
+  .setup-section__heading { gap: 8px; margin-bottom: 9px; }
+  .setup-section__heading h3 { font-size: .88rem; }
+  .setup-section__heading p { font-size: .64rem; }
+  .step-number { width: 29px; height: 29px; flex-basis: 29px; border-radius: 8px; font-size: .68rem; }
+  .two-columns label, .count-grid label, .name-grid label { gap: 4px; font-size: .62rem; }
+  .two-columns input, .two-columns select, .count-grid input, .name-grid input { min-height: 33px; padding: 6px 8px; font-size: .65rem; }
+  .count-grid, .name-grid, .room-grid { gap: 6px; }
+  .room-group { margin-bottom: 10px; }
+  .room-grid label { min-height: 29px; padding: 4px 7px; font-size: .59rem; }
+  .room-grid input, .select-floor-rooms input { width: 13px; height: 13px; }
+  .select-all-rooms { gap: 8px; margin-bottom: 11px; padding: 8px 10px; }
+  .select-all-rooms strong { font-size: .66rem; }
+  .select-all-rooms small { font-size: .57rem; }
+  .term-modal > footer { gap: 7px; padding: 9px 18px; }
+  .term-modal > footer button { min-height: 31px; padding: 6px 11px; font-size: .63rem; }
+  .footer-help { font-size: .59rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .term-row, .mode-card, .preview-card, .preview-pagination button { transition: none; }
 }
 </style>

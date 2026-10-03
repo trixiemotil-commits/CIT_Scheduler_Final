@@ -47,6 +47,14 @@
 
     <!-- ═══════════════════ MAIN ═══════════════════ -->
     <main class="main" :class="{ 'main-list-view': scheduleViewMode === 'list' }">
+      <Teleport to="body">
+        <Transition name="schedule-toast">
+          <div v-if="statusToast" class="schedule-status-toast" :class="`is-${statusToast.type}`" role="status" aria-live="polite">
+            <span class="schedule-status-toast__icon" aria-hidden="true">{{ statusToast.icon }}</span>
+            <span>{{ statusToast.title }}</span>
+          </div>
+        </Transition>
+      </Teleport>
       <!-- Page Header -->
       <header class="main-header">
         <div class="header-left">
@@ -411,11 +419,11 @@
                 <tr v-for="entry in visibleScheduleEntries" :key="entry._key" class="schedule-list-row" @click="openEditModal(entry.slot, entry.day, entry)">
                   <td><span class="list-day">{{ entry.day }}</span></td>
                   <td><span class="list-time">{{ entry.timeIn }} – {{ entry.timeOut }}</span></td>
-                  <td><span class="list-year">{{ entry.year }}</span></td>
+                  <td><span :class="['list-year', { 'list-not-applicable': entry.entryType === 'lunch' }]" :title="entry.entryType === 'lunch' ? 'Not applicable for lunch break' : undefined">{{ entry.entryType === 'lunch' ? 'N/A' : entry.year }}</span></td>
                   <td><span class="list-subject">{{ entry.subject }}</span></td>
                   <td><span class="list-teacher">{{ entry.teacher }}</span></td>
-                  <td><span class="list-room">{{ entry.room }}</span></td>
-                  <td><span class="list-section">{{ entry.section }}</span></td>
+                  <td><span :class="['list-room', { 'list-not-applicable': entry.entryType === 'lunch' }]" :title="entry.entryType === 'lunch' ? 'Not applicable for lunch break' : undefined">{{ entry.entryType === 'lunch' ? 'N/A' : entry.room }}</span></td>
+                  <td><span :class="['list-section', { 'list-not-applicable': entry.entryType === 'lunch' }]" :title="entry.entryType === 'lunch' ? 'Not applicable for lunch break' : undefined">{{ entry.entryType === 'lunch' ? 'N/A' : entry.section }}</span></td>
                   <td><span :class="['list-schedule-type', entry.parallel ? 'is-parallel' : 'is-single']">{{ entry.parallel ? `Parallel (${entry.parallelCount || 2})` : 'Not Parallel' }}</span></td>
                   <td><span class="list-campus">{{ entry.campus }}</span></td>
                 </tr>
@@ -429,8 +437,8 @@
       </div>
       <!-- Schedule Card (teacher mode: teacher selected / room mode: room selected / student mode: year+section selected) -->
       <div v-else-if="scheduleViewMode === 'timetable' && ((addMode === 'teacher' && selectedTeacher) || (addMode === 'room' && contextRoom) || (addMode === 'student' && studentYear && studentSection && studentEditorActive))" class="schedule-card">
-        <div class="sched-topbar">
-          <button class="schedule-back-btn" aria-label="Back to teacher selection" title="Back to teacher selection" @click="returnToTermWorkspace">&larr;</button>
+        <div class="sched-topbar timetable-schedule-toolbar">
+          <button class="schedule-back-btn" :aria-label="`Back to ${addMode} selection`" :title="`Back to ${addMode} selection`" @click="returnToTermWorkspace">&larr;</button>
           <div class="sched-topbar-left">
             <span class="sched-context-label">Schedule for</span>
             <h2 class="sched-grid-title">
@@ -449,14 +457,6 @@
             </h2>
           </div>
           <div class="sched-topbar-right">
-            <div class="schedule-legend" aria-label="Schedule color legend">
-              <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
-              <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
-              <span><i class="legend-swatch legend-swatch--faculty"></i>CIT Faculty</span>
-              <span><i class="legend-swatch legend-swatch--lunch"></i>Lunch</span>
-              <span><i class="legend-swatch legend-swatch--consultation"></i>Consultation</span>
-              <span><i class="legend-swatch legend-swatch--main-campus"></i>Main Campus</span>
-            </div>
             <!-- Section filter (teacher mode only) -->
             <div v-if="addMode === 'teacher'" class="sched-select-wrap">
               <select class="sched-select" v-model="filterSection">
@@ -479,6 +479,19 @@
                 <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>
               </svg>
             </button>
+            <button v-if="addMode === 'teacher'" class="icon-btn lunch-break-toolbar-btn" title="Set Lunch Break" aria-label="Set Lunch Break" @click="openLunchBreakPicker('')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
+            </button>
+          </div>
+          <div class="schedule-legend-wrap">
+            <div class="schedule-legend" aria-label="Schedule color legend">
+              <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
+              <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
+              <span><i class="legend-swatch legend-swatch--faculty"></i>CIT Faculty</span>
+              <span><i class="legend-swatch legend-swatch--lunch"></i>Lunch</span>
+              <span><i class="legend-swatch legend-swatch--consultation"></i>Consultation</span>
+              <span><i class="legend-swatch legend-swatch--main-campus"></i>Main Campus</span>
+            </div>
           </div>
         </div>
 
@@ -583,7 +596,8 @@
                       >
                         <div class="entry-teacher">Consultation</div>
                         <div class="entry-subject" style="font-size:0.72rem;opacity:0.9">{{ getConsultationForCell30(slot, day).startTime }} – {{ getConsultationForCell30(slot, day).endTime }}</div>
-                        <div class="consult-edit-hint">Click to manage</div>
+                        <div v-if="formatConsultationAddedAt(getConsultationForCell30(slot, day))" class="entry-timestamp">Added: {{ formatConsultationAddedAt(getConsultationForCell30(slot, day)) }}</div>
+                        <div class="consult-edit-hint">Click to edit</div>
                       </div>
                     </template>
                     <!-- Empty cell -->
@@ -625,6 +639,8 @@
                             <span class="entry-section-badge">{{ e.section }}</span>
                           </div>
                         </div>
+                        <div v-if="getEntriesForRoomCell30(slot, day)[0].addedAt" class="entry-timestamp">Added: {{ getEntriesForRoomCell30(slot, day)[0].addedAt }}</div>
+                        <div class="entry-edit-hint">Click to edit</div>
                       </div>
                     </template>
                     <template v-else>
@@ -670,18 +686,16 @@
                 <TypeaheadSelect v-model="form.teacher" :options="teacherSelectOptions" placeholder="Select Teacher" />
               </div>
             </div>
-            <template v-if="!editMode">
-              <div class="form-row-inline schedule-day-field">
-                <label class="form-label">Day</label>
-                <div class="form-select-wrap">
-                  <select v-model="form.day" class="form-select">
-                    <option value="" disabled>Select Day</option>
-                    <option v-for="d in days" :key="d" :value="d">{{ d }}</option>
-                  </select>
-                  <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
+            <div class="form-row-inline schedule-day-field">
+              <label class="form-label">Day</label>
+              <div class="form-select-wrap">
+                <select v-model="form.day" class="form-select">
+                  <option value="" disabled>Select Day</option>
+                  <option v-for="d in days" :key="d" :value="d">{{ d }}</option>
+                </select>
+                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
-            </template>
+            </div>
             <div class="form-row-inline schedule-year-field">
               <label class="form-label">Year</label>
               <div v-if="addMode === 'student' && studentYear" class="form-value-locked">{{ studentYear }}</div>
@@ -845,22 +859,18 @@
             {{ modalTimeError }}
           </div>
 
-          <div v-if="!editMode && addMode === 'teacher' && lunchBreakContext.teacher && lunchBreakContext.day" class="lunch-break-footer">
-            <button type="button" class="lunch-break-modal-btn" @click="openLunchBreakPicker">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
-              Set Lunch Break
-            </button>
-          </div>
-
           <div class="sched-modal-actions">
             <button v-if="editMode" class="clear-slot-btn" @click="clearSlot">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
               Clear Slot
             </button>
-            <button class="cancel-btn-text" @click="showSchedModal = false">Cancel</button>
-            <button class="save-btn" @click="saveEntry" :disabled="!form.teacher || !form.subject || !form.timeIn || !form.timeOut || (!editMode && !form.day) || !!modalTimeError">
+            <button v-if="addMode === 'teacher' && (selectedTeacher || form.teacher) && form.day" type="button" class="lunch-break-modal-btn" @click="openLunchBreakPicker(form.day)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
+              Set Lunch Break
+            </button>
+            <button class="save-btn" @click="saveEntry" :aria-busy="savingSchedule" :disabled="!form.teacher || !form.subject || !form.day || !form.timeIn || !form.timeOut || !!modalTimeError || submittingSchedule">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              {{ editMode ? 'Update' : 'Add' }}
+              {{ savingSchedule ? (editMode ? 'Updating...' : 'Saving...') : editMode ? 'Update' : 'Add' }}
             </button>
           </div>
         </div>
@@ -878,7 +888,7 @@
             <div class="lunch-break-picker-copy">
               <span class="lunch-break-picker-eyebrow">Break settings</span>
               <h2 id="lunch-break-picker-title">{{ lunchBreakContext.editing ? 'Edit Lunch Break' : 'Set Lunch Break' }}</h2>
-              <p>{{ lunchBreakContext.day }}<template v-if="lunchBreakContext.teacher"> · Prof. {{ lunchBreakContext.teacher }}</template></p>
+              <p>{{ lunchBreakForm.days.length ? lunchBreakForm.days.join(', ') : 'Select one or more days' }}<template v-if="lunchBreakContext.teacher"> · Prof. {{ lunchBreakContext.teacher }}</template></p>
             </div>
             <button type="button" class="lunch-break-picker-close" aria-label="Close lunch break dialog" @click="showLunchBreakPicker = false">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -887,17 +897,31 @@
 
           <p class="lunch-break-picker-help">Choose when this teacher’s lunch break begins and ends. The selected time will be reserved on the timetable.</p>
 
+          <div class="lunch-break-day-selector" role="group" aria-label="Select lunch break days">
+            <span class="lunch-break-day-selector-label">Day{{ lunchBreakContext.editing ? '' : 's' }}</span>
+            <label v-if="!lunchBreakContext.editing" class="lunch-break-select-all" :class="{ selected: lunchBreakForm.days.length === days.length }">
+              <input type="checkbox" :checked="lunchBreakForm.days.length === days.length" @change="toggleAllLunchBreakDays" />
+              <span>Select all days</span>
+            </label>
+            <div class="lunch-break-day-options">
+              <label v-for="day in days" :key="day" :class="{ selected: lunchBreakForm.days.includes(day) }">
+                <input v-model="lunchBreakForm.days" type="checkbox" :value="day" @change="handleLunchBreakDayChange(day, $event)" />
+                <span>{{ day }}</span>
+              </label>
+            </div>
+          </div>
+
           <div class="lunch-break-picker-fields">
             <label class="lunch-break-picker-field">
               <span>Start Time</span>
-              <select v-model="lunchBreakForm.timeIn">
+              <select v-model="lunchBreakForm.timeIn" :class="{ 'is-placeholder': !lunchBreakForm.timeIn }">
                 <option value="" disabled>Select Start Time</option>
-                <option v-for="time in timeOptions" :key="time" :value="time">{{ time }}</option>
+                <option v-for="time in lunchBreakStartTimeOptions" :key="time" :value="time">{{ time }}</option>
               </select>
             </label>
             <label class="lunch-break-picker-field">
               <span>End Time</span>
-              <select v-model="lunchBreakForm.timeOut">
+              <select v-model="lunchBreakForm.timeOut" :class="{ 'is-placeholder': !lunchBreakForm.timeOut }">
                 <option value="" disabled>Select End Time</option>
                 <option v-for="time in endTimeOptionsAfter(lunchBreakForm.timeIn)" :key="time" :value="time">{{ time }}</option>
               </select>
@@ -905,16 +929,17 @@
           </div>
 
           <p v-if="lunchBreakTimeError" class="lunch-break-picker-error">{{ lunchBreakTimeError }}</p>
-
           <div class="lunch-break-picker-actions">
+            <button v-if="lunchBreakContext.editing" type="button" class="lunch-break-clear-btn" @click="clearLunchBreakSlot">Clear Slot</button>
             <button type="button" class="cancel-btn-text" @click="showLunchBreakPicker = false">Cancel</button>
             <button
               type="button"
               class="save-btn"
-              :disabled="!lunchBreakForm.timeIn || !lunchBreakForm.timeOut || !!lunchBreakTimeError"
+              :aria-busy="savingLunchBreak"
+              :disabled="savingLunchBreak || !lunchBreakForm.days.length || !lunchBreakForm.timeIn || !lunchBreakForm.timeOut || !!lunchBreakTimeError"
               @click="saveLunchBreakFromPicker"
             >
-              {{ lunchBreakContext.editing ? 'Update Lunch Break' : 'Save Lunch Break' }}
+              {{ savingLunchBreak ? (lunchBreakContext.editing ? 'Updating...' : 'Saving...') : lunchBreakContext.editing ? 'Update Lunch Break' : 'Save Lunch Break' }}
             </button>
           </div>
         </section>
@@ -1196,19 +1221,39 @@
             <span class="consult-empty-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
             </span>
-            <div><strong>No consultation hours yet</strong><span>Add the teacher’s first available time below.</span></div>
+            <div><strong>No consultation hours yet</strong><span>Add the teacher’s first available time with the button below.</span></div>
           </div>
             </section>
-            <section class="consult-right-pane" aria-label="Consultation slot form">
-          <div class="sched-form consult-form-shell">
-            <div class="consult-form-heading">
-              <div class="consult-form-icon" aria-hidden="true">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
-              </div>
-              <div><div class="consult-form-title">{{ consultEditId ? 'Edit consultation slot' : 'Add consultation slot' }}</div><p>{{ consultEditId ? 'Update the selected availability below.' : 'Choose a day and available time range.' }}</p></div>
+            <div class="consult-overview-actions">
+              <button type="button" class="consult-open-editor-btn" @click="openAddConsultSlot">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                Add consultation slot
+              </button>
             </div>
-            <div class="form-row-inline consult-day-field">
-              <label class="form-label">Day</label>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="consultSlotEditorOpen" class="modal-overlay consult-slot-editor-overlay" @click.self="closeConsultSlotEditor">
+        <section class="sched-modal-box consult-modal-box consult-slot-editor-box" role="dialog" aria-modal="true" aria-labelledby="consult-slot-editor-title">
+          <header class="consult-slot-editor-header">
+            <div class="consult-form-icon" aria-hidden="true">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+            </div>
+            <div class="consult-slot-editor-copy">
+              <span class="sched-modal-mode-badge">{{ consultEditId ? 'Edit consultation slot' : 'New consultation slot' }}</span>
+              <h2 id="consult-slot-editor-title">{{ consultEditId ? 'Update availability' : 'Add consultation slot' }}</h2>
+              <p>{{ consultEditId ? 'Adjust the selected day and time range.' : 'Choose a day and available time range.' }}</p>
+            </div>
+            <button type="button" class="panel-close consult-close" aria-label="Close consultation slot editor" @click="closeConsultSlotEditor">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </header>
+          <div class="consult-slot-editor-fields">
+            <label class="consult-editor-field consult-editor-field--full">
+              <span class="form-label">Day</span>
               <div class="form-select-wrap">
                 <select v-model="consultForm.dayOfWeek" class="form-select">
                   <option value="" disabled>Select Day</option>
@@ -1221,9 +1266,9 @@
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
-            </div>
-            <div class="form-row-inline">
-              <label class="form-label">Start Time</label>
+            </label>
+            <label class="consult-editor-field">
+              <span class="form-label">Start time</span>
               <div class="form-select-wrap">
                 <select v-model="consultForm.startTime" class="form-select">
                   <option value="" disabled>Select Time</option>
@@ -1231,9 +1276,9 @@
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
-            </div>
-            <div class="form-row-inline">
-              <label class="form-label">End Time</label>
+            </label>
+            <label class="consult-editor-field">
+              <span class="form-label">End time</span>
               <div class="form-select-wrap">
                 <select v-model="consultForm.endTime" class="form-select">
                   <option value="" disabled>Select Time</option>
@@ -1241,23 +1286,19 @@
                 </select>
                 <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
-            </div>
-            <div v-if="consultTimeError" class="time-error" style="margin:0 24px 8px;">
+            </label>
+            <div v-if="consultTimeError" class="time-error consult-editor-error" role="alert">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               {{ consultTimeError }}
             </div>
           </div>
-          <div class="sched-modal-actions">
-            <button v-if="consultEditId" class="cancel-btn-text" @click="consultEditId = null; Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })">Cancel Edit</button>
-            <button class="cancel-btn-text" @click="showConsultModal = false">Close</button>
-            <button class="save-btn" @click="saveConsultSlot" :disabled="!consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || !!consultTimeError">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              {{ consultEditId ? 'Update' : 'Save Slot' }}
+          <footer class="consult-slot-editor-actions">
+            <button type="button" class="cancel-btn-text" @click="closeConsultSlotEditor">Cancel</button>
+            <button type="button" class="save-btn" @click="saveConsultSlot" :disabled="!consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || !!consultTimeError">
+              {{ consultEditId ? 'Update slot' : 'Save slot' }}
             </button>
-          </div>
-            </section>
-          </div>
-        </div>
+          </footer>
+        </section>
       </div>
     </Teleport>
 
@@ -1302,7 +1343,7 @@ import {
 } from '@/composables/useSchedule.js'
 import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -2111,6 +2152,14 @@ function formatAddedAt(dateValue) {
   )
 }
 
+function formatConsultationAddedAt(consultation = {}) {
+  const formattedDate = formatAddedAt(consultation.createdAt || consultation.addedAt)
+  if (formattedDate) return formattedDate
+  const id = String(consultation.id || '')
+  if (!/^[a-f\d]{24}$/i.test(id)) return ''
+  return formatAddedAt(Number.parseInt(id.slice(0, 8), 16) * 1000)
+}
+
 function inferCampus(entry = {}) {
   if (entry.campus === 'Main Campus' || entry.campus === 'South Campus') return entry.campus
   if (entry.color === 'color-orange') return 'Main Campus'
@@ -2315,22 +2364,20 @@ function buildConflictHtml(conflicts) {
     </div>`).join('')
 }
 
-function showSuccessToast(title) {
-  return Swal.fire({
-    toast: true,
-    position: 'top-end',
-    icon: 'success',
-    title,
-    showConfirmButton: false,
-    timer: 5000,
-    timerProgressBar: true,
-    background: '#fff',
-    color: '#344149',
-    customClass: { popup: 'swal-cit-toast' },
-  })
+function showSuccessToast(title, icon = '✓', type = 'success') {
+  statusToast.value = { title, icon, type }
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+  statusToastTimer = window.setTimeout(() => {
+    statusToast.value = null
+    statusToastTimer = null
+  }, 5000)
 }
 
-async function showConflictDialog(conflicts) {
+onBeforeUnmount(() => {
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+})
+
+async function showConflictDialog(conflicts, compact = false) {
   return Swal.fire({
     icon: 'warning',
     title: '<span style="font-size:1.1rem;font-weight:700;">Schedule Conflict</span>',
@@ -2342,7 +2389,7 @@ async function showConflictDialog(conflicts) {
     confirmButtonText: 'OK',
     confirmButtonColor: '#4b5563',
     background: '#fff',
-    customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title' },
+    customClass: { popup: compact ? 'swal-lunch-conflict-popup' : 'swal-cit-popup', title: 'swal-cit-title' },
   })
 }
 
@@ -2442,8 +2489,14 @@ async function confirmLongTeacherSession(payload) {
 /* ── Modal state ── */
 const showSchedModal = ref(false)
 const editMode       = ref(false)
+const savingSchedule = ref(false)
+const submittingSchedule = ref(false)
+const statusToast = ref('')
+let statusToastTimer = null
+const originalScheduleSignature = ref(null)
 const fromButton     = ref(false)
 const showLunchBreakPicker = ref(false)
+const savingLunchBreak = ref(false)
 const lastLongSessionConfirmed = ref('')
 const lunchBreakContext = reactive({
   id: '',
@@ -2488,6 +2541,7 @@ watch(showSchedModal, (val) => {
   }
 })
 const modalTimeError = ref('')
+const hasScheduleChanges = computed(() => originalScheduleSignature.value !== scheduleEditSignature(form))
 const majorOptions = ['', 'Business Informatics', 'Systems Development', 'Computer Security', 'Digital Arts']
 
 function normalizedSemester(semester) {
@@ -2516,7 +2570,19 @@ function getSubjectOptions(year, major) {
 const modalSubjectOptions = computed(() => getSubjectOptions(form.year, form.major))
 const modalSubjectOptionsForAdd = computed(() => getSubjectOptions(addForm.year, addForm.major))
 const listSubjectOptions = computed(() => getSubjectOptions(listAddForm.year, listAddForm.major))
-const lunchBreakForm = reactive({ timeIn: '', timeOut: '' })
+const lunchBreakForm = reactive({ days: [], timeIn: '', timeOut: '' })
+const lunchBreakStartTimeOptions = computed(() => {
+  const earliestStart = parseTime('10:00 AM')
+  const latestEarlyLunchStart = parseTime('1:00 PM')
+  const options = timeOptions.filter(time => {
+    const minutes = parseTime(time)
+    return minutes >= earliestStart && minutes <= latestEarlyLunchStart
+  })
+  if (lunchBreakContext.editing && lunchBreakForm.timeIn && !options.includes(lunchBreakForm.timeIn)) {
+    options.unshift(lunchBreakForm.timeIn)
+  }
+  return options
+})
 const lunchBreakTimeError = computed(() => {
   if (!lunchBreakForm.timeIn || !lunchBreakForm.timeOut) return ''
   return parseTime(lunchBreakForm.timeOut) <= parseTime(lunchBreakForm.timeIn)
@@ -2581,8 +2647,12 @@ watch(() => form.campus, (campus) => {
   else form.color = 'color-green'
 })
 
-function openLunchBreakPicker() {
+function openLunchBreakPicker(initialDay = form.day) {
+  const selectedDay = days.includes(initialDay) ? initialDay : ''
   lunchBreakContext.id = ''
+  lunchBreakContext.teacher = selectedTeacher.value || form.teacher || ''
+  lunchBreakContext.day = selectedDay
+  lunchBreakContext.campus = form.campus || 'South Campus'
   lunchBreakContext.editing = false
   lunchBreakContext.oldTableLabel = ''
   lunchBreakContext.oldSection = ''
@@ -2590,9 +2660,19 @@ function openLunchBreakPicker() {
   lunchBreakContext.oldTimeIn = ''
   lunchBreakContext.oldTimeOut = ''
   lunchBreakContext.legacyYear = ''
-  lunchBreakForm.timeIn = form.timeIn || ''
-  lunchBreakForm.timeOut = form.timeOut || ''
+  lunchBreakForm.days = selectedDay ? [selectedDay] : []
+  lunchBreakForm.timeIn = selectedDay && lunchBreakStartTimeOptions.value.includes(form.timeIn) ? form.timeIn : ''
+  lunchBreakForm.timeOut = lunchBreakForm.timeIn ? form.timeOut || '' : ''
   showLunchBreakPicker.value = true
+}
+
+function handleLunchBreakDayChange(day, event) {
+  if (!lunchBreakContext.editing || !event.target.checked) return
+  lunchBreakForm.days = [day]
+}
+
+function toggleAllLunchBreakDays(event) {
+  lunchBreakForm.days = event.target.checked ? [...days] : []
 }
 
 function openLunchBreakEditor(entry) {
@@ -2609,6 +2689,7 @@ function openLunchBreakEditor(entry) {
   lunchBreakContext.oldTimeIn = entry.timeIn || ''
   lunchBreakContext.oldTimeOut = entry.timeOut || ''
   lunchBreakContext.legacyYear = years.includes(entry.legacyYear || entry.year) ? (entry.legacyYear || entry.year) : years[0]
+  lunchBreakForm.days = entry.day ? [entry.day] : []
   lunchBreakForm.timeIn = entry.timeIn || ''
   lunchBreakForm.timeOut = entry.timeOut || ''
   showSchedModal.value = false
@@ -2697,50 +2778,113 @@ async function postLunchBreak(payload) {
 }
 
 async function saveLunchBreakFromPicker() {
-  if (!lunchBreakContext.teacher || !lunchBreakContext.day || !lunchBreakForm.timeIn || !lunchBreakForm.timeOut || lunchBreakTimeError.value) return
+  const selectedDays = lunchBreakContext.editing
+    ? lunchBreakForm.days.slice(0, 1)
+    : [...lunchBreakForm.days]
+  const wasEditingLunchBreak = lunchBreakContext.editing
+  if (!lunchBreakContext.teacher || !selectedDays.length || !lunchBreakForm.timeIn || !lunchBreakForm.timeOut || lunchBreakTimeError.value) return
+  if (
+    wasEditingLunchBreak
+    && selectedDays[0] === lunchBreakContext.oldDay
+    && lunchBreakForm.timeIn === lunchBreakContext.oldTimeIn
+    && lunchBreakForm.timeOut === lunchBreakContext.oldTimeOut
+  ) {
+    showSuccessToast('No changes made', '✕', 'error')
+    return
+  }
 
-  const payload = {
+  const payloadForDay = day => ({
     entryType: 'lunch',
     teacher: lunchBreakContext.teacher,
-    day: lunchBreakContext.day,
+    day,
     timeIn: lunchBreakForm.timeIn,
     timeOut: lunchBreakForm.timeOut,
     campus: lunchBreakContext.campus,
     parallel: false,
     room: '',
     academicTermId: getSelectedTermId() || undefined,
-  }
+  })
   const skipFilter = lunchBreakContext.editing
     ? (_key, entry) => entry.id === lunchBreakContext.id
     : null
-  const conflicts = checkScheduleConflict(payload, skipFilter)
+  const conflicts = selectedDays.flatMap(day => checkScheduleConflict(payloadForDay(day), skipFilter))
   if (conflicts.length > 0) {
-    await showConflictDialog(conflicts)
+    await showConflictDialog(conflicts, true)
     return
   }
 
+  if (savingLunchBreak.value) return
+  savingLunchBreak.value = true
   try {
     if (lunchBreakContext.editing) {
       if (!lunchBreakContext.id) {
         throw new Error('This lunch break is missing its saved identifier. Refresh the schedule and try again.')
       }
-      await updateLunchBreak(payload)
+      await updateLunchBreak(payloadForDay(selectedDays[0]))
     } else {
-      await postLunchBreak(payload)
+      for (const day of selectedDays) await postLunchBreak(payloadForDay(day))
     }
     await refreshScheduleData(lunchBreakContext.teacher)
     yearDropdown.value = 'All'
     filterSection.value = 'All'
     showLunchBreakPicker.value = false
     showSchedModal.value = false
+    const successMessage = wasEditingLunchBreak
+      ? 'Lunch break updated successfully'
+      : selectedDays.length > 1 ? 'Lunch breaks saved successfully' : 'Lunch break saved successfully'
+    await showSuccessToast(successMessage)
   } catch (error) {
+    if (error?.status === 409) {
+      await refreshScheduleData(lunchBreakContext.teacher).catch(() => {})
+      const refreshedConflicts = selectedDays.flatMap(day => checkScheduleConflict(payloadForDay(day), skipFilter))
+      await showConflictDialog(refreshedConflicts.length
+        ? refreshedConflicts
+        : [{ type: 'Schedule', message: 'This lunch break conflicts with an existing schedule.', detail: error.message || 'Choose a different day or time.' }], true)
+      return
+    }
     await showScheduleError(error, 'Unable to save lunch break')
+  } finally {
+    savingLunchBreak.value = false
+  }
+}
+
+async function clearLunchBreakSlot() {
+  if (!lunchBreakContext.editing || !lunchBreakContext.id) return
+  const confirmation = await Swal.fire({
+    icon: 'warning',
+    title: 'Clear this lunch break?',
+    text: 'This will remove the selected lunch break from the schedule.',
+    showCancelButton: true,
+    reverseButtons: true,
+    confirmButtonText: 'Yes, clear slot',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#b52222',
+    cancelButtonColor: '#6c757d',
+    background: '#fff',
+    customClass: {
+      popup: 'swal-clear-slot-popup',
+      title: 'swal-cit-title',
+      confirmButton: 'swal-clear-slot-confirm',
+      cancelButton: 'swal-clear-slot-cancel',
+    },
+  })
+  if (!confirmation.isConfirmed) return
+
+  try {
+    await apiRequest(`/schedules/lunch/${encodeURIComponent(lunchBreakContext.id)}`, { method: 'DELETE' })
+    await refreshScheduleData(lunchBreakContext.teacher)
+    showLunchBreakPicker.value = false
+    showSchedModal.value = false
+    await showSuccessToast('Lunch break removed successfully')
+  } catch (error) {
+    await showScheduleError(error, 'Unable to remove lunch break')
   }
 }
 
 function openAddModal(slot, day) {
   filterSection.value  = 'All'
   editMode.value       = false
+  originalScheduleSignature.value = null
   fromButton.value     = (slot === null && day === null)
   showLunchBreakPicker.value = false
   lunchBreakContext.teacher = selectedTeacher.value || ''
@@ -2823,6 +2967,7 @@ function openEditModal(slot, day, e) {
     0, form.parallelSlots.length,
     ...(e.parallelSlots?.length ? e.parallelSlots.map(s => ({ ...s })) : buildSlots(form.parallelCount))
   )
+  originalScheduleSignature.value = scheduleEditSignature(form)
   modalTimeError.value = ''
   showSchedModal.value = true
 }
@@ -2900,6 +3045,27 @@ function isEntryBeingEdited(entry) {
   )
 }
 
+function scheduleEditSignature(source) {
+  const parallel = Boolean(source.parallel)
+  return JSON.stringify({
+    teacher: source.teacher || '',
+    day: source.day || '',
+    year: source.year || '',
+    subject: source.subject || '',
+    campus: source.campus || 'South Campus',
+    timeIn: source.timeIn || '',
+    timeOut: source.timeOut || '',
+    parallel,
+    parallelCount: parallel ? source.parallelCount : 1,
+    slots: parallel
+      ? Array.from({ length: source.parallelCount }, (_, index) => {
+          const slot = source.parallelSlots[index] || {}
+          return { section: slot.section || '', room: slot.room || '', roomType: slot.roomType || 'Lecture' }
+        })
+      : [{ section: source.section || '', room: source.room || '', roomType: source.roomType || 'Lecture' }],
+  })
+}
+
 function buildSchedulePayload(source) {
   const payload = {
     tableLabel: source.teacher,
@@ -2936,16 +3102,26 @@ function setVisibleSection(source) {
 }
 
 async function saveEntry() {
-  if (!form.teacher || !form.subject) return
+  if (submittingSchedule.value || !form.teacher || !form.subject) return
+  if (editMode.value && !hasScheduleChanges.value) {
+    showSuccessToast('No changes made', '✕', 'error')
+    return
+  }
   if (form.parallel && form.parallelSlots.every(s => !s.section)) return
+  submittingSchedule.value = true
   try {
     const payload = buildSchedulePayload(form)
     const skipFilter = editMode.value ? (_key, entry) => isEntryBeingEdited(entry) : null
     const conflicts = checkScheduleConflict(payload, skipFilter)
     if (conflicts.length > 0) { await showConflictDialog(conflicts); return }
     if (!editMode.value && !await confirmLongTeacherSession(payload)) return
+    savingSchedule.value = true
     await proceedWithSave(payload)
   } catch (error) { await showScheduleError(error) }
+  finally {
+    savingSchedule.value = false
+    submittingSchedule.value = false
+  }
 }
 
 function recurringAssignmentEntries(old) {
@@ -3026,7 +3202,6 @@ async function replaceRecurringAssignment(payload, old) {
 
 async function proceedWithSave(payload) {
   try {
-    if (editMode.value && form._oldDay) payload.day = form._oldDay
     if (editMode.value) {
       const old = buildOldDescriptor()
       if (old.recurringAssignment) {
@@ -3053,10 +3228,18 @@ async function proceedWithSave(payload) {
 async function clearSlot() {
   const confirmation = await Swal.fire({
     icon: 'warning', title: 'Clear this slot?',
+    iconHtml: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 14h28M19 14V9h10v5M14 14l2 26h16l2-26M20 20v14M28 20v14"/></svg>',
     text: 'This will remove the selected class schedule from the grid.',
     showCancelButton: true, confirmButtonText: 'Yes, clear slot', cancelButtonText: 'Cancel',
-    confirmButtonColor: '#e63946', cancelButtonColor: '#6c757d', background: '#fff',
-    customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title' },
+    reverseButtons: true,
+    confirmButtonColor: '#c93636', cancelButtonColor: '#6c757d', background: '#fff',
+    customClass: {
+      popup: 'swal-clear-slot-popup',
+      icon: 'swal-clear-slot-icon',
+      title: 'swal-cit-title',
+      confirmButton: 'swal-clear-slot-confirm',
+      cancelButton: 'swal-clear-slot-cancel',
+    },
   })
   if (!confirmation.isConfirmed) return
   try {
@@ -3185,6 +3368,7 @@ async function addEntry() {
 
 /* ── Consultation modal ── */
 const showConsultModal  = ref(false)
+const consultSlotEditorOpen = ref(false)
 const consultEditId     = ref(null)
 const consultWeeklyMins = ref(0)
 const consultForm = reactive({ dayOfWeek: '', startTime: '', endTime: '' })
@@ -3208,10 +3392,25 @@ async function openConsultModal() {
     consultWeeklyMins.value = res.weeklyUsedMinutes || 0
   } catch (_) { consultWeeklyMins.value = 0 }
   await fetchConsultationsForTeacher()
+  consultSlotEditorOpen.value = false
   consultEditId.value = null
   Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
   consultTimeError.value = ''
   showConsultModal.value = true
+}
+
+function openAddConsultSlot() {
+  consultEditId.value = null
+  Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
+  consultTimeError.value = ''
+  consultSlotEditorOpen.value = true
+}
+
+function closeConsultSlotEditor() {
+  consultSlotEditorOpen.value = false
+  consultEditId.value = null
+  Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
+  consultTimeError.value = ''
 }
 
 function editConsultSlot(slot) {
@@ -3220,6 +3419,7 @@ function editConsultSlot(slot) {
   consultForm.startTime  = slot.startTime
   consultForm.endTime    = slot.endTime
   consultTimeError.value = ''
+  consultSlotEditorOpen.value = true
 }
 
 async function openConsultSlotModal(slot) {
@@ -3241,6 +3441,7 @@ async function saveConsultSlot() {
     } else {
       await apiRequest('/consultations', { method: 'POST', body: JSON.stringify(payload) })
     }
+    consultSlotEditorOpen.value = false
     consultEditId.value = null
     Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
     consultTimeError.value = ''
@@ -3260,9 +3461,14 @@ async function saveConsultSlot() {
 async function deleteConsultSlot(id) {
   const ok = await Swal.fire({
     icon: 'warning', title: 'Remove Consultation Slot?', text: 'This slot will be permanently deleted.',
-    showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#e63946',
+    showCancelButton: true, reverseButtons: true, confirmButtonText: 'Delete', confirmButtonColor: '#b52222',
     cancelButtonText: 'Cancel', cancelButtonColor: '#6c757d', background: '#fff',
-    customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title' },
+    customClass: {
+      popup: 'swal-clear-slot-popup',
+      title: 'swal-cit-title',
+      confirmButton: 'swal-clear-slot-confirm',
+      cancelButton: 'swal-clear-slot-cancel',
+    },
   })
   if (!ok.isConfirmed) return
   try {
@@ -3571,6 +3777,29 @@ onMounted(async () => {
   display: grid;
   gap: 12px;
 }
+.lunch-break-day-selector { display: grid; gap: 10px; margin: 0 22px 16px; }
+.lunch-break-day-selector-label { color: #424950; font-size: .78rem; font-weight: 700; }
+.lunch-break-select-all { display: flex; min-height: 36px; align-items: center; gap: 8px; padding: 7px 10px; color: #536069; border: 1px solid #cbd3d8; border-radius: 8px; background: rgba(255,255,255,.68); font-size: .7rem; font-weight: 650; cursor: pointer; }
+.lunch-break-select-all.selected { color: #344149; border-color: #71818b; background: #e8edef; }
+.lunch-break-select-all input { width: 14px; height: 14px; flex: 0 0 14px; margin: 0; accent-color: #44515d; }
+.lunch-break-day-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.lunch-break-day-options label {
+  display: flex;
+  min-width: 0;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  color: #536069;
+  border: 1px solid #cbd3d8;
+  border-radius: 8px;
+  background: rgba(255,255,255,.68);
+  font-size: .7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lunch-break-day-options label.selected { color: #344149; border-color: #71818b; background: #e8edef; }
+.lunch-break-day-options input { width: 14px; height: 14px; flex: 0 0 14px; margin: 0; accent-color: #44515d; }
 .lunch-break-picker-field {
   display: grid;
   grid-template-columns: 92px 1fr;
@@ -3941,7 +4170,7 @@ onMounted(async () => {
 .save-inline-btn { width: 100%; justify-content: center; font-size: 0.82rem; padding: 8px 10px; }
 .table-time-error { margin-top: 6px; font-size: 0.8rem; color: #e63946; }
 
-.td-cell { cursor: pointer; transition: background 0.15s; padding: 0; position: relative; }
+.td-cell { cursor: pointer; transition: background 0.15s; padding: 0; position: relative; background: #f8f9fa; }
 .td-cell:hover { background: #f4f5f5; }
 .td-cell.has-entry { padding: 0; }
 .td-cell.readonly-entry-cell { cursor: default; }
@@ -3980,7 +4209,7 @@ onMounted(async () => {
 .entry-section-row { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .entry-section-badge { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.9; background: rgba(255,255,255,0.2); padding: 1px 4px; border-radius: 3px; }
 .entry-room { font-size: 0.72rem; opacity: 0.75; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56px; }
-.entry-edit-hint { font-size: 0.6rem; opacity: 0; transition: opacity 0.15s; font-style: italic; position: absolute; bottom: 2px; right: 6px; background: rgba(0,0,0,0.3); padding: 1px 4px; border-radius: 3px; color: white; z-index: 2; }
+.entry-edit-hint { position: absolute; top: 50%; left: 50%; z-index: 2; padding: 4px 8px; color: #fff; border-radius: 999px; background: rgba(0,0,0,.42); font-size: .6rem; font-style: italic; white-space: nowrap; opacity: 0; pointer-events: none; transform: translate(-50%,-50%); transition: opacity .15s ease; }
 .sched-entry:hover .entry-edit-hint { opacity: 0.9; }
 .entry-timestamp { font-size: 0.55rem; opacity: 0.6; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: absolute; bottom: 2px; left: 6px; background: rgba(0,0,0,0.2); padding: 1px 4px; border-radius: 3px; color: rgba(255,255,255,0.9); z-index: 2; }
 .click-to-add { display: flex; align-items: center; justify-content: center; height: 100%; text-align: center; font-size: 0.72rem; color: #aaa; user-select: none; padding: 4px; }
@@ -4180,7 +4409,7 @@ onMounted(async () => {
 .schedule-entry-modal .parallel-slot-divider { margin-top: 3px; color: #69757e; border-color: #dce2e5; font-size: .64rem; }
 .schedule-entry-modal .time-error { margin: 0 24px 12px !important; padding: 9px 11px !important; }
 .schedule-entry-modal .lunch-break-footer { margin: 0; padding: 0 24px 18px; }
-.schedule-entry-modal .lunch-break-modal-btn { min-height: 42px; border-color: #bdc7cd; border-radius: 9px; background: #e9edef; color: #4d5a63; font-size: .73rem; }
+.schedule-entry-modal .lunch-break-modal-btn { width: auto; min-width: 0; flex: 0 0 auto; min-height: 42px; padding: 8px 12px; white-space: nowrap; border-color: #bdc7cd; border-radius: 9px; background: #e9edef; color: #4d5a63; font-size: .73rem; }
 .schedule-entry-modal .sched-modal-actions {
   position: sticky;
   bottom: 0;
@@ -4225,7 +4454,7 @@ onMounted(async () => {
 .schedule-entry-modal .schedule-for-text { font-size: .84rem; line-height: 1.4; }
 
 .lunch-break-picker {
-  width: 500px;
+  width: 560px;
   max-width: calc(100vw - 32px);
   padding: 0;
   overflow: hidden;
@@ -4275,7 +4504,8 @@ onMounted(async () => {
 .lunch-break-picker-help { margin: 18px 22px 0; padding: 11px 12px; color: #5f6c74; border-left: 3px solid #64727c; border-radius: 0 8px 8px 0; background: #e9edef; font-size: .75rem; line-height: 1.55; }
 .lunch-break-picker-fields { gap: 14px; padding: 18px 22px 2px; }
 .lunch-break-picker-field { grid-template-columns: 1fr; gap: 7px; color: #55626b; font-size: .76rem; font-weight: 680; }
-.lunch-break-picker-field select { min-height: 46px; padding: 10px 36px 10px 12px; color: #303b43; border-color: #c5ced3; border-radius: 9px; background: #fff; font-size: .82rem; outline: none; }
+.lunch-break-picker-field select { min-height: 46px; padding: 10px 36px 10px 12px; color: #303b43; border-color: #c5ced3; border-radius: 9px; background: #fff; font-size: .82rem; font-weight: 500; outline: none; }
+.lunch-break-picker-field select.is-placeholder { color: #8b959b; font-weight: 400; }
 .lunch-break-picker-field select:focus { border-color: #7d8a93; box-shadow: 0 0 0 3px rgba(70,84,94,.1); }
 .lunch-break-picker-error { margin: 14px 22px 0; padding: 10px 11px; color: #884848; border: 1px solid #e2caca; background: #f8eaea; font-size: .74rem; line-height: 1.45; }
 .lunch-break-picker-actions { margin: 18px 0 0; padding: 14px 22px 19px; border-top: 1px solid #dbe1e4; background: #edf1f2; }
@@ -4283,7 +4513,8 @@ onMounted(async () => {
 .lunch-break-picker-actions .cancel-btn-text:hover { border-color: #ced6da; background: #fff; opacity: 1; }
 .lunch-break-picker-actions .save-btn { min-height: 42px; padding: 9px 18px; border: 1px solid #414d56; border-radius: 9px; background: linear-gradient(145deg,#64717b,#37434c); box-shadow: 0 4px 10px rgba(38,46,52,.16); font-size: .76rem; }
 .lunch-break-picker-actions .save-btn:disabled { color: #929aa0; border-color: #d1d7db; background: #dfe3e5; box-shadow: none; opacity: 1; }
-
+.lunch-break-clear-btn { min-height: 40px; margin-right: auto; padding: 8px 13px; color: #a33c3c; border: 1px solid #e2baba; border-radius: 8px; background: #fff6f6; font-size: .74rem; font-weight: 650; cursor: pointer; }
+.lunch-break-clear-btn:hover { border-color: #c98787; background: #fbeaea; }
 /* Edit schedule hierarchy */
 .schedule-entry-modal .schedule-teacher-field,
 .schedule-entry-modal .schedule-subject-field,
@@ -4528,8 +4759,47 @@ onMounted(async () => {
   font-size: .72rem;
   font-weight: 500;
 }
-.sched-topbar-right { padding: 4px; border: 1px solid #d3dade; border-radius: 11px; background: #eef1f2; }
-.schedule-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 11px; margin-right: 4px; color: #64717a; font-size: .66rem; font-weight: 650; white-space: nowrap; }
+.sched-topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.schedule-card > .timetable-schedule-toolbar {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 12px;
+}
+.schedule-card > .timetable-schedule-toolbar .schedule-back-btn {
+  grid-column: 1;
+  grid-row: 1;
+}
+.schedule-card > .timetable-schedule-toolbar .sched-topbar-left {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+.schedule-card > .timetable-schedule-toolbar .sched-grid-title { white-space: nowrap; }
+.schedule-card > .timetable-schedule-toolbar .sched-topbar-right {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  justify-content: flex-end;
+  width: auto;
+  flex-wrap: wrap;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.schedule-card > .timetable-schedule-toolbar .schedule-legend-wrap {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d3dade;
+  border-radius: 11px;
+  background: #eef1f2;
+}
+.schedule-legend { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px 11px; margin-right: 4px; color: #64717a; font-size: .66rem; font-weight: 650; white-space: nowrap; }
 .schedule-legend span { display: inline-flex; align-items: center; gap: 4px; }
 .legend-swatch { width: 10px; height: 10px; display: inline-block; border-radius: 3px; }
 .legend-swatch--lecture { background: #e9c46a; }
@@ -4541,6 +4811,8 @@ onMounted(async () => {
 .sched-select { min-height: 38px; border-color: transparent; border-radius: 8px; background: transparent; color: #48545d; font-size: .72rem; font-weight: 600; }
 .sched-select:hover,.sched-select:focus { border-color: #bec7cc; background: #fff; }
 .icon-btn.consult-btn { width: 38px; height: 38px; border-radius: 8px; color: #fff; border-color: #3e4b55; background: linear-gradient(145deg,#62717b,#35434c); box-shadow: 0 3px 8px rgba(38,48,55,.17); }
+.icon-btn.lunch-break-toolbar-btn { width: 38px; height: 38px; justify-content: center; padding: 0; border-radius: 8px; color: #45545e; border-color: #c7d0d5; background: linear-gradient(145deg,#f8fafb,#e3e8ea); box-shadow: 0 3px 8px rgba(38,48,55,.1); }
+.icon-btn.lunch-break-toolbar-btn:hover { color: #263640; border-color: #99a7af; background: #fff; }
 .main .sched-grid-wrap {
   width: 100%;
   margin: 0;
@@ -4719,6 +4991,13 @@ onMounted(async () => {
   font-size: .68rem;
   font-weight: 620;
 }
+.list-not-applicable {
+  color: #68747c;
+  border-style: dashed;
+  background: #e8edef;
+  font-size: .62rem;
+  font-style: italic;
+}
 .list-subject { display: -webkit-box; overflow: hidden; color: #263139; font-weight: 570; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .list-teacher { display: -webkit-box; overflow: hidden; color: #39464f; font-weight: 620; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .list-campus { display: block; overflow: hidden; color: #66727b; white-space: nowrap; text-overflow: ellipsis; }
@@ -4808,6 +5087,11 @@ onMounted(async () => {
   .main-header { align-items: flex-start; flex-direction: column; }
   .header-right { width: 100%; align-items: flex-start; }
   .sched-topbar { align-items: flex-start; flex-direction: column; }
+  .schedule-card > .timetable-schedule-toolbar { grid-template-columns: 40px minmax(0, 1fr); }
+  .schedule-card > .timetable-schedule-toolbar .sched-topbar-left { grid-column: 2; grid-row: 1; }
+  .schedule-card > .timetable-schedule-toolbar .sched-grid-title { white-space: normal; }
+  .schedule-card > .timetable-schedule-toolbar .sched-topbar-right { grid-column: 2; grid-row: 2; justify-self: stretch; width: 100%; }
+  .schedule-card > .timetable-schedule-toolbar .schedule-legend-wrap { grid-row: 3; }
   .list-schedule-toolbar { gap: 14px; }
   .list-toolbar-actions { width: 100%; }
   .list-toolbar-actions .new-sched-btn { width: 100%; justify-content: center; }
@@ -4881,19 +5165,25 @@ onMounted(async () => {
 }
 .consult-edit-hint {
   position: absolute;
-  right: 7px;
-  bottom: 6px;
-  padding: 3px 7px;
+  top: 50%;
+  left: 50%;
+  max-width: calc(100% - 12px);
+  padding: 4px 8px;
   color: rgba(255,255,255,.94);
   border-radius: 999px;
   background: rgba(24,65,106,.34);
   font-size: .58rem;
-  font-weight: 650;
+  font-style: italic;
+  font-weight: 400;
   letter-spacing: .01em;
-  opacity: .84;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%,-50%);
+  transition: opacity .15s ease;
 }
 .consult-entry:hover .consult-edit-hint,
-.consult-entry:focus-visible .consult-edit-hint { background: rgba(24,65,106,.52); opacity: 1; }
+.consult-entry:focus-visible .consult-edit-hint { background: rgba(24,65,106,.62); opacity: 1; }
 
 /* Consultation dialog layout */
 .consult-modal-box {
@@ -5230,6 +5520,11 @@ onMounted(async () => {
   box-shadow: none;
 }
 .consult-header-icon {
+  display: grid;
+  place-items: center;
+  align-self: flex-start;
+  padding: 0;
+  line-height: 0;
   color: #44515d;
   border: 1px solid #d9e1e7;
   background: #f2f5f7;
@@ -5256,23 +5551,92 @@ onMounted(async () => {
   transform: none;
 }
 .consult-modal-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 20px;
+  padding: 24px 32px 28px;
   background: #f8fafb;
 }
 .consult-left-pane {
-  border-right: 1px solid #e1e7eb;
-  background: #f3f6f8;
+  display: grid;
+  grid-template-columns: minmax(230px,.8fr) minmax(0,1.2fr);
+  align-items: stretch;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   box-shadow: none;
 }
 .consult-right-pane {
   background: #fff;
   box-shadow: none;
 }
+.consult-modal-content > .consult-right-pane { background: transparent; }
 .consult-usage,
 .consult-slot-item,
 .consult-empty {
-  border: 1px solid #dfe6eb;
+  min-height: 104px;
+  align-self: stretch;
+  margin: 0;
+  padding: 18px 20px;
+  border-style: solid;
+  border-radius: 14px;
+}
+.consult-usage {
+  align-content: center;
+  gap: 14px;
+  min-height: 104px;
+  padding: 18px 20px;
+  border-radius: 14px;
+}
+.consult-usage-copy { align-items: baseline; flex-wrap: wrap; gap: 6px 12px; }
+.consult-usage-copy span { color: #5d6873; font-size: .75rem; }
+.consult-usage-copy strong { color: #26313b; font-size: .82rem; }
+.consult-empty-icon { width: 42px; height: 42px; flex-basis: 42px; }
+.consult-empty strong { color: #303b45; font-size: .8rem; }
+.consult-empty div span { margin-top: 4px; color: #75818a; font-size: .7rem; line-height: 1.45; }
+.consult-modal-box .consult-right-pane .consult-form-shell {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 16px 20px;
+  margin: 0;
+  padding: 22px 24px 24px;
+  border: 1px solid #e1e7eb;
+  border-radius: 14px;
   background: #fff;
-  box-shadow: none;
+  box-shadow: 0 4px 14px rgba(32,40,48,.035);
+}
+.consult-right-pane .consult-form-heading { padding-bottom: 15px; }
+.consult-right-pane .consult-form-heading .consult-form-title { font-size: .9rem; }
+.consult-right-pane .consult-form-heading p { font-size: .7rem; }
+.consult-modal-box .form-select { min-height: 48px; }
+.consult-left-pane:has(.consult-slots-list) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.consult-left-pane:has(.consult-slots-list) .consult-usage { grid-column: 1; grid-row: 1 / span 2; }
+.consult-left-pane:has(.consult-slots-list) .consult-section-heading { grid-column: 2; grid-row: 1; padding: 4px 0 0; }
+.consult-left-pane:has(.consult-slots-list) .consult-slots-list { grid-column: 2; grid-row: 2; width: 100%; }
+.consult-modal-box .sched-modal-actions {
+  position: static;
+  margin-top: 0;
+  padding: 16px 32px 22px;
+  backdrop-filter: none;
+}
+@media (max-width: 640px) {
+  .consult-modal-content { gap: 16px; padding: 18px; }
+  .consult-left-pane { grid-template-columns: 1fr; gap: 12px; }
+  .consult-usage,.consult-empty { min-height: auto; }
+  .consult-modal-box .consult-right-pane .consult-form-shell { grid-template-columns: 1fr; margin: 0; padding: 18px; }
+  .consult-form-heading,.consult-day-field { grid-column: auto; }
+  .consult-modal-box .sched-modal-actions { padding: 14px 18px 18px; }
+  .consult-left-pane:has(.consult-slots-list) .consult-usage,
+  .consult-left-pane:has(.consult-slots-list) .consult-section-heading,
+  .consult-left-pane:has(.consult-slots-list) .consult-slots-list { grid-column: auto; grid-row: auto; }
+}
+@media (min-width: 641px) and (max-width: 900px) {
+  .consult-modal-content { padding: 22px; }
+  .consult-left-pane { grid-template-columns: 1fr 1fr; }
+  .consult-modal-box .consult-right-pane .consult-form-shell { margin: 0; }
 }
 .consult-progress {
   height: 8px;
@@ -5353,10 +5717,21 @@ onMounted(async () => {
 }
 .consult-modal-box .sched-modal-actions,
 .consult-right-pane .sched-modal-actions {
-  border-top: 1px solid #e1e7eb;
-  background: #fff;
-  box-shadow: none;
+  margin-top: 8px !important;
+  padding: 8px 24px 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
+.sched-grid td.td-cell { background-color: #f8f9fa; }
+.sched-grid td.td-cell:hover { background-color: #edf1f3; }
+.sched-grid td.td-cell.readonly-entry-cell:hover { background-color: #f8f9fa; }
+.consult-modal-content > .consult-right-pane { background: transparent !important; }
+.consult-empty .consult-empty-icon { display: grid !important; place-items: center; align-self: center; line-height: 0; }
+.consult-empty .consult-empty-icon svg { display: block; width: 28px; height: 28px; flex: 0 0 auto; margin: 0; }
+.consult-left-pane .consult-slot-item { min-height: 64px; padding: 7px 10px; }
+.consult-modal-box .consult-header-icon { width: 56px; height: 56px; flex-basis: 56px; place-items: center; }
+.consult-modal-box .consult-header-icon svg { width: 28px; height: 28px; }
 .consult-modal-box .cancel-btn-text {
   color: #5d6873;
   border: 1px solid transparent;
@@ -5384,17 +5759,139 @@ onMounted(async () => {
   background: #edf1f3;
   box-shadow: none;
 }
+.consult-overview-actions { display: flex; justify-content: flex-end; margin-top: -8px; }
+.consult-open-editor-btn {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  color: #fff;
+  border: 1px solid #3e4a55;
+  border-radius: 9px;
+  background: #44515d;
+  box-shadow: 0 5px 12px rgba(48,57,66,.14);
+  font-size: .74rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.consult-open-editor-btn:hover { background: #303b45; }
+.consult-open-editor-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.consult-slot-editor-overlay { z-index: 1100; padding: 16px; background: rgba(19,26,31,.56); }
+.consult-modal-box.consult-slot-editor-box {
+  display: flex;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  flex-direction: column;
+  overflow: auto;
+  border-radius: 17px;
+  background: #f8fafb;
+}
+.consult-slot-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e1e7eb;
+  background: #fff;
+}
+.consult-slot-editor-copy { min-width: 0; flex: 1; }
+.consult-slot-editor-copy .sched-modal-mode-badge { margin-bottom: 4px; }
+.consult-slot-editor-copy h2 { margin: 0; color: #202830; font-size: 1.08rem; line-height: 1.3; }
+.consult-slot-editor-copy p { margin: 3px 0 0; color: #75818a; font-size: .7rem; line-height: 1.4; }
+.consult-slot-editor-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 16px; padding: 20px 22px 22px; }
+.consult-editor-field { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
+.consult-editor-field--full { grid-column: 1 / -1; }
+.consult-editor-field .form-label { color: #4e5b64; font-size: .72rem; font-weight: 650; }
+.consult-slot-editor-box .form-select { min-height: 44px; padding: 9px 34px 9px 11px; border-radius: 9px; font-size: .76rem; }
+.consult-editor-error { grid-column: 1 / -1; margin: 0 !important; }
+.consult-slot-editor-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 22px 18px; border-top: 1px solid #e1e7eb; background: #fff; }
+.consult-slot-editor-actions .save-btn { min-height: 38px; padding: 8px 16px; font-size: .74rem; }
+.consult-slot-editor-actions .cancel-btn-text { min-height: 38px; padding: 8px 12px; font-size: .72rem; }
+.schedule-status-toast {
+  position: fixed;
+  z-index: 2000;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  display: flex;
+  width: min(380px, calc(100vw - 32px));
+  align-items: center;
+  gap: 11px;
+  padding: 13px 16px;
+  border: 1px solid #d8dee2;
+  border-left: 3px solid #547b66;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .97);
+  box-shadow: 0 12px 34px rgba(27, 37, 45, .18);
+  color: #303a42;
+  font: 600 .82rem/1.45 'Poppins', sans-serif;
+}
+.schedule-status-toast__icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf0f2;
+  color: #303a42;
+  font-size: .82rem;
+  font-weight: 800;
+}
+.schedule-status-toast.is-error { border-left-color: #a84c4c; }
+.schedule-status-toast.is-error .schedule-status-toast__icon { background: #fbeaea; color: #a84c4c; }
+.schedule-toast-enter-active,
+.schedule-toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.schedule-toast-enter-from,
+.schedule-toast-leave-to { opacity: 0; transform: translateY(-8px); }
 @media (max-width: 900px) {
   .consult-left-pane { border-right: 0; border-bottom: 1px solid #e1e7eb; }
   .consult-right-pane .consult-form-shell { padding: 24px; }
 }
 @media (max-width: 640px) {
   .consult-right-pane .consult-form-shell { padding: 20px 18px; }
+  .consult-overview-actions { margin-top: 0; }
+  .consult-open-editor-btn { width: 100%; }
+  .consult-slot-editor-overlay { padding: 12px; }
+  .consult-modal-box.consult-slot-editor-box { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
+  .consult-slot-editor-header { gap: 9px; padding: 15px; }
+  .consult-slot-editor-fields { gap: 12px; padding: 16px 15px 18px; }
+  .consult-slot-editor-actions { padding: 10px 15px 15px; }
+  .schedule-status-toast {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    padding: 12px 14px;
+    font-size: .78rem;
+  }
 }
 </style>
 
 <style>
 .swal-cit-popup { font-family: 'Poppins', sans-serif !important; border-radius: 18px !important; padding: 32px 28px 24px !important; box-shadow: 0 12px 48px rgba(0,0,0,0.18) !important; }
+.swal-clear-slot-popup { width: min(460px, calc(100vw - 32px)) !important; padding: 22px 30px 20px !important; border-radius: 20px !important; box-shadow: 0 16px 48px rgba(24, 30, 36, .2) !important; }
+.swal-clear-slot-popup .swal2-icon { width: 76px !important; height: 76px !important; margin: 4px auto 6px !important; border: 2px solid #a51f1f !important; border-radius: 50% !important; color: #a51f1f !important; }
+.swal-clear-slot-icon svg { display: block; width: 48px; height: 48px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; }
+.swal-clear-slot-popup .swal2-title { margin: 0 0 4px !important; color: #34383d !important; font-size: 1.3rem !important; font-weight: 700 !important; }
+.swal-clear-slot-popup .swal2-html-container { margin: 0.25em 0 .65em !important; color: #45494e !important; font-size: 1rem !important; line-height: 1.5 !important; }
+.swal-clear-slot-popup .swal2-actions { display: flex; width: 100%; justify-content: center; gap: 10px; margin-top: .5em; }
+.swal-clear-slot-confirm,
+.swal-clear-slot-cancel { flex: 1 1 0; min-height: 42px; margin: 0 !important; padding: 8px 12px !important; border-radius: 9px !important; font-size: .88rem !important; font-weight: 600 !important; }
+.swal-clear-slot-confirm { border: 1px solid #a51f1f !important; background: #b52222 !important; color: #fff !important; box-shadow: 0 4px 10px rgba(140, 26, 26, .22) !important; }
+.swal-clear-slot-confirm:hover { background: #951b1b !important; filter: none !important; }
+.swal-clear-slot-cancel:hover { background: #dcdfe1 !important; filter: none !important; }
 .swal-cit-title { font-family: 'Poppins', sans-serif !important; font-size: 1.15rem !important; font-weight: 700 !important; color: #1a1a2e !important; margin-bottom: 8px !important; }
 .swal-cit-btn { font-family: 'Poppins', sans-serif !important; font-size: 0.9rem !important; font-weight: 600 !important; border-radius: 10px !important; padding: 9px 28px !important; letter-spacing: 0.02em !important; }
+.swal-lunch-conflict-popup { width: min(390px, calc(100vw - 32px)) !important; padding: 18px 20px 16px !important; border-radius: 16px !important; box-shadow: 0 16px 44px rgba(24,30,36,.22) !important; }
+.swal-lunch-conflict-popup .swal2-icon { width: 56px !important; height: 56px !important; margin: 6px auto 8px !important; }
+.swal-lunch-conflict-popup .swal2-title { margin: 0 0 5px !important; }
+.swal-lunch-conflict-popup .swal2-title span { font-size: 1rem !important; }
+.swal-lunch-conflict-popup .swal2-html-container { margin: .25em 0 .6em !important; font-size: .76rem !important; }
+.swal-lunch-conflict-popup .swal2-html-container > p { margin-bottom: 7px !important; font-size: .74rem !important; }
+.swal-lunch-conflict-popup .swal2-html-container > div { max-height: 160px !important; }
+.swal-lunch-conflict-popup .swal2-actions { margin-top: .5em !important; }
+.swal-lunch-conflict-popup .swal2-confirm { width: 132px; min-height: 36px; padding: 7px 20px !important; font-size: .76rem !important; }
 </style>
