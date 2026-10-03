@@ -118,6 +118,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    assignedAcademicTermId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AcademicTerm",
+      default: null,
+    },
     phone: {
       type: String,
       trim: true,

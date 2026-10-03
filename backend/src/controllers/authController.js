@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const AcademicTerm = require("../models/AcademicTerm");
 const { sendPasswordOtpEmail, sendLoginOtpEmail, sendTwoFactorEnabledEmail } = require("../config/mail");
 const ConsultationRequest = require('../models/ConsultationRequest')
 const Notification = require('../models/Notification')
@@ -110,6 +111,7 @@ function toSafeUser(user) {
     department: user.department,
     yearLevel: user.yearLevel,
     section: user.section,
+    assignedAcademicTermId: user.assignedAcademicTermId ? String(user.assignedAcademicTermId) : "",
     phone: user.phone,
     gender: user.gender,
     account_status: user.account_status,
@@ -610,6 +612,8 @@ async function updateMe(req, res) {
     const studentId = normalizeString(req.body.studentId);
     const yearLevel = normalizeString(req.body.yearLevel);
     const section = normalizeString(req.body.section);
+    const academicTermId = normalizeString(req.body.academicTermId);
+    const assigningAcademicTerm = Object.prototype.hasOwnProperty.call(req.body, "academicTermId");
     const avatar = normalizeString(req.body.avatar);
     const gender = normalizeString(req.body.gender);
     const teacherStatus = normalizeString(req.body.teacher_status);
@@ -659,6 +663,18 @@ async function updateMe(req, res) {
       return res.status(400).json({ message: "Invalid year level." });
     }
 
+    let assignedAcademicTerm = null;
+    if (assigningAcademicTerm) {
+      if (user.role !== "student" || !/^[a-f\d]{24}$/i.test(academicTermId)) {
+        return res.status(400).json({ message: "Invalid academic term assignment." });
+      }
+      assignedAcademicTerm = await AcademicTerm.findOne({ _id: academicTermId, isPublished: true });
+      const sections = assignedAcademicTerm?.sectionNames?.[yearLevel];
+      if (!assignedAcademicTerm || !yearLevel || !section || !Array.isArray(sections) || !sections.includes(section)) {
+        return res.status(400).json({ message: "Select a valid year and section for the published academic term." });
+      }
+    }
+
     if (gender && !["Male", "Female", "Other"].includes(gender)) {
       return res.status(400).json({ message: "Invalid gender." });
     }
@@ -695,6 +711,7 @@ async function updateMe(req, res) {
       }
       user.yearLevel = yearLevel || user.yearLevel || "";
       user.section = section || user.section || "";
+      if (assignedAcademicTerm) user.assignedAcademicTermId = assignedAcademicTerm._id;
     }
     if (avatar) {
       user.avatar = avatar;

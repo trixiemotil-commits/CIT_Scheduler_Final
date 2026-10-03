@@ -181,15 +181,6 @@ const publishedTermLabel = computed(() =>
   publishedTerm.value ? `${publishedTerm.value.schoolYear} · ${publishedTerm.value.semester}` : 'A new semester'
 )
 
-function getStudentTermStorageKeys() {
-  const user = getUser() || {}
-  const userKey = user.id || user._id || user.email || 'student'
-  return {
-    assignment: `cit_student_term_assignment_${userKey}`,
-    notification: `cit_student_term_notification_${userKey}`,
-  }
-}
-
 watch(() => termForm.yearLevel, () => { termForm.section = '' })
 
 async function authenticatedRequest(path, options = {}) {
@@ -220,11 +211,21 @@ async function checkPublishedTerm() {
     const termId = String(term.id || term._id || '')
     if (!termId) return
 
-    const { assignment, notification } = getStudentTermStorageKeys()
-    if (localStorage.getItem(assignment) === termId) return
-    if (localStorage.getItem(notification) === termId) return
+    const profilePayload = await authenticatedRequest('/auth/me')
+    const user = profilePayload.user || {}
+    if (user.id || user._id) saveMergedUser(user)
+    if (String(user.assignedAcademicTermId || '') === termId) return
 
-    localStorage.setItem(notification, termId)
+    const existingSections = term.sectionNames?.[user.yearLevel]
+    if (!user.assignedAcademicTermId && user.yearLevel && user.section && existingSections?.includes(user.section)) {
+      const backfillPayload = await authenticatedRequest('/auth/me', {
+        method: 'PUT',
+        body: JSON.stringify({ yearLevel: user.yearLevel, section: user.section, academicTermId: termId }),
+      })
+      if (backfillPayload.user) saveMergedUser(backfillPayload.user)
+      return
+    }
+
     showTermPrompt.value = true
   } catch (error) {
     if (error.status === 401) {
@@ -244,12 +245,13 @@ async function saveTermAssignment() {
   try {
     const payload = await authenticatedRequest('/auth/me', {
       method: 'PUT',
-      body: JSON.stringify({ yearLevel: termForm.yearLevel, section: termForm.section }),
+      body: JSON.stringify({
+        yearLevel: termForm.yearLevel,
+        section: termForm.section,
+        academicTermId: String(publishedTerm.value?.id || publishedTerm.value?._id || ''),
+      }),
     })
     const user = saveMergedUser(payload.user || {})
-    const termId = String(publishedTerm.value?.id || publishedTerm.value?._id || '')
-    const { assignment } = getStudentTermStorageKeys()
-    localStorage.setItem(assignment, termId)
     showTermPrompt.value = false
   } catch (error) {
     termPromptError.value = error.message
