@@ -26,7 +26,7 @@
           :key="item.name"
           :to="item.to"
           class="nav-item"
-          :class="{ active: currentRoute === item.to }"
+          :class="{ active: currentRoute === item.to, 'nav-item--users': item.to === '/admin/users' }"
         >
           <span class="nav-icon" v-html="item.icon"></span>
           <span>{{ item.name }}</span>
@@ -56,7 +56,7 @@
     <!-- ═══════════════════ MAIN ═══════════════════ -->
     <main class="main">
       <!-- Header -->
-      <header class="main-header">
+      <header class="main-header um-page-header">
         <div>
           <h1 class="page-title">
             <span class="page-title-kicker">Users Management</span>
@@ -64,31 +64,20 @@
           </h1>
           <p class="page-sub">Add, edit, and manage system user accounts</p>
         </div>
+        <button v-if="activeView === 'active'" class="um-add-btn" @click="openAddUser">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add User
+        </button>
       </header>
 
       <section class="um-management-panel">
       <!-- Top bar -->
       <div class="um-topbar">
-        <div class="um-view-tabs">
-          <select v-model="statusFilter" class="um-filter-select um-filter-select--status">
-            <option value="all">All Users</option>
-            <option value="active">Active</option>
-            <option value="pending">Pending</option>
-            <option value="denied">Denied</option>
-            <option value="inactive">Inactive</option>
-            <option value="archived">Archived</option>
-          </select>
+        <div class="um-overview-heading">
+          <h2>Users Overview</h2>
+          <p>{{ filteredUsers.length }} user{{ filteredUsers.length === 1 ? '' : 's' }} shown</p>
         </div>
         <div class="um-topbar-right">
-          <button
-            v-if="activeView === 'active' && pendingCount > 0"
-            class="um-approve-all-btn"
-            :disabled="isBulkApproving"
-            @click="promptApproveAll"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/><path d="M22 10l-7 7"/></svg>
-            {{ isBulkApproving ? 'Approving...' : `Approve All (${pendingCount})` }}
-          </button>
           <button
             v-if="activeView === 'active' && selectedPendingUsers.length"
             class="um-approve-selected-btn"
@@ -104,6 +93,14 @@
             </span>
             <input v-model="searchQuery" class="um-search-input" type="text" :placeholder="activeView === 'archived' ? 'Search archived...' : 'Search users...'" />
           </div>
+          <select v-model="statusFilter" class="um-filter-select um-filter-select--status">
+            <option value="all">All Users</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="denied">Denied</option>
+            <option value="inactive">Inactive</option>
+            <option value="archived">Archived</option>
+          </select>
           <select v-model="roleFilter" class="um-filter-select">
             <option value="">All Roles</option>
             <option value="Admin">Admin</option>
@@ -118,10 +115,6 @@
               <rect x="6" y="14" width="12" height="8"/>
             </svg>
             Print
-          </button>
-          <button v-if="activeView === 'active'" class="um-add-btn" @click="openAddUser">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Add User
           </button>
         </div>
       </div>
@@ -191,6 +184,17 @@
             <div class="um-stat-label">4th Year</div>
           </div>
         </div>
+      </div>
+
+      <div v-if="activeView === 'active' && pendingCount > 0" class="um-stats-actions">
+        <button
+          class="um-approve-all-btn"
+          :disabled="isBulkApproving"
+          @click="promptApproveAll"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/><path d="M22 10l-7 7"/></svg>
+          {{ isBulkApproving ? 'Approving...' : `Approve All (${pendingCount})` }}
+        </button>
       </div>
 
       <!-- Table -->
@@ -1570,6 +1574,7 @@ function confirmRestoreUser() {
 .nav-item:hover  { background: #f8fafc; color: #4b5563; }
 .nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
+.nav-item--users { margin-top: 6px; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
 .logout-btn {
@@ -2638,6 +2643,18 @@ function confirmRestoreUser() {
 .main-header::before { display: none; }
 .main { padding: 24px 38px 44px; }
 .main-header { margin-bottom: 25px; }
+.um-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.um-page-header .um-add-btn {
+  width: auto;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
 .um-management-panel {
   padding: 17px 27px 24px !important;
   border: 1px solid var(--metal-line) !important;
@@ -2650,6 +2667,17 @@ function confirmRestoreUser() {
   margin-bottom: 16px;
   padding-bottom: 15px;
   border-bottom: 1px solid #e1e6e9;
+}
+.um-overview-heading h2 {
+  margin: 0;
+  color: #252e35;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.um-overview-heading p {
+  margin: 4px 0 0;
+  color: #78838b;
+  font-size: .75rem;
 }
 .um-view-tabs {
   gap: 7px;
@@ -2675,7 +2703,10 @@ function confirmRestoreUser() {
   background: #3f4d57;
   box-shadow: 0 5px 12px rgba(45,56,64,.16);
 }
-.um-topbar-right { gap: 8px; }
+.um-topbar-right {
+  gap: 8px;
+  margin-left: auto;
+}
 .um-search-input,
 .um-filter-select,
 .um-print-btn {
@@ -2814,16 +2845,29 @@ function confirmRestoreUser() {
 }
 .um-view-tabs { background: transparent; box-shadow: none; }
 .um-view-tab--on,
-.um-add-btn,
 .um-approve-all-btn,
 .um-approve-selected-btn {
   background: #44515d;
   box-shadow: none;
 }
 .um-view-tab--on:hover,
-.um-add-btn:hover,
 .um-approve-all-btn:hover,
 .um-approve-selected-btn:hover { background: #35424d; }
+.um-add-btn {
+  min-height: 46px;
+  padding: 0 18px;
+  gap: 8px;
+  border: 1px solid #3e4d58;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #5c6771, #343e47);
+  box-shadow: 0 8px 20px rgba(45,55,63,.2), inset 0 1px 0 rgba(255,255,255,.3);
+  font-size: .78rem;
+  font-weight: 600;
+}
+.um-add-btn:hover {
+  background: linear-gradient(145deg, #687580, #3d4852);
+  transform: translateY(-1px);
+}
 .um-approve-all-btn {
   border-color: #176b3a;
   background: #21834b;
@@ -2831,10 +2875,26 @@ function confirmRestoreUser() {
 }
 .um-approve-all-btn:hover { background: #176b3a; }
 .um-search-input,
-.um-filter-select,
-.um-print-btn { background: #fff; box-shadow: none; }
+.um-filter-select { background: #fff; box-shadow: none; }
+.um-print-btn {
+  border: 1px solid #9fc4ee;
+  background: linear-gradient(145deg, #eef6ff, #d8eaff);
+  color: #2f7ed8;
+  box-shadow: 0 3px 8px rgba(47,126,216,.12), inset 0 1px rgba(255,255,255,.8);
+}
+.um-print-btn:hover {
+  border-color: #6ea8e8;
+  background: linear-gradient(145deg, #f6fbff, #cfe5ff);
+  color: #1f6ec4;
+  transform: translateY(-1px);
+}
 .um-stats-row { gap: 12px; }
 .um-stats-row { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.um-stats-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
 .um-stat-card {
   background: #fff;
   border-color: #dbe3e7;

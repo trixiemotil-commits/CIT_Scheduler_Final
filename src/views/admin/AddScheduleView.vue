@@ -5868,6 +5868,36 @@ onMounted(async () => {
     font-size: .78rem;
   }
 }
+@media (max-width: 1200px) {
+  .main .sched-grid-wrap { padding: 12px; overflow-x: hidden; }
+  .sched-grid { width: 100%; min-width: 0; table-layout: fixed; }
+  .sched-grid th,
+  .sched-grid td { min-width: 0; }
+  .sched-grid th { padding: 8px 3px; font-size: .62rem; }
+  .sched-grid th.th-time { width: 62px; }
+  .sched-grid td.td-time { width: 62px; padding-inline: 3px; font-size: .56rem; }
+  .sched-grid tbody tr { height: 40px; }
+  .sched-grid .sched-entry { left: 2px; right: 2px; padding: 4px 3px; }
+  .sched-grid .entry-teacher { font-size: .58rem; line-height: 1.15; }
+  .sched-grid .entry-subject { font-size: .54rem; line-height: 1.2; }
+  .sched-grid .entry-time-range { font-size: .5rem; }
+  .sched-grid .entry-section-badge,
+  .sched-grid .entry-room { font-size: .52rem; }
+  .sched-grid .subbed-indication { padding: 2px 3px; font-size: .5rem; }
+  .sched-grid .click-to-add { padding: 2px; font-size: .54rem; }
+}
+@media (max-width: 640px) {
+  .main .sched-grid-wrap { padding: 6px; }
+  .sched-grid th { padding: 7px 1px; font-size: .5rem; }
+  .sched-grid th.th-time { width: 48px; }
+  .sched-grid td.td-time { width: 48px; padding-inline: 1px; font-size: .48rem; }
+  .sched-grid .sched-entry { left: 1px; right: 1px; padding: 3px 2px; }
+  .sched-grid .entry-teacher { font-size: .48rem; }
+  .sched-grid .entry-subject { font-size: .46rem; }
+  .sched-grid .entry-time-range,
+  .sched-grid .entry-section-badge,
+  .sched-grid .entry-room { font-size: .44rem; }
+}
 </style>
 
 <style>

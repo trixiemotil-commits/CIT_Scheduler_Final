@@ -2698,6 +2698,103 @@ body,
   }
 }
 
+/* Academic Terms schedule mode picker scales with the available workspace. */
+.layout > .main > .workspace-card {
+  width: 100%;
+  max-width: none;
+}
+
+.layout > .main > .workspace-card .mode-grid {
+  width: min(100%, 1320px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 1.25vw, 24px);
+  margin: clamp(22px, 2.2vw, 38px) auto;
+}
+
+.layout > .main > .workspace-card .mode-card {
+  min-width: 0;
+  min-height: clamp(130px, 11vw, 190px);
+  padding: clamp(15px, 1.6vw, 26px);
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: clamp(12px, 1.2vw, 20px);
+  text-align: left;
+}
+
+.layout > .main > .workspace-card .mode-icon {
+  width: clamp(48px, 5vw, 76px);
+  height: clamp(48px, 5vw, 76px);
+  flex: 0 0 auto;
+  border-radius: 22px;
+  color: #f7f8f8;
+  background: linear-gradient(145deg, #65717a, #30383f);
+  box-shadow: 0 8px 16px rgba(37, 43, 48, .22), inset 0 1px rgba(255,255,255,.2);
+}
+
+.layout > .main > .workspace-card .mode-icon :deep(svg) {
+  width: clamp(23px, 2.4vw, 34px);
+  height: clamp(23px, 2.4vw, 34px);
+}
+
+.layout > .main > .workspace-card .mode-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.layout > .main > .workspace-card .mode-copy strong {
+  display: block;
+  color: #242b31;
+  font-size: clamp(.9rem, 1.05vw, 1.2rem);
+  line-height: 1.2;
+}
+
+.layout > .main > .workspace-card .mode-copy small {
+  display: block;
+  max-width: 25ch;
+  margin-top: 6px;
+  color: #68737c;
+  font-size: clamp(.68rem, .78vw, .88rem);
+  line-height: 1.45;
+}
+
+.layout > .main > .workspace-card .mode-arrow {
+  flex: 0 0 auto;
+  color: #53616a;
+  font-size: clamp(1.1rem, 1.5vw, 1.6rem);
+}
+
+@media (min-width: 1601px) {
+  .layout > .main > .workspace-card { padding: clamp(32px, 2vw, 48px); }
+  .layout > .main > .workspace-card .mode-grid { width: min(100%, 1520px); }
+}
+
+@media (max-width: 900px) {
+  .layout > .main > .workspace-card .mode-grid {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .layout > .main > .workspace-card .mode-card {
+    min-height: 112px;
+    padding: 14px;
+    gap: 11px;
+  }
+
+  .layout > .main > .workspace-card .mode-copy strong { font-size: .86rem; }
+  .layout > .main > .workspace-card .mode-copy small { font-size: .68rem; }
+  .layout > .main > .workspace-card .mode-icon { width: 44px; height: 44px; border-radius: 14px; }
+  .layout > .main > .workspace-card .mode-icon :deep(svg) { width: 23px; height: 23px; }
+}
+
+@media (max-width: 560px) {
+  .layout > .main > .workspace-card .mode-grid { grid-template-columns: 1fr; gap: 10px; margin-block: 16px; }
+  .layout > .main > .workspace-card .mode-card { min-height: 88px; padding: 12px; }
+  .layout > .main > .workspace-card .mode-copy strong { font-size: .82rem; }
+  .layout > .main > .workspace-card .mode-copy small { font-size: .64rem; line-height: 1.35; }
+  .layout > .main > .workspace-card .mode-arrow { font-size: 1rem; }
+}
+
 /* Admin dashboard viewport and content sizing */
 .layout.admin-dashboard {
   width: 100%;

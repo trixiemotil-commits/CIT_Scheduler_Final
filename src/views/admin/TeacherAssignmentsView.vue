@@ -1,5 +1,19 @@
 <template>
   <div class="layout">
+    <Teleport to="body">
+      <Transition name="teacher-toast">
+        <div
+          v-if="teacherToast"
+          class="teacher-status-toast"
+          :class="`is-${teacherToast.type}`"
+          :role="teacherToast.type === 'error' ? 'alert' : 'status'"
+          aria-live="polite"
+        >
+          <span class="teacher-status-toast__icon" aria-hidden="true">{{ teacherToast.type === 'success' ? '✓' : '!' }}</span>
+          <span>{{ teacherToast.message }}</span>
+        </div>
+      </Transition>
+    </Teleport>
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
     <aside class="sidebar admin-sidebar">
       <AdminSidebarToggle />
@@ -143,9 +157,6 @@
               <!-- Name -->
               <h3 class="teacher-name">{{ teacher.name }}</h3>
 
-              <!-- College -->
-              <p class="teacher-college">{{ teacher.college }}</p>
-
               <!-- Email -->
               <div class="teacher-email">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -171,24 +182,26 @@
               </div>
 
               <!-- Substitute Teacher -->
-              <div v-if="teacher.status === 'On Leave'" class="leave-coverage-block">
-                <div class="leave-coverage-notice">
+              <div class="leave-coverage-block">
+                <div class="leave-coverage-notice" :class="{ 'is-unavailable': teacher.status !== 'On Leave' }">
                   <span class="leave-coverage-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M8 2v4M16 2v4M3 10h18" />
                       <rect x="3" y="4" width="18" height="17" rx="2" />
-                      <path d="m9 15 2 2 4-4" />
+                      <path v-if="teacher.status === 'On Leave'" d="m9 15 2 2 4-4" />
+                      <path v-else d="M8 14h8" />
                     </svg>
                   </span>
                   <span>
                     <strong>Substitute coverage</strong>
-                    <small v-if="getTeacherWeeklySchedule(teacher).length">
+                    <small v-if="teacher.status !== 'On Leave'">Unavailable until status is On Leave</small>
+                    <small v-else-if="getTeacherWeeklySchedule(teacher).length">
                       {{ getAssignedCoverageCount(teacher) }} of {{ getTeacherWeeklySchedule(teacher).length }} classes assigned
                     </small>
                     <small v-else>No scheduled classes to cover</small>
                   </span>
                   <button
-                    v-if="getTeacherWeeklySchedule(teacher).length"
+                    v-if="teacher.status === 'On Leave' && getTeacherWeeklySchedule(teacher).length"
                     type="button"
                     class="manage-coverage-btn"
                     title="Manage substitute assignments"
@@ -340,8 +353,9 @@
 
           <!-- Actions -->
           <div class="modal-actions">
-            <button class="modal-add-btn" :disabled="isSavingNewTeacher" @click="addNewTeacher">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            <button class="modal-add-btn" :class="{ 'is-loading': isSavingNewTeacher }" :disabled="isSavingNewTeacher" :aria-busy="isSavingNewTeacher" @click="addNewTeacher">
+              <svg v-if="isSavingNewTeacher" class="teacher-button-spinner" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".25"/><path d="M12 3a9 9 0 0 1 9 9"/></svg>
+              <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
               <span>{{ isSavingNewTeacher ? 'Saving…' : 'Add teacher' }}</span>
             </button>
           </div>
@@ -465,6 +479,9 @@ const previewImage = ref('')
 const TEACHER_EMAIL_SUFFIX = '.au@phinmaed.com'
 const fileInput = ref(null)
 const isSavingNewTeacher = ref(false)
+const teacherToast = ref(null)
+let teacherToastTimer = null
+let teacherToastId = 0
 
 const activeTab = ref('All')
 const currentIndex = ref(0)
@@ -1133,19 +1150,19 @@ const addNewTeacher = async () => {
   const emailLocalPart = getTeacherEmailLocalPart()
 
   if (!newTeacherFirstName.value.trim() || !newTeacherLastName.value.trim() || !emailLocalPart || !newTeacherEmployeeId.value.trim() || !newTeacherPassword.value || !newTeacherConfirmPassword.value || !newTeacherCurrentPassword.value) {
-    alert('Please fill in all required fields.')
+    showTeacherToast('error', 'Please fill in all required fields.')
     return
   }
   if (newTeacherPassword.value !== newTeacherConfirmPassword.value) {
-    alert('Passwords do not match.')
+    showTeacherToast('error', 'Passwords do not match.')
     return
   }
   if (newTeacherPassword.value.length < 8) {
-    alert('Password must be at least 8 characters long.')
+    showTeacherToast('error', 'Password must be at least 8 characters long.')
     return
   }
   if (!/^AU\d{4}-\d{4,5}$/.test(newTeacherEmployeeId.value)) {
-    alert('Employee ID must include four digits after AU and four or five digits after the hyphen.')
+    showTeacherToast('error', 'Employee ID must include four digits after AU and four or five digits after the hyphen.')
     return
   }
 
@@ -1172,25 +1189,23 @@ const addNewTeacher = async () => {
     await loadTeachers()
     resetAddTeacherForm()
     showAddModal.value = false
-    await Swal.fire({
-      icon: 'success',
-      title: 'Teacher saved',
-      text: 'The teacher profile has been saved to the database.',
-      confirmButtonColor: '#4b5563',
-      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
-    })
+    showTeacherToast('success', 'The teacher profile has been saved.')
   } catch (error) {
     console.error('Failed to add teacher:', error)
-    await Swal.fire({
-      icon: 'error',
-      title: 'Unable to save teacher',
-      text: error.message || 'Failed to save teacher to the database.',
-      confirmButtonColor: '#4b5563',
-      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
-    })
+    showTeacherToast('error', error.message || 'Failed to save teacher to the database.')
   } finally {
     isSavingNewTeacher.value = false
   }
+}
+
+function showTeacherToast(type, message) {
+  teacherToast.value = { type, message }
+  const toastId = ++teacherToastId
+  if (teacherToastTimer) window.clearTimeout(teacherToastTimer)
+  teacherToastTimer = window.setTimeout(() => {
+    if (toastId === teacherToastId) teacherToast.value = null
+    teacherToastTimer = null
+  }, 5000)
 }
 
 let teacherRefreshInterval
@@ -1225,6 +1240,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (teacherToastTimer) window.clearTimeout(teacherToastTimer)
   useNotifications.removeNotificationListener(onTeacherStatusNotification)
   window.clearInterval(teacherRefreshInterval)
   window.clearInterval(statusClockInterval)
@@ -1385,7 +1401,7 @@ onUnmounted(() => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
 }
 
@@ -1465,7 +1481,7 @@ onUnmounted(() => {
   align-items: flex-start;
   gap: 16px;
   justify-content: center;
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
   width: 100%;
 }
@@ -2396,16 +2412,17 @@ onUnmounted(() => {
 .teachers-section { padding: 17px 27px 24px; border: 1px solid rgba(255,255,255,.9); border-radius: 20px; background: rgba(255,255,255,.78); box-shadow: 0 14px 38px rgba(41,51,59,.1); }
 .section-header { align-items: center; margin-bottom: 16px; padding-bottom: 15px; border-bottom: 1px solid #e1e6e9; }
 .section-title { color: #252e35; font-size: 1.18rem; letter-spacing: -.02em; }
+.teachers-section .section-title { font-weight: 600 !important; }
 .section-sub { margin-top: 5px; color: #78838b; font-size: .75rem; }
 .summary-counts { display: flex; align-items: stretch; gap: 8px; }
-.summary-counts span { display: inline-flex; min-width: 78px; align-items: center; justify-content: center; gap: 7px; padding: 8px 11px; color: #66727b; border: 1px solid #dce2e5; border-radius: 11px; background: rgba(247,249,250,.9); font-size: .64rem; font-weight: 600; white-space: nowrap; }
-.summary-counts b { color: #2c3740; font-size: .95rem; line-height: 1; }
+.summary-counts span { display: inline-flex; min-width: 0; align-items: center; justify-content: center; gap: 5px; padding: 5px 8px; color: #66727b; border: 1px solid #dce2e5; border-radius: 11px; background: rgba(247,249,250,.9); font-size: .64rem; font-weight: 600; white-space: nowrap; }
+.summary-counts b { display: inline-grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; color: #2c3740; border-radius: 50%; background: #e5eaed; font-size: .8rem; line-height: 1; }
 .summary-counts small { font-size: .64rem; font-weight: 600; }
 .summary-counts .summary-count--total { border-color: #cfd7dc; background: #f4f6f7; }
 .summary-counts .available { color: #34704e; border-color: #b9d8c5; background: #eef8f2; }
-.summary-counts .available b { color: #276743; }
+.summary-counts .available b { color: #276743; background: #dcefe3; }
 .summary-counts .summary-count--leave { color: #95615d; border-color: #e2c9c7; background: #fbf2f1; }
-.summary-counts .summary-count--leave b { color: #874b47; }
+.summary-counts .summary-count--leave b { color: #874b47; background: #f2dfde; }
 .status-tabs { gap: 7px; margin-bottom: 20px; }
 .status-tab { display: inline-flex; min-height: 38px; padding: 7px 12px; align-items: center; gap: 7px; color: #59656e; border-color: #d8dee2; border-radius: 10px; background: #f7f8f9; font-size: .72rem; font-weight: 600; }
 .status-tab span { display: grid; min-width: 20px; height: 20px; place-items: center; padding: 0 5px; color: #6c7780; border-radius: 99px; background: #e5e9ec; font-size: .61rem; }
@@ -2417,7 +2434,7 @@ onUnmounted(() => {
 .teachers-empty-icon { display: grid; width: 66px; height: 66px; margin-bottom: 17px; place-items: center; border: 1px solid #d9e0e4; border-radius: 18px; background: #f5f7f8; color: #69777f; }
 .teachers-empty-icon svg { width: 31px; height: 31px; }
 .teachers-empty-state h3 { margin: 0; color: #29333a; font-size: 1.05rem; font-weight: 700; }
-.teachers-empty-state p { max-width: 430px; margin: 7px 0 18px; color: #738089; font-size: .78rem; line-height: 1.55; }
+.teachers-empty-state p { max-width: none; margin: 7px 0 18px; color: #738089; font-size: .78rem; line-height: 1.55; white-space: nowrap; }
 .teachers-empty-state button { min-height: 40px; padding: 9px 16px; border: 1px solid #cad3d8; border-radius: 9px; background: #fff; color: #43515a; font: inherit; font-size: .72rem; font-weight: 700; cursor: pointer; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
 .teachers-empty-state button:hover { border-color: #9eabb2; background: #f5f7f8; transform: translateY(-1px); }
 .teachers-loading { display: contents; }
@@ -2474,7 +2491,7 @@ onUnmounted(() => {
 .teacher-avatar-wrap { margin: 10px 0 14px; }
 .teacher-avatar { width: 82px; height: 82px; border: 3px solid #fff; box-shadow: 0 0 0 1px #d7dde1, 0 6px 15px rgba(35,44,51,.13); }
 .teacher-name { margin-bottom: 4px; color: #222a31; font-size: 1rem; }
-.teacher-college { min-height: 36px; margin-bottom: 10px; color: #77828a; font-size: .73rem; }
+.teacher-college { min-height: 0; margin-bottom: 4px; color: #77828a; font-size: .73rem; }
 .teacher-email { justify-content: center; min-width: 0; margin-bottom: 15px; color: #64717a; font-size: .7rem; }
 .teacher-email span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .teacher-status-wrap { display: flex; flex-direction: column; gap: 6px; margin-bottom: 13px; }
@@ -2485,10 +2502,13 @@ onUnmounted(() => {
 .area-tag { padding: 6px 9px; color: #50606b; border: 1px solid #dfe5e8; border-radius: 8px; background: #f4f7f8; font-size: .67rem; }
 .leave-coverage-block { margin: 3px 0 13px; }
 .leave-coverage-notice { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid #e0d4d1; border-radius: 11px; background: #faf6f4; color: #4a3d3a; text-align: left; }
+.leave-coverage-notice.is-unavailable { border-color: #dce3e6; background: #f4f6f7; color: #52616a; }
 .leave-coverage-notice > span:nth-child(2) { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .leave-coverage-notice strong { font-size: .72rem; font-weight: 700; }
 .leave-coverage-notice small { color: #7f706b; font-size: .64rem; line-height: 1.35; }
+.leave-coverage-notice.is-unavailable small { color: #74818a; }
 .leave-coverage-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 9px; background: #eee2de; color: #75564d; }
+.leave-coverage-notice.is-unavailable .leave-coverage-icon { background: #e7ecef; color: #667680; }
 .leave-coverage-icon svg { width: 17px; height: 17px; }
 .manage-coverage-btn { display: flex; min-height: 32px; align-items: center; justify-content: center; gap: 4px; padding: 6px 9px; flex: 0 0 auto; border: 1px solid #cdbdb7; border-radius: 8px; background: #fff; color: #624b44; font: inherit; font-size: .63rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 5px rgba(70,50,43,.06); transition: border-color .18s ease, background .18s ease, transform .18s ease; }
 .manage-coverage-btn svg { width: 15px; height: 15px; }
@@ -2559,9 +2579,29 @@ onUnmounted(() => {
 
 /* Large Desktop (1200px+) - 3 columns */
 @media (min-width: 1200px) {
+  .teachers-section { padding-top: 6px; }
   .teachers-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+  .section-title { font-size: 1.32rem; }
+  .section-sub { font-size: .84rem; }
+  .summary-counts span { font-size: .7rem; }
+  .summary-counts b { font-size: .86rem; }
+  .summary-counts small { font-size: .7rem; }
+  .status-tab { font-size: .78rem; }
+  .status-tab span { font-size: .66rem; }
+  .teacher-name { font-size: 1.1rem; }
+  .teacher-college { font-size: .8rem; }
+  .teacher-email { font-size: .76rem; }
+  .teacher-status-wrap > label { font-size: .68rem; }
+  .status-dropdown { font-size: .78rem; }
+  .status-badge { font-size: .63rem; }
+  .designated-label,
+  .substitute-label { font-size: .68rem; }
+  .area-tag { font-size: .73rem; }
+  .leave-coverage-notice strong { font-size: .8rem; }
+  .leave-coverage-notice small { font-size: .7rem; }
+  .manage-coverage-btn { font-size: .69rem; }
 }
 
 /* Desktop (900px - 1200px) - 2-3 columns */
@@ -2569,6 +2609,7 @@ onUnmounted(() => {
   .teachers-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  .teachers-section { padding-top: 6px; }
 }
 
 /* Tablet (600px - 900px) - 2 columns */
@@ -2577,10 +2618,12 @@ onUnmounted(() => {
     grid-template-columns: repeat(2, 1fr);
   }
   .main { padding: 28px 24px 32px; }
+  .teachers-section { padding-top: 6px; }
+  .teachers-empty-state p { max-width: 100%; white-space: normal; }
   .section-header { flex-direction: column; gap: 16px; align-items: flex-start; }
   .add-teacher-btn { width: 100%; justify-content: center; }
   .status-tabs { flex-wrap: wrap; }
-  .teacher-card { min-height: 520px; }
+  .teacher-card { min-height: 0; }
   .carousel-arrow { display: none; }
 }
 
@@ -2594,7 +2637,8 @@ onUnmounted(() => {
   .section-header { flex-direction: column; gap: 16px; align-items: flex-start; }
   .section-title { font-size: 0.95rem; }
   .section-sub { font-size: 0.75rem; }
-  .teachers-section { padding: 16px 20px 16px; border-radius: 12px; }
+  .teachers-section { padding: 6px 20px 16px; border-radius: 12px; }
+  .teachers-empty-state p { max-width: 100%; white-space: normal; }
   .status-tabs { flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
   .status-tab { padding: 6px 12px; font-size: 0.8rem; }
   .add-teacher-btn { width: 100%; padding: 8px 16px; font-size: 0.85rem; justify-content: center; }
@@ -2602,7 +2646,7 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  .teacher-card { padding: 20px 18px 18px; min-height: 450px; }
+  .teacher-card { padding: 20px 18px 18px; min-height: 0; }
   .teacher-avatar { width: 90px; height: 90px; }
   .carousel-arrow { display: none; }
   .carousel-indicators { gap: 4px; }
@@ -2642,7 +2686,7 @@ onUnmounted(() => {
 /* Small Mobile (<480px) - Extra small adjustments */
 @media (max-width: 479px) {
   .main { padding: 12px 16px 24px; }
-  .teachers-section { padding: 12px 16px 12px; }
+  .teachers-section { padding: 6px 16px 12px; }
   .page-title { font-size: 1.25rem; }
   .modal-box { width: 98vw; }
 }
@@ -2725,5 +2769,121 @@ onUnmounted(() => {
   .add-teacher-modal .modal-form { padding: 20px 22px; }
   .add-teacher-modal .teacher-form-row { grid-template-columns: 1fr; }
   .add-teacher-modal .modal-actions { padding: 14px 22px 18px; }
+}
+.teacher-status-toast {
+  position: fixed;
+  z-index: 3000;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  display: flex;
+  width: min(380px, calc(100vw - 32px));
+  align-items: center;
+  gap: 11px;
+  padding: 13px 16px;
+  border: 1px solid #d8dee2;
+  border-left: 3px solid #547b66;
+  border-radius: 12px;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 12px 34px rgba(27,37,45,.18);
+  color: #303a42;
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.teacher-status-toast.is-error { border-left-color: #a84c4c; }
+.teacher-status-toast__icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #e8f2ec;
+  color: #3e7657;
+  font-size: .82rem;
+  font-weight: 800;
+}
+.teacher-status-toast.is-error .teacher-status-toast__icon { background: #f7eaea; color: #a84c4c; }
+.teacher-toast-enter-active,
+.teacher-toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.teacher-toast-enter-from,
+.teacher-toast-leave-to { opacity: 0; transform: translateY(-8px); }
+.add-teacher-modal .modal-add-btn.is-loading { cursor: progress; opacity: .82; }
+.teacher-button-spinner { animation: teacherButtonSpin .8s linear infinite; }
+@keyframes teacherButtonSpin { to { transform: rotate(360deg); } }
+@media (max-width: 600px) {
+  .teacher-status-toast {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    padding: 12px 14px;
+    font-size: .78rem;
+  }
+}
+.layout > .main .teachers-section { padding-top: 2px !important; }
+
+/* Fit the faculty overview and its cards into compact desktop/tablet widths. */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .layout > .main { min-width: 0; padding: 18px 20px 30px; }
+  .layout > .main .main-header { gap: 14px; margin-bottom: 18px; }
+  .layout > .main .page-title { font-size: clamp(1.55rem, 2.5vw, 1.9rem); }
+  .layout > .main .page-sub { max-width: 520px; font-size: .76rem; }
+  .layout > .main .header-add-btn { min-height: 39px; padding-inline: 12px; font-size: .68rem; }
+  .layout > .main .teachers-section { width: 100%; min-width: 0; padding: 12px 16px 18px !important; border-radius: 16px; }
+  .layout > .main .section-header { min-width: 0; gap: 12px; margin-bottom: 12px; padding-bottom: 11px; }
+  .layout > .main .section-title { font-size: 1rem; }
+  .layout > .main .section-sub { font-size: .66rem; }
+  .layout > .main .summary-counts { gap: 5px; }
+  .layout > .main .summary-counts span { gap: 4px; padding: 4px 6px; font-size: .58rem; }
+  .layout > .main .summary-counts b { width: 19px; height: 19px; flex-basis: 19px; font-size: .68rem; }
+  .layout > .main .summary-counts small { font-size: .57rem; }
+  .layout > .main .status-tabs { gap: 5px; margin-bottom: 13px; }
+  .layout > .main .status-tab { min-height: 32px; padding: 5px 9px; gap: 5px; font-size: .63rem; }
+  .layout > .main .status-tab span { min-width: 17px; height: 17px; font-size: .55rem; }
+  .layout > .main .teachers-carousel-wrap { min-width: 0; width: 100%; }
+  .layout > .main .teachers-grid { min-width: 0; min-height: 0; width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 10px; }
+  .layout > .main .teacher-card { width: 100%; max-width: 340px; min-width: 0; justify-self: center; padding: 13px 10px 11px; border-radius: 13px; }
+  .layout > .main .teacher-avatar { width: 60px; height: 60px; }
+  .layout > .main .teacher-name { font-size: .82rem; }
+  .layout > .main .teacher-college,
+  .layout > .main .teacher-email { font-size: .62rem; }
+  .layout > .main .teacher-status-wrap { gap: 4px; margin-bottom: 9px; }
+  .layout > .main .teacher-status-wrap > label,
+  .layout > .main .designated-label,
+  .layout > .main .substitute-label { font-size: .55rem; }
+  .layout > .main .status-dropdown { min-height: 35px; padding: 6px 9px; font-size: .64rem; }
+  .layout > .main .status-badge { top: 10px; right: 10px; padding: 4px 6px; font-size: .52rem; }
+  .layout > .main .area-tag { padding: 5px 7px; font-size: .59rem; }
+  .layout > .main .leave-coverage-notice strong { font-size: .68rem; }
+  .layout > .main .leave-coverage-notice small { font-size: .6rem; }
+  .layout > .main .manage-coverage-btn { font-size: .6rem; }
+  .layout > .main .section-title { font-size: .92rem; }
+  .layout > .main .section-sub { font-size: .6rem; }
+  .layout > .main .summary-counts span { font-size: .53rem; }
+  .layout > .main .summary-counts b { font-size: .62rem; }
+  .layout > .main .summary-counts small { font-size: .51rem; }
+  .layout > .main .status-tab { font-size: .57rem; }
+  .layout > .main .status-tab span { font-size: .5rem; }
+  .layout > .main .teacher-name { font-size: .76rem; }
+  .layout > .main .teacher-college,
+  .layout > .main .teacher-email { font-size: .57rem; }
+  .layout > .main .teacher-status-wrap > label,
+  .layout > .main .designated-label,
+  .layout > .main .substitute-label { font-size: .5rem; }
+  .layout > .main .status-dropdown { font-size: .59rem; }
+  .layout > .main .area-tag { font-size: .54rem; }
+  .add-teacher-modal .modal-eyebrow { font-size: .58rem; }
+  .add-teacher-modal .modal-title { font-size: 1.12rem; }
+  .add-teacher-modal .modal-sub { font-size: .74rem; }
+  .add-teacher-modal .modal-avatar-copy strong { font-size: .7rem; }
+  .add-teacher-modal .modal-avatar-copy span { font-size: .6rem; }
+  .add-teacher-modal .modal-field > span,
+  .add-teacher-modal .modal-areas-label { font-size: .63rem; }
+  .add-teacher-modal .modal-input,
+  .add-teacher-modal .modal-dropdown-btn { font-size: .7rem; }
+  .add-teacher-modal .modal-email-suffix { font-size: .62rem; }
+  .add-teacher-modal .modal-selected-areas span { font-size: .61rem; }
+  .add-teacher-modal .modal-cancel-btn,
+  .add-teacher-modal .modal-add-btn { font-size: .7rem; }
 }
 </style>
