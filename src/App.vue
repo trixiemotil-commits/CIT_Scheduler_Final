@@ -17,6 +17,7 @@
         </svg>
       </button>
     </Transition>
+    <div v-if="securitySuccess" class="security-success-toast" role="status">{{ securitySuccess }}</div>
     <div v-if="showNativeSplash" class="native-splash" aria-label="CITScheduler" role="status">
       <div class="native-splash__lottie-art" aria-hidden="true">
         <span class="native-splash__orbit native-splash__orbit--one"></span>
@@ -33,13 +34,36 @@
         </div>
       </div>
     </div>
+    <div v-if="approvalPending" class="security-warning-backdrop" role="presentation">
+      <section class="security-warning" role="alertdialog" aria-modal="true" aria-labelledby="approval-pending-title">
+        <div class="security-warning-icon" aria-hidden="true">!</div>
+        <h2 id="approval-pending-title">Sign-in awaiting review</h2>
+        <p>An existing signed-in device must review this sign-in before this session can access the account.</p>
+        <div class="security-warning-actions">
+          <button type="button" class="security-warning-logout" @click="logoutPendingSession">Log out this device</button>
+        </div>
+      </section>
+    </div>
     <div v-if="showSecurityWarning" class="security-warning-backdrop" role="presentation">
       <section class="security-warning" role="alertdialog" aria-modal="true" aria-labelledby="security-warning-title">
         <div class="security-warning-icon" aria-hidden="true">!</div>
-        <h2 id="security-warning-title">Security notice</h2>
-        <p>Your account was used to sign in on another device. If this was you, you can continue. If not, secure your account from the new device.</p>
+        <h2 id="security-warning-title">{{ securityMode === 'reset' ? 'Password reset required' : 'New device sign-in' }}</h2>
+        <p v-if="securityMode === 'reset'">A sign-in was reported as unrecognized. Reset your password before continuing to use this account.</p>
+        <template v-else>
+          <p>Your account was accessed from a device that has not been trusted.</p>
+          <dl v-if="securityDetails" class="security-warning-details">
+            <div><dt>Device</dt><dd>{{ securityDetails.device }}</dd></div>
+            <div><dt>Location</dt><dd>{{ securityDetails.location }}</dd></div>
+            <div><dt>Time</dt><dd>{{ securityTime }}</dd></div>
+          </dl>
+          <p v-if="securityError" class="security-warning-error" role="alert">{{ securityError }}</p>
+        </template>
         <div class="security-warning-actions">
-          <button type="button" class="security-warning-keep" @click="dismissSecurityWarning">Dismiss</button>
+          <button v-if="securityMode === 'reset'" type="button" class="security-warning-logout" @click="startPasswordReset">Reset password</button>
+          <template v-else>
+            <button type="button" class="security-warning-keep" :disabled="securityBusy" @click="trustCurrentDevice">{{ securityAction === 'trust' ? 'Saving…' : 'It was me' }}</button>
+            <button type="button" class="security-warning-logout" :disabled="securityBusy" @click="reportCurrentDevice">{{ securityAction === 'report' ? 'Signing out…' : "It wasn't me" }}</button>
+          </template>
         </div>
       </section>
     </div>
@@ -47,23 +71,35 @@
 </template>
 
 <script setup>
-import { getToken } from '@/auth.js'
+import { getToken, logout } from '@/auth.js'
 import { Capacitor } from '@capacitor/core'
 import { IonApp } from '@ionic/vue'
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterView, useRoute } from 'vue-router'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const showNativeSplash = ref(Capacitor.isNativePlatform())
 const showSecurityWarning = ref(false)
+const approvalPending = ref(false)
 const showBackToTop = ref(false)
 const backToTopRight = ref('24px')
 const backToTopBottom = ref('max(24px, env(safe-area-inset-bottom))')
 const route = useRoute()
+const router = useRouter()
 let activeScrollTarget = null
 let ionicScrollContents = []
 let securityPoll = null
 let splashTimer = null
+const securityMode = ref('review')
+const securityDetails = ref(null)
+const securityError = ref('')
+const securitySuccess = ref('')
+const securityBusy = ref(false)
+const securityAction = ref('')
+const securityDismissed = ref(false)
+const securityTime = computed(() => securityDetails.value?.createdAt
+  ? new Date(securityDetails.value.createdAt).toLocaleString()
+  : 'Unknown')
 
 function updateBackToTop(target, scrollTop, canScroll) {
   if (!canScroll) {
@@ -169,18 +205,30 @@ function scrollBackToTop() {
 
 async function checkForNewLogin() {
   const token = getToken()
-  if (!token || showSecurityWarning.value) return
+  if (!token || showSecurityWarning.value || securityDismissed.value) return
 
   try {
     const response = await fetch(`${API_BASE}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
+    if (response.status === 401) {
+      logout()
+      await router.replace('/')
+      return
+    }
     if (!response.ok) return
     const payload = await response.json()
-    const loginAt = String(payload.security?.lastLoginAt || '')
-    const marker = `cit-security-login-warning:${loginAt}`
-    if (!payload.security?.newLoginDetected || !loginAt || sessionStorage.getItem(marker)) return
-    sessionStorage.setItem(marker, 'shown')
+    if (payload.security?.passwordResetRequired) {
+      approvalPending.value = false
+      securityMode.value = 'reset'
+      showSecurityWarning.value = true
+      return
+    }
+    approvalPending.value = Boolean(payload.security?.approvalPending)
+    if (approvalPending.value) return
+    if (!payload.security?.newLoginDetected) return
+    securityMode.value = 'review'
+    securityDetails.value = payload.security.currentDevice
     showSecurityWarning.value = true
   } catch (_) {
     // Security polling is best-effort and must not interrupt the active session.
@@ -188,7 +236,67 @@ async function checkForNewLogin() {
 }
 
 function dismissSecurityWarning() {
+  securityDismissed.value = true
   showSecurityWarning.value = false
+}
+
+async function trustCurrentDevice() {
+  securityBusy.value = true
+  securityAction.value = 'trust'
+  securityError.value = ''
+  securitySuccess.value = ''
+  try {
+    const response = await fetch(`${API_BASE}/auth/security/trust-current-device`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify({ sessionId: securityDetails.value?.sessionId }),
+    })
+    const body = await response.json()
+    if (!response.ok) throw new Error(body.message || 'Unable to trust this device.')
+    showSecurityWarning.value = false
+    securityDismissed.value = false
+    securitySuccess.value = body.message || 'This device sign-in was confirmed.'
+  } catch (error) {
+    securityError.value = error.message
+  } finally {
+    securityBusy.value = false
+    securityAction.value = ''
+  }
+}
+
+async function reportCurrentDevice() {
+  securityBusy.value = true
+  securityAction.value = 'report'
+  securityError.value = ''
+  securitySuccess.value = ''
+  try {
+    const response = await fetch(`${API_BASE}/auth/security/report-current-device`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify({ sessionId: securityDetails.value?.sessionId }),
+    })
+    const body = await response.json()
+    if (!response.ok) throw new Error(body.message || 'Unable to secure this account.')
+    showSecurityWarning.value = false
+    securityDismissed.value = false
+    securitySuccess.value = body.message || 'The unrecognized device was signed out.'
+  } catch (error) {
+    securityError.value = error.message
+  } finally {
+    securityBusy.value = false
+    securityAction.value = ''
+  }
+}
+
+async function logoutPendingSession() {
+  logout()
+  approvalPending.value = false
+  await router.replace('/')
+}
+
+function startPasswordReset() {
+  logout()
+  router.push('/forgot-password')
 }
 
 onMounted(() => {
@@ -198,6 +306,7 @@ onMounted(() => {
     }, 5000)
   }
   securityPoll = window.setInterval(checkForNewLogin, 15000)
+  checkForNewLogin()
   document.addEventListener('visibilitychange', checkForNewLogin)
   document.addEventListener('scroll', handleDocumentScroll, true)
   window.addEventListener('scroll', handleWindowScroll, { passive: true })
@@ -205,7 +314,10 @@ onMounted(() => {
   refreshScrollTracking()
 })
 
-watch(() => route.fullPath, refreshScrollTracking)
+watch(() => route.fullPath, (path, previousPath) => {
+  refreshScrollTracking()
+  if (previousPath === '/' && path !== '/') checkForNewLogin()
+})
 
 onUnmounted(() => {
   if (splashTimer) window.clearTimeout(splashTimer)
@@ -436,4 +548,29 @@ onUnmounted(() => {
 .security-warning-actions button { flex: 1; min-height: 40px; border-radius: 9px; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
 .security-warning-keep { border: 1px solid #3f4b54; background: #46535c; color: #fff; }
 .security-warning-logout { border: 1px solid #d78b91; background: #fff; color: #b64f59; }
+.security-warning-actions button:disabled { opacity: .6; cursor: wait; }
+.security-warning-details { display: grid; gap: 7px; margin: 14px 0; font-size: .78rem; }
+.security-warning-details div { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; }
+.security-warning-details dt { color: #66737b; }
+.security-warning-details dd { margin: 0; overflow-wrap: anywhere; }
+.security-warning-option { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 14px; font-size: .76rem; line-height: 1.4; }
+.security-warning-option input { margin: 2px 0 0; accent-color: #46535c; }
+.security-warning-error { color: #b64f59 !important; }
+.security-success-toast {
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 11000;
+  width: min(440px, calc(100% - 32px));
+  padding: 13px 18px;
+  transform: translateX(-50%);
+  border: 1px solid #93c7ad;
+  border-radius: 8px;
+  background: #effaf3;
+  color: #1c6843;
+  box-shadow: 0 8px 24px rgba(25, 58, 41, .18);
+  font-size: .85rem;
+  font-weight: 650;
+  text-align: center;
+}
 </style>

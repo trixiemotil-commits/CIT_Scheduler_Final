@@ -186,6 +186,8 @@
 
 
         <!-- ── FAQs ── -->
+        <RecentDevices />
+
         <div class="settings-faq-section">
           <div class="faq-header">
             <div class="faq-header-icon">
@@ -300,6 +302,7 @@
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
+import RecentDevices from '@/components/RecentDevices.vue'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, onUnmounted, ref } from 'vue'

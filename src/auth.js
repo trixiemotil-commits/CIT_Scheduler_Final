@@ -19,6 +19,16 @@ function activeStorage() {
   return localStorage.getItem('cit_token') ? localStorage : sessionStorage
 }
 
+function getDeviceId() {
+  let deviceId = localStorage.getItem('cit_device_id') || ''
+  if (!/^[a-zA-Z0-9-]{32,100}$/.test(deviceId)) {
+    deviceId = globalThis.crypto?.randomUUID?.()
+      || Array.from(globalThis.crypto.getRandomValues(new Uint8Array(24)), byte => byte.toString(16).padStart(2, '0')).join('')
+    localStorage.setItem('cit_device_id', deviceId)
+  }
+  return deviceId
+}
+
 function saveSession({ token, user }, remember = false) {
   const storage = sessionStorageFor(remember)
   localStorage.removeItem('cit_token')
@@ -109,7 +119,7 @@ async function request(path, options = {}) {
 }
 
 export async function login(email, password, recaptchaToken = null, mathChallenge = null, remember = false) {
-  const body = { email, password }
+  const body = { email, password, deviceId: getDeviceId() }
   if (mathChallenge) {
     body.client = 'mobile'
     body.mathChallenge = mathChallenge.question

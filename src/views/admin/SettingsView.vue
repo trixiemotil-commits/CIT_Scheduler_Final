@@ -198,6 +198,8 @@
 
 
         <!-- ── FAQs ── -->
+        <RecentDevices />
+
         <div class="settings-faq-section">
           <div class="faq-header">
             <div class="faq-header-icon">
@@ -263,6 +265,7 @@
 
 <script setup>
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
+import RecentDevices from '@/components/RecentDevices.vue'
 import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
 import { computed, onUnmounted, ref } from 'vue'

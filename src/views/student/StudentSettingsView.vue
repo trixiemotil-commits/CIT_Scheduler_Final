@@ -71,6 +71,8 @@
       <div v-if="twoFactorSuccess" class="msg">{{ twoFactorSuccess }}</div>
     </div>
 
+    <RecentDevices />
+
     <div id="faqs" class="section-card faq-card">
       <div class="section-title">FAQs</div>
       <div class="faq-list">
@@ -126,6 +128,7 @@
 
 <script setup>
 import { getToken, getUser, saveMergedUser } from '@/auth.js'
+import RecentDevices from '@/components/RecentDevices.vue'
 import { IonContent, IonPage } from '@ionic/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 

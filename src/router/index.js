@@ -1,6 +1,7 @@
 import { getToken, getUser, isLoggedIn, setActiveRole } from '@/auth.js'
 import { createRouter, createWebHistory } from '@ionic/vue-router'
 const ForgotPasswordView = () => import('@/views/ForgotPasswordView.vue')
+const SecurityLoginReviewView = () => import('@/views/SecurityLoginReviewView.vue')
 const LoginView = () => import('@/views/LoginView.vue')
 const AddScheduleView = () => import('@/views/admin/AddScheduleView.vue')
 const AcademicTermsView = () => import('@/views/admin/AcademicTermsView.vue')
@@ -38,6 +39,7 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'login', component: LoginView },
     { path: '/forgot-password', name: 'forgot-password', component: ForgotPasswordView },
+    { path: '/security/login-review', name: 'security-login-review', component: SecurityLoginReviewView },
     { path: '/admin/dashboard', name: 'admin-dashboard', component: AdminDashboardView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/activity-logs', name: 'admin-activity-logs', component: ActivityLogsView, meta: { requiresAuth: true, role: 'admin' } },
     { path: '/admin/schedule', name: 'admin-schedule', component: ScheduleView, meta: { requiresAuth: true, role: 'admin' } },

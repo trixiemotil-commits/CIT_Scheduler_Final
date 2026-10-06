@@ -17,14 +17,11 @@ npm install
 MONGODB_URI=your_atlas_connection_string
 PORT=5000
 JWT_SECRET=your_long_random_secret
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=notifications@example.com
-SMTP_PASS=your_smtp_password
-SMTP_FROM="CIT Scheduler <notifications@example.com>"
+FRONTEND_URL=https://citscheduler.com
+RESEND_API_KEY=your_resend_api_key
 ```
 
-Use [backend/.env.example](.env.example) as the complete template. For Gmail, create a Google App Password and use `smtp.gmail.com` with port `587`.
+`FRONTEND_URL` is the public web app origin used to build new-device review links. Configure `RESEND_API_KEY` for security and account email delivery.
 
 3. Start server:
 
@@ -37,7 +34,12 @@ npm run dev
 - `GET /api/health`
 - `POST /api/auth/register`
 - `POST /api/auth/login`
+- `POST /api/auth/security-review/confirm` (one-use email confirmation token)
 - `GET /api/auth/me` (Bearer token required)
+- `GET /api/auth/sessions` (Bearer token required; list active devices)
+- `DELETE /api/auth/sessions/:sessionId` (Bearer token required; revoke a device session)
+- `POST /api/auth/security/trust-current-device` (Bearer token required)
+- `POST /api/auth/security/report-current-device` (Bearer token required)
 - `POST /api/auth/request-password-otp` (Bearer token required; body: `{ "currentPassword": "..." }`)
 - `POST /api/auth/change-password` (Bearer token required; body: `{ "currentPassword": "...", "otp": "123456", "newPassword": "..." }`)
 - `GET /api/rbac/admin` (admin only)

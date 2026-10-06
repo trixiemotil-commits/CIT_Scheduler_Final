@@ -46,4 +46,11 @@ function getDeviceDescription(req) {
   return [device, os, browser].filter(Boolean).join(" / ").slice(0, 200);
 }
 
-module.exports = { getRequestIp, getDeviceDescription };
+function getRequestLocation(req) {
+  const city = String(req.headers["cf-ipcity"] || req.headers["x-vercel-ip-city"] || "").trim();
+  const region = String(req.headers["x-vercel-ip-country-region"] || "").trim();
+  const country = String(req.headers["cf-ipcountry"] || req.headers["x-vercel-ip-country"] || "").trim();
+  return [city, region, country].filter(Boolean).join(", ") || "Approximate location unavailable";
+}
+
+module.exports = { getRequestIp, getDeviceDescription, getRequestLocation };

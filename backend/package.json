@@ -4,7 +4,7 @@
   "private": true,
   "main": "src/server.js/index.js",
   "scripts": {
-    "dev": "node src/server.js/index.js",
+    "dev": "node --watch src/server.js/index.js",
     "start": "node src/server.js/index.js"
   },
   "dependencies": {

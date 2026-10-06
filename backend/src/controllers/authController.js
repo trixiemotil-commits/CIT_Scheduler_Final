@@ -3,7 +3,8 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const AcademicTerm = require("../models/AcademicTerm");
-const { sendPasswordOtpEmail, sendLoginOtpEmail, sendTwoFactorEnabledEmail } = require("../config/mail");
+const { sendPasswordOtpEmail, sendLoginOtpEmail, sendTwoFactorEnabledEmail, sendNewDeviceLoginEmail } = require("../config/mail");
+const { getRequestIp, getDeviceDescription, getRequestLocation } = require("../utils/requestMetadata");
 const ConsultationRequest = require('../models/ConsultationRequest')
 const Notification = require('../models/Notification')
 const { logActivity } = require("../utils/activityLogWriter");
@@ -47,6 +48,7 @@ const PASSWORD_OTP_RESEND_DELAY_MS = 60 * 1000;
 const PASSWORD_OTP_MAX_ATTEMPTS = 5;
 const LOGIN_OTP_LIFETIME_MS = 5 * 60 * 1000;
 const LOGIN_OTP_MAX_ATTEMPTS = 5;
+const LOGIN_REVIEW_LIFETIME_MS = 15 * 60 * 1000;
 const LOGIN_LOCKOUT_THRESHOLDS = [5, 3, 2];
 const LOGIN_LOCKOUT_DURATIONS_MS = [
   60 * 1000,
@@ -79,20 +81,71 @@ function signToken(user, activeRole = user.role, sessionId = null) {
   );
 }
 
-async function completeLogin(user) {
+function hashDeviceKey(deviceId) {
+  return crypto.createHash("sha256").update(String(deviceId)).digest("hex");
+}
+
+function getSecurityReviewUrl(token, choice) {
+  const baseUrl = String(process.env.FRONTEND_URL || "https://citscheduler.com").replace(/\/$/, "");
+  const url = new URL("/security/login-review", baseUrl);
+  url.searchParams.set("token", token);
+  url.searchParams.set("choice", choice);
+  return url.toString();
+}
+
+async function completeLogin(user, req, suppliedDeviceId) {
   const now = new Date();
+  const deviceId = /^[a-zA-Z0-9-]{32,100}$/.test(String(suppliedDeviceId || ""))
+    ? String(suppliedDeviceId)
+    : "";
+  const deviceKeyHash = deviceId ? hashDeviceKey(deviceId) : "";
+  const device = getDeviceDescription(req);
+  const ipAddress = getRequestIp(req);
+  const location = getRequestLocation(req);
   const activeSessions = Array.isArray(user.activeSessions) ? user.activeSessions : [];
   user.activeSessions = activeSessions.filter((session) => new Date(session.expiresAt).getTime() > now.getTime());
   const loginWarning = user.activeSessions.length > 0;
+  const trustedDevices = Array.isArray(user.trustedDevices) ? user.trustedDevices : [];
+  const trustedDevice = deviceKeyHash && trustedDevices.find((item) => item.keyHash === deviceKeyHash);
+  if (trustedDevice) {
+    trustedDevice.lastUsedAt = now;
+    trustedDevice.label = device;
+  }
+  const reviewToken = trustedDevice ? "" : crypto.randomBytes(32).toString("base64url");
   const sessionId = crypto.randomUUID();
   user.activeSessions.push({
     id: sessionId,
     createdAt: now,
     expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+    deviceKeyHash,
+    device,
+    ipAddress,
+    location,
+    lastActiveAt: now,
+    securityAlertPending: !trustedDevice,
+    securityActionTokenHash: reviewToken ? hashOtp(reviewToken) : null,
+    securityActionTokenExpiresAt: reviewToken ? new Date(now.getTime() + LOGIN_REVIEW_LIFETIME_MS) : null,
   });
   user.lastLoginAt = now;
   await user.save();
-  return { loginWarning, sessionId };
+  let securityEmailSent = false;
+  if (reviewToken) {
+    try {
+      await sendNewDeviceLoginEmail({
+        to: user.email,
+        device,
+        location,
+        ipAddress,
+        occurredAt: now,
+        trustUrl: getSecurityReviewUrl(reviewToken, "trust"),
+        reportUrl: getSecurityReviewUrl(reviewToken, "report"),
+      });
+      securityEmailSent = true;
+    } catch (mailError) {
+      console.error("New-device security email failed:", mailError.message);
+    }
+  }
+  return { loginWarning, sessionId, securityAlert: !trustedDevice, securityApprovalRequired: !trustedDevice, securityEmailSent };
 }
 
 function toSafeUser(user) {
@@ -125,6 +178,19 @@ function toSafeUser(user) {
     twoFactorEnabled: Boolean(user.twoFactorEnabled),
     name: `${user.firstName} ${user.lastName}`.trim(),
   };
+}
+
+function getPendingReviewSession(user, reviewerSessionId, requestedSessionId = "") {
+  const sessions = Array.isArray(user.activeSessions) ? user.activeSessions : [];
+  const reviewerIndex = sessions.findIndex((session) => String(session.id) === String(reviewerSessionId || ""));
+  const reviewableSessions = reviewerIndex < 0 ? sessions : sessions.slice(reviewerIndex + 1);
+  const pendingSessions = reviewableSessions.filter((session) => (
+    session.securityAlertPending && new Date(session.expiresAt).getTime() > Date.now()
+  ));
+  if (requestedSessionId) {
+    return pendingSessions.find((session) => String(session.id) === String(requestedSessionId)) || null;
+  }
+  return pendingSessions[pendingSessions.length - 1] || null;
 }
 
 function isStrongPassword(password) {
@@ -387,6 +453,10 @@ async function login(req, res) {
       return res.status(403).json({ message: "Only student accounts can log in to the student mobile app." });
     }
 
+    if (user.passwordResetRequired) {
+      return res.status(423).json({ message: "A security alert requires you to reset your password before logging in." });
+    }
+
     const roles = getUserRoles(user);
 
     if (user.twoFactorEnabled) {
@@ -415,6 +485,7 @@ async function login(req, res) {
           id: user._id.toString(),
           email: user.email,
           purpose: "login-2fa",
+          deviceId: String(req.body?.deviceId || ""),
           ...(req.body?.client === "mobile" ? { client: "mobile" } : {}),
         },
         process.env.JWT_SECRET,
@@ -429,12 +500,15 @@ async function login(req, res) {
       });
     }
 
-    const loginSession = await completeLogin(user);
+    const loginSession = await completeLogin(user, req, req.body?.deviceId);
     const token = signToken(user, user.role, loginSession.sessionId);
 
     return res.status(200).json({
       message: "Login successful.",
       loginWarning: loginSession.loginWarning,
+      securityAlert: loginSession.securityAlert,
+      securityApprovalRequired: loginSession.securityApprovalRequired,
+      securityEmailSent: loginSession.securityEmailSent,
       token,
       user: { ...toSafeUser(user), role: user.role, roles },
     });
@@ -491,11 +565,18 @@ async function verifyLoginOtp(req, res) {
 
     clearLoginOtp(user);
     await user.save();
-    const loginSession = await completeLogin(user);
+    if (user.passwordResetRequired) {
+      return res.status(423).json({ message: "A security alert requires you to reset your password before logging in." });
+    }
+
+    const loginSession = await completeLogin(user, req, challenge.deviceId);
     const roles = getUserRoles(user);
     return res.status(200).json({
       message: "Login successful.",
       loginWarning: loginSession.loginWarning,
+      securityAlert: loginSession.securityAlert,
+      securityApprovalRequired: loginSession.securityApprovalRequired,
+      securityEmailSent: loginSession.securityEmailSent,
       token: signToken(user, user.role, loginSession.sessionId),
       user: { ...toSafeUser(user), role: user.role, roles },
     });
@@ -545,22 +626,174 @@ async function me(req, res) {
       return res.status(404).json({ message: "User not found." });
     }
 
-    const tokenIssuedAt = Number(req.user?.iat || 0) * 1000;
-    const now = Date.now();
     const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt).getTime() : 0;
     const activeSessions = Array.isArray(user.activeSessions) ? user.activeSessions : [];
-    const newLoginDetected = activeSessions.some((session) => {
-      const createdAt = new Date(session.createdAt).getTime();
-      const expiresAt = new Date(session.expiresAt).getTime();
-      return expiresAt > now && createdAt > tokenIssuedAt + 1000 && String(session.id) !== String(req.user?.sid || '');
-    });
+    const currentSession = activeSessions.find((session) => String(session.id) === String(req.user?.sid || ""));
+    const pendingLoginSession = getPendingReviewSession(user, req.user?.sid);
 
     return res.status(200).json({
       user: toSafeUser(user),
-      security: { newLoginDetected, lastLoginAt: lastLoginAt || null },
+      security: {
+        newLoginDetected: Boolean(pendingLoginSession),
+        approvalPending: Boolean(currentSession?.securityAlertPending),
+        lastLoginAt: lastLoginAt || null,
+        passwordResetRequired: Boolean(user.passwordResetRequired),
+        currentDevice: pendingLoginSession ? {
+          sessionId: pendingLoginSession.id,
+          device: pendingLoginSession.device || "Unknown device",
+          location: pendingLoginSession.location || "Approximate location unavailable",
+          ipAddress: pendingLoginSession.ipAddress || "",
+          createdAt: pendingLoginSession.createdAt,
+        } : null,
+      },
     });
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch user profile.", error: error.message });
+  }
+}
+
+function toSafeSession(session, currentSessionId) {
+  return {
+    id: session.id,
+    device: session.device || "Unknown device",
+    ipAddress: session.ipAddress || "",
+    location: session.location || "Approximate location unavailable",
+    createdAt: session.createdAt,
+    lastActiveAt: session.lastActiveAt || session.createdAt,
+    expiresAt: session.expiresAt,
+    current: String(session.id) === String(currentSessionId || ""),
+  };
+}
+
+async function listSessions(req, res) {
+  try {
+    const user = await User.findById(req.user.id).select("activeSessions").lean();
+    if (!user) return res.status(404).json({ message: "User not found." });
+    const now = Date.now();
+    const sessions = (user.activeSessions || [])
+      .filter((session) => new Date(session.expiresAt).getTime() > now)
+      .sort((first, second) => new Date(second.lastActiveAt || second.createdAt) - new Date(first.lastActiveAt || first.createdAt))
+      .map((session) => toSafeSession(session, req.user.sid));
+    return res.status(200).json({ sessions });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to load recent devices.", error: error.message });
+  }
+}
+
+async function revokeSession(req, res) {
+  try {
+    const sessionId = String(req.params.sessionId || "");
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found." });
+    const sessionExists = (user.activeSessions || []).some((session) => String(session.id) === sessionId);
+    if (!sessionExists) return res.status(404).json({ message: "That device session is no longer active." });
+    user.activeSessions = user.activeSessions.filter((session) => String(session.id) !== sessionId);
+    await user.save();
+    return res.status(200).json({ message: "Device signed out." });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to sign out that device.", error: error.message });
+  }
+}
+
+async function trustCurrentDevice(req, res) {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found." });
+    const session = getPendingReviewSession(user, req.user.sid, String(req.body?.sessionId || ""));
+    if (!session || !session.deviceKeyHash) {
+      return res.status(404).json({ message: "That pending device sign-in is no longer active." });
+    }
+    const now = new Date();
+    user.trustedDevices = (user.trustedDevices || []).filter((item) => item.keyHash !== session.deviceKeyHash);
+    user.trustedDevices.push({ keyHash: session.deviceKeyHash, label: session.device, trustedAt: now, lastUsedAt: now });
+    user.trustedDevices = user.trustedDevices
+      .sort((first, second) => new Date(second.lastUsedAt) - new Date(first.lastUsedAt))
+      .slice(0, 20);
+    session.securityAlertPending = false;
+    session.securityActionTokenHash = null;
+    session.securityActionTokenExpiresAt = null;
+    await user.save();
+    return res.status(200).json({ message: "This device is now trusted." });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to trust this device.", error: error.message });
+  }
+}
+
+async function reportCurrentDevice(req, res) {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found." });
+    const session = getPendingReviewSession(user, req.user.sid, String(req.body?.sessionId || ""));
+    if (!session) return res.status(404).json({ message: "That pending device sign-in is no longer active." });
+    const sessionId = String(session.id);
+    user.activeSessions = user.activeSessions.filter((session) => String(session.id) !== sessionId);
+    await user.save();
+    return res.status(200).json({
+      message: "The unrecognized device has been signed out.",
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to secure this account.", error: error.message });
+  }
+}
+
+async function confirmSecurityReview(req, res) {
+  try {
+    const token = String(req.body?.token || "");
+    const choice = String(req.body?.choice || "");
+    if (token.length < 32 || token.length > 128 || !["trust", "report"].includes(choice)) {
+      return res.status(400).json({ message: "This security link is invalid or expired." });
+    }
+    const tokenHash = hashOtp(token);
+    const now = new Date();
+    const tokenClaim = `claimed:${crypto.randomUUID()}`;
+    const user = await User.findOneAndUpdate({
+      activeSessions: {
+        $elemMatch: {
+          securityActionTokenHash: tokenHash,
+          securityActionTokenExpiresAt: { $gt: now },
+          expiresAt: { $gt: now },
+        },
+      },
+    }, {
+      $set: {
+        "activeSessions.$.securityActionTokenHash": tokenClaim,
+        "activeSessions.$.securityActionTokenExpiresAt": null,
+      },
+    }, { new: true });
+    const session = user?.activeSessions.find((item) => item.securityActionTokenHash === tokenClaim);
+    if (!user || !session) {
+      return res.status(410).json({ message: "This security link has expired or has already been used." });
+    }
+
+    if (choice === "trust") {
+      if (!session.deviceKeyHash) {
+        return res.status(400).json({ message: "This device cannot be remembered. Use the in-app security notice instead." });
+      }
+      user.trustedDevices = (user.trustedDevices || []).filter((item) => item.keyHash !== session.deviceKeyHash);
+      user.trustedDevices.push({ keyHash: session.deviceKeyHash, label: session.device, trustedAt: now, lastUsedAt: now });
+      user.trustedDevices = user.trustedDevices
+        .sort((first, second) => new Date(second.lastUsedAt) - new Date(first.lastUsedAt))
+        .slice(0, 20);
+      session.securityAlertPending = false;
+      session.securityActionTokenHash = null;
+      session.securityActionTokenExpiresAt = null;
+      await user.save();
+      return res.status(200).json({ message: "Confirmed. This device is trusted and its session remains active." });
+    }
+
+    const invalidateOtherSessions = req.body?.invalidateOtherSessions !== false;
+    user.passwordResetRequired = true;
+    user.activeSessions = invalidateOtherSessions
+      ? []
+      : user.activeSessions.filter((item) => String(item.id) !== String(session.id));
+    await user.save();
+    return res.status(200).json({
+      message: "The reported device has been signed out. Reset your password before signing in again.",
+      passwordResetRequired: true,
+      invalidatedOtherSessions: invalidateOtherSessions,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to process this security report.", error: error.message });
   }
 }
 
@@ -946,6 +1179,8 @@ async function resetPassword(req, res) {
     }
 
     user.passwordHash = await bcrypt.hash(String(newPassword), 10);
+    user.passwordResetRequired = false;
+    user.activeSessions = [];
     clearPasswordOtp(user);
     await user.save();
 
@@ -1053,6 +1288,7 @@ async function changePassword(req, res) {
     }
 
     user.passwordHash = await bcrypt.hash(String(newPassword), 10);
+    user.passwordResetRequired = false;
     clearPasswordOtp(user);
     await user.save();
 
@@ -1077,6 +1313,11 @@ module.exports = {
   selectRole,
   logoutSession,
   me,
+  listSessions,
+  revokeSession,
+  trustCurrentDevice,
+  reportCurrentDevice,
+  confirmSecurityReview,
   updateMe,
   requestPasswordOtp,
   changePassword,
