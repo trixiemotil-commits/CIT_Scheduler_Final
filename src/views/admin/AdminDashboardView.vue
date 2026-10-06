@@ -3309,6 +3309,15 @@ function confirmLogout() {
   .workload-legend { gap: 5px 8px; font-size: .6rem; }
 }
 
+/* Compact dashboard labels for laptop and smaller desktop viewports. */
+@media (min-width: 769px) and (max-width: 1200px) {
+  .today-teachers-header h2 { font-size: .96rem; }
+  .chart-title { font-size: 1rem; }
+  .chart-caption { font-size: .6rem; }
+  .stat-label { font-size: .64rem; }
+  .stat-sub { font-size: .58rem; line-height: 1.35; }
+}
+
 @media (max-width: 1100px) {
   .main { padding-inline: 28px; }
 }

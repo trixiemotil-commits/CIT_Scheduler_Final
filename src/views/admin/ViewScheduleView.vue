@@ -147,6 +147,16 @@
               <p class="sched-grid-sub">{{ selectedFloor }} &bull; Read-only view</p>
             </div>
             <div class="sched-topbar-right">
+              <button class="icon-btn" title="Print" aria-label="Print schedule" @click="printSchedule">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                <span>Print</span>
+              </button>
+              <button v-if="viewMode === 'room'" class="icon-btn export-btn" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8"/></svg>
+                <span>Excel</span>
+              </button>
+            </div>
+            <div class="schedule-legend-wrap">
               <div class="schedule-legend" aria-label="Schedule color legend">
                 <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
                 <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
@@ -155,13 +165,6 @@
                 <span><i class="legend-swatch legend-swatch--consultation"></i>Consultation</span>
                 <span><i class="legend-swatch legend-swatch--main-campus"></i>Main Campus</span>
               </div>
-              <button class="icon-btn" title="Print" @click="printSchedule">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-              </button>
-              <button v-if="viewMode === 'room'" class="icon-btn export-btn" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8"/></svg>
-                <span>Excel</span>
-              </button>
             </div>
           </div>
           <div v-if="loading" class="loading-state">
@@ -236,15 +239,18 @@
               <p class="sched-grid-sub">Student group · Read-only view</p>
             </div>
             <div class="sched-topbar-right">
+              <button class="icon-btn" title="Print" aria-label="Print schedule" @click="printSchedule">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                <span>Print</span>
+              </button>
+            </div>
+            <div class="schedule-legend-wrap">
               <div class="schedule-legend" aria-label="Schedule color legend">
                 <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
                 <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
                 <span><i class="legend-swatch legend-swatch--faculty"></i>CIT Faculty</span>
                 <span><i class="legend-swatch legend-swatch--lunch"></i>Lunch</span>
               </div>
-              <button class="icon-btn" title="Print" @click="printSchedule">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-              </button>
             </div>
           </div>
           <div v-if="loading" class="loading-state">Loading schedule…</div>
@@ -316,6 +322,16 @@
               <p class="sched-grid-sub">Read-only view</p>
             </div>
             <div class="sched-topbar-right">
+              <button class="icon-btn" title="Print" aria-label="Print schedule" @click="printSchedule">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                <span>Print</span>
+              </button>
+              <button v-if="viewMode === 'room'" class="icon-btn export-btn" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8"/></svg>
+                <span>Excel</span>
+              </button>
+            </div>
+            <div class="schedule-legend-wrap">
               <div class="schedule-legend" aria-label="Schedule color legend">
                 <span><i class="legend-swatch legend-swatch--lecture"></i>Lecture</span>
                 <span><i class="legend-swatch legend-swatch--lab"></i>Laboratory</span>
@@ -324,13 +340,6 @@
                 <span><i class="legend-swatch legend-swatch--consultation"></i>Consultation</span>
                 <span><i class="legend-swatch legend-swatch--main-campus"></i>Main Campus</span>
               </div>
-              <button class="icon-btn" title="Print" @click="printSchedule">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-              </button>
-              <button v-if="viewMode === 'room'" class="icon-btn export-btn" title="Download Excel" aria-label="Download Excel" @click="exportScheduleExcel">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8"/></svg>
-                <span>Excel</span>
-              </button>
             </div>
           </div>
           <div v-if="loading" class="loading-state">
@@ -1723,7 +1732,20 @@ function printSchedule() {
   background: linear-gradient(145deg, #f6fbff, #cfe5ff);
   transform: translateY(-1px);
 }
+.sched-topbar-right .icon-btn[title="Print"] { gap: 5px; }
+.sched-topbar-right .icon-btn[title="Print"] span { font-weight: 700; }
 .export-btn { gap: 6px; white-space: nowrap; font-size: .78rem; font-weight: 700; }
+.sched-topbar-right .export-btn {
+  color: #217346;
+  border-color: #a8cbb5;
+  background: linear-gradient(145deg, #f1faf4, #dcefe2);
+  box-shadow: 0 3px 8px rgba(33, 115, 70, .12), inset 0 1px rgba(255,255,255,.8);
+}
+.sched-topbar-right .export-btn:hover {
+  color: #185c38;
+  border-color: #75ad89;
+  background: linear-gradient(145deg, #f7fcf8, #cfe7d6);
+}
 
 /* ── Mode selection ── */
 .mode-select-container { display: flex; flex-direction: column; gap: 16px; }
@@ -2359,10 +2381,11 @@ function printSchedule() {
 .free-time-cell {
   position: relative;
   vertical-align: middle !important;
-  background: linear-gradient(135deg, rgba(238, 232, 255, 0.88), rgba(245, 241, 255, 0.74)) !important;
+  /* Keep empty slots filled even when a neighboring event spans several rows. */
+  background: linear-gradient(135deg, #eee8ff, #f5f1ff) !important;
 }
 .free-time-cell:hover {
-  background: linear-gradient(135deg, rgba(230, 220, 255, 0.94), rgba(240, 235, 255, 0.82)) !important;
+  background: linear-gradient(135deg, #e6dcff, #f0ebff) !important;
 }
 .free-time-label {
   position: absolute;
@@ -2609,4 +2632,79 @@ function printSchedule() {
   padding: 10px 32px; border-radius: 10px; cursor: pointer;
 }
 .logout-confirm-btn:hover { background: #6b7280; }
+@media (max-width: 1200px) {
+  .sched-grid-wrap,
+  .schedule-card--student .sched-grid-wrap { padding: 12px; overflow-x: hidden; }
+  .sched-grid { width: 100%; min-width: 0; table-layout: fixed; }
+  .sched-grid th,
+  .sched-grid td { min-width: 0; }
+  .sched-grid th { padding: 8px 3px; font-size: .62rem; }
+  .sched-grid th.th-time { width: 62px; }
+  .sched-grid td.td-time { width: 62px; padding-inline: 3px; font-size: .56rem; }
+  .sched-grid tbody tr { height: 40px; }
+  .sched-grid .sched-entry { left: 2px; right: 2px; padding: 4px 3px; }
+  .sched-grid .entry-teacher { font-size: .58rem; line-height: 1.15; }
+  .sched-grid .entry-subject { font-size: .54rem; line-height: 1.2; }
+  .sched-grid .entry-time-range { font-size: .5rem; }
+  .sched-grid .entry-section-badge,
+  .sched-grid .entry-room { font-size: .52rem; }
+  .sched-grid .subbed-badge { padding: 2px 3px; font-size: .5rem; }
+  .sched-grid .free-time-label { padding-inline: 2px; font-size: .58rem; }
+}
+@media (max-width: 640px) {
+  .sched-grid-wrap,
+  .schedule-card--student .sched-grid-wrap { padding: 6px; }
+  .sched-grid th { padding: 7px 1px; font-size: .5rem; }
+  .sched-grid th.th-time { width: 48px; }
+  .sched-grid td.td-time { width: 48px; padding-inline: 1px; font-size: .48rem; }
+  .sched-grid .sched-entry { left: 1px; right: 1px; padding: 3px 2px; }
+  .sched-grid .entry-teacher { font-size: .48rem; }
+  .sched-grid .entry-subject { font-size: .46rem; }
+  .sched-grid .entry-time-range,
+  .sched-grid .entry-section-badge,
+  .sched-grid .entry-room { font-size: .44rem; }
+}
+.schedule-card > .sched-topbar {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 12px;
+}
+.schedule-card > .sched-topbar .schedule-back-btn { grid-column: 1; grid-row: 1; }
+.schedule-card > .sched-topbar .sched-topbar-left { grid-column: 2; grid-row: 1; min-width: 0; }
+.schedule-card > .sched-topbar .sched-grid-title { white-space: nowrap; }
+.schedule-card > .sched-topbar .sched-topbar-right {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.schedule-card > .sched-topbar .schedule-legend-wrap {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d3dade;
+  border-radius: 11px;
+  background: #eef1f2;
+}
+.schedule-card > .sched-topbar .schedule-legend { justify-content: flex-end; }
+@media (max-width: 900px) {
+  .schedule-card > .sched-topbar { grid-template-columns: 40px minmax(0, 1fr); }
+  .schedule-card > .sched-topbar .sched-topbar-left { grid-column: 2; grid-row: 1; }
+  .schedule-card > .sched-topbar .sched-grid-title { white-space: normal; }
+  .schedule-card > .sched-topbar .sched-topbar-right {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: stretch;
+    justify-content: flex-end;
+    width: 100%;
+  }
+  .schedule-card > .sched-topbar .schedule-legend-wrap { grid-row: 3; }
+}
 </style>

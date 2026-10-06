@@ -887,6 +887,50 @@ async function updateLunchBreak(req, res) {
   }
 }
 
+async function deleteLunchBreak(req, res) {
+  try {
+    const lunchId = normalizeString(req.params?.id);
+    if (!/^[a-f\d]{24}$/i.test(lunchId)) {
+      return res.status(400).json({ message: "Invalid lunch break identifier." });
+    }
+
+    const existing = await ScheduleEntry.findById(lunchId);
+    const isLunchBreak = existing && (
+      existing.entryType === "lunch" ||
+      /\blunch\b/i.test(normalizeString(existing.subject))
+    );
+    if (!isLunchBreak) {
+      return res.status(404).json({ message: "Lunch break not found." });
+    }
+
+    await existing.deleteOne();
+    await logActivity({
+      actor: req.user,
+      action: `Removed lunch schedule for ${existing.teacher || "a teacher"} (${existing.day || ''}, ${existing.timeIn || ''}-${existing.timeOut || ''})`,
+      path: req.originalUrl || req.path,
+      method: req.method,
+      req,
+    });
+    try {
+      await notifyActiveAdmins({
+        actorId: req.user?.id,
+        type: "lunch_break_deleted_admin",
+        title: "Lunch break removed",
+        message: `A lunch break was removed for ${existing.teacher || "a teacher"}.`,
+        related: { scheduleId: lunchId, teacher: existing.teacher || "" },
+        route: "/admin/schedule/view",
+      });
+    } catch (notificationError) {
+      console.warn("Lunch break removed, but admin notification failed:", notificationError.message);
+    }
+
+    return res.json({ message: "Lunch break removed." });
+  } catch (error) {
+    console.error("Failed to delete lunch break:", error);
+    return res.status(500).json({ message: "Failed to delete lunch break.", error: error.message });
+  }
+}
+
 async function replaceSchedule(req, res) {
   try {
     const { old: oldDescriptor, next } = req.body || {};
@@ -1116,6 +1160,7 @@ module.exports = {
   createSchedule,
   createLunchBreak,
   updateLunchBreak,
+  deleteLunchBreak,
   replaceSchedule,
   deleteSchedule,
   getAdminDashboardSummary,

@@ -7,6 +7,7 @@ const {
   createSchedule,
   createLunchBreak,
   updateLunchBreak,
+  deleteLunchBreak,
   replaceSchedule,
   deleteSchedule,
   getAdminDashboardSummary,
@@ -24,6 +25,7 @@ router.post("/tables", createScheduleTable);
 router.post("/", createSchedule);
 router.post("/lunch", createLunchBreak);
 router.patch("/lunch/:id", updateLunchBreak);
+router.delete("/lunch/:id", deleteLunchBreak);
 router.post("/replace", replaceSchedule);
 router.post("/delete", deleteSchedule);
 

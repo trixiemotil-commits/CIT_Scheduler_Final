@@ -225,7 +225,7 @@
 
     <!-- ═══ Add / Edit Schedule Modal ═══ -->
     <Teleport to="body">
-      <div v-if="showSchedModal" class="modal-overlay" @click.self="showSchedModal = false">
+      <div v-if="showSchedModal" class="modal-overlay" @click.self="closeScheduleModal">
         <div class="sched-modal-box">
           <!-- Title -->
           <div class="sched-modal-header">
@@ -443,11 +443,11 @@
           </div>
 
           <div class="sched-modal-actions">
-            <button v-if="editMode" class="clear-slot-btn" :disabled="clearingSchedule || savingSchedule" @click="clearSlot">
+            <button v-if="editMode" class="clear-slot-btn" :disabled="clearingSchedule || savingSchedule" :aria-busy="clearingSchedule" @click="clearSlot">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
               {{ clearingSchedule ? 'Clearing…' : 'Clear Slot' }}
             </button>
-            <button class="cancel-btn-text" @click="showSchedModal = false">Cancel</button>
+            <button class="cancel-btn-text" :disabled="savingSchedule || clearingSchedule" @click="closeScheduleModal">Cancel</button>
             <button class="save-btn" :aria-busy="savingSchedule" @click="saveEntry" :disabled="!form.teacher || !form.subject || !form.timeIn || !form.timeOut || (fromButton && !editMode && !form.day) || !!modalTimeError || savingSchedule || clearingSchedule">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               {{ savingSchedule ? (editMode ? 'Updating…' : 'Adding…') : editMode ? 'Update' : 'Add' }}
@@ -460,7 +460,7 @@
     <!-- ═══ Add Schedule Panel ═══ -->
     <Teleport to="body">
       <transition name="panel">
-        <div v-if="showAddPanel" class="panel-overlay" @click.self="showAddPanel = false">
+        <div v-if="showAddPanel" class="panel-overlay" @click.self="closeAddPanel">
           <div class="add-panel">
             <!-- Panel Header -->
             <div class="panel-header">
@@ -469,7 +469,7 @@
                 <h2 class="panel-title">New Schedule Entry</h2>
                 <p class="panel-sub">Fill in all fields then click Add</p>
               </div>
-              <button class="panel-close" @click="showAddPanel = false">
+              <button class="panel-close" :disabled="addingSchedule" :aria-busy="addingSchedule" @click="closeAddPanel">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
@@ -692,7 +692,7 @@
 
             <!-- Sticky footer -->
             <div class="panel-footer">
-              <button class="reset-btn" @click="resetAddForm">Reset</button>
+              <button class="reset-btn" :disabled="addingSchedule" @click="resetAddForm">Reset</button>
               <button
                 class="save-btn"
                 @click="addEntry"
@@ -710,34 +710,40 @@
 
     <!-- ═══ Consultation Management Modal ═══ -->
     <Teleport to="body">
-      <div v-if="showConsultModal" class="modal-overlay" @click.self="showConsultModal = false">
+      <div v-if="showConsultModal" class="modal-overlay" @click.self="closeConsultModal">
         <div class="sched-modal-box consult-modal-box">
-          <div class="sched-modal-header">
+          <div class="sched-modal-header consult-modal-heading">
+            <span class="consult-modal-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </span>
             <div>
               <div class="sched-modal-mode-badge badge-add">Consultation Hours</div>
               <h2 class="sched-modal-title">Prof. {{ selectedTeacher }}</h2>
-              <p class="sched-modal-sub">
-                <span :class="consultWeeklyMins >= 240 ? 'limit-warning' : 'limit-ok'">
-                  {{ consultWeeklyMins }} / 240 min used this week
-                </span>
-              </p>
+              <p class="sched-modal-sub">Set weekly times when students can request a consultation.</p>
             </div>
-            <button class="panel-close" @click="showConsultModal = false">
+            <button class="panel-close" :disabled="savingConsultation || !!deletingConsultSlotId" @click="closeConsultModal">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
 
+          <section class="consult-availability" aria-label="Weekly consultation availability">
+            <div class="consult-availability-copy"><span>Weekly availability</span><strong :class="consultWeeklyMins >= 240 ? 'limit-warning' : 'limit-ok'">{{ consultWeeklyMins }} <small>of 240 minutes</small></strong></div>
+            <div class="consult-progress" role="progressbar" :aria-valuenow="Math.min(consultWeeklyMins, 240)" aria-valuemin="0" aria-valuemax="240"><span :class="{ 'is-full': consultWeeklyMins >= 240 }" :style="{ width: `${Math.min(consultWeeklyMins / 240 * 100, 100)}%` }"></span></div>
+          </section>
+
           <!-- Existing slots list -->
           <div v-if="consultationSlots.length" class="consult-slots-list">
             <div v-for="cslot in consultationSlots" :key="cslot.id" class="consult-slot-item">
-              <div class="consult-slot-day">{{ cslot.dayOfWeek }}</div>
-              <div class="consult-slot-time">{{ cslot.startTime }} – {{ cslot.endTime }}</div>
-              <div class="consult-slot-dur">{{ cslot.durationMinutes }} min</div>
+              <div class="consult-slot-details">
+                <strong class="consult-slot-day">{{ cslot.dayOfWeek }}</strong>
+                <span class="consult-slot-time">{{ cslot.startTime }} – {{ cslot.endTime }}</span>
+                <small class="consult-slot-dur">{{ cslot.durationMinutes }} minutes</small>
+              </div>
               <div class="consult-slot-actions">
-                <button class="consult-edit-btn" @click="editConsultSlot(cslot)">Edit</button>
-                <button class="consult-del-btn" :disabled="!!deletingConsultSlotId || savingConsultation" :title="deletingConsultSlotId === cslot.id ? 'Deleting…' : 'Delete consultation slot'" @click="deleteConsultSlot(cslot.id)">
+                <button class="consult-edit-btn" :disabled="savingConsultation || !!deletingConsultSlotId" @click="editConsultSlot(cslot)">Edit</button>
+                <button class="consult-del-btn" :class="{ 'is-loading': deletingConsultSlotId === cslot.id }" :aria-busy="deletingConsultSlotId === cslot.id" :disabled="!!deletingConsultSlotId || savingConsultation" :title="deletingConsultSlotId === cslot.id ? 'Deleting…' : 'Delete consultation slot'" @click="deleteConsultSlot(cslot.id)">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-                  <span v-if="deletingConsultSlotId === cslot.id">Deleting…</span>
+                  <span>{{ deletingConsultSlotId === cslot.id ? 'Deleting…' : 'Delete' }}</span>
                 </button>
               </div>
             </div>
@@ -745,8 +751,12 @@
           <div v-else class="consult-empty">No consultation slots set for this teacher.</div>
 
           <!-- Add / Edit form -->
-          <div class="sched-form" style="border-top:1px solid #eee;padding-top:12px;margin-top:4px;">
-            <div class="consult-form-title">{{ consultEditId ? 'Edit Slot' : 'Add New Slot' }}</div>
+          <section class="consult-editor">
+            <div class="consult-editor-heading">
+              <span class="consult-editor-plus" aria-hidden="true">{{ consultEditId ? '↻' : '+' }}</span>
+              <div><h3>{{ consultEditId ? 'Edit consultation slot' : 'Add consultation slot' }}</h3><p>Choose a day and available time range.</p></div>
+          </div>
+          <div class="sched-form">
             <div class="form-row-inline">
               <label class="form-label">Day</label>
               <div class="form-select-wrap">
@@ -787,10 +797,11 @@
               {{ consultTimeError }}
             </div>
           </div>
+          </section>
 
-          <div class="sched-modal-actions">
-            <button v-if="consultEditId" class="cancel-btn-text" @click="consultEditId = null; Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })">Cancel Edit</button>
-            <button class="cancel-btn-text" @click="showConsultModal = false">Close</button>
+          <div class="sched-modal-actions consult-modal-actions">
+            <button v-if="consultEditId" class="cancel-btn-text" :disabled="savingConsultation || !!deletingConsultSlotId" @click="consultEditId = null; Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })">Cancel Edit</button>
+            <button class="cancel-btn-text" :disabled="savingConsultation || !!deletingConsultSlotId" @click="closeConsultModal">Close</button>
             <button
               class="save-btn"
               @click="saveConsultSlot"
@@ -1011,6 +1022,11 @@ const consultEditId     = ref(null)
 const consultWeeklyMins = ref(0)
 const consultForm = reactive({ dayOfWeek: '', startTime: '', endTime: '' })
 const consultTimeError  = ref('')
+
+function closeConsultModal() {
+  if (savingConsultation.value || deletingConsultSlotId.value) return
+  showConsultModal.value = false
+}
 
 watch([() => consultForm.startTime, () => consultForm.endTime], () => {
   if (consultForm.startTime && consultForm.endTime) {
@@ -1483,6 +1499,11 @@ function isConsultSpannedCell(slot, day) {
 
 /* ── Modal state ── */
 const showSchedModal = ref(false)
+
+function closeScheduleModal() {
+  if (savingSchedule.value || clearingSchedule.value) return
+  showSchedModal.value = false
+}
 const editMode = ref(false)
 const fromButton = ref(false)
 
@@ -1830,6 +1851,11 @@ const showAddPanel   = ref(false)
 const addSavedCount  = ref(0)
 const addShowFlash   = ref(false)
 const addTimeError   = ref('')
+
+function closeAddPanel() {
+  if (addingSchedule.value) return
+  showAddPanel.value = false
+}
 
 const addForm = reactive({
   day: '', timeIn: '', timeOut: '',
@@ -2973,7 +2999,9 @@ function confirmLogout() {
 .schedule-toast-leave-to { opacity: 0; transform: translateY(-8px); }
 .schedule-export-btn.is-loading { cursor: progress; }
 .consult-btn.is-loading svg { animation: schedule-button-spin .8s linear infinite; }
-.consult-del-btn:disabled { cursor: wait; opacity: .7; }
+.consult-del-btn:disabled,.consult-edit-btn:disabled,.panel-close:disabled,.reset-btn:disabled,.cancel-btn-text:disabled,.clear-slot-btn:disabled { cursor: wait; opacity: .68; }
+.consult-del-btn.is-loading { min-width: 78px; justify-content: center; }
+.save-btn[aria-busy="true"]:disabled { cursor: progress; opacity: .78; }
 @keyframes schedule-button-spin { to { transform: rotate(360deg); } }
 @media (max-width: 600px) {
   .schedule-status-toast {
@@ -2983,5 +3011,141 @@ function confirmLogout() {
     padding: 12px 14px;
     font-size: .78rem;
   }
+}
+
+/* Consultation hours editor layout */
+.consult-modal-box {
+  display: grid;
+  width: min(900px, calc(100vw - 48px));
+  max-width: 900px;
+  max-height: min(760px, calc(100dvh - 48px));
+  grid-template-columns: minmax(250px, .78fr) minmax(0, 1.4fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #d9dfe3;
+  border-radius: 20px;
+  color: #27323a;
+  box-shadow: 0 24px 70px rgba(20, 29, 36, .25);
+}
+.consult-modal-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  padding: 24px 30px;
+  border-bottom: 1px solid #e1e6e9;
+  background: linear-gradient(135deg, #fff, #f7f9fa);
+}
+.consult-modal-heading > div { flex: 1; min-width: 0; }
+.consult-modal-heading .sched-modal-mode-badge { margin-bottom: 5px; }
+.consult-modal-heading .sched-modal-title { color: #27323a; font-size: 1.25rem; }
+.consult-modal-heading .sched-modal-sub { color: #74808a; font-size: .8rem; line-height: 1.45; }
+.consult-modal-heading .panel-close { align-self: flex-start; padding: 8px; border-color: #dce2e6; border-radius: 9px; }
+.consult-modal-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  color: #536470;
+  border: 1px solid #dbe2e6;
+  border-radius: 14px;
+  background: #f0f3f5;
+}
+.consult-availability {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 20px 20px 10px;
+  padding: 15px 16px;
+  border: 1px solid #dfe5e8;
+  border-radius: 12px;
+  background: #fff;
+}
+.consult-availability-copy { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.consult-availability-copy > span { color: #68757e; font-size: .74rem; font-weight: 650; }
+.consult-availability-copy strong { color: #344957; font-size: .88rem; white-space: nowrap; }
+.consult-availability-copy strong small { color: #7d8991; font-size: .68rem; font-weight: 500; }
+.consult-progress { height: 7px; margin-top: 12px; overflow: hidden; border-radius: 99px; background: #e8ecef; }
+.consult-progress span { display: block; height: 100%; border-radius: inherit; background: #687985; transition: width .2s ease; }
+.consult-progress span.is-full { background: #c97818; }
+.consult-slots-list,
+.consult-empty {
+  grid-column: 1;
+  grid-row: 3;
+  min-height: 0;
+  margin: 0 20px 20px;
+  padding: 14px;
+  overflow-y: auto;
+  border: 1px solid #e0e5e8;
+  border-radius: 12px;
+  background: #f7f9fa;
+}
+.consult-slots-list { display: flex; flex-direction: column; gap: 9px; }
+.consult-slot-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px; border-color: #dce3e7; border-radius: 10px; background: #fff; }
+.consult-slot-details { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.consult-slot-day { min-width: 0; color: #34424b; font-size: .78rem; }
+.consult-slot-time { color: #53616b; font-size: .72rem; }
+.consult-slot-dur { color: #89939a; font-size: .65rem; }
+.consult-slot-actions { flex: 0 0 auto; }
+.consult-edit-btn, .consult-del-btn { min-height: 30px; padding: 5px 8px; border-radius: 7px; font-family: inherit; font-size: .65rem; font-weight: 600; line-height: 1.1; }
+.consult-del-btn { gap: 4px; }
+.consult-empty { display: flex; flex-direction: column; justify-content: center; gap: 6px; color: #6c7881; font-size: .72rem; line-height: 1.45; }
+.consult-empty strong { color: #34424b; font-size: .8rem; }
+.consult-editor {
+  grid-column: 2;
+  grid-row: 2 / 4;
+  min-width: 0;
+  padding: 24px 28px;
+  border-left: 1px solid #e1e6e9;
+  background: #fff;
+}
+.consult-form-title { grid-column: 1 / -1; padding: 0; color: #34424b; font-size: 1rem; font-weight: 700; }
+.consult-editor-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 17px; border-bottom: 1px solid #e6eaed; }
+.consult-editor-heading h3 { margin: 0; color: #34424b; font-size: 1rem; }
+.consult-editor-heading p { margin: 4px 0 0; color: #7b8790; font-size: .75rem; }
+.consult-editor-plus { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; color: #fff; border-radius: 11px; background: linear-gradient(145deg, #64747f, #3e4c56); font-size: 1.5rem; line-height: 1; }
+.consult-modal-box .sched-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 14px 16px; margin: 0 !important; padding: 0 !important; border: 0 !important; }
+.consult-modal-box .form-row-inline { display: flex; min-width: 0; align-items: stretch; flex-direction: column; gap: 6px; }
+.consult-modal-box .form-row-inline:first-of-type,
+.consult-modal-box .consult-time-error { grid-column: 1 / -1; }
+.consult-modal-box .form-row-inline .form-label { color: #596670; font-size: .72rem; font-weight: 650; }
+.consult-modal-box .form-select { min-height: 44px; padding: 10px 36px 10px 12px; border-color: #d3dce1; border-radius: 9px; background: #fbfcfc; color: #34424b; font-size: .78rem; }
+.consult-modal-box .form-select:focus { border-color: #748794; box-shadow: 0 0 0 3px rgba(82, 103, 117, .12); }
+.consult-time-error { margin: 0 !important; font-size: .72rem; }
+.consult-modal-actions { grid-column: 1 / -1; grid-row: 4; margin: 0; padding: 14px 24px; border-top: 1px solid #e1e6e9; background: #fafbfc; }
+.consult-modal-actions .cancel-btn-text { color: #66737c; font-size: .8rem; }
+.consult-modal-actions .save-btn { min-height: 40px; padding: 9px 15px; border: 1px solid #3e4c56; border-radius: 9px; background: #3e4c56; color: #fff; font-size: .76rem; }
+
+@media (max-width: 700px) {
+  .consult-modal-box { width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto auto; overflow-y: auto; border-radius: 16px; }
+  .consult-modal-heading { grid-column: 1; padding: 17px; gap: 11px; }
+  .consult-modal-icon { width: 40px; height: 40px; flex-basis: 40px; border-radius: 11px; }
+  .consult-modal-heading .sched-modal-title { font-size: 1.05rem; }
+  .consult-modal-heading .sched-modal-sub { font-size: .7rem; }
+  .consult-availability { grid-column: 1; grid-row: auto; margin: 12px 14px 0; padding: 12px; }
+  .consult-slots-list, .consult-empty { grid-column: 1; grid-row: auto; max-height: 180px; margin: 10px 14px 0; padding: 11px; }
+  .consult-editor { grid-column: 1; grid-row: auto; padding: 17px 14px; border-top: 1px solid #e1e6e9; border-left: 0; }
+  .consult-editor-heading { margin-bottom: 15px; padding-bottom: 13px; }
+  .consult-editor-heading h3 { font-size: .92rem; }
+  .consult-modal-box .form-select { min-height: 40px; font-size: .74rem; }
+  .consult-modal-actions { grid-column: 1; grid-row: auto; padding: 11px 14px; }
+}
+@media (max-width: 420px) {
+  .consult-modal-box { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  .consult-modal-heading { padding: 14px 12px; }
+  .consult-availability { margin-inline: 10px; }
+  .consult-availability-copy { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .consult-slots-list, .consult-empty { margin-inline: 10px; }
+  .consult-slot-item { align-items: flex-start; flex-direction: column; }
+  .consult-slot-actions { align-self: flex-end; }
+  .consult-editor { padding-inline: 12px; }
+  .consult-modal-box .sched-form { grid-template-columns: minmax(0, 1fr); }
+  .consult-modal-box .form-row-inline:first-of-type,
+  .consult-modal-box .consult-time-error { grid-column: 1; }
+  .consult-modal-actions { flex-wrap: wrap; gap: 7px; padding-inline: 10px; }
+  .consult-modal-actions button { flex: 1 1 auto; justify-content: center; }
 }
 </style>

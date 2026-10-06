@@ -1,5 +1,19 @@
 <template>
   <div class="layout">
+    <Teleport to="body">
+      <Transition name="event-toast">
+        <div
+          v-if="eventToast"
+          class="event-status-toast"
+          :class="`is-${eventToast.type}`"
+          :role="eventToast.type === 'error' ? 'alert' : 'status'"
+          aria-live="polite"
+        >
+          <span class="event-status-toast__icon" aria-hidden="true">{{ eventToast.type === 'success' ? '✓' : '!' }}</span>
+          <span>{{ eventToast.message }}</span>
+        </div>
+      </Transition>
+    </Teleport>
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
     <aside class="sidebar admin-sidebar">
       <AdminSidebarToggle />
@@ -20,7 +34,7 @@
           :key="item.name"
           :to="item.to"
           class="nav-item"
-          :class="{ active: currentRoute === item.to }"
+          :class="{ active: currentRoute === item.to, 'nav-item--users': item.to === '/admin/users' }"
         >
           <span class="nav-icon" v-html="item.icon"></span>
           <span>{{ item.name }}</span>
@@ -58,7 +72,7 @@
           <p class="page-sub">Manage and track school events</p>
         </div>
         <button class="add-event-btn header-add-event-btn" @click="openAddEvent">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Add Event
         </button>
       </header>
@@ -344,8 +358,7 @@
           </div>
 
           <!-- Form body -->
-          <form ref="eventFormElement" @submit.prevent="saveEvent" class="event-form">
-
+          <form id="event-form" ref="eventFormElement" novalidate @submit.prevent="saveEvent" class="event-form">
             <!-- Title -->
             <div class="form-group">
               <label class="form-label">Event Title <span class="form-required">*</span></label>
@@ -370,12 +383,24 @@
 
               <div class="form-group">
                 <label class="form-label">Start Time <span class="form-required">*</span></label>
-                <SystemClockPicker v-model="eventForm.time" placeholder="Select start time" />
+                <div class="fi-wrap">
+                  <svg class="fi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                  <select v-model="eventForm.time" class="form-input fi-input event-time-select" :class="{ 'is-placeholder': !eventForm.time }" required @change="handleEventStartTimeChange">
+                    <option value="" disabled>Select start time</option>
+                    <option v-for="time in eventStartTimeOptions" :key="time" :value="time">{{ formatDisplayTime(time) }}</option>
+                  </select>
+                </div>
               </div>
 
               <div class="form-group">
                 <label class="form-label">End Time <span class="form-required">*</span></label>
-                <SystemClockPicker v-model="eventForm.endTime" placeholder="Select end time" :min="eventForm.time" />
+                <div class="fi-wrap">
+                  <svg class="fi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                  <select v-model="eventForm.endTime" class="form-input fi-input event-time-select" :class="{ 'is-placeholder': !eventForm.endTime }" required>
+                    <option value="" disabled>Select end time</option>
+                    <option v-for="time in eventEndTimeOptions" :key="time" :value="time">{{ formatDisplayTime(time) }}</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -458,15 +483,14 @@
               <input ref="imgInput" type="file" accept="image/*" class="img-file-input" @change="handleImageUpload" />
             </div>
 
-            <!-- Actions -->
-            <div class="form-actions">
-              <button type="submit" class="ev-submit-btn">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                {{ editingEvent ? 'Save Changes' : 'Add Event' }}
-              </button>
-            </div>
-
           </form>
+          <div class="form-actions">
+            <button type="submit" form="event-form" class="ev-submit-btn" :class="{ 'is-loading': savingEvent }" :disabled="savingEvent" :aria-busy="savingEvent">
+              <svg v-if="savingEvent" class="event-button-spinner" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".25"/><path d="M12 3a9 9 0 0 1 9 9"/></svg>
+              <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              {{ savingEvent ? 'Saving…' : editingEvent ? 'Save Changes' : 'Add Event' }}
+            </button>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -491,12 +515,35 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- Event archive/delete confirmation -->
+    <Teleport to="body">
+      <div v-if="showEventActionConfirm" class="modal-overlay" @click.self="closeEventActionConfirm">
+        <section class="event-action-confirm" role="alertdialog" aria-modal="true" aria-labelledby="event-action-title" aria-describedby="event-action-description">
+          <div class="event-action-confirm__icon" :class="{ 'is-delete': eventActionType === 'delete' }" aria-hidden="true">
+            <svg v-if="eventActionType === 'delete'" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+            <svg v-else width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+          </div>
+          <span class="event-action-confirm__eyebrow">{{ eventActionType === 'delete' ? 'Permanent action' : 'Move to archive' }}</span>
+          <h2 id="event-action-title">{{ eventActionType === 'delete' ? 'Delete this event?' : 'Archive this event?' }}</h2>
+          <p id="event-action-description">
+            <template v-if="eventActionType === 'delete'">“{{ pendingEventAction?.title }}” will be permanently deleted. This cannot be undone.</template>
+            <template v-else>“{{ pendingEventAction?.title }}” will be moved to Archived. You can restore it later.</template>
+          </p>
+          <div class="event-action-confirm__buttons">
+            <button type="button" class="event-action-confirm__cancel" :disabled="eventActionBusy" @click="closeEventActionConfirm">Cancel</button>
+            <button type="button" :class="['event-action-confirm__submit', { 'is-delete': eventActionType === 'delete' }]" :disabled="eventActionBusy" @click="confirmEventAction">
+              {{ eventActionBusy ? 'Working…' : eventActionType === 'delete' ? 'Delete permanently' : 'Archive event' }}
+            </button>
+          </div>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
-import SystemClockPicker from '@/components/SystemClockPicker.vue'
 import SystemDatePicker from '@/components/SystemDatePicker.vue'
 import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -564,6 +611,14 @@ const editingEvent   = ref(null)
 const eventsTab      = ref('active')
 const eventForm      = ref({ title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [], studentYearLevels: [] })
 const eventFormElement = ref(null)
+const savingEvent = ref(false)
+const showEventActionConfirm = ref(false)
+const pendingEventAction = ref(null)
+const eventActionType = ref('archive')
+const eventActionBusy = ref(false)
+const eventToast = ref(null)
+let eventToastTimer = null
+let eventToastId = 0
 const eventYearLevels = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 const imagePreview   = ref('')
 const imgInput       = ref(null)
@@ -577,15 +632,42 @@ const todayDate = (() => {
   const day = String(now.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 })()
+const eventTimeOptions = computed(() => {
+  return Array.from({ length: 33 }, (_, index) => {
+    const minutes = 5 * 60 + index * 30
+    return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+  })
+})
+const eventStartTimeOptions = computed(() => eventTimeOptions.value.filter((time) =>
+  time >= '05:00' && time < '21:00'
+))
+const eventEndTimeOptions = computed(() => eventTimeOptions.value.filter((time) =>
+  (!eventForm.value.time || time > eventForm.value.time) && time <= '21:00'
+))
 
-/* ── Time Picker ── */
-const showTimePicker = ref(false)
-const tempHour   = ref('12')
-const tempMinute = ref('00')
-const tempPeriod = ref('AM')
+function showEventToast(type, message) {
+  eventToast.value = { type, message }
+  const toastId = ++eventToastId
+  if (eventToastTimer) window.clearTimeout(eventToastTimer)
+  eventToastTimer = window.setTimeout(() => {
+    if (toastId === eventToastId) eventToast.value = null
+    eventToastTimer = null
+  }, 5000)
+}
+onBeforeUnmount(() => {
+  if (eventToastTimer) window.clearTimeout(eventToastTimer)
+})
 
-const pickerHours   = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
-const pickerMinutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'))
+function handleEventStartTimeChange() {
+  if (eventForm.value.endTime && eventForm.value.endTime <= eventForm.value.time) {
+    eventForm.value.endTime = ''
+  }
+}
+
+function minutesSinceMidnight(time) {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time)
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null
+}
 
 function formatDisplayDate(date) {
   if (!date) return ''
@@ -599,24 +681,6 @@ function formatDisplayTime(time24) {
   const period = h >= 12 ? 'PM' : 'AM'
   const h12 = h % 12 || 12
   return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`
-}
-
-function syncPickerToTime(time24) {
-  if (!time24) { tempHour.value = '12'; tempMinute.value = '00'; tempPeriod.value = 'AM'; return }
-  const [hh, mm] = time24.split(':').map(Number)
-  tempPeriod.value = hh >= 12 ? 'PM' : 'AM'
-  const h12 = hh % 12 || 12
-  tempHour.value   = String(h12).padStart(2, '0')
-  const snapped = Math.round(mm / 5) * 5
-  tempMinute.value = String(snapped >= 60 ? 55 : snapped).padStart(2, '0')
-}
-
-function confirmTime() {
-  let h = parseInt(tempHour.value)
-  if (tempPeriod.value === 'AM') { if (h === 12) h = 0 }
-  else { if (h !== 12) h += 12 }
-  eventForm.value.time = `${String(h).padStart(2, '0')}:${tempMinute.value}`
-  showTimePicker.value = false
 }
 
 const events = ref([])
@@ -735,11 +799,9 @@ function openAddEvent() {
   editingEvent.value = null
   eventForm.value = { title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [], studentYearLevels: [] }
   imagePreview.value = ''
-  showTimePicker.value = false
   showTeacherPicker.value = false
   teacherSearchQuery.value = ''
   loadEventTeachers()
-  syncPickerToTime('')
   if (imgInput.value) imgInput.value.value = ''
   showEventModal.value = true
   nextTick(() => { eventFormElement.value?.scrollTo({ top: 0 }) })
@@ -749,11 +811,9 @@ function openEditEvent(ev) {
   editingEvent.value = ev
   eventForm.value = { title: ev.title, description: ev.description, date: ev.date, time: ev.time, endTime: ev.endTime || '', location: ev.location, image: ev.image || '', teacherIds: [...(ev.teacherIds || [])], studentYearLevels: [...(ev.studentYearLevels || [])] }
   imagePreview.value = ev.image || ''
-  showTimePicker.value = false
   showTeacherPicker.value = false
   teacherSearchQuery.value = ''
   loadEventTeachers()
-  syncPickerToTime(ev.time || '')
   if (imgInput.value) imgInput.value.value = ''
   showEventModal.value = true
   nextTick(() => { eventFormElement.value?.scrollTo({ top: 0 }) })
@@ -782,19 +842,34 @@ function removeImage() {
 }
 
 async function saveEvent() {
-  if (!eventForm.value.title.trim()) return
+  if (savingEvent.value) return
+  if (!eventForm.value.title.trim()) {
+    showEventToast('error', 'Enter an event title.')
+    return
+  }
   if (!editingEvent.value && eventForm.value.date && eventForm.value.date < todayDate) {
-    window.alert('New events cannot use a past date.')
+    showEventToast('error', 'New events cannot use a past date.')
     return
   }
   if (!eventForm.value.date || !eventForm.value.time || !eventForm.value.endTime) {
-    window.alert('Date, start time, and end time are required.')
+    showEventToast('error', 'Date, start time, and end time are required.')
+    return
+  }
+  const startMinutes = minutesSinceMidnight(eventForm.value.time)
+  const endMinutes = minutesSinceMidnight(eventForm.value.endTime)
+  if (startMinutes === null || startMinutes < 300 || startMinutes > 1230 || startMinutes % 30 !== 0) {
+    showEventToast('error', 'Start time must be between 5:00 AM and 8:30 PM in 30-minute intervals.')
+    return
+  }
+  if (endMinutes === null || endMinutes < 300 || endMinutes > 1260 || endMinutes % 30 !== 0) {
+    showEventToast('error', 'End time must be no later than 9:00 PM in 30-minute intervals.')
     return
   }
   if (eventForm.value.endTime <= eventForm.value.time) {
-    window.alert('End time must be later than start time.')
+    showEventToast('error', 'End time must be later than start time.')
     return
   }
+  savingEvent.value = true
   try {
     const path = editingEvent.value ? `/${editingEvent.value.id}` : ''
     const method = editingEvent.value ? 'PATCH' : 'POST'
@@ -807,29 +882,68 @@ async function saveEvent() {
     })
     await loadEvents()
     showEventModal.value = false
+    showEventToast('success', editingEvent.value ? 'Event updated successfully.' : 'Event added successfully.')
   } catch (error) {
-    window.alert(error.message)
+    showEventToast('error', error.message || 'Unable to save this event.')
+  } finally {
+    savingEvent.value = false
   }
 }
 
 async function archiveEvent(ev) {
+  const isRestoring = ev.status === 'archived'
+  if (!isRestoring) {
+    pendingEventAction.value = ev
+    eventActionType.value = 'archive'
+    showEventActionConfirm.value = true
+    return
+  }
+
   try {
     await eventRequest(`/${ev.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ ...ev, status: ev.status === 'active' ? 'archived' : 'active' }),
+      body: JSON.stringify({ ...ev, status: 'active' }),
     })
     await loadEvents()
+    showEventToast('success', 'Event restored.')
   } catch (error) {
-    window.alert(error.message)
+    showEventToast('error', error.message || 'Unable to update this event.')
   }
 }
 
-async function deleteEvent(ev) {
+function deleteEvent(ev) {
+  pendingEventAction.value = ev
+  eventActionType.value = 'delete'
+  showEventActionConfirm.value = true
+}
+
+function closeEventActionConfirm() {
+  if (eventActionBusy.value) return
+  showEventActionConfirm.value = false
+  pendingEventAction.value = null
+}
+
+async function confirmEventAction() {
+  const ev = pendingEventAction.value
+  if (!ev || eventActionBusy.value) return
+  eventActionBusy.value = true
   try {
-    await eventRequest(`/${ev.id}`, { method: 'DELETE' })
+    if (eventActionType.value === 'delete') {
+      await eventRequest(`/${ev.id}`, { method: 'DELETE' })
+    } else {
+      await eventRequest(`/${ev.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ ...ev, status: 'archived' }),
+      })
+    }
     await loadEvents()
+    showEventToast('success', eventActionType.value === 'delete' ? 'Event permanently deleted.' : 'Event archived.')
+    showEventActionConfirm.value = false
+    pendingEventAction.value = null
   } catch (error) {
-    window.alert(error.message)
+    showEventToast('error', error.message || (eventActionType.value === 'delete' ? 'Unable to delete this event.' : 'Unable to archive this event.'))
+  } finally {
+    eventActionBusy.value = false
   }
 }
 
@@ -925,6 +1039,7 @@ onMounted(() => {
 .nav-item:hover { background: #f8fafc; color: #4b5563; }
 .nav-item.active { background: #4b5563; color: #fff; }
 .nav-item.active .nav-icon { color: #fff; }
+.nav-item--users { margin-top: 6px; }
 .nav-icon { display: flex; align-items: center; flex-shrink: 0; }
 
 /* Logout */
@@ -1054,6 +1169,31 @@ onMounted(() => {
 }
 .logout-confirm-btn:hover { background: #6b7280; }
 
+.event-action-confirm {
+  width: min(430px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 18px;
+  background: linear-gradient(145deg, #fff, #f1f3f4);
+  box-shadow: 0 24px 70px rgba(19, 29, 36, .28), inset 0 1px rgba(255,255,255,.9);
+  color: #273139;
+}
+.event-action-confirm__icon { display: grid; width: 48px; height: 48px; margin-bottom: 16px; place-items: center; border: 1px solid #cbded1; border-radius: 14px; background: #edf6f0; color: #467455; }
+.event-action-confirm__icon.is-delete { border-color: #f0cccc; background: #fff0f0; color: #c34d4d; }
+.event-action-confirm__eyebrow { color: #78848b; font-size: .65rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.event-action-confirm h2 { margin: 5px 0 8px; color: #222b31; font-size: 1.3rem; letter-spacing: -.025em; }
+.event-action-confirm p { margin: 0; color: #69767e; font-size: .82rem; line-height: 1.55; overflow-wrap: anywhere; }
+.event-action-confirm__buttons { display: flex; justify-content: flex-end; gap: 9px; margin-top: 24px; }
+.event-action-confirm__buttons button { min-height: 40px; padding: 9px 14px; border: 1px solid #d1d8dc; border-radius: 9px; font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer; transition: transform .15s ease, background .15s ease; }
+.event-action-confirm__buttons button:hover:not(:disabled) { transform: translateY(-1px); }
+.event-action-confirm__buttons button:disabled { cursor: wait; opacity: .65; }
+.event-action-confirm__cancel { background: #fff; color: #56636b; }
+.event-action-confirm__cancel:hover:not(:disabled) { background: #f7f8f9; }
+.event-action-confirm__submit { border-color: #405b4b !important; background: linear-gradient(145deg, #5f806b, #3f5e4a); color: #fff; }
+.event-action-confirm__submit.is-delete { border-color: #b94c4c !important; background: linear-gradient(145deg, #df6868, #b94141); }
+.event-action-confirm__submit:hover:not(:disabled) { filter: brightness(1.04); }
+.event-action-confirm__buttons button:focus-visible { outline: 3px solid rgba(63, 94, 74, .25); outline-offset: 2px; }
+
 /* ═══ EVENTS SECTION ═══ */
 .events-topbar {
   display: flex;
@@ -1093,7 +1233,7 @@ onMounted(() => {
 .add-event-btn {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   background: #4b5563;
   color: #fff;
   border: none;
@@ -1471,15 +1611,17 @@ onMounted(() => {
   height: 30px;
   border-radius: 8px;
   background: rgba(255,255,255,0.15);
-  color: #fff;
+  color: #111827;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
   transition: background 0.15s;
 }
-.ev-modal-close:hover { background: rgba(255,255,255,0.28); }
 
 .event-form { display: flex; flex-direction: column; gap: 18px; padding: 26px 28px 28px; }
 .form-group { display: flex; flex-direction: column; gap: 7px; }
@@ -1492,7 +1634,7 @@ onMounted(() => {
   padding: 0 13px; border: 1px solid #e1e5e8; border-radius: 10px;
   background: #f8f9fb; color: #1b4332; font: inherit; cursor: pointer; text-align: left;
 }
-.teacher-picker-trigger:hover { border-color: #74a98e; }
+.teacher-picker-trigger:hover { border-color: #9ca3af; }
 .teacher-picker-value { color: #333; font-size: 0.88rem; }
 .teacher-picker-placeholder { color: #a7adba; font-size: 0.88rem; }
 .teacher-picker-trigger .td-chevron { margin-left: auto; color: #687178; }
@@ -1506,12 +1648,12 @@ onMounted(() => {
 .teacher-picker-all { display: flex; align-items: center; gap: 8px; margin: 9px 3px 6px; font-size: 0.78rem; color: #567064; cursor: pointer; }
 .teacher-picker-list { max-height: 164px; overflow-y: auto; border-top: 1px solid #edf0ee; }
 .teacher-picker-option { display: flex; align-items: center; gap: 9px; padding: 8px 4px; color: #333; font-size: 0.84rem; cursor: pointer; }
-.teacher-picker-option:hover { background: #f2f8f4; }
+.teacher-picker-option:hover { background: #f3f4f6; }
 .teacher-picker-option input, .teacher-picker-all input { accent-color: #1b4332; }
 .year-level-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .year-level-option { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #e4e7e9; border-radius: 7px; color: #42514a; font-size: 0.82rem; cursor: pointer; }
-.year-level-option:hover { border-color: #74a98e; background: #f2f8f4; }
-.year-level-option input { accent-color: #1b4332; }
+.year-level-option:hover { border-color: #9ca3af; background: #f3f4f6; color: #374151; }
+.year-level-option input { accent-color: #4b5563; }
 .teacher-picker-avatar { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #dcefe4; color: #1b4332; font-size: 0.66rem; font-weight: 700; }
 .teacher-picker-empty { margin: 14px 4px; color: #8b9490; text-align: center; font-size: 0.8rem; }
 .teacher-picker-help { color: #8b9490; font-size: 0.74rem; }
@@ -1792,7 +1934,7 @@ onMounted(() => {
   background: linear-gradient(145deg, #5c6771, #343e47);
   box-shadow: 0 8px 20px rgba(45,55,63,.2);
   font-size: .78rem;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .add-event-btn:hover {
@@ -2202,24 +2344,18 @@ onMounted(() => {
   color: #ffffff;
 }
 
-.ev-modal-close:hover {
-  border-color: rgba(255,255,255,.45);
-  background: rgba(255,255,255,.22);
-  color: #ffffff;
-}
-
 .event-form {
   flex: 1 1 auto;
   gap: 12px;
   padding: 16px 24px 0;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #9bb9a8 transparent;
+  scrollbar-color: #9ca3af transparent;
   background: #fbfdfc;
 }
 
 .event-form::-webkit-scrollbar { width: 7px; }
-.event-form::-webkit-scrollbar-thumb { background: #9bb9a8; border-radius: 10px; }
+.event-form::-webkit-scrollbar-thumb { background: #9ca3af; border-radius: 10px; }
 .event-form::-webkit-scrollbar-track { background: transparent; }
 
 .form-row {
@@ -2234,8 +2370,8 @@ onMounted(() => {
 .event-form .teacher-picker-help { font-size: .68rem; }
 .event-form .year-level-option { padding: 8px 10px; font-size: .76rem; }
 .event-form .form-input:focus,
-.event-form .teacher-picker-trigger:focus,
-.event-form .time-display:focus { border-color: #5b9275; box-shadow: 0 0 0 3px rgba(91,146,117,.12); }
+.event-form .time-display:focus { border-color: #6b7280; box-shadow: 0 0 0 3px rgba(83,91,100,.12); }
+.event-form .teacher-picker-trigger:focus { border-color: #6b7280; box-shadow: 0 0 0 3px rgba(83,91,100,.12); }
 
 .teacher-picker-trigger {
   color: #475569;
@@ -2568,10 +2704,13 @@ onMounted(() => {
 .header-add-event-btn {
   min-height: 46px;
   padding: 0 18px;
+  gap: 8px;
   border: 1px solid #3e4d58;
   border-radius: 12px;
   background: linear-gradient(145deg, #5c6771, #343e47);
-  box-shadow: 0 8px 20px rgba(45,55,63,.2);
+  box-shadow: 0 8px 20px rgba(45,55,63,.2), inset 0 1px 0 rgba(255,255,255,.3);
+  font-size: .78rem;
+  font-weight: 600;
 }
 .add-event-btn:hover,
 .header-add-event-btn:hover {
@@ -2632,6 +2771,8 @@ onMounted(() => {
 }
 
 .fi-input { padding-left: 34px !important; }
+.event-time-select { cursor: pointer; }
+.event-time-select.is-placeholder { color: #92989e !important; }
 .form-textarea { min-height: 70px; line-height: 1.45; }
 .teacher-picker-value,
 .teacher-picker-placeholder,
@@ -2657,12 +2798,18 @@ onMounted(() => {
 .img-upload-preview { height: 110px; }
 
 .form-actions {
+  display: flex;
+  min-height: 68px;
+  flex: 0 0 auto;
   gap: 9px;
-  padding-top: 12px;
-  margin-top: 1px;
+  padding: 12px 26px;
+  margin: 0;
   justify-content: flex-end;
-  padding-bottom: 2px;
+  align-items: center;
+  border-top: 1px solid #d7dfe3;
+  background: #f7f9fa;
 }
+.event-modal-box > .event-form { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 .ev-submit-btn {
   min-height: 40px;
@@ -2679,6 +2826,7 @@ onMounted(() => {
   .event-modal-box { width: min(94vw, 680px); height: calc(100vh - 32px); max-height: calc(100vh - 32px); }
   .ev-modal-banner { padding-inline: 18px; }
   .event-form { padding: 16px 18px 14px; }
+  .form-actions { padding-inline: 18px; }
 }
 
 .events-loading {
@@ -2734,5 +2882,55 @@ onMounted(() => {
   }
 
   .event-skeleton-cover { min-height: 120px; }
+}
+.event-status-toast {
+  position: fixed;
+  z-index: 12000;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  display: flex;
+  width: min(380px, calc(100vw - 32px));
+  align-items: center;
+  gap: 11px;
+  padding: 13px 16px;
+  border: 1px solid #d8dee2;
+  border-left: 3px solid #547b66;
+  border-radius: 12px;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 12px 34px rgba(27,37,45,.18);
+  color: #303a42;
+  font-size: .82rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.event-status-toast.is-error { border-left-color: #a84c4c; }
+.event-status-toast__icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #e8f2ec;
+  color: #3e7657;
+  font-size: .82rem;
+  font-weight: 800;
+}
+.event-status-toast.is-error .event-status-toast__icon { background: #f7eaea; color: #a84c4c; }
+.event-toast-enter-active,
+.event-toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.event-toast-enter-from,
+.event-toast-leave-to { opacity: 0; transform: translateY(-8px); }
+.ev-submit-btn.is-loading { cursor: progress; opacity: .82; }
+.event-button-spinner { animation: eventButtonSpin .8s linear infinite; }
+@keyframes eventButtonSpin { to { transform: rotate(360deg); } }
+@media (max-width: 600px) {
+  .event-status-toast {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    padding: 12px 14px;
+    font-size: .78rem;
+  }
 }
 </style>

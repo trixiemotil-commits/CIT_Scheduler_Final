@@ -381,6 +381,7 @@ function toClient(doc) {
     endTime: doc.endTime,
     durationMinutes: slotDurationMinutes(doc.startTime, doc.endTime),
     academicTermId: doc.academicTermId?.toString?.() || null,
+    createdAt: doc.createdAt || null,
   };
 }
 
