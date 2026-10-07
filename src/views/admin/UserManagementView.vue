@@ -70,26 +70,8 @@
         </button>
       </header>
 
-      <section class="um-management-panel">
-      <!-- Top bar -->
-      <div class="um-topbar">
-        <div class="um-overview-heading">
-          <h2>Users Overview</h2>
-          <p>{{ filteredUsers.length }} user{{ filteredUsers.length === 1 ? '' : 's' }} shown</p>
-        </div>
-        <div class="um-topbar-right">
-          <button class="um-print-btn" title="Print Users" @click="printUsersTable">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9"/>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-              <rect x="6" y="14" width="12" height="8"/>
-            </svg>
-            Print
-          </button>
-        </div>
-      </div>
-
-      <!-- Stats row -->
+      <!-- User stats sit above and outside the overview panel. -->
+      <section class="um-user-stats" aria-label="User statistics">
       <div class="um-stats-row">
         <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show all users" @click="selectUserStat('all')" @keydown.enter="selectUserStat('all')" @keydown.space.prevent="selectUserStat('all')">
           <div class="um-stat-icon um-stat-icon--total">
@@ -155,8 +137,28 @@
           </div>
         </div>
       </div>
+      </section>
 
-      <div v-if="activeView === 'active' && (pendingCount > 0 || filteredUsers.length > 0 || isMultiSelectMode)" class="um-stats-actions">
+      <section class="um-management-panel">
+        <!-- Top bar -->
+        <div class="um-topbar">
+          <div class="um-overview-heading">
+            <h2>Users Overview</h2>
+            <p>{{ filteredUsers.length }} user{{ filteredUsers.length === 1 ? '' : 's' }} shown</p>
+          </div>
+          <div class="um-topbar-right">
+            <button class="um-print-btn" title="Print Users" @click="printUsersTable">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"/>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                <rect x="6" y="14" width="12" height="8"/>
+              </svg>
+              Print
+            </button>
+          </div>
+        </div>
+
+      <div v-if="activeView === 'active'" class="um-stats-actions">
         <button
           v-if="filteredUsers.length > 0 || isMultiSelectMode"
           class="um-select-mode-btn"
@@ -167,27 +169,29 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path v-if="isMultiSelectMode" d="m8 12 2.5 2.5L16 9"/></svg>
           {{ isMultiSelectMode ? 'Cancel selection' : 'Select multiple' }}
         </button>
-        <div class="um-search-wrap">
-          <span class="um-search-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          </span>
-          <input v-model="searchQuery" class="um-search-input" type="text" :placeholder="activeView === 'archived' ? 'Search archived...' : 'Search users...'" />
-        </div>
-        <select v-model="statusFilter" class="um-filter-select um-filter-select--status">
-          <option value="all">All Users</option>
-          <option value="active">Active</option>
-          <option value="pending">Pending</option>
-          <option value="denied">Denied</option>
-          <option value="inactive">Inactive</option>
-          <option value="archived">Archived</option>
-        </select>
-        <select v-model="roleFilter" class="um-filter-select">
-          <option value="">All Roles</option>
-          <option value="Admin">Admin</option>
-          <option value="Teacher">Teacher</option>
-          <option value="Admin &amp; Teacher">Admin &amp; Teacher</option>
-          <option value="Student">Student</option>
-        </select>
+        <template v-if="activeView === 'active'">
+          <div class="um-search-wrap">
+            <span class="um-search-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </span>
+            <input v-model="searchQuery" class="um-search-input" type="text" :placeholder="activeView === 'archived' ? 'Search archived...' : 'Search users...'" />
+          </div>
+          <select v-model="statusFilter" class="um-filter-select um-filter-select--status">
+            <option value="all">All Users</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="denied">Denied</option>
+            <option value="inactive">Inactive</option>
+            <option value="archived">Archived</option>
+          </select>
+          <select v-model="roleFilter" class="um-filter-select">
+            <option value="">All Roles</option>
+            <option value="Admin">Admin</option>
+            <option value="Teacher">Teacher</option>
+            <option value="Admin &amp; Teacher">Admin &amp; Teacher</option>
+            <option value="Student">Student</option>
+          </select>
+        </template>
         <template v-if="selectedNonPendingUsers.length > 0">
           <button class="um-bulk-archive-btn" @click="showBulkArchiveModal = true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
@@ -637,14 +641,15 @@
   <!-- ═══ Sweet Alert — Register Confirm ═══ -->
   <Teleport to="body">
     <div v-if="showRegisterConfirm" class="modal-overlay">
-      <div class="swal-box">
-        <div class="swal-icon" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
+      <div class="swal-box" role="dialog" aria-modal="true" aria-labelledby="register-confirm-title" aria-describedby="register-confirm-description">
+        <div class="swal-icon swal-icon--warning" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
         </div>
-        <p class="swal-text">Are you sure you want to continue?</p>
+        <p id="register-confirm-title" class="swal-text">Are you sure you want to continue?</p>
+        <p id="register-confirm-description" class="swal-description">Please review the account details before continuing.</p>
         <div class="swal-actions">
           <button class="swal-cancel" @click="showRegisterConfirm = false">Cancel</button>
-          <button class="swal-continue" @click="confirmSaveUser">Continue</button>
+          <button class="swal-continue swal-continue--success" @click="confirmSaveUser">Continue</button>
         </div>
       </div>
     </div>
@@ -653,14 +658,15 @@
   <!-- ═══ Sweet Alert — Approve All Confirm ═══ -->
   <Teleport to="body">
     <div v-if="showApproveAllConfirm" class="modal-overlay">
-      <div class="swal-box">
-        <div class="swal-icon" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
+      <div class="swal-box" role="dialog" aria-modal="true" aria-labelledby="approve-confirm-title" aria-describedby="approve-confirm-description">
+        <div class="swal-icon swal-icon--success" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>
         </div>
-        <p class="swal-text">{{ approvalMode === 'selected' ? `Approve ${selectedPendingUsers.length} selected user account(s)?` : `Approve all ${pendingCount} pending user account(s)?` }}</p>
+        <p id="approve-confirm-title" class="swal-text">{{ approvalMode === 'selected' ? `Approve ${selectedPendingUsers.length} selected user account(s)?` : `Approve all ${pendingCount} pending user account(s)?` }}</p>
+        <p id="approve-confirm-description" class="swal-description">{{ approvalMode === 'selected' ? 'The selected pending accounts will be activated.' : 'All pending user accounts will be activated.' }}</p>
         <div class="swal-actions">
           <button class="swal-cancel" @click="showApproveAllConfirm = false">Cancel</button>
-          <button class="swal-continue" @click="confirmApproval">{{ approvalMode === 'selected' ? 'Approve Selected' : 'Approve All' }}</button>
+          <button class="swal-continue swal-continue--success" @click="confirmApproval">{{ approvalMode === 'selected' ? 'Approve Selected' : 'Approve All' }}</button>
         </div>
       </div>
     </div>
@@ -668,17 +674,20 @@
 
   <Teleport to="body">
     <div v-if="showRowStatusConfirm" class="modal-overlay" @click.self="cancelRowStatusChange">
-      <div class="swal-box" role="dialog" aria-modal="true" aria-labelledby="row-status-confirm-title">
-        <div class="swal-icon" aria-hidden="true">
-          <svg v-if="rowStatusNextValue === 'Active'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>
-          <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 6-12 12M6 6l12 12"/></svg>
+      <div class="swal-box" role="dialog" aria-modal="true" aria-labelledby="row-status-confirm-title" aria-describedby="row-status-confirm-description">
+        <div :class="['swal-icon', rowStatusNextValue === 'Active' ? 'swal-icon--success' : 'swal-icon--danger']" aria-hidden="true">
+          <svg v-if="rowStatusNextValue === 'Active'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>
+          <svg v-else width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 6-12 12M6 6l12 12"/></svg>
         </div>
         <p id="row-status-confirm-title" class="swal-text">
           {{ rowStatusNextValue === 'Active' ? `Approve ${rowStatusTarget?.name}?` : `Decline ${rowStatusTarget?.name}?` }}
         </p>
+        <p id="row-status-confirm-description" class="swal-description">
+          {{ rowStatusNextValue === 'Active' ? 'This account will be activated.' : 'This account will be denied.' }}
+        </p>
         <div class="swal-actions">
           <button class="swal-cancel" @click="cancelRowStatusChange">Cancel</button>
-          <button :class="['swal-continue', { 'swal-decline': rowStatusNextValue === 'Denied' }]" @click="confirmRowStatusChange">
+          <button :class="['swal-continue', rowStatusNextValue === 'Active' ? 'swal-continue--success' : 'swal-continue--danger']" @click="confirmRowStatusChange">
             {{ rowStatusNextValue === 'Active' ? 'Approve' : 'Decline' }}
           </button>
         </div>
@@ -1876,10 +1885,10 @@ function confirmRestoreUser() {
   display: flex;
   flex-wrap: nowrap;
   gap: 10px;
-  margin-bottom: 24px;
   width: 100%;
   overflow: hidden;
 }
+.um-user-stats { margin-bottom: 12px; }
 .um-stat-card {
   flex: 1 1 0;
   min-width: 120px;
@@ -1986,7 +1995,7 @@ function confirmRestoreUser() {
   letter-spacing: 0.5px;
   padding: 14px 20px;
 }
-.um-select-col { width: 42px; padding-left: 14px !important; padding-right: 4px !important; text-align: center; }
+.um-select-col { width: 42px; padding-left: 14px !important; padding-right: 10px !important; text-align: center; }
 .um-select-check { width: 16px; height: 16px; accent-color: #1b4332; cursor: pointer; vertical-align: middle; }
 .um-row {
   border-bottom: 1px solid #f4f4f4;
@@ -2531,8 +2540,6 @@ function confirmRestoreUser() {
   box-shadow: none;
 }
 .swal-continue:hover { background: #35424d; }
-.swal-continue.swal-decline { border-color: #991b1b; background: #b91c1c; }
-.swal-continue.swal-decline:hover { background: #991b1b; }
 
 .um-toast {
   position: fixed;
@@ -2912,7 +2919,7 @@ function confirmRestoreUser() {
 .um-table:not(.um-table--selecting) th:nth-child(5),
 .um-table:not(.um-table--selecting) td:nth-child(5) { width: 10%; }
 .um-table--selecting th:nth-child(1),
-.um-table--selecting td:nth-child(1) { width: 26px; }
+.um-table--selecting td:nth-child(1) { width: 34px; }
 .um-table--selecting th:nth-child(2),
 .um-table--selecting td:nth-child(2) { width: 25%; }
 .um-table--selecting th:nth-child(3),
@@ -3066,6 +3073,25 @@ function confirmRestoreUser() {
 }
 .um-stats-row { gap: 12px; }
 .um-stats-row { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.um-user-stats .um-stats-row { gap: 12px; }
+.um-user-stats .um-stat-card {
+  min-height: 92px;
+  padding: 8px 12px;
+  gap: 8px;
+}
+.um-user-stats .um-stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+}
+.um-user-stats .um-stat-icon svg { width: 30px; height: 30px; }
+.um-user-stats .um-stat-val { font-size: 1.4rem; }
+.um-user-stats .um-stat-label {
+  width: 100%;
+  text-align: left;
+  font-size: .74rem;
+}
+.um-user-stats .um-stat-card:first-child .um-stat-label { white-space: nowrap; }
 .um-stats-actions {
   display: flex;
   align-items: center;
@@ -3073,6 +3099,22 @@ function confirmRestoreUser() {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 14px;
+}
+.um-stats-actions .um-search-wrap {
+  flex: 1 1 220px;
+  min-width: 190px;
+}
+.um-stats-actions .um-search-input {
+  box-sizing: border-box;
+  width: 100%;
+}
+.um-stats-actions .um-filter-select {
+  flex: 0 1 145px;
+  min-width: 135px;
+}
+.um-stats-actions .um-filter-select--status {
+  flex-basis: 160px;
+  min-width: 150px;
 }
 .um-stats-actions .um-approve-all-btn { margin-left: auto; }
 .um-stat-card {
@@ -3123,6 +3165,11 @@ function confirmRestoreUser() {
 @media (max-width: 900px) {
   .um-stats-row { overflow-x: auto; }
   .um-stat-card { min-width: 120px; }
+  .um-stats-actions .um-search-wrap,
+  .um-stats-actions .um-search-input,
+  .um-stats-actions .um-filter-select { width: 100%; }
+  .um-stats-actions .um-search-wrap,
+  .um-stats-actions .um-filter-select { flex: 1 1 100%; }
 }
 
 @media (max-width: 700px) {
@@ -3214,60 +3261,105 @@ function confirmRestoreUser() {
 
 /* ── Confirmation popup final theme ─────────────────────────────────── */
 .swal-box {
-  width: min(420px, calc(100vw - 40px));
+  width: min(425px, calc(100vw - 40px));
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 26px 28px 22px;
-  border: 1px solid #d5dde1;
-  border-radius: 18px;
-  background: #f7f9fa;
-  box-shadow: 0 18px 42px rgba(34,45,54,.22);
+  gap: 10px;
+  padding: 26px 28px 24px;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #f8fafb, #e7ebed);
+  box-shadow: 0 18px 42px rgba(34,45,54,.24), inset 0 1px 0 rgba(255,255,255,.8);
 }
 .swal-icon {
+  display: grid;
   width: 60px;
   height: 60px;
   flex-basis: 60px;
-  border: 1px solid #dfcfaa;
-  border-radius: 16px;
-  background: #f8f3e7;
-  color: #765f2e;
+  place-items: center;
+  border: 2px solid #c92f2f;
+  border-radius: 50%;
+  background: transparent;
+  color: #bd2424;
+}
+.swal-icon span {
+  font-size: 2.1rem;
+  font-weight: 500;
+  line-height: 1;
 }
 .swal-icon svg { width: 28px; height: 28px; }
+.swal-icon--warning {
+  border-color: #dfcfaa;
+  background: #f8f3e7;
+  color: #8a6b2f;
+}
+.swal-icon--success {
+  border-color: #21834b;
+  background: #e6f5eb;
+  color: #176b3a;
+}
+.swal-icon--danger {
+  border-color: #c92f2f;
+  background: #fceaea;
+  color: #b52222;
+}
 .swal-text {
   flex: none;
-  max-width: 290px;
+  max-width: 340px;
   margin: 0;
-  color: #202830;
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.4;
+  color: #34383d;
+  font-size: 1.12rem;
+  font-weight: 750;
+  line-height: 1.35;
   text-align: center;
 }
-.swal-actions { gap: 8px; margin-top: 2px; }
+.swal-description {
+  max-width: 340px;
+  margin: 2px 0 8px;
+  color: #626970;
+  font-size: .9rem;
+  line-height: 1.45;
+  text-align: center;
+}
+.swal-actions {
+  display: flex;
+  width: 100%;
+  gap: 9px;
+  margin-top: 2px;
+}
 .swal-cancel,
 .swal-continue {
-  min-height: 38px;
-  border-radius: 10px;
-  font-size: .8rem;
+  flex: 1 1 0;
+  min-height: 44px;
+  border-radius: 9px;
+  font-size: .82rem;
+  font-weight: 750;
 }
 .swal-cancel {
-  min-width: 82px;
-  padding: 8px 16px;
-  border: 1px solid #d6dfe3;
-  background: #fff;
-  color: #59656e;
+  padding: 9px 16px;
+  border: 1px solid #68727a;
+  background: #707980;
+  color: #fff;
 }
+.swal-cancel:hover { background: #5e6870; }
 .swal-continue {
-  min-width: 108px;
-  padding: 8px 16px;
+  padding: 9px 16px;
   border: 1px solid #3e4d58;
   background: #44515d;
   box-shadow: 0 5px 10px rgba(45,55,63,.14);
 }
-.swal-cancel:hover { background: #eef2f4; }
 .swal-continue:hover { background: #35424d; }
+.swal-continue--success {
+  border-color: #176b3a;
+  background: #21834b;
+}
+.swal-continue--success:hover { background: #176b3a; }
+.swal-continue--danger {
+  border-color: #b52222;
+  background: #c62828;
+}
+.swal-continue--danger:hover { background: #a51f1f; }
 
 @media (min-width: 901px) {
   .um-view-tabs { flex: 0 0 160px; }
