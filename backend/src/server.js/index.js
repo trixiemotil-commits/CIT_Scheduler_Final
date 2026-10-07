@@ -17,6 +17,7 @@ const activityLogger = require("../middleware/activityLogger");
 const ConsultationAvailability = require("../models/ConsultationAvailability");
 const Event = require("../models/Event");
 const User = require("../models/User");
+const { processExpiredConsultationQueues } = require("../controllers/consultationController");
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -103,7 +104,7 @@ async function archiveExpiredEvents() {
 
 async function autoClockOutTeachers() {
   try {
-    const timeZone = process.env.APP_TIME_ZONE || "Asia/Manila";
+    const timeZone = "Asia/Manila";
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone,
       weekday: "short",
@@ -113,16 +114,14 @@ async function autoClockOutTeachers() {
     }).formatToParts(new Date());
     const day = parts.find(part => part.type === "weekday")?.value;
     const hour = Number(parts.find(part => part.type === "hour")?.value);
-    const minute = Number(parts.find(part => part.type === "minute")?.value);
     const isWeekday = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].includes(day);
-    const isPastClockOut = hour > 19 || (hour === 19 && minute >= 30);
+    const isPastClockOut = hour >= 20;
     if (!isWeekday || !isPastClockOut) return;
 
     const result = await User.updateMany(
       {
         $or: [{ role: "teacher" }, { roles: "teacher" }],
         teacher_clocked_out: { $ne: true },
-        teacher_time_in: { $ne: null },
       },
       {
         $set: {
@@ -135,7 +134,7 @@ async function autoClockOutTeachers() {
     );
 
     if (result.modifiedCount > 0) {
-      console.log(`Automatically clocked out ${result.modifiedCount} teacher${result.modifiedCount === 1 ? "" : "s"} after 7:30 PM.`);
+      console.log(`Automatically clocked out ${result.modifiedCount} teacher${result.modifiedCount === 1 ? "" : "s"} at or after 8:00 PM Philippine time.`);
     }
   } catch (error) {
     console.error("Failed to automatically clock out teachers:", error.message);
@@ -147,6 +146,7 @@ async function startServer() {
     await connectDB();
     await archiveExpiredEvents();
     await autoClockOutTeachers();
+    await processExpiredConsultationQueues();
     // Replace the legacy cross-term uniqueness rule with a term-scoped rule.
     const consultationIndexes = await ConsultationAvailability.collection.indexes();
     if (consultationIndexes.some((index) => index.name === "employeeId_1_dayOfWeek_1")) {
@@ -166,6 +166,10 @@ async function startServer() {
 
     setInterval(() => {
       autoClockOutTeachers();
+    }, 60 * 1000);
+
+    setInterval(() => {
+      processExpiredConsultationQueues();
     }, 60 * 1000);
 
     server.on("error", (error) => {

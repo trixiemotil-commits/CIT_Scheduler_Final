@@ -654,7 +654,8 @@ async function saveTeacherStatus({ record = false, durationMinutes = 0, clockOut
     const updatedUser = saveMergedUser(payload.user || {})
     teacherStatus.value = updatedUser.teacher_status || teacherStatus.value
     teacherAvailability.value = updatedUser.teacher_availability || teacherAvailability.value
-    teacherTimeIn.value = updatedUser.teacher_time_in || teacherTimeIn.value
+    teacherTimeIn.value = updatedUser.teacher_time_in || null
+    teacherIsClockedOut.value = Boolean(updatedUser.teacher_clocked_out)
     teacherStatusMessage.value = record ? 'Time in recorded and status saved.' : 'Status saved. Students can request consultations only when you are available and on school.'
     clearTimeout(statusMessageTimer)
     statusMessageTimer = setTimeout(() => {
@@ -728,7 +729,22 @@ const teacherStatusClass = computed(() => {
 })
 
 function getTodayKey() {
-  return new Date().toISOString().slice(0, 10)
+  const parts = getPhilippineTimeParts()
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+function getPhilippineTimeParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    weekday: 'short',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  return Object.fromEntries(parts.map(({ type, value }) => [type, value]))
 }
 
 function getTeacherStorageId() {
@@ -749,8 +765,7 @@ function getTeacherForcedOfflineDateKey() {
 }
 
 function isWeekday(date = new Date()) {
-  const day = date.getDay()
-  return day >= 1 && day <= 6
+  return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].includes(getPhilippineTimeParts(date).weekday)
 }
 
 function markMorningPromptShown() {
@@ -794,15 +809,16 @@ function shouldShowMorningPrompt() {
   if (!isWeekday()) return false
   if (morningPromptDate.value === getTodayKey()) return false
   if (morningPromptSessionShown.value) return false
-  const now = new Date()
-  return now.getHours() > 6 || (now.getHours() === 6 && now.getMinutes() >= 30)
+  const parts = getPhilippineTimeParts()
+  const minuteOfDay = Number(parts.hour) * 60 + Number(parts.minute)
+  return minuteOfDay >= 6 * 60 && minuteOfDay < 20 * 60
 }
 
 function shouldEnforceAutoOffline() {
   if (!isWeekday()) return false
   if (forcedOfflineDate.value === getTodayKey()) return false
-  const now = new Date()
-  return now.getHours() > 19 || (now.getHours() === 19 && now.getMinutes() >= 30)
+  const parts = getPhilippineTimeParts()
+  return Number(parts.hour) >= 20
 }
 
 function openMorningPrompt() {
@@ -825,7 +841,7 @@ function enforceAutoOffline() {
   teacherStatus.value = 'On Leave'
   showMorningPrompt.value = false
   saveTeacherStatus({ clockOut: true })
-  teacherStatusMessage.value = 'You were automatically clocked out at 7:30 PM.'
+  teacherStatusMessage.value = 'You were automatically clocked out at 8:00 PM Philippine time.'
   teacherStatusError.value = false
   clearTimeout(statusMessageTimer)
   statusMessageTimer = setTimeout(() => { teacherStatusMessage.value = '' }, 4000)
@@ -859,6 +875,7 @@ function setAvailability(availability) {
 
 function recordTimeIn() {
   teacherStatus.value = 'On School'
+  teacherIsClockedOut.value = false
   closePresenceMenu()
   saveTeacherStatus({ record: true })
 }
@@ -870,6 +887,7 @@ async function loadTeacherStatus() {
     teacherStatus.value = currentUser.teacher_status || 'On School'
     teacherAvailability.value = currentUser.teacher_availability || 'Available'
     teacherTimeIn.value = currentUser.teacher_time_in || null
+    teacherIsClockedOut.value = Boolean(currentUser.teacher_clocked_out)
   } catch (_) {
     // Keep the session values as a safe offline fallback.
   }

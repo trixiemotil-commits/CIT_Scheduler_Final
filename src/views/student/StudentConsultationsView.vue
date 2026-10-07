@@ -81,6 +81,11 @@
           <span :class="['status-pill', pillClass(s.status)]">{{ s.status }}</span>
         </div>
 
+        <div v-if="s.rescheduleOfferPending" class="auto-reschedule-offer">
+          <strong>New consultation time proposed</strong>
+          <span>The previous consultation hours ended before your turn. Proceed with this new schedule or cancel the booking.</span>
+        </div>
+
         <!-- Reschedule reason -->
         <div v-if="s.status === 'Reschedule' && s.reason" class="rejection-msg">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg>{{ s.reason }}
@@ -96,8 +101,16 @@
             <button class="act-btn red" @click="openCancel(s)">Cancel</button>
           </template>
           <template v-else-if="s.status === 'Reschedule'">
-            <button class="act-btn green" @click="openEdit(s)">Reschedule</button>
-            <button class="act-btn red" @click="openCancel(s)">Cancel</button>
+            <template v-if="s.rescheduleOfferPending">
+              <button class="act-btn green" :disabled="acceptingRescheduleId === s.id" @click="acceptRescheduledBooking(s)">
+                {{ acceptingRescheduleId === s.id ? 'Saving...' : 'Proceed with new time' }}
+              </button>
+              <button class="act-btn red" @click="openCancel(s)">Cancel booking</button>
+            </template>
+            <template v-else>
+              <button class="act-btn green" @click="openEdit(s)">Reschedule</button>
+              <button class="act-btn red" @click="openCancel(s)">Cancel</button>
+            </template>
           </template>
           <template v-else-if="s.status === 'Completed'">
             <button class="act-btn outline full" @click="openDetails(s)">View Notes</button>
@@ -213,16 +226,23 @@
     </div>
 
     <!-- ══ CANCEL CONFIRMATION MODAL ══ -->
-    <div v-if="showCancel" class="modal-overlay alert-overlay" @click.self="showCancel = false">
-      <div class="cancel-alert">
-        <div class="cancel-alert-icon">!</div>
-        <div class="cancel-alert-text">Are you sure you want to cancel your consultation to that teacher?</div>
-        <div class="cancel-alert-actions">
-          <button class="alert-cancel" @click="showCancel = false">Cancel</button>
-          <button class="alert-continue" @click="confirmCancel">Continue</button>
-        </div>
+    <Teleport to="body">
+      <div v-if="showCancel" class="modal-overlay alert-overlay cancel-confirm-overlay" @click.self="showCancel = false">
+        <section class="cancel-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="cancel-confirm-title" aria-describedby="cancel-confirm-description">
+          <div class="cancel-confirm-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5m0 3h.01M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h2 id="cancel-confirm-title" class="cancel-confirm-title">Cancel consultation?</h2>
+          <p id="cancel-confirm-description" class="cancel-confirm-text">
+            This will cancel your consultation with <strong>{{ activeSession?.teacher || 'this teacher' }}</strong>.
+          </p>
+          <div class="cancel-confirm-actions">
+            <button class="cancel-confirm-back" @click="showCancel = false">Keep booking</button>
+            <button class="cancel-confirm-submit" @click="confirmCancel">Cancel consultation</button>
+          </div>
+        </section>
       </div>
-    </div>
+    </Teleport>
 
     <!-- ══ RESCHEDULE MODAL ══ -->
     <div v-if="showReschedule" class="modal-overlay" @click.self="showReschedule = false">
@@ -308,7 +328,7 @@ import { useStudentData } from '@/composables/useStudentData.js'
 import { IonContent, IonPage } from '@ionic/vue'
 import { computed, onMounted, ref } from 'vue'
 
-const { sessions, cancelSession, updateSession, isLoadingSessions, sessionsError, loadSessions } = useStudentData()
+const { sessions, cancelSession, acceptRescheduleOffer, updateSession, isLoadingSessions, sessionsError, loadSessions } = useStudentData()
 const { refresh: refreshConsultations } = useAutoRefresh(
   () => loadSessions(true, { includeArchived: true })
 )
@@ -325,6 +345,7 @@ const CONSULTATION_REASONS = [
 
 const tabs       = ['All', 'Pending', 'Approved', 'Reschedule', 'Completed', 'Cancelled', 'Archived']
 const activeTab  = ref('All')
+const acceptingRescheduleId = ref('')
 
 const filteredSessions = computed(() =>
   activeTab.value === 'All' ? sessions.value : sessions.value.filter(s => s.status === activeTab.value)
@@ -671,6 +692,18 @@ async function saveEdit() {
 /* ── Cancel Confirmation ── */
 const showCancel = ref(false)
 function openCancel(s) { activeSession.value = s; showCancel.value = true }
+async function acceptRescheduledBooking(session) {
+  if (acceptingRescheduleId.value) return
+  acceptingRescheduleId.value = session.id
+  try {
+    await acceptRescheduleOffer(session.id)
+    showToast('Rescheduled consultation confirmed.')
+  } catch (error) {
+    showToast(error.message || 'Unable to confirm the new consultation time.')
+  } finally {
+    acceptingRescheduleId.value = ''
+  }
+}
 async function confirmCancel() {
   try {
     await cancelSession(activeSession.value.id)
@@ -953,6 +986,21 @@ onMounted(() => {
 .pill-red    { background: #ffeaea; color: #e63946; }
 .pill-gray   { background: #f0f0f0; color: #666; }
 
+.auto-reschedule-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #c7d9ec;
+  border-radius: 10px;
+  background: #edf5fc;
+  color: #385c7d;
+  font-size: .76rem;
+  line-height: 1.4;
+}
+.auto-reschedule-offer strong { color: #285d94; }
+
 .rejection-msg {
   display: flex;
   align-items: flex-start;
@@ -1024,54 +1072,81 @@ onMounted(() => {
 .full-btn { flex: 1; }
 
 /* Cancel alert */
-.cancel-alert {
-  width: 270px;
-  background: #fff;
-  border: 1px solid #6f7b85;
-  border-radius: 14px;
-  padding: 14px 12px 10px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
-}
-.cancel-alert-icon {
-  width: 48px;
-  height: 48px;
-  margin: 2px auto 10px;
-  border: 3px solid #f0c541;
-  border-radius: 14px;
-  color: #f0c541;
-  font-weight: 700;
-  font-size: 1.45rem;
-  display: flex;
+.cancel-confirm-overlay {
   align-items: center;
   justify-content: center;
+  padding: 20px;
 }
-.cancel-alert-text {
+.cancel-confirm-card {
+  box-sizing: border-box;
+  width: min(100%, 410px);
+  padding: 28px;
+  border: 1px solid rgba(255,255,255,.92);
+  border-radius: 24px;
+  background: linear-gradient(145deg, #f8f9f9 0%, #e6e9ea 100%);
+  box-shadow: 0 22px 60px rgba(20,25,29,.28), inset 0 1px rgba(255,255,255,.9);
   text-align: center;
-  font-size: 0.95rem;
-  line-height: 1.4;
-  color: #30343a;
-  margin-bottom: 10px;
+  animation: cancel-confirm-enter .18s ease-out;
 }
-.cancel-alert-actions {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
+.cancel-confirm-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 16px;
+  place-items: center;
+  border: 1px solid #edc7c5;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #fff4f3, #f3dfde);
+  color: #b3423e;
 }
-.alert-cancel,
-.alert-continue {
-  border: none;
-  background: transparent;
-  font-size: 1rem;
+.cancel-confirm-icon svg { width: 28px; height: 28px; }
+.cancel-confirm-title {
+  margin: 0;
+  color: #252b31;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+.cancel-confirm-text {
+  margin: 10px 0 24px;
+  color: #65717a;
+  font-size: .94rem;
+  line-height: 1.55;
+}
+.cancel-confirm-text strong { color: #303940; font-weight: 700; }
+.cancel-confirm-actions { display: flex; gap: 10px; }
+.cancel-confirm-actions button {
+  flex: 1;
+  min-height: 46px;
+  padding: 10px 14px;
+  border-radius: 13px;
   font-family: inherit;
+  font-size: .88rem;
+  font-weight: 700;
   cursor: pointer;
-  padding: 2px 4px;
+  transition: transform .16s ease, box-shadow .16s ease;
 }
-.alert-cancel { color: #f4434f; }
-.alert-continue {
+.cancel-confirm-actions button:active { transform: translateY(1px); }
+.cancel-confirm-back {
+  border: 1px solid #cbd2d6;
+  background: linear-gradient(145deg,#f3f4f4,#dfe2e3);
+  color: #59646d;
+}
+.cancel-confirm-submit {
+  border: 1px solid #9f3c39;
+  background: linear-gradient(145deg,#c95750,#a43e3a);
   color: #fff;
-  background: #1b7741;
-  border-radius: 999px;
-  padding: 2px 12px;
+  box-shadow: 0 6px 13px rgba(164,62,58,.2), inset 0 1px rgba(255,255,255,.18);
+}
+.cancel-confirm-actions button:focus-visible { outline: 3px solid rgba(60,111,157,.48); outline-offset: 2px; }
+@keyframes cancel-confirm-enter {
+  from { opacity: 0; transform: translateY(6px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (max-width: 420px) {
+  .cancel-confirm-overlay { padding: 16px; }
+  .cancel-confirm-card { padding: 24px 20px 20px; border-radius: 21px; }
+  .cancel-confirm-actions { flex-direction: column-reverse; }
 }
 
 /* Form fields */

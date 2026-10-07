@@ -78,36 +78,6 @@
           <p>{{ filteredUsers.length }} user{{ filteredUsers.length === 1 ? '' : 's' }} shown</p>
         </div>
         <div class="um-topbar-right">
-          <button
-            v-if="activeView === 'active' && selectedPendingUsers.length"
-            class="um-approve-selected-btn"
-            :disabled="isBulkApproving"
-            @click="promptApproveSelected"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/><path d="M22 10l-7 7"/></svg>
-            {{ isBulkApproving ? 'Approving...' : `Approve Selected (${selectedPendingUsers.length})` }}
-          </button>
-          <div class="um-search-wrap">
-            <span class="um-search-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </span>
-            <input v-model="searchQuery" class="um-search-input" type="text" :placeholder="activeView === 'archived' ? 'Search archived...' : 'Search users...'" />
-          </div>
-          <select v-model="statusFilter" class="um-filter-select um-filter-select--status">
-            <option value="all">All Users</option>
-            <option value="active">Active</option>
-            <option value="pending">Pending</option>
-            <option value="denied">Denied</option>
-            <option value="inactive">Inactive</option>
-            <option value="archived">Archived</option>
-          </select>
-          <select v-model="roleFilter" class="um-filter-select">
-            <option value="">All Roles</option>
-            <option value="Admin">Admin</option>
-            <option value="Teacher">Teacher</option>
-            <option value="Admin &amp; Teacher">Admin &amp; Teacher</option>
-            <option value="Student">Student</option>
-          </select>
           <button class="um-print-btn" title="Print Users" @click="printUsersTable">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 6 2 18 2 18 9"/>
@@ -150,7 +120,7 @@
         </div>
         <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show first-year students" @click="selectUserStat('year-1')" @keydown.enter="selectUserStat('year-1')" @keydown.space.prevent="selectUserStat('year-1')">
           <div class="um-stat-icon um-stat-icon--year-1">
-            <span>1</span>
+            <span>1st</span>
           </div>
           <div class="um-stat-info">
             <div class="um-stat-val">{{ yearLevelCounts.first }}</div>
@@ -159,7 +129,7 @@
         </div>
         <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show second-year students" @click="selectUserStat('year-2')" @keydown.enter="selectUserStat('year-2')" @keydown.space.prevent="selectUserStat('year-2')">
           <div class="um-stat-icon um-stat-icon--year-2">
-            <span>2</span>
+            <span>2nd</span>
           </div>
           <div class="um-stat-info">
             <div class="um-stat-val">{{ yearLevelCounts.second }}</div>
@@ -168,7 +138,7 @@
         </div>
         <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show third-year students" @click="selectUserStat('year-3')" @keydown.enter="selectUserStat('year-3')" @keydown.space.prevent="selectUserStat('year-3')">
           <div class="um-stat-icon um-stat-icon--year-3">
-            <span>3</span>
+            <span>3rd</span>
           </div>
           <div class="um-stat-info">
             <div class="um-stat-val">{{ yearLevelCounts.third }}</div>
@@ -177,7 +147,7 @@
         </div>
         <div class="um-stat-card um-stat-card--clickable" role="button" tabindex="0" aria-label="Show fourth-year students" @click="selectUserStat('year-4')" @keydown.enter="selectUserStat('year-4')" @keydown.space.prevent="selectUserStat('year-4')">
           <div class="um-stat-icon um-stat-icon--year-4">
-            <span>4</span>
+            <span>4th</span>
           </div>
           <div class="um-stat-info">
             <div class="um-stat-val">{{ yearLevelCounts.fourth }}</div>
@@ -186,14 +156,52 @@
         </div>
       </div>
 
-      <div v-if="activeView === 'active' && pendingCount > 0" class="um-stats-actions">
+      <div v-if="activeView === 'active' && (pendingCount > 0 || filteredUsers.length > 0 || isMultiSelectMode)" class="um-stats-actions">
         <button
+          v-if="filteredUsers.length > 0 || isMultiSelectMode"
+          class="um-select-mode-btn"
+          :class="{ 'is-active': isMultiSelectMode }"
+          :aria-pressed="isMultiSelectMode"
+          @click="toggleMultiSelectMode"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path v-if="isMultiSelectMode" d="m8 12 2.5 2.5L16 9"/></svg>
+          {{ isMultiSelectMode ? 'Cancel selection' : 'Select multiple' }}
+        </button>
+        <div class="um-search-wrap">
+          <span class="um-search-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </span>
+          <input v-model="searchQuery" class="um-search-input" type="text" :placeholder="activeView === 'archived' ? 'Search archived...' : 'Search users...'" />
+        </div>
+        <select v-model="statusFilter" class="um-filter-select um-filter-select--status">
+          <option value="all">All Users</option>
+          <option value="active">Active</option>
+          <option value="pending">Pending</option>
+          <option value="denied">Denied</option>
+          <option value="inactive">Inactive</option>
+          <option value="archived">Archived</option>
+        </select>
+        <select v-model="roleFilter" class="um-filter-select">
+          <option value="">All Roles</option>
+          <option value="Admin">Admin</option>
+          <option value="Teacher">Teacher</option>
+          <option value="Admin &amp; Teacher">Admin &amp; Teacher</option>
+          <option value="Student">Student</option>
+        </select>
+        <template v-if="selectedNonPendingUsers.length > 0">
+          <button class="um-bulk-archive-btn" @click="showBulkArchiveModal = true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            Archive ({{ selectedNonPendingUsers.length }})
+          </button>
+        </template>
+        <button
+          v-if="pendingCount > 0"
           class="um-approve-all-btn"
           :disabled="isBulkApproving"
-          @click="promptApproveAll"
+          @click="promptApproveAction"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/><path d="M22 10l-7 7"/></svg>
-          {{ isBulkApproving ? 'Approving...' : `Approve All (${pendingCount})` }}
+          {{ isBulkApproving ? 'Approving...' : isMultiSelectMode && selectedPendingUsers.length ? `Approve Selected (${selectedPendingUsers.length})` : `Approve All Pending (${pendingCount})` }}
         </button>
       </div>
 
@@ -201,17 +209,17 @@
       <div v-if="loadError" class="um-error-banner">{{ loadError }}</div>
       <div v-else-if="autoRefreshNotice" class="um-info-banner">{{ autoRefreshNotice }}</div>
       <div class="um-table-wrap">
-        <table class="um-table">
+        <table class="um-table" :class="{ 'um-table--selecting': isMultiSelectMode }">
           <thead>
             <tr>
-              <th class="um-select-col">
+              <th v-if="isMultiSelectMode" class="um-select-col">
                 <input
-                  v-if="activeView === 'active' && selectablePendingUsers.length"
+                  v-if="activeView === 'active' && filteredUsers.length"
                   type="checkbox"
                   class="um-select-check"
-                  :checked="allVisiblePendingSelected"
-                  :aria-label="allVisiblePendingSelected ? 'Clear pending-user selection' : 'Select all pending users'"
-                  @change="toggleAllVisiblePending"
+                  :checked="allVisibleUsersSelected"
+                  :aria-label="allVisibleUsersSelected ? 'Clear user selection' : 'Select all visible users'"
+                  @change="toggleAllVisibleUsers"
                 />
               </th>
               <th>User</th>
@@ -224,7 +232,7 @@
           </thead>
           <tbody>
             <tr v-if="isLoadingUsers">
-              <td colspan="7">
+              <td :colspan="isMultiSelectMode ? 7 : 6">
                 <div class="um-empty">
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   <span>Loading users...</span>
@@ -233,10 +241,9 @@
             </tr>
             <template v-else>
             <tr v-for="user in filteredUsers" :key="user.id" class="um-row">
-              <td class="um-select-col">
+              <td v-if="isMultiSelectMode" class="um-select-col">
                 <input
-                  v-if="activeView === 'active' && user.status === 'Pending'"
-                  v-model="selectedPendingIds"
+                  v-model="selectedUserIds"
                   type="checkbox"
                   class="um-select-check"
                   :value="user.id"
@@ -271,10 +278,10 @@
                 <div class="um-actions">
                   <template v-if="activeView === 'active'">
                     <div class="um-actions-row">
-                      <button class="um-btn um-btn--edit" @click="openEditUser(user)" title="Edit" aria-label="Edit user">
+                      <button v-if="user.status !== 'Pending'" class="um-btn um-btn--edit" @click="openEditUser(user)" title="Edit" aria-label="Edit user">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
-                      <button class="um-btn um-btn--archive" @click="openArchiveUser(user)" title="Archive" aria-label="Archive user">
+                      <button v-if="user.status !== 'Pending'" class="um-btn um-btn--archive" @click="openArchiveUser(user)" title="Archive" aria-label="Archive user">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                       </button>
                       <button v-if="user.isLoginLocked" class="um-btn um-btn--unlock" @click="unlockUser(user)" title="Unlock login" aria-label="Unlock user login">
@@ -282,10 +289,10 @@
                       </button>
                     </div>
                     <div v-if="user.status === 'Pending'" class="um-actions-row">
-                      <button class="um-btn um-btn--approve" @click="approveUser(user)" title="Approve" aria-label="Approve user">
+                      <button class="um-btn um-btn--approve" @click="promptRowStatusChange(user, 'Active')" title="Approve" aria-label="Approve user">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                       </button>
-                      <button class="um-btn um-btn--deny" @click="denyUser(user)" title="Deny" aria-label="Deny user">
+                      <button class="um-btn um-btn--deny" @click="promptRowStatusChange(user, 'Denied')" title="Decline" aria-label="Decline user">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                       </button>
                     </div>
@@ -299,7 +306,7 @@
               </td>
             </tr>
             <tr v-if="filteredUsers.length === 0">
-              <td colspan="7">
+              <td :colspan="isMultiSelectMode ? 7 : 6">
                 <div class="um-empty">
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   <span>No users found</span>
@@ -549,6 +556,24 @@
     </div>
   </Teleport>
 
+  <Teleport to="body">
+    <div v-if="showBulkArchiveModal" class="modal-overlay" @click.self="showBulkArchiveModal = false">
+      <div class="um-delete-box" role="dialog" aria-modal="true" aria-labelledby="bulk-archive-title">
+        <div class="um-delete-icon um-bulk-archive-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        </div>
+        <h2 id="bulk-archive-title" class="um-delete-title">Archive selected users?</h2>
+        <p class="um-delete-sub">{{ selectedNonPendingUsers.length }} selected user{{ selectedNonPendingUsers.length === 1 ? '' : 's' }} will lose access, but their data will be preserved.</p>
+        <div class="um-delete-actions">
+          <button class="um-cancel-btn" :disabled="isBulkArchiving" @click="showBulkArchiveModal = false">Cancel</button>
+          <button class="um-archive-confirm-btn" :disabled="isBulkArchiving" @click="archiveSelectedUsers">
+            {{ isBulkArchiving ? 'Archiving...' : `Archive ${selectedNonPendingUsers.length} users` }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <!-- ═══ Reset Password Confirm ═══ -->
   <Teleport to="body">
     <div v-if="showResetConfirmModal" class="modal-overlay" @click.self="showResetConfirmModal = false">
@@ -636,6 +661,26 @@
         <div class="swal-actions">
           <button class="swal-cancel" @click="showApproveAllConfirm = false">Cancel</button>
           <button class="swal-continue" @click="confirmApproval">{{ approvalMode === 'selected' ? 'Approve Selected' : 'Approve All' }}</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <Teleport to="body">
+    <div v-if="showRowStatusConfirm" class="modal-overlay" @click.self="cancelRowStatusChange">
+      <div class="swal-box" role="dialog" aria-modal="true" aria-labelledby="row-status-confirm-title">
+        <div class="swal-icon" aria-hidden="true">
+          <svg v-if="rowStatusNextValue === 'Active'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>
+          <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 6-12 12M6 6l12 12"/></svg>
+        </div>
+        <p id="row-status-confirm-title" class="swal-text">
+          {{ rowStatusNextValue === 'Active' ? `Approve ${rowStatusTarget?.name}?` : `Decline ${rowStatusTarget?.name}?` }}
+        </p>
+        <div class="swal-actions">
+          <button class="swal-cancel" @click="cancelRowStatusChange">Cancel</button>
+          <button :class="['swal-continue', { 'swal-decline': rowStatusNextValue === 'Denied' }]" @click="confirmRowStatusChange">
+            {{ rowStatusNextValue === 'Active' ? 'Approve' : 'Decline' }}
+          </button>
         </div>
       </div>
     </div>
@@ -742,7 +787,8 @@ function showToast(message) {
 }
 const autoRefreshNotice = ref('')
 const isBulkApproving = ref(false)
-const selectedPendingIds = ref([])
+const selectedUserIds = ref([])
+const isMultiSelectMode = ref(false)
 const approvalMode = ref('all')
 const PHINMA_EMAIL_REGEX = /^[a-z0-9._%+-]+\.au@phinmaed\.com$/i
 const VALID_LAST_NAME_REGEX = /^[\p{L}\p{M}]+(?:[ '\u2019.-][\p{L}\p{M}]+)*$/u
@@ -811,22 +857,34 @@ function selectUserStat(stat) {
   activeView.value = 'active'
 }
 
-const selectablePendingUsers = computed(() => filteredUsers.value.filter((user) => user.status === 'Pending'))
 const selectedPendingUsers = computed(() => {
-  const selectedIds = new Set(selectedPendingIds.value)
+  const selectedIds = new Set(selectedUserIds.value)
   return users.value.filter((user) => user.status === 'Pending' && selectedIds.has(user.id))
 })
-const allVisiblePendingSelected = computed(() => {
-  const visible = selectablePendingUsers.value
-  return visible.length > 0 && visible.every((user) => selectedPendingIds.value.includes(user.id))
+const selectedNonPendingUsers = computed(() => {
+  const selectedIds = new Set(selectedUserIds.value)
+  return users.value.filter((user) => user.status !== 'Pending' && user.status !== 'Archived' && selectedIds.has(user.id))
+})
+const allVisibleUsersSelected = computed(() => {
+  const visible = filteredUsers.value
+  return visible.length > 0 && visible.every((user) => selectedUserIds.value.includes(user.id))
 })
 
-function toggleAllVisiblePending() {
-  const visibleIds = selectablePendingUsers.value.map((user) => user.id)
-  if (allVisiblePendingSelected.value) {
-    selectedPendingIds.value = selectedPendingIds.value.filter((id) => !visibleIds.includes(id))
+function toggleMultiSelectMode() {
+  if (isMultiSelectMode.value) {
+    selectedUserIds.value = []
+    isMultiSelectMode.value = false
+    return
+  }
+  isMultiSelectMode.value = true
+}
+
+function toggleAllVisibleUsers() {
+  const visibleIds = filteredUsers.value.map((user) => user.id)
+  if (allVisibleUsersSelected.value) {
+    selectedUserIds.value = selectedUserIds.value.filter((id) => !visibleIds.includes(id))
   } else {
-    selectedPendingIds.value = [...new Set([...selectedPendingIds.value, ...visibleIds])]
+    selectedUserIds.value = [...new Set([...selectedUserIds.value, ...visibleIds])]
   }
 }
 
@@ -1098,6 +1156,9 @@ const showCurrentAdminPassword = ref(false)
 const formError       = ref('')
 const showRegisterConfirm = ref(false)
 const showApproveAllConfirm = ref(false)
+const showRowStatusConfirm = ref(false)
+const rowStatusTarget = ref(null)
+const rowStatusNextValue = ref('')
 const isSavingUser    = ref(false)
 const studentYearOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', yearLevel: '', section: '', password: '', confirmPassword: '', currentPassword: '' })
@@ -1223,19 +1284,32 @@ async function unlockUser(user) {
   }
 }
 
-async function approveUser(user) {
-  try {
-    await updateUserStatus(user, 'Active')
-  } catch (error) {
-    loadError.value = error.message || 'Failed to approve user.'
-  }
+function promptRowStatusChange(user, status) {
+  rowStatusTarget.value = user
+  rowStatusNextValue.value = status
+  showRowStatusConfirm.value = true
 }
 
-async function denyUser(user) {
+function cancelRowStatusChange() {
+  showRowStatusConfirm.value = false
+  rowStatusTarget.value = null
+  rowStatusNextValue.value = ''
+}
+
+async function confirmRowStatusChange() {
+  const user = rowStatusTarget.value
+  const nextStatus = rowStatusNextValue.value
+  if (!user || !['Active', 'Denied'].includes(nextStatus)) return
+
+  showRowStatusConfirm.value = false
   try {
-    await updateUserStatus(user, 'Denied')
+    await updateUserStatus(user, nextStatus)
+    showToast(nextStatus === 'Active' ? 'User approved successfully.' : 'User declined successfully.')
   } catch (error) {
-    loadError.value = error.message || 'Failed to deny user.'
+    loadError.value = error.message || `Failed to ${nextStatus === 'Active' ? 'approve' : 'decline'} user.`
+  } finally {
+    rowStatusTarget.value = null
+    rowStatusNextValue.value = ''
   }
 }
 
@@ -1269,7 +1343,7 @@ async function approveSelectedPending() {
       method: 'PATCH',
       body: JSON.stringify({ status: 'Active' })
     })))
-    selectedPendingIds.value = []
+    selectedUserIds.value = []
     await fetchUsers()
   } catch (error) {
     loadError.value = error.message || 'Failed to approve selected users.'
@@ -1290,6 +1364,11 @@ function promptApproveSelected() {
   if (!selectedPendingUsers.value.length || isBulkApproving.value) return
   approvalMode.value = 'selected'
   showApproveAllConfirm.value = true
+}
+
+function promptApproveAction() {
+  if (isMultiSelectMode.value && selectedPendingUsers.value.length) promptApproveSelected()
+  else promptApproveAll()
 }
 
 async function confirmApproval() {
@@ -1467,6 +1546,8 @@ function resendOtp() {
 /* ── Archive User ── */
 const showArchiveModal = ref(false)
 const archiveTarget    = ref(null)
+const showBulkArchiveModal = ref(false)
+const isBulkArchiving = ref(false)
 
 function openArchiveUser(user) {
   archiveTarget.value    = user
@@ -1484,6 +1565,32 @@ async function confirmArchiveUser() {
     showToast('User archived successfully.')
   } catch (error) {
     loadError.value = error.message || 'Failed to archive user.'
+  }
+}
+
+async function archiveSelectedUsers() {
+  const targets = selectedNonPendingUsers.value
+  if (!targets.length || isBulkArchiving.value) return
+
+  isBulkArchiving.value = true
+  loadError.value = ''
+  const results = await Promise.allSettled(targets.map((user) => apiRequest(`/users/${user.id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'Archived' })
+  })))
+  const archivedUsers = targets.filter((user, index) => results[index].status === 'fulfilled')
+  const archivedIds = new Set(archivedUsers.map((user) => user.id))
+  selectedUserIds.value = selectedUserIds.value.filter((id) => !archivedIds.has(id))
+  try {
+    if (archivedUsers.length) await fetchUsers()
+    showBulkArchiveModal.value = false
+    if (archivedUsers.length === targets.length) {
+      showToast(`${archivedUsers.length} users archived successfully.`)
+    } else {
+      loadError.value = `Archived ${archivedUsers.length} of ${targets.length} selected users. Some users could not be archived.`
+    }
+  } finally {
+    isBulkArchiving.value = false
   }
 }
 
@@ -1667,6 +1774,26 @@ function confirmRestoreUser() {
 }
 .um-approve-selected-btn:hover { background: #edf8f1; }
 .um-approve-selected-btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+.um-select-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 9px 13px;
+  border: 1px solid #cbd5dc;
+  border-radius: 10px;
+  background: #fff;
+  color: #44515d;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .18s, border-color .18s, color .18s;
+}
+.um-select-mode-btn:hover { background: #f1f5f7; border-color: #aebbc3; }
+.um-select-mode-btn.is-active { border-color: #9aa6ae; background: #e8ecef; color: #3f4b53; }
+.um-select-mode-btn.is-active:hover { background: #dce2e6; }
 .um-print-btn {
   display: flex;
   align-items: center;
@@ -1785,7 +1912,7 @@ function confirmRestoreUser() {
 .um-stat-icon--admin   { background: #e6f2ff; color: #2563eb; }
 .um-stat-icon--archived { background: #f4f0ff; color: #7c3aed; }
 .um-stat-card--clickable { cursor: pointer; transition: box-shadow 0.18s, transform 0.15s, border-color 0.18s; }
-.um-stat-card--clickable:hover { box-shadow: 0 10px 20px rgba(17, 24, 39, 0.08); transform: translateY(-2px); border-color: rgba(90, 100, 109, 0.24); }
+.um-stat-card--clickable:hover { box-shadow: 0 10px 20px rgba(17, 24, 39, 0.08); border-color: rgba(90, 100, 109, 0.24); }
 .um-stat-card--selected { border-color: rgba(77, 89, 98, 0.38); box-shadow: 0 10px 20px rgba(17, 24, 39, 0.06); }
 .um-stat-icon--teacher { background: #fff3d8; color: #b45309; }
 .um-stat-icon--active  { background: #dff6ea; color: #1e7c59; }
@@ -2404,6 +2531,8 @@ function confirmRestoreUser() {
   box-shadow: none;
 }
 .swal-continue:hover { background: #35424d; }
+.swal-continue.swal-decline { border-color: #991b1b; background: #b91c1c; }
+.swal-continue.swal-decline:hover { background: #991b1b; }
 
 .um-toast {
   position: fixed;
@@ -2611,10 +2740,14 @@ function confirmRestoreUser() {
 }
 @media (max-width: 700px) {
   .um-stats-row { grid-template-columns: 1fr 1fr; }
-  .um-table th:nth-child(4),
-  .um-table td:nth-child(4),
-  .um-table th:nth-child(5),
-  .um-table td:nth-child(5) { display: none; }
+  .um-table:not(.um-table--selecting) th:nth-child(3),
+  .um-table:not(.um-table--selecting) td:nth-child(3),
+  .um-table:not(.um-table--selecting) th:nth-child(4),
+  .um-table:not(.um-table--selecting) td:nth-child(4),
+  .um-table--selecting th:nth-child(4),
+  .um-table--selecting td:nth-child(4),
+  .um-table--selecting th:nth-child(5),
+  .um-table--selecting td:nth-child(5) { display: none; }
 }
 @media (max-width: 600px) {
   .sidebar { width: 240px; min-width: 240px; }
@@ -2744,7 +2877,7 @@ function confirmRestoreUser() {
   background: #fff;
   box-shadow: 0 7px 18px rgba(42,52,59,.07);
 }
-.um-stat-card:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(42,52,59,.1); }
+.um-stat-card:hover { box-shadow: 0 10px 22px rgba(42,52,59,.1); }
 .um-stat-card--selected { border-color: #7c8994; box-shadow: 0 0 0 2px rgba(100,116,139,.12), 0 8px 18px rgba(42,52,59,.08); }
 .um-stat-icon { width: 42px; height: 42px; border-radius: 12px; }
 .um-stat-val { font-size: 1.35rem; font-weight: 800; }
@@ -2768,20 +2901,31 @@ function confirmRestoreUser() {
 .um-view-tab { min-width: 112px; justify-content: center; }
 .um-view-tab--on { color: #fff; }
 .um-table { table-layout: fixed; }
-.um-table th:nth-child(1),
-.um-table td:nth-child(1) { width: 26px; }
-.um-table th:nth-child(2),
-.um-table td:nth-child(2) { width: 25%; }
-.um-table th:nth-child(3),
-.um-table td:nth-child(3) { width: 29%; }
-.um-table th:nth-child(4),
-.um-table td:nth-child(4) { width: 11%; }
-.um-table th:nth-child(5),
-.um-table td:nth-child(5) { width: 12%; }
-.um-table th:nth-child(6),
-.um-table td:nth-child(6) { width: 10%; }
-.um-table th:nth-child(7),
-.um-table td:nth-child(7) { width: 104px; }
+.um-table:not(.um-table--selecting) th:nth-child(1),
+.um-table:not(.um-table--selecting) td:nth-child(1) { width: 25%; }
+.um-table:not(.um-table--selecting) th:nth-child(2),
+.um-table:not(.um-table--selecting) td:nth-child(2) { width: 29%; }
+.um-table:not(.um-table--selecting) th:nth-child(3),
+.um-table:not(.um-table--selecting) td:nth-child(3) { width: 9%; }
+.um-table:not(.um-table--selecting) th:nth-child(4),
+.um-table:not(.um-table--selecting) td:nth-child(4) { width: 12%; }
+.um-table:not(.um-table--selecting) th:nth-child(5),
+.um-table:not(.um-table--selecting) td:nth-child(5) { width: 10%; }
+.um-table--selecting th:nth-child(1),
+.um-table--selecting td:nth-child(1) { width: 26px; }
+.um-table--selecting th:nth-child(2),
+.um-table--selecting td:nth-child(2) { width: 25%; }
+.um-table--selecting th:nth-child(3),
+.um-table--selecting td:nth-child(3) { width: 29%; }
+.um-table--selecting th:nth-child(4),
+.um-table--selecting td:nth-child(4) { width: 9%; }
+.um-table--selecting th:nth-child(5),
+.um-table--selecting td:nth-child(5) { width: 12%; }
+.um-table--selecting th:nth-child(6),
+.um-table--selecting td:nth-child(6) { width: 10%; }
+.um-table th:last-child,
+.um-table td:last-child { width: 156px; }
+.um-table th:last-child { text-align: center; }
 .um-user-info { min-width: 0; }
 .um-table th:nth-child(2),
 .um-table td:nth-child(2) { padding-left: 10px; }
@@ -2792,15 +2936,15 @@ function confirmRestoreUser() {
 .um-table td:nth-child(2) { padding-right: 10px; }
 .um-table th:nth-child(3),
 .um-table td:nth-child(3) { padding-left: 10px; padding-right: 10px; }
-.um-user-avatar { width: 36px; height: 36px; }
+.um-user-avatar { width: 36px; height: 36px; min-width: 36px; flex: 0 0 36px; }
 .um-user-name,
 .um-user-dept,
 .um-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; }
-.um-actions { width: 100%; align-items: flex-end; }
+.um-actions { width: 100%; align-items: center; }
 .um-actions-row {
   display: grid;
   grid-template-columns: repeat(2, 28px);
-  justify-content: end;
+  justify-content: center;
   gap: 4px;
 }
 .um-actions .um-btn {
@@ -2874,6 +3018,38 @@ function confirmRestoreUser() {
   color: #fff;
 }
 .um-approve-all-btn:hover { background: #176b3a; }
+.um-approve-selected-btn {
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid #0f3d22;
+  border-radius: 13px;
+  background: #14532d;
+  color: #fff;
+  font-size: .78rem;
+  font-weight: 850;
+  box-shadow: 0 12px 24px rgba(48,57,66,.2), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.um-approve-selected-btn:hover { background: #0f3d22; }
+.um-bulk-archive-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 13px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.um-bulk-archive-btn { border: 1px solid #edb888; background: #fff4e8; color: #b45309; }
+.um-bulk-archive-btn:hover { background: #ffedd5; }
+.um-bulk-archive-icon { background: #fff7ed; color: #b45309; }
+.um-archive-confirm-btn:disabled,
+.um-submit-btn:disabled,
+.um-cancel-btn:disabled { cursor: progress; opacity: .65; }
 .um-search-input,
 .um-filter-select { background: #fff; box-shadow: none; }
 .um-print-btn {
@@ -2892,9 +3068,13 @@ function confirmRestoreUser() {
 .um-stats-row { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
 .um-stats-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 14px;
 }
+.um-stats-actions .um-approve-all-btn { margin-left: auto; }
 .um-stat-card {
   background: #fff;
   border-color: #dbe3e7;
@@ -2912,10 +3092,28 @@ function confirmRestoreUser() {
 .um-user-avatar { box-shadow: none; }
 .um-stat-icon--admin-teacher { background: #e6eef2; color: #4a6875; }
 .um-stat-card .um-stat-label { line-height: 1.2; }
-.um-stat-card { gap: 9px; padding: 13px 10px; }
-.um-stat-icon { width: 36px; height: 36px; border-radius: 10px; }
+.um-stat-card { gap: 5px; padding: 13px 10px; }
+.um-stat-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 1.15rem;
+}
+.um-stat-icon svg { width: 24px; height: 24px; }
+.um-stat-icon span { font-size: .8rem; line-height: 1; }
 .um-stat-val { font-size: 1.2rem; }
-.um-stat-label { font-size: .6rem; white-space: nowrap; }
+.um-stat-label { font-size: .68rem; white-space: normal; }
+.um-stat-card { justify-content: flex-start; }
+.um-stat-info {
+  flex-direction: column-reverse;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex-wrap: nowrap;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
 
 @media (max-width: 1280px) {
   .um-stats-row { overflow-x: auto; }

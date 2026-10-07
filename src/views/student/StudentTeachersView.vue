@@ -358,7 +358,10 @@ function normalizeTeacherStatus(statusOrObj) {
     const resolvedStatus = String(t.status || '').trim().toLowerCase()
     if (resolvedStatus === 'offline') return 'Offline'
     if (resolvedStatus === 'on event') return 'On Event'
-    if (t.teacher_clocked_out || String(t.teacher_status || '').toLowerCase() === 'on leave') {
+    if (t.teacher_clocked_out || (
+      String(t.teacher_status || '').toLowerCase() === 'on leave'
+      && !t.teacher_time_in
+    )) {
       return 'Offline'
     }
     if (resolvedStatus === 'on school' || resolvedStatus === 'in school') return 'In School'

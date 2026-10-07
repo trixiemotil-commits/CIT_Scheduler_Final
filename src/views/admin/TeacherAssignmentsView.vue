@@ -89,8 +89,9 @@
           </div>
           <div class="summary-counts">
             <span class="summary-count summary-count--total"><b>{{ teachers.length }}</b><small>Total</small></span>
-            <span class="summary-count available"><b>{{ teachers.filter(item => normalizeTeacherStatus(item.status) === 'On School').length }}</b><small>On School</small></span>
-            <span class="summary-count summary-count--leave"><b>{{ teachers.filter(item => normalizeTeacherStatus(item.status) === 'On Leave').length }}</b><small>On leave</small></span>
+            <span class="summary-count available"><b>{{ teachers.filter(item => ['On School', 'On Event'].includes(normalizeTeacherStatus(displayTeacherStatus(item)))).length }}</b><small>On School</small></span>
+            <span class="summary-count summary-count--event"><b>{{ teachers.filter(item => normalizeTeacherStatus(displayTeacherStatus(item)) === 'On Event').length }}</b><small>On Event</small></span>
+            <span class="summary-count summary-count--leave"><b>{{ teachers.filter(item => item.adminStatus === 'On Leave').length }}</b><small>On leave</small></span>
           </div>
         </div>
 
@@ -103,7 +104,7 @@
             @click="selectStatusTab(tab)"
           >
             {{ statusTabLabel(tab) }}
-            <span>{{ tab === 'All' ? teachers.length : teachers.filter(item => normalizeTeacherStatus(item.status) === normalizeTeacherStatus(tab)).length }}</span>
+            <span>{{ tab === 'All' ? teachers.length : tab === 'On School' ? teachers.filter(item => ['On School', 'On Event'].includes(normalizeTeacherStatus(displayTeacherStatus(item)))).length : tab === 'On Leave' ? teachers.filter(item => item.adminStatus === 'On Leave').length : teachers.filter(item => normalizeTeacherStatus(displayTeacherStatus(item)) === normalizeTeacherStatus(tab)).length }}</span>
           </button>
         </div>
 
@@ -142,11 +143,11 @@
             <div
               v-for="teacher in visibleTeachers"
               :key="teacher.id"
-              :class="['teacher-card', `card-${statusCssClass(teacher.status)}`]"
+              :class="['teacher-card', `card-${statusCssClass(displayTeacherStatus(teacher))}`]"
             >
               <!-- Status Badge -->
-              <div :class="['status-badge', `badge-${statusCssClass(teacher.currentStatus)}`]">
-                {{ teacher.currentStatus }}
+              <div :class="['status-badge', `badge-${statusCssClass(displayTeacherStatus(teacher))}`]">
+                {{ displayTeacherStatus(teacher) }}
               </div>
 
               <!-- Avatar -->
@@ -170,8 +171,8 @@
               <div class="teacher-status-wrap">
                 <label>Availability status</label>
                 <select
-                  v-model="teacher.status"
-                  :class="['status-dropdown', `status-${statusCssClass(teacher.status)}`]"
+                  v-model="teacher.adminStatus"
+                  :class="['status-dropdown', `status-${statusCssClass(teacher.adminStatus)}`]"
                   @change="updateTeacherStatus(teacher)"
                 >
                   <option value="On School">On School</option>
@@ -183,25 +184,25 @@
 
               <!-- Substitute Teacher -->
               <div class="leave-coverage-block">
-                <div class="leave-coverage-notice" :class="{ 'is-unavailable': teacher.status !== 'On Leave' }">
+                <div class="leave-coverage-notice" :class="{ 'is-unavailable': teacher.adminStatus !== 'On Leave' }">
                   <span class="leave-coverage-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M8 2v4M16 2v4M3 10h18" />
                       <rect x="3" y="4" width="18" height="17" rx="2" />
-                      <path v-if="teacher.status === 'On Leave'" d="m9 15 2 2 4-4" />
+                      <path v-if="teacher.adminStatus === 'On Leave'" d="m9 15 2 2 4-4" />
                       <path v-else d="M8 14h8" />
                     </svg>
                   </span>
                   <span>
                     <strong>Substitute coverage</strong>
-                    <small v-if="teacher.status !== 'On Leave'">Unavailable until status is On Leave</small>
+                    <small v-if="teacher.adminStatus !== 'On Leave'">Unavailable until status is On Leave</small>
                     <small v-else-if="getTeacherWeeklySchedule(teacher).length">
                       {{ getAssignedCoverageCount(teacher) }} of {{ getTeacherWeeklySchedule(teacher).length }} classes assigned
                     </small>
                     <small v-else>No scheduled classes to cover</small>
                   </span>
                   <button
-                    v-if="teacher.status === 'On Leave' && getTeacherWeeklySchedule(teacher).length"
+                    v-if="teacher.adminStatus === 'On Leave' && getTeacherWeeklySchedule(teacher).length"
                     type="button"
                     class="manage-coverage-btn"
                     title="Manage substitute assignments"
@@ -543,7 +544,7 @@ function canAutoRefresh() {
   return !Object.keys(unsavedChanges.value || {}).length
 }
 
-const statusTabs = ['All', 'On School', 'On Meeting', 'On Leave']
+const statusTabs = ['All', 'On School', 'On Event', 'On Meeting', 'On Leave']
 
 function normalizeTeacherStatus(status) {
   if (!status) return 'On School'
@@ -578,6 +579,8 @@ const loadingTeachers = ref(false)
 const scheduleCache = ref({})
 const scheduleLoading = ref({})
 const currentTime = ref(new Date())
+const eventStatusByTeacherId = ref({})
+let eventStatusClockInterval = null
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 async function apiRequest(path, options = {}) {
@@ -619,6 +622,7 @@ function mapTeacherStatus(status) {
   const normalized = normalizeTeacherStatus(status)
   if (normalized === 'On Meeting' || normalized === 'On-Meeting') return 'On Meeting'
   if (normalized === 'On Leave') return 'On Leave'
+  if (normalized === 'Offline') return 'Offline'
   return 'On School'
 }
 
@@ -741,12 +745,11 @@ function mapTeacherFromApi(user) {
     ? user.designatedAreas
     : (user.department ? [user.department] : [])
 
+  // Keep the admin's selectable status separate from the effective badge.
+  const adminStatus = mapTeacherStatus(user.teacher_status)
   const isClockedOut = Boolean(
     user.teacher_clocked_out
-    || (
-      user.teacher_status === 'On Leave'
-      && (user.teacher_availability === 'Unavailable' || !user.teacher_time_in)
-    )
+    || (adminStatus === 'On Leave' && !user.teacher_time_in)
   )
 
   return {
@@ -759,6 +762,7 @@ function mapTeacherFromApi(user) {
     email: user.email || '',
     avatar: user.avatar || initialsAvatar(fullName),
     status: isClockedOut ? 'Offline' : mapTeacherStatus(user.teacher_status),
+    adminStatus,
     currentStatus: 'Offline',
     account_status: user.account_status || 'Active',
     teacher_status: user.teacher_status || 'On School',
@@ -772,7 +776,7 @@ function mapTeacherFromApi(user) {
     designatedAreas,
     substituteTeacher: user.substituteTeacher || null,
     substituteAssignments: user.substituteAssignments || {},
-    _lastStatus: isClockedOut ? 'Offline' : mapTeacherStatus(user.teacher_status),
+    _lastStatus: adminStatus,
   }
 }
 
@@ -781,11 +785,48 @@ function isTeacherActive(teacher) {
 }
 
 function getActualTeacherStatus(teacher) {
-  if (
-    teacher.teacher_clocked_out
-    || (normalizeTeacherStatus(teacher.status) === 'On Leave' && !teacher.teacher_time_in)
-  ) return 'Offline'
+  if (teacher.teacher_clocked_out || (teacher.adminStatus === 'On Leave' && !teacher.teacher_time_in)) return 'Offline'
   return normalizeTeacherStatus(teacher.status) || 'On School'
+}
+
+function displayTeacherStatus(teacher) {
+  if (teacher.adminStatus === 'On Leave') return getActualTeacherStatus(teacher)
+  return eventStatusByTeacherId.value[String(teacher.id)] || getActualTeacherStatus(teacher)
+}
+
+function parseEventTime(value) {
+  const match = String(value || '').match(/^(\d{2}):(\d{2})$/)
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null
+}
+
+async function refreshEventTeacherStatuses() {
+  try {
+    const token = getToken()
+    if (!token) return
+    const response = await fetch(`${API_BASE}/events`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) return
+
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const minutes = now.getHours() * 60 + now.getMinutes()
+    const nextStatuses = {}
+    for (const event of (Array.isArray(payload.events) ? payload.events : [])) {
+      if (event.status !== 'active' || event.date !== today) continue
+      const start = parseEventTime(event.time)
+      const end = parseEventTime(event.endTime)
+      if (start === null || end === null || minutes < start || minutes >= end) continue
+      for (const id of Array.isArray(event.teacherIds) ? event.teacherIds : []) {
+        nextStatuses[String(id)] = 'On Event'
+      }
+    }
+    eventStatusByTeacherId.value = nextStatuses
+  } catch (_error) {
+    // Keep the last known event state; the regular refresh will retry.
+  }
 }
 
 function refreshActualStatuses() {
@@ -826,7 +867,7 @@ function getTeacherNameById(id) {
 }
 
 function getAvailableSubstitutesForEntry(currentTeacher, entry) {
-  const candidates = teachers.value.filter((t) => t.id !== currentTeacher.id && normalizeTeacherStatus(t.status) === 'On School')
+  const candidates = teachers.value.filter((t) => t.id !== currentTeacher.id && normalizeTeacherStatus(displayTeacherStatus(t)) === 'On School')
 
   const filtered = candidates.filter((candidate) => {
     const schedule = getScheduleForTeacher(candidate.name)
@@ -869,6 +910,7 @@ async function loadTeachers() {
 
     await Promise.all(teachers.value.map((teacher) => loadTeacherSchedule(teacher.name)))
     refreshActualStatuses()
+    await refreshEventTeacherStatuses()
   } catch (error) {
     teachers.value = []
     console.error('Failed to load teachers:', error)
@@ -879,6 +921,7 @@ async function loadTeachers() {
 
 const statusPriority = {
   'On School': 0,
+  'On Event': 0,
   'On Meeting': 1,
   'On Leave': 2,
   Offline: 3,
@@ -886,8 +929,8 @@ const statusPriority = {
 
 const filteredTeachers = computed(() => {
   const sortTeachers = (items) => [...items].sort((a, b) => {
-    const aStatus = normalizeTeacherStatus(a.status)
-    const bStatus = normalizeTeacherStatus(b.status)
+    const aStatus = normalizeTeacherStatus(displayTeacherStatus(a))
+    const bStatus = normalizeTeacherStatus(displayTeacherStatus(b))
     const aPriority = statusPriority[aStatus] ?? 99
     const bPriority = statusPriority[bStatus] ?? 99
     if (aPriority !== bPriority) return aPriority - bPriority
@@ -895,8 +938,11 @@ const filteredTeachers = computed(() => {
   })
 
   if (activeTab.value === 'All') return sortTeachers(teachers.value)
-  if (activeTab.value === 'On Leave') return sortTeachers(teachers.value.filter(t => normalizeTeacherStatus(t.status) === 'On Leave'))
-  return sortTeachers(teachers.value.filter(t => normalizeTeacherStatus(t.status) === normalizeTeacherStatus(activeTab.value)))
+  if (activeTab.value === 'On School') {
+    return sortTeachers(teachers.value.filter(t => ['On School', 'On Event'].includes(normalizeTeacherStatus(displayTeacherStatus(t)))))
+  }
+  if (activeTab.value === 'On Leave') return sortTeachers(teachers.value.filter(t => t.adminStatus === 'On Leave'))
+  return sortTeachers(teachers.value.filter(t => normalizeTeacherStatus(displayTeacherStatus(t)) === normalizeTeacherStatus(activeTab.value)))
 })
 
 const visibleTeachers = computed(() => {
@@ -962,12 +1008,12 @@ const previousTeachers = () => {
 }
 
 const updateTeacherStatus = async (teacher) => {
-  const previousStatus = teacher._lastStatus || teacher.status
+  const previousStatus = teacher._lastStatus || teacher.adminStatus
 
   try {
     const response = await apiRequest(`/users/${teacher.id}/teacher-status`, {
       method: 'PATCH',
-      body: JSON.stringify({ teacher_status: mapTeacherStatusToApi(teacher.status) }),
+      body: JSON.stringify({ teacher_status: mapTeacherStatusToApi(teacher.adminStatus) }),
     })
 
     if (response?.user) {
@@ -977,10 +1023,10 @@ const updateTeacherStatus = async (teacher) => {
       return
     }
 
-    teacher._lastStatus = teacher.status
+    teacher._lastStatus = teacher.adminStatus
     teacher.currentStatus = getActualTeacherStatus(teacher)
   } catch (error) {
-    teacher.status = previousStatus
+    teacher.adminStatus = previousStatus
     console.error('Failed to update teacher status:', error)
     alert(error.message || 'Failed to update teacher status.')
   }
@@ -1231,6 +1277,10 @@ onMounted(() => {
   loadTeachers()
   useNotifications.addNotificationListener(onTeacherStatusNotification)
   teacherRefreshInterval = window.setInterval(loadTeachersIfAllowed, 15000)
+  eventStatusClockInterval = window.setInterval(() => {
+    currentTime.value = new Date()
+    refreshEventTeacherStatuses()
+  }, 10000)
   statusClockInterval = window.setInterval(() => {
     currentTime.value = new Date()
     refreshActualStatuses()
@@ -1243,6 +1293,7 @@ onUnmounted(() => {
   if (teacherToastTimer) window.clearTimeout(teacherToastTimer)
   useNotifications.removeNotificationListener(onTeacherStatusNotification)
   window.clearInterval(teacherRefreshInterval)
+  window.clearInterval(eventStatusClockInterval)
   window.clearInterval(statusClockInterval)
   window.removeEventListener('focus', loadTeachersIfAllowed)
   document.removeEventListener('visibilitychange', refreshTeachersWhenVisible)
@@ -2423,6 +2474,8 @@ onUnmounted(() => {
 .summary-counts .available b { color: #276743; background: #dcefe3; }
 .summary-counts .summary-count--leave { color: #95615d; border-color: #e2c9c7; background: #fbf2f1; }
 .summary-counts .summary-count--leave b { color: #874b47; background: #f2dfde; }
+.summary-counts .summary-count--event { color: #285d94; border-color: #bfd3e8; background: #eef5fc; }
+.summary-counts .summary-count--event b { color: #285d94; background: #dceafa; }
 .status-tabs { gap: 7px; margin-bottom: 20px; }
 .status-tab { display: inline-flex; min-height: 38px; padding: 7px 12px; align-items: center; gap: 7px; color: #59656e; border-color: #d8dee2; border-radius: 10px; background: #f7f8f9; font-size: .72rem; font-weight: 600; }
 .status-tab span { display: grid; min-width: 20px; height: 20px; place-items: center; padding: 0 5px; color: #6c7780; border-radius: 99px; background: #e5e9ec; font-size: .61rem; }
@@ -2484,10 +2537,12 @@ onUnmounted(() => {
 .teacher-card.card-in-school::before { background: #499067; }
 .teacher-card.card-on-leave::before { background: #9b7272; }
 .teacher-card.card-on-meeting::before { background: #a78c53; }
+.teacher-card.card-on-event::before { background: #3977b8; }
 .status-badge { top: 14px; right: 14px; display: flex; align-items: center; gap: 5px; padding: 5px 8px; color: #53616a !important; border: 1px solid #d8dee2; border-radius: 999px; background: #f1f3f4 !important; font-size: .58rem; letter-spacing: .04em; }
 .badge-in-school { color: #276842 !important; border-color: #bddbc8; background: #e8f5ed !important; }
 .badge-on-leave { color: #7d4545 !important; border-color: #dec5c5; background: #f7eded !important; }
 .badge-on-meeting { color: #765f2e !important; border-color: #e1d5b8; background: #f8f3e7 !important; }
+.badge-on-event { color: #285d94 !important; border-color: #bfd3e8; background: #eaf3fb !important; }
 .teacher-avatar-wrap { margin: 10px 0 14px; }
 .teacher-avatar { width: 82px; height: 82px; border: 3px solid #fff; box-shadow: 0 0 0 1px #d7dde1, 0 6px 15px rgba(35,44,51,.13); }
 .teacher-name { margin-bottom: 4px; color: #222a31; font-size: 1rem; }

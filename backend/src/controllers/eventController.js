@@ -20,10 +20,12 @@ function cleanStudentYearLevels(value) {
   return [...new Set(value.map(cleanString).filter((yearLevel) => allowed.has(yearLevel)))];
 }
 
-async function validateEventTeacherIds(teacherIds, allowedExistingIds = new Set()) {
+async function validateEventTeacherIds(teacherIds) {
   if (!teacherIds.length) return null;
 
-  const idsToValidate = teacherIds.filter((teacherId) => !allowedExistingIds.has(String(teacherId)));
+  // Validate every assignment, including existing ones, so an off-school
+  // teacher cannot remain assigned by editing an old event.
+  const idsToValidate = teacherIds;
   if (!idsToValidate.length) return null;
 
   const teachers = await User.find({
@@ -255,10 +257,7 @@ async function updateEvent(req, res) {
     if (requestedStatus !== "archived" && payload.endTime <= payload.time) {
       return res.status(400).json({ message: "Event end time must be later than its start time." });
     }
-    const teacherValidationError = await validateEventTeacherIds(
-      payload.teacherIds,
-      new Set((existing.teacherIds || []).map(String))
-    );
+    const teacherValidationError = await validateEventTeacherIds(payload.teacherIds);
     if (teacherValidationError) {
       return res.status(400).json({ message: teacherValidationError });
     }

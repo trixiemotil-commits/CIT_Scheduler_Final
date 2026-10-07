@@ -277,9 +277,11 @@ select {
 .card-in-school { background: #f0fdf4 !important; border-color: #22c55e !important; }
 .card-on-leave { background: #fef2f2 !important; border-color: #ef4444 !important; }
 .card-on-meeting { background: #fefce8 !important; border-color: #eab308 !important; }
+.card-on-event { background: #eff6ff !important; border-color: #3b82f6 !important; }
 .badge-in-school { color: #fff !important; background: #16a34a !important; }
 .badge-on-leave { color: #fff !important; background: #dc2626 !important; }
 .badge-on-meeting { color: #422006 !important; background: #eab308 !important; }
+.badge-on-event { color: #fff !important; background: #2563eb !important; }
 
 .badge-approved,
 .badge-pending,

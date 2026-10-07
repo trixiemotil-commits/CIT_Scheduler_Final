@@ -935,6 +935,21 @@ async function updateMe(req, res) {
       return res.status(403).json({ message: "Only teachers can update teacher status." });
     }
 
+    if (isTeacher && (recordTimeIn || teacherStatus === "On School")) {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Manila",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(new Date());
+      const hour = Number(parts.find((part) => part.type === "hour")?.value);
+      const minute = Number(parts.find((part) => part.type === "minute")?.value);
+      const minutesSinceMidnight = hour * 60 + minute;
+      if (minutesSinceMidnight < 6 * 60 || minutesSinceMidnight >= 20 * 60) {
+        return res.status(400).json({ message: "Clock-in is available from 6:00 AM to 8:00 PM Philippine time." });
+      }
+    }
+
     if (avatar && !avatar.startsWith("data:image/") && !/^https?:\/\//i.test(avatar)) {
       return res.status(400).json({ message: "Avatar must be a valid image URL or data URL." });
     }

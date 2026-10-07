@@ -117,11 +117,16 @@ function mapRequestToSession(requestDoc, teacherLookup, availabilityLookup) {
     teacherAvatar,
     teacherInitials: initialsFor(teacher),
     teacherColor,
-    status: requestDoc.availabilityId ? 'Approved' : mapStatusFromApi(requestDoc.status),
+    status: requestDoc.rescheduleOfferPending
+      ? 'Reschedule'
+      : requestDoc.availabilityId && String(requestDoc.status || '').toUpperCase() === 'APPROVED'
+        ? 'Approved'
+        : mapStatusFromApi(requestDoc.status),
+    rescheduleOfferPending: Boolean(requestDoc.rescheduleOfferPending),
     date: normalizeDateOnly(requestDoc.consultationDate || requestDoc.requestDate),
-    timeStart: matchedSlot?.startTime || requestDoc.consultationStartTime || '',
-    timeEnd: matchedSlot?.endTime || requestDoc.consultationEndTime || '',
-    time: matchedSlot?.startTime || requestDoc.consultationStartTime || '--:--',
+    timeStart: requestDoc.consultationStartTime || matchedSlot?.startTime || '',
+    timeEnd: requestDoc.consultationEndTime || matchedSlot?.endTime || '',
+    time: requestDoc.consultationStartTime || matchedSlot?.startTime || '--:--',
     duration: '60 min',
     notes: requestDoc.purpose || '',
     consultationNotes: requestDoc.consultationNotes || '',
@@ -184,7 +189,17 @@ async function loadSessions(force = false, options = { includeArchived: false })
         })
 
       const requests = Array.isArray(requestsPayload.requests) ? requestsPayload.requests : []
-      sessions.value = requests.map((r) => mapRequestToSession(r, teacherLookup, availabilityLookup))
+      sessions.value = requests
+        .map((r) => mapRequestToSession(r, teacherLookup, availabilityLookup))
+        .sort((a, b) => {
+          const subjectTeacherOrder = Number(Boolean(b.isSubjectTeacher)) - Number(Boolean(a.isSubjectTeacher))
+          if (subjectTeacherOrder) return subjectTeacherOrder
+
+          const dateOrder = String(b.date || '').localeCompare(String(a.date || ''))
+          if (dateOrder) return dateOrder
+
+          return String(b.id || '').localeCompare(String(a.id || ''))
+        })
       hasLoadedSessions = true
       lastIncludeArchived = includeArchived
       return sessions.value
@@ -242,6 +257,15 @@ async function cancelSession(id) {
     sessions.value[idx] = { ...sessions.value[idx], status: 'Cancelled' }
   }
   notifyStudentDataChanged('consultation-cancelled')
+}
+
+async function acceptRescheduleOffer(id) {
+  await apiRequest(`/consultations/requests/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'APPROVED' }),
+  })
+  await loadSessions(true, { includeArchived: lastIncludeArchived })
+  notifyStudentDataChanged('consultation-reschedule-accepted')
 }
 
 async function updateSession(id, changes, options = {}) {
@@ -302,6 +326,7 @@ export function useStudentData() {
     loadSessions,
     addSession,
     cancelSession,
+    acceptRescheduleOffer,
     updateSession,
   }
 }

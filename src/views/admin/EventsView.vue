@@ -415,7 +415,7 @@
 
             <!-- Teachers involved -->
             <div class="form-group">
-              <label class="form-label">Teachers Involved <span class="form-optional">(optional)</span></label>
+              <label class="form-label">Teachers Involved <span class="form-optional">(required for teacher status)</span></label>
               <div class="teacher-picker" v-click-outside="() => showTeacherPicker = false">
                 <button type="button" class="teacher-picker-trigger" @click="showTeacherPicker = !showTeacherPicker">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -441,7 +441,7 @@
                   </div>
                 </div>
               </div>
-              <span class="teacher-picker-help">Select the teachers who will attend this event.</span>
+              <span class="teacher-picker-help">Select the teachers who will attend. Their status shows “On Event” during the event time.</span>
             </div>
 
             <!-- Students involved -->

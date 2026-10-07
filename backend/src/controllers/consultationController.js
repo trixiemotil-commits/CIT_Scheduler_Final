@@ -174,6 +174,224 @@ function dateOnlyToUtc(dateStr) {
   return new Date(Date.UTC(year, monthIndex, day, 0, 0, 0, 0));
 }
 
+function philippineDateTimeParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    weekday: "long",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  return Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+}
+
+function dateKeyFromParts(parts) {
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function formatTimeForMessage(time) {
+  const minutes = parseTimeToMinutes(time);
+  if (minutes === null) return String(time || "");
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${hour >= 12 ? "PM" : "AM"}`;
+}
+
+function nextAvailableConsultationAppointment(slots, occupancy, todayKey, nowMinutes, eventByDate) {
+  const today = dateOnlyToUtc(todayKey);
+  if (!today) return null;
+
+  for (let offset = 0; offset <= 370; offset += 1) {
+    const calendarDate = new Date(today);
+    calendarDate.setUTCDate(calendarDate.getUTCDate() + offset);
+    const dayOfWeek = DAYS[calendarDate.getUTCDay()];
+    const slot = slots.find((item) => item.dayOfWeek === dayOfWeek);
+    if (!slot) continue;
+
+    const start = parseTimeToMinutes(slot.startTime);
+    const end = parseTimeToMinutes(slot.endTime);
+    if (start === null || end === null || end <= start) continue;
+    const capacity = Math.floor((end - start) / 60);
+    if (!capacity) continue;
+
+    const dateKey = calendarDate.toISOString().slice(0, 10);
+    const occupancyKey = `${slot._id}|${dateKey}`;
+    const used = occupancy.get(occupancyKey) || 0;
+    if (used >= capacity) continue;
+
+    const appointmentStart = start + used * 60;
+    if (dateKey === todayKey && appointmentStart <= nowMinutes) continue;
+
+    const overlapsEvent = (eventByDate.get(dateKey) || []).some((event) => {
+      const eventStart = parseTimeToMinutes(event.time);
+      const eventEnd = parseTimeToMinutes(event.endTime);
+      return eventStart !== null && eventEnd !== null
+        && appointmentStart < eventEnd
+        && appointmentStart + 60 > eventStart;
+    });
+    if (overlapsEvent) continue;
+
+    occupancy.set(occupancyKey, used + 1);
+    return {
+      availability: slot,
+      consultationDate: dateOnlyToUtc(dateKey),
+      dateKey,
+      startTime: minutesTo24h(appointmentStart),
+      endTime: minutesTo24h(appointmentStart + 60),
+    };
+  }
+
+  return null;
+}
+
+async function processExpiredConsultationQueues(now = new Date()) {
+  try {
+    const nowParts = philippineDateTimeParts(now);
+    const todayKey = dateKeyFromParts(nowParts);
+    const todayUtc = dateOnlyToUtc(todayKey);
+    const nowMinutes = Number(nowParts.hour) * 60 + Number(nowParts.minute);
+    const dueRequests = await ConsultationRequest.find({
+      status: "APPROVED",
+      availabilityId: { $exists: true, $ne: null },
+      consultationDate: { $lte: todayUtc },
+    }).sort({ consultationDate: 1, createdAt: 1, _id: 1 }).lean();
+
+    if (!dueRequests.length) return 0;
+
+    const sourceAvailabilityIds = [...new Set(dueRequests.map((request) => String(request.availabilityId)))];
+    const sourceSlots = await ConsultationAvailability.find({ _id: { $in: sourceAvailabilityIds } }).lean();
+    const sourceSlotById = new Map(sourceSlots.map((slot) => [String(slot._id), slot]));
+    const groups = new Map();
+    for (const request of dueRequests) {
+      const dateKey = new Date(request.consultationDate).toISOString().slice(0, 10);
+      const slot = sourceSlotById.get(String(request.availabilityId));
+      if (!slot) continue;
+      const end = parseTimeToMinutes(slot.endTime);
+      const isExpired = dateKey < todayKey || (dateKey === todayKey && end !== null && end <= nowMinutes);
+      if (!isExpired) continue;
+      const key = `${request.employeeId}|${request.availabilityId}|${dateKey}`;
+      if (!groups.has(key)) groups.set(key, { employeeId: request.employeeId, sourceSlot: slot, dateKey, requests: [] });
+      groups.get(key).requests.push(request);
+    }
+
+    let movedCount = 0;
+    for (const group of groups.values()) {
+      const teacherUser = await findTeacherUserByIdentifier(group.employeeId);
+      const teacherName = teacherUser ? normalizeTeacherFullName(teacherUser) : group.sourceSlot.teacher;
+      const activeTermId = await getActiveAcademicTermReference();
+      const slotQuery = {
+        $and: [
+          { $or: [{ employeeId: group.employeeId }, { employeeId: teacherUser?.employeeId || "__missing__" }, { teacher: teacherName }] },
+          activeTermId ? { academicTermId: activeTermId } : { academicTermId: null },
+        ],
+      };
+      let targetSlots = await ConsultationAvailability.find(slotQuery).sort({ dayOfWeek: 1, startTime: 1 }).lean();
+      if (!targetSlots.length) targetSlots = [group.sourceSlot];
+      const targetSlotIds = targetSlots.map((slot) => slot._id);
+      const rangeEnd = dateOnlyToUtc(new Date(Date.parse(`${todayKey}T00:00:00Z`) + 371 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+      const activeBookings = await ConsultationRequest.find({
+        availabilityId: { $in: targetSlotIds },
+        status: { $in: ["APPROVED", "RESCHED"] },
+        consultationDate: { $gte: todayUtc, $lte: rangeEnd },
+      }).select("availabilityId consultationDate status rescheduleOfferPending").lean();
+      const occupancy = new Map();
+      for (const booking of activeBookings) {
+        if (booking.status === "RESCHED" && !booking.rescheduleOfferPending) continue;
+        const dateKey = new Date(booking.consultationDate).toISOString().slice(0, 10);
+        const key = `${booking.availabilityId}|${dateKey}`;
+        occupancy.set(key, (occupancy.get(key) || 0) + 1);
+      }
+
+      const targetTeacherId = teacherUser?._id;
+      const futureEvents = targetTeacherId
+        ? await Event.find({
+          status: "active",
+          teacherIds: { $in: [String(targetTeacherId)] },
+          date: { $gte: todayKey, $lte: rangeEnd.toISOString().slice(0, 10) },
+        }).select("date time endTime").lean()
+        : [];
+      const eventByDate = new Map();
+      for (const event of futureEvents) {
+        if (!eventByDate.has(event.date)) eventByDate.set(event.date, []);
+        eventByDate.get(event.date).push(event);
+      }
+
+      for (const request of group.requests) {
+        let appointment = null;
+        const studentBookings = await ConsultationRequest.find({
+          studentId: request.studentId,
+          status: { $in: ACTIVE_STUDENT_REQUEST_STATUSES },
+          consultationDate: { $gte: todayUtc, $lte: rangeEnd },
+          _id: { $ne: request._id },
+        }).select("consultationDate consultationStartTime consultationEndTime").lean();
+        for (let attempt = 0; attempt < 400; attempt += 1) {
+          const candidate = nextAvailableConsultationAppointment(targetSlots, occupancy, todayKey, nowMinutes, eventByDate);
+          if (!candidate) break;
+          const conflict = studentBookings.some((booking) => {
+            if (new Date(booking.consultationDate).toISOString().slice(0, 10) !== candidate.dateKey) return false;
+            const existingStart = parseTimeToMinutes(booking.consultationStartTime);
+            if (existingStart === null) return false;
+            const existingEnd = parseTimeToMinutes(booking.consultationEndTime) ?? existingStart + 60;
+            const candidateStart = parseTimeToMinutes(candidate.startTime);
+            return candidateStart < existingEnd && existingStart < candidateStart + 60;
+          });
+          if (!conflict) {
+            appointment = candidate;
+            break;
+          }
+        }
+        if (!appointment) break;
+
+        const updateResult = await ConsultationRequest.updateOne(
+          { _id: request._id, status: "APPROVED" },
+          { $set: {
+            status: "RESCHED",
+            rescheduleOfferPending: true,
+            availabilityId: appointment.availability._id,
+            consultationDate: appointment.consultationDate,
+            consultationStartTime: appointment.startTime,
+            consultationEndTime: appointment.endTime,
+          } }
+        );
+        if (!updateResult.modifiedCount) continue;
+
+        const dateLabel = new Date(`${appointment.dateKey}T00:00:00Z`).toLocaleDateString("en-PH", {
+          timeZone: "UTC", weekday: "long", month: "long", day: "numeric", year: "numeric",
+        });
+        try {
+          await Notification.create({
+            recipientId: request.studentId,
+            type: "consultation_reschedule_offer",
+            title: "Consultation time rescheduled",
+            message: `Your ${request.subject} consultation could not be completed during the previous consultation hours. Proposed new schedule: ${dateLabel}, ${formatTimeForMessage(appointment.startTime)}–${formatTimeForMessage(appointment.endTime)}. Proceed with this booking or cancel it from Student Consultations.`,
+            related: { consultationRequestId: String(request._id), status: "RESCHED" },
+            data: { route: "/student/consultations", rescheduleOfferPending: true },
+          });
+        } catch (notificationError) {
+          console.warn("Rescheduled consultation, but student notification failed:", notificationError.message);
+        }
+
+        await ConsultationLog.create({
+          requestId: request._id,
+          timeIn: appointment.startTime,
+          timeOut: appointment.endTime,
+          notes: `Automatically offered a new consultation schedule: ${appointment.dateKey} ${appointment.startTime}-${appointment.endTime}. Awaiting student confirmation.`,
+        });
+        movedCount += 1;
+      }
+    }
+
+    if (movedCount) console.log(`Offered new schedules for ${movedCount} unfinished consultation booking${movedCount === 1 ? "" : "s"}.`);
+    return movedCount;
+  } catch (error) {
+    console.error("Failed to reschedule unfinished consultations:", error.message);
+    return 0;
+  }
+}
+
 function isEventCurrentlyActive(event, now = new Date()) {
   if (!event || event.status !== "active" || event.date !== `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`) {
     return false;
@@ -195,11 +413,7 @@ async function getActiveEventTeacherContext() {
   for (const event of activeEvents) {
     if (!isEventCurrentlyActive(event)) continue;
     const teacherIds = Array.isArray(event.teacherIds) ? event.teacherIds.filter(Boolean) : [];
-    if (!teacherIds.length) {
-      allTeachersOnEvent = true;
-    } else {
-      teacherIds.forEach((teacherId) => activeEventTeacherIds.add(String(teacherId)));
-    }
+    teacherIds.forEach((teacherId) => activeEventTeacherIds.add(String(teacherId)));
   }
 
   return { activeEventTeacherIds, allTeachersOnEvent };
@@ -214,26 +428,22 @@ async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTea
     return "Offline";
   }
 
-  if (allTeachersOnEvent || eventTeacherIds.has(String(userDoc._id))) {
-    return "On Event";
-  }
-
-  if (
-    userDoc.teacher_clocked_out
-    || (
-      userDoc.teacher_status === "On Leave"
-      && (userDoc.teacher_availability === "Unavailable" || !userDoc.teacher_time_in)
-    )
-  ) {
+  if (userDoc.teacher_clocked_out) {
     return "Offline";
   }
 
   const configuredStatus = String(userDoc.teacher_status || "").trim();
   if (configuredStatus === "On Leave") {
-    return "Offline";
+    return userDoc.teacher_time_in ? "On Leave" : "Offline";
+  }
+  if (allTeachersOnEvent || eventTeacherIds.has(String(userDoc._id))) {
+    return "On Event";
   }
   if (["On School", "On Meeting", "On Leave"].includes(configuredStatus)) {
     return configuredStatus;
+  }
+  if (configuredStatus === "On Event") {
+    return "On School";
   }
 
   const clockIn = userDoc.teacher_time_in ? new Date(userDoc.teacher_time_in) : null;
@@ -426,10 +636,11 @@ function toClientRequest(doc, studentMeta = null, availabilityMeta = null, consu
     consultationDate: doc.consultationDate,
     requestedTeacher: availabilityMeta?.teacher || "",
     consultationDayOfWeek: availabilityMeta?.dayOfWeek || "",
-    consultationStartTime: availabilityMeta?.startTime || doc.consultationStartTime || "",
-    consultationEndTime: availabilityMeta?.endTime || doc.consultationEndTime || "",
+    consultationStartTime: doc.consultationStartTime || availabilityMeta?.startTime || "",
+    consultationEndTime: doc.consultationEndTime || availabilityMeta?.endTime || "",
     consultationNotes: consultationNotes || "",
     status: doc.status,
+    rescheduleOfferPending: Boolean(doc.rescheduleOfferPending),
     isSubjectTeacher: Boolean(doc.isSubjectTeacher),
     createdAt: doc.createdAt,
   };
@@ -756,6 +967,23 @@ async function createConsultationRequest(req, res) {
       : null;
     if (teacherClassConflict) {
       return res.status(409).json({ message: teacherClassConflict });
+    }
+
+    const eventDate = consultationDate.toISOString().slice(0, 10);
+    const sameDayEvents = await Event.find({
+      status: "active",
+      teacherIds: { $in: [String(teacherUser._id)] },
+      date: eventDate,
+    }).select("title time endTime").lean();
+    const overlappingEvent = sameDayEvents.find((event) => {
+      const eventStart = parseTimeToMinutes(event.time);
+      const eventEnd = parseTimeToMinutes(event.endTime);
+      return eventStart !== null && eventEnd !== null
+        && requestMinutes < eventEnd
+        && requestMinutes + 60 > eventStart;
+    });
+    if (overlappingEvent) {
+      return res.status(409).json({ message: `This consultation overlaps ${overlappingEvent.title}. Please choose a different time.` });
     }
 
     const requestDate = new Date();
@@ -1096,6 +1324,23 @@ async function updateConsultationRequestByStudent(req, res) {
       return res.status(400).json({ message: "Selected consultation availability is invalid." });
     }
 
+    const eventDate = consultationDate.toISOString().slice(0, 10);
+    const sameDayEvents = await Event.find({
+      status: "active",
+      teacherIds: { $in: [String(teacherUser._id)] },
+      date: eventDate,
+    }).select("title time endTime").lean();
+    const overlappingEvent = sameDayEvents.find((event) => {
+      const eventStart = parseTimeToMinutes(event.time);
+      const eventEnd = parseTimeToMinutes(event.endTime);
+      return eventStart !== null && eventEnd !== null
+        && requestStartMinutes < eventEnd
+        && requestStartMinutes + 60 > eventStart;
+    });
+    if (overlappingEvent) {
+      return res.status(409).json({ message: `This consultation overlaps ${overlappingEvent.title}. Please choose a different time.` });
+    }
+
     const hasTimeConflict = await hasStudentTimeConflict(
       req.user.id,
       consultationDate,
@@ -1172,7 +1417,10 @@ async function updateConsultationRequestStatus(req, res) {
         return res.status(403).json({ message: "You can only update your own consultation requests." });
       }
 
-      if (nextStatus !== "CANCELLED") {
+      const acceptingRescheduleOffer = nextStatus === "APPROVED"
+        && previousStatus === "RESCHED"
+        && requestDoc.rescheduleOfferPending;
+      if (nextStatus !== "CANCELLED" && !acceptingRescheduleOffer) {
         return res.status(403).json({ message: "Students are only allowed to cancel consultation requests." });
       }
 
@@ -1182,6 +1430,12 @@ async function updateConsultationRequestStatus(req, res) {
     }
 
     requestDoc.status = nextStatus;
+    if (nextStatus === "APPROVED" && requestDoc.rescheduleOfferPending) {
+      requestDoc.rescheduleOfferPending = false;
+    }
+    if (nextStatus === "CANCELLED") {
+      requestDoc.rescheduleOfferPending = false;
+    }
     if (String(nextStatus).toUpperCase() === 'RESCHED' && statusNotes) {
       const existingPurpose = String(requestDoc.purpose || '')
       const cleanedNotes = String(statusNotes || '').trim()
@@ -1517,5 +1771,6 @@ module.exports = {
   listConsultationRequests,
   updateConsultationRequestByStudent,
   updateConsultationRequestStatus,
+  processExpiredConsultationQueues,
   listConsultationLogs,
 };

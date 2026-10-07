@@ -51,6 +51,11 @@ const consultationRequestSchema = new mongoose.Schema(
       required: false,
       index: true,
     },
+    rescheduleOfferPending: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     status: {
       type: String,
       enum: STATUS_VALUES,
@@ -66,8 +71,10 @@ const consultationRequestSchema = new mongoose.Schema(
 consultationRequestSchema.index({ studentId: 1, employeeId: 1, requestDate: 1 });
 consultationRequestSchema.index({ employeeId: 1, consultationDate: 1 });
 
-consultationRequestSchema.pre("validate", function autoApproveSlotRequests() {
-  if (this.availabilityId) {
+consultationRequestSchema.pre("validate", function autoApproveNewSlotRequests() {
+  // Slot bookings are auto-approved while pending, but lifecycle updates such
+  // as completed, cancelled, and rescheduled must keep their requested status.
+  if (this.availabilityId && this.status === "PENDING") {
     this.status = "APPROVED";
   }
 });
