@@ -482,6 +482,9 @@
             <button v-if="addMode === 'teacher'" class="icon-btn lunch-break-toolbar-btn" title="Set Lunch Break" aria-label="Set Lunch Break" @click="openLunchBreakPicker('')">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
             </button>
+            <button v-if="addMode === 'teacher'" class="icon-btn work-hours-toolbar-btn" title="Set Faculty Work Hours" aria-label="Set Faculty Work Hours" @click="openWorkHoursPicker">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h3M8 18h6"/></svg>
+            </button>
           </div>
           <div class="schedule-legend-wrap">
             <div class="schedule-legend" aria-label="Schedule color legend">
@@ -538,6 +541,10 @@
                 <th class="th-time">Time</th>
                 <th v-for="day in days" :key="day">{{ day }}</th>
               </tr>
+              <tr v-if="addMode === 'teacher' && selectedTeacher" class="work-hours-summary-row">
+                <th class="th-time">Work hours</th>
+                <th v-for="day in days" :key="day">{{ teacherWorkHoursLabel(day) }}</th>
+              </tr>
             </thead>
             <tbody>
               <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
@@ -551,6 +558,8 @@
                       'has-entry': getEntriesForCell30(slot, day).length,
                       'consult-cell': !getEntriesForCell30(slot, day).length && !!getConsultationForCell30(slot, day),
                       'free-time-cell': !getEntriesForCell30(slot, day).length && !getConsultationForCell30(slot, day),
+                      'faculty-work-hours-cell': addMode === 'teacher' && !!selectedTeacher && isWithinTeacherWorkHours(slot, day),
+                      'faculty-outside-work-hours-cell': addMode === 'teacher' && !!selectedTeacher && isOutsideTeacherWorkHours(slot, day),
                       'readonly-entry-cell': getEntriesForCell30(slot, day).length && addMode === 'teacher' && !selectedTeacher,
                     }"
                     @click="canInteractCell30(slot, day) ? handleCellClick30(slot, day) : null"
@@ -877,6 +886,65 @@
       </div>
     </Teleport>
 
+    <!-- ═══ Faculty Work Hours Picker ═══ -->
+    <Teleport to="body">
+      <div v-if="showWorkHoursPicker" class="modal-overlay lunch-break-picker-overlay" @click.self="showWorkHoursPicker = false">
+        <section class="lunch-break-picker work-hours-picker" role="dialog" aria-modal="true" aria-labelledby="work-hours-picker-title">
+          <div class="lunch-break-picker-header">
+            <div class="lunch-break-picker-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+            </div>
+            <div class="lunch-break-picker-copy">
+              <span class="lunch-break-picker-eyebrow">Faculty schedule settings</span>
+              <h2 id="work-hours-picker-title">Set Work Hours</h2>
+              <p>Prof. {{ selectedTeacher }}</p>
+            </div>
+            <button type="button" class="lunch-break-picker-close" aria-label="Close work hours dialog" @click="showWorkHoursPicker = false">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <p class="lunch-break-picker-help">Set work hours independently for each day. Assigned teaching hours are limited to 44 hours per selected term.</p>
+
+          <div class="work-hours-total" :class="{ 'over-limit': assignedWorkHours.total > 44 }" aria-live="polite">
+            <div class="work-hours-total-heading">
+              <span>Total work hours per week</span>
+              <strong>{{ formatWorkHours(assignedWorkHours.total) }} / 44 hours</strong>
+            </div>
+            <p>Work windows: {{ formatWorkHours(assignedWorkHours.workWindows) }} h · Classes &amp; office hours: {{ formatWorkHours(assignedWorkHours.classesAndOfficeHours) }} h · Consultations: {{ formatWorkHours(assignedWorkHours.consultations) }} h · Lunch breaks excluded</p>
+          </div>
+
+          <div class="work-hours-day-grid" role="group" aria-label="Faculty work hours by day">
+            <section v-for="day in days" :key="day" class="work-hours-day-column">
+              <h3>{{ day }}</h3>
+              <label class="work-hours-day-field">
+                <span>Work Start</span>
+                <select v-model="workHoursForm.byDay[day].startTime" :class="{ 'is-placeholder': !workHoursForm.byDay[day].startTime }">
+                  <option value="">Not set</option>
+                  <option v-for="time in timeOptions" :key="time" :value="time">{{ time }}</option>
+                </select>
+              </label>
+              <label class="work-hours-day-field">
+                <span>Work End</span>
+                <select v-model="workHoursForm.byDay[day].endTime" :class="{ 'is-placeholder': !workHoursForm.byDay[day].endTime }">
+                  <option value="">Not set</option>
+                  <option v-for="time in timeOptions" :key="time" :value="time">{{ time }}</option>
+                </select>
+              </label>
+            </section>
+          </div>
+
+          <p v-if="workHoursError || workHoursFormError" class="lunch-break-picker-error">{{ workHoursError || workHoursFormError }}</p>
+          <div class="lunch-break-picker-actions">
+            <button type="button" class="cancel-btn-text" @click="showWorkHoursPicker = false">Cancel</button>
+            <button type="button" class="save-btn" :disabled="savingWorkHours || !!workHoursFormError" :aria-busy="savingWorkHours" @click="saveWorkHours">
+              {{ savingWorkHours ? 'Saving...' : 'Save Work Hours' }}
+            </button>
+          </div>
+        </section>
+      </div>
+    </Teleport>
+
     <!-- ═══ Lunch Break Time Picker ═══ -->
     <Teleport to="body">
       <div v-if="showLunchBreakPicker" class="modal-overlay lunch-break-picker-overlay" @click.self="showLunchBreakPicker = false">
@@ -1155,7 +1223,7 @@
             </transition>
             <div class="panel-footer">
               <button class="reset-btn" @click="resetAddForm">Reset</button>
-              <div v-if="!addFormWithinUnitLimit" class="time-error">This teacher cannot exceed 30 units.</div>
+              <div v-if="!addFormWithinUnitLimit" class="time-error">This teacher cannot exceed 44 work hours or 30 units.</div>
               <button class="save-btn" @click="addEntry" :disabled="!addFormValid || !addFormWithinUnitLimit || addingSchedule" :aria-busy="addingSchedule">
                 <svg v-if="addingSchedule" class="spin-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
                 <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1329,17 +1397,17 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import TypeaheadSelect from '@/components/TypeaheadSelect.vue'
 import {
-    colorForRoom,
-    colorForRoomType,
-    days,
-    entries,
-    parseTime,
-    roomOptions,
-    sections,
-    subjectCatalog,
-    teacherOptions,
-    timeOptions,
-    years,
+  colorForRoom,
+  colorForRoomType,
+  days,
+  entries,
+  parseTime,
+  roomOptions,
+  sections,
+  subjectCatalog,
+  teacherOptions,
+  timeOptions,
+  years,
 } from '@/composables/useSchedule.js'
 import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
@@ -1352,6 +1420,33 @@ function endTimeOptionsAfter(startTime) {
   if (!startTime) return timeOptions
   const startMinutes = parseTime(startTime)
   return timeOptions.filter((time) => parseTime(time) > startMinutes)
+}
+
+function normalizeScheduleTime(value, fallback) {
+  const minutes = parseTime(value)
+  return timeOptions.find(time => parseTime(time) === minutes) || fallback
+}
+
+function emptyWorkHoursByDay() {
+  return Object.fromEntries(days.map(day => [day, { startTime: '', endTime: '' }]))
+}
+
+function workHoursByDayFromTable(table) {
+  const savedByDay = table?.workHoursByDay
+  const hasSavedDaySettings = savedByDay && typeof savedByDay === 'object' && days.some(day => savedByDay[day])
+  if (hasSavedDaySettings) {
+    return Object.fromEntries(days.map(day => [day, {
+      startTime: normalizeScheduleTime(savedByDay[day]?.startTime, ''),
+      endTime: normalizeScheduleTime(savedByDay[day]?.endTime, ''),
+    }]))
+  }
+
+  const legacyStart = normalizeScheduleTime(table?.workStartTime, '')
+  const legacyEnd = normalizeScheduleTime(table?.workEndTime, '')
+  return Object.fromEntries(days.map(day => [day, {
+    startTime: legacyStart,
+    endTime: legacyEnd,
+  }]))
 }
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
@@ -1914,6 +2009,84 @@ async function fetchConsultationsForTeacher() {
   } catch (_) { consultationSlots.value = [] }
 }
 
+const assignedWorkHours = computed(() => {
+  const teacherEntries = Object.values(entries).filter(entry =>
+    entry.teacher === selectedTeacher.value &&
+    !entry.isSubstitute &&
+    entry.teacher &&
+    entry.entryType !== 'lunch' &&
+    !/lunch\s*break/i.test(String(entry.subject || ''))
+  )
+  const consultationEntries = teacherEntries.filter(entry =>
+    entry.entryType === 'consultation' || /consultation/i.test(String(entry.subject || ''))
+  )
+  const classAndOfficeEntries = teacherEntries.filter(entry => !consultationEntries.includes(entry))
+  const classesAndOfficeHours = scheduleWorkload(classAndOfficeEntries).hours
+  const consultationIntervals = new Map()
+  const lunchIntervalsByDay = new Map(days.map(day => [day, []]))
+  let workWindows = 0
+
+  days.forEach(day => {
+    const { startTime, endTime } = workHoursForm.byDay[day]
+    const start = parseTime(startTime)
+    const end = parseTime(endTime)
+    if (!startTime || !endTime || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return
+    workWindows += (end - start) / 60
+  })
+
+  Object.values(entries).filter(entry => entry.teacher === selectedTeacher.value && !entry.isSubstitute).forEach(entry => {
+    const day = entry.day
+    const start = parseTime(entry.timeIn)
+    const end = parseTime(entry.timeOut)
+    if (!lunchIntervalsByDay.has(day) || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return
+    const isLunch = entry.entryType === 'lunch' || /lunch\s*break/i.test(String(entry.subject || ''))
+    if (isLunch) lunchIntervalsByDay.get(day).push({ start, end })
+  })
+
+  ;[...consultationEntries, ...consultationSlots.value].forEach(slot => {
+    const day = slot.dayOfWeek || slot.day || ''
+    const startTime = slot.startTime || slot.timeIn || ''
+    const endTime = slot.endTime || slot.timeOut || ''
+    const duration = parseTime(endTime) - parseTime(startTime)
+    if (!Number.isFinite(duration) || duration <= 0) return
+    consultationIntervals.set(`${day}|${startTime}|${endTime}`, duration)
+  })
+
+  const consultations = Array.from(consultationIntervals.values()).reduce((sum, duration) => sum + duration / 60, 0)
+  let totalMinutes = 0
+  days.forEach(day => {
+    const { startTime, endTime } = workHoursForm.byDay[day]
+    const start = parseTime(startTime)
+    const end = parseTime(endTime)
+    if (!startTime || !endTime || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return
+    const lunches = lunchIntervalsByDay.get(day)
+      .map(interval => ({ start: Math.max(start, interval.start), end: Math.min(end, interval.end) }))
+      .filter(interval => interval.end > interval.start)
+      .sort((left, right) => left.start - right.start)
+    let lunchMinutes = 0
+    let mergedLunch = null
+    lunches.forEach(interval => {
+      if (mergedLunch && interval.start <= mergedLunch.end) mergedLunch.end = Math.max(mergedLunch.end, interval.end)
+      else {
+        if (mergedLunch) lunchMinutes += mergedLunch.end - mergedLunch.start
+        mergedLunch = interval
+      }
+    })
+    if (mergedLunch) lunchMinutes += mergedLunch.end - mergedLunch.start
+    totalMinutes += end - start - lunchMinutes
+  })
+  return {
+    workWindows,
+    classesAndOfficeHours,
+    consultations,
+    total: totalMinutes / 60,
+  }
+})
+
+function formatWorkHours(hours) {
+  return Number(hours.toFixed(1)).toString()
+}
+
 watch(selectedTerm, async () => {
   if (selectedTeacher.value || addMode.value === 'teacher' || addMode.value === 'room') {
     await refreshScheduleData(selectedTeacher.value || '')
@@ -2008,6 +2181,41 @@ function isSpannedCell30(slot, day) {
 
 function getScheduleRowspan30(entry) {
   return Math.min(timeSlots30.length, getRowspan30(entry) + 1)
+}
+
+function teacherWorkHoursForDay(day) {
+  const table = scheduleTables.value.find(item => item.label === selectedTeacher.value)
+  const saved = table?.workHoursByDay?.[day]
+  if (saved && (saved.startTime || saved.endTime)) {
+    return {
+      startTime: normalizeScheduleTime(saved.startTime, ''),
+      endTime: normalizeScheduleTime(saved.endTime, ''),
+    }
+  }
+  return {
+    startTime: normalizeScheduleTime(table?.workStartTime, ''),
+    endTime: normalizeScheduleTime(table?.workEndTime, ''),
+  }
+}
+
+function teacherWorkHoursLabel(day) {
+  const { startTime, endTime } = teacherWorkHoursForDay(day)
+  return startTime && endTime ? `${startTime} – ${endTime}` : 'Not set'
+}
+
+function isConfiguredTeacherWorkDay(day) {
+  const { startTime, endTime } = teacherWorkHoursForDay(day)
+  return Boolean(startTime && endTime)
+}
+
+function isWithinTeacherWorkHours(slot, day) {
+  const { startTime, endTime } = teacherWorkHoursForDay(day)
+  const slotMinutes = parseTime(slot)
+  return Boolean(startTime && endTime && slotMinutes >= parseTime(startTime) && slotMinutes < parseTime(endTime))
+}
+
+function isOutsideTeacherWorkHours(slot, day) {
+  return isConfiguredTeacherWorkDay(day) && !isWithinTeacherWorkHours(slot, day)
 }
 
 function scheduleEntryStyle30(rowSlot, entry) {
@@ -2167,10 +2375,13 @@ function inferCampus(entry = {}) {
 }
 
 function syncPagesFromApi(apiTables, preferredLabel = '') {
+  scheduleTables.value = Array.isArray(apiTables) ? apiTables : []
   const sorted = Array.isArray(apiTables)
     ? apiTables.map(table => ({ label: table.label, section: 'All' })).sort((a, b) => a.label.localeCompare(b.label))
     : []
   pages.value = [{ label: 'All', section: 'All' }, ...sorted]
+  const teacherTable = scheduleTables.value.find(table => table.label === selectedTeacher.value)
+  workHoursForm.byDay = workHoursByDayFromTable(teacherTable)
 }
 
 function syncEntriesFromApi(apiEntries) {
@@ -2497,6 +2708,22 @@ const originalScheduleSignature = ref(null)
 const fromButton     = ref(false)
 const showLunchBreakPicker = ref(false)
 const savingLunchBreak = ref(false)
+const showWorkHoursPicker = ref(false)
+const savingWorkHours = ref(false)
+const workHoursError = ref('')
+const workHoursForm = reactive({ byDay: emptyWorkHoursByDay() })
+const workHoursFormError = computed(() => {
+  let hasConfiguredDay = false
+  for (const day of days) {
+    const { startTime, endTime } = workHoursForm.byDay[day]
+    if (!startTime && !endTime) continue
+    hasConfiguredDay = true
+    if (!startTime || !endTime) return `${day}: set both a work start and work end.`
+    if (parseTime(endTime) <= parseTime(startTime)) return `${day}: work end must be later than work start.`
+  }
+  return hasConfiguredDay ? '' : 'Set work hours for at least one day.'
+})
+const scheduleTables = ref([])
 const lastLongSessionConfirmed = ref('')
 const lunchBreakContext = reactive({
   id: '',
@@ -2664,6 +2891,44 @@ function openLunchBreakPicker(initialDay = form.day) {
   lunchBreakForm.timeIn = selectedDay && lunchBreakStartTimeOptions.value.includes(form.timeIn) ? form.timeIn : ''
   lunchBreakForm.timeOut = lunchBreakForm.timeIn ? form.timeOut || '' : ''
   showLunchBreakPicker.value = true
+}
+
+function openWorkHoursPicker() {
+  const table = scheduleTables.value.find(item => item.label === selectedTeacher.value)
+  workHoursForm.byDay = workHoursByDayFromTable(table)
+  workHoursError.value = ''
+  showWorkHoursPicker.value = true
+}
+
+async function saveWorkHours() {
+  if (!selectedTeacher.value || savingWorkHours.value) return
+  if (workHoursFormError.value) {
+    workHoursError.value = workHoursFormError.value
+    return
+  }
+
+  savingWorkHours.value = true
+  workHoursError.value = ''
+  try {
+    const response = await apiRequest('/schedules/tables', {
+      method: 'POST',
+      body: JSON.stringify({
+        teacher: selectedTeacher.value,
+        workHoursByDay: workHoursForm.byDay,
+      }),
+    })
+    if (response.table) {
+      const existingIndex = scheduleTables.value.findIndex(table => table.label === response.table.label)
+      if (existingIndex >= 0) scheduleTables.value.splice(existingIndex, 1, response.table)
+      else scheduleTables.value.push(response.table)
+    }
+    showWorkHoursPicker.value = false
+    await showSuccessToast('Faculty work hours saved')
+  } catch (error) {
+    workHoursError.value = error?.message || 'Unable to save faculty work hours.'
+  } finally {
+    savingWorkHours.value = false
+  }
 }
 
 function handleLunchBreakDayChange(day, event) {
@@ -3082,6 +3347,7 @@ function buildSchedulePayload(source) {
   }
   const termId = getSelectedTermId()
   if (termId) payload.academicTermId = termId
+  payload.workHoursByDay = source.workHoursByDay || null
   if (source.parallel) {
     payload.parallelSlots = source.parallelSlots.map(s => ({ section: s.section, room: s.room, roomType: s.roomType || 'Lecture' }))
   } else {
@@ -3334,25 +3600,46 @@ const addFormValid = computed(() =>
   addForm.day && addForm.timeIn && addForm.timeOut &&
   addForm.teacher && addForm.subject && !addTimeError.value
 )
-const addFormUnits = computed(() => {
-  return scheduleWorkload([
-    ...Object.values(entries),
-    ...workloadEntriesForSource(addForm),
-  ]).units
-})
-const addFormWithinUnitLimit = computed(() => isGenericTeacher(addForm.teacher) || addFormUnits.value <= 30)
+const addFormWorkload = computed(() => scheduleWorkload([
+  ...Object.values(entries),
+  ...workloadEntriesForSource(addForm),
+]))
+const addFormUnits = computed(() => addFormWorkload.value.units)
+const addFormHours = computed(() => addFormWorkload.value.hours)
+const addFormWithinUnitLimit = computed(() => isGenericTeacher(addForm.teacher) || (addFormUnits.value <= 30 && addFormHours.value <= 44))
 
 async function addEntry() {
   if (addingSchedule.value) return
   if (!addFormValid.value) return
   if (!addFormWithinUnitLimit.value) return
   if (addForm.parallel && addForm.parallelSlots.every(ps => !ps.section)) return
+  if (!addFormWithinUnitLimit.value) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Teacher workload limit reached',
+      text: 'This teacher already has 44 work hours assigned for the selected term. Please reduce the assignment or assign a different teacher.',
+      confirmButtonText: 'OK',
+      confirmButtonColor: '#4b5563',
+      background: '#fff',
+    })
+    return
+  }
   addingSchedule.value = true
   try {
-    const payload = buildSchedulePayload(addForm)
+    const payload = buildSchedulePayload({
+      ...addForm,
+      workHoursByDay: workHoursForm.byDay,
+    })
     const conflicts = checkScheduleConflict(payload)
     if (conflicts.length > 0) { await showConflictDialog(conflicts); return }
     if (!await confirmLongTeacherSession(payload)) return
+    await apiRequest('/schedules/tables', {
+      method: 'POST',
+      body: JSON.stringify({
+        teacher: addForm.teacher,
+        workHoursByDay: workHoursForm.byDay,
+      }),
+    }).catch(() => {})
     await apiRequest('/schedules', { method: 'POST', body: JSON.stringify(payload) })
     setVisibleSection(addForm)
     await refreshScheduleData(addForm.teacher)
@@ -4507,6 +4794,22 @@ onMounted(async () => {
 .lunch-break-picker-field select { min-height: 46px; padding: 10px 36px 10px 12px; color: #303b43; border-color: #c5ced3; border-radius: 9px; background: #fff; font-size: .82rem; font-weight: 500; outline: none; }
 .lunch-break-picker-field select.is-placeholder { color: #8b959b; font-weight: 400; }
 .lunch-break-picker-field select:focus { border-color: #7d8a93; box-shadow: 0 0 0 3px rgba(70,84,94,.1); }
+.work-hours-picker { width: min(1120px, calc(100vw - 40px)); max-width: none; max-height: calc(100vh - 32px); overflow-y: auto; }
+.work-hours-day-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; padding: 18px 22px 4px; }
+.work-hours-day-column { min-width: 0; padding: 0 10px; border-right: 1px solid #dce2e5; }
+.work-hours-day-column:last-child { border-right: 0; }
+.work-hours-day-column h3 { margin: 0 0 14px; color: #34414a; font-size: .78rem; font-weight: 720; text-align: center; }
+.work-hours-day-field { display: grid; gap: 6px; margin-bottom: 12px; color: #59666f; font-size: .68rem; font-weight: 680; }
+.work-hours-day-field select { width: 100%; min-height: 40px; padding: 8px 25px 8px 8px; color: #303b43; border: 1px solid #c5ced3; border-radius: 8px; background: #fff; font-size: .7rem; font-weight: 500; }
+.work-hours-day-field select.is-placeholder { color: #8b959b; font-weight: 400; }
+.work-hours-day-field select:focus { border-color: #7d8a93; outline: none; box-shadow: 0 0 0 3px rgba(70,84,94,.1); }
+.work-hours-total { margin: 12px 22px 0; padding: 10px 12px; color: #40534e; border-left: 3px solid #5f8174; border-radius: 0 8px 8px 0; background: #e9f0ed; }
+.work-hours-total-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: .76rem; font-weight: 650; }
+.work-hours-total-heading strong { color: #314b40; font-size: .9rem; white-space: nowrap; }
+.work-hours-total p { margin: 4px 0 0; color: #66766f; font-size: .67rem; line-height: 1.45; }
+.work-hours-total.over-limit { color: #804747; border-left-color: #b85c5c; background: #f8eaea; }
+.work-hours-total.over-limit .work-hours-total-heading strong { color: #9b3535; }
+.work-hours-total.over-limit p { color: #8a5e5e; }
 .lunch-break-picker-error { margin: 14px 22px 0; padding: 10px 11px; color: #884848; border: 1px solid #e2caca; background: #f8eaea; font-size: .74rem; line-height: 1.45; }
 .lunch-break-picker-actions { margin: 18px 0 0; padding: 14px 22px 19px; border-top: 1px solid #dbe1e4; background: #edf1f2; }
 .lunch-break-picker-actions .cancel-btn-text { min-height: 40px; padding: 8px 14px; color: #5a6770; border: 1px solid transparent; border-radius: 8px; font-size: .76rem; font-weight: 650; }
@@ -4515,6 +4818,21 @@ onMounted(async () => {
 .lunch-break-picker-actions .save-btn:disabled { color: #929aa0; border-color: #d1d7db; background: #dfe3e5; box-shadow: none; opacity: 1; }
 .lunch-break-clear-btn { min-height: 40px; margin-right: auto; padding: 8px 13px; color: #a33c3c; border: 1px solid #e2baba; border-radius: 8px; background: #fff6f6; font-size: .74rem; font-weight: 650; cursor: pointer; }
 .lunch-break-clear-btn:hover { border-color: #c98787; background: #fbeaea; }
+@media (max-width: 1000px) {
+  .work-hours-day-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 18px; }
+  .work-hours-day-column:nth-child(3) { border-right: 0; }
+}
+@media (max-width: 620px) {
+  .work-hours-picker { width: calc(100vw - 24px); max-height: calc(100vh - 24px); }
+  .work-hours-day-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 4px; padding: 16px 12px 4px; }
+  .work-hours-day-column { padding: 0 8px; }
+  .work-hours-day-column:nth-child(3) { border-right: 1px solid #dce2e5; }
+  .work-hours-day-column:nth-child(even) { border-right: 0; }
+  .work-hours-picker .lunch-break-picker-header { padding-right: 14px; padding-left: 14px; }
+  .work-hours-picker .lunch-break-picker-help { margin-right: 14px; margin-left: 14px; }
+  .work-hours-total { margin-right: 14px; margin-left: 14px; }
+  .work-hours-total-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
+}
 /* Edit schedule hierarchy */
 .schedule-entry-modal .schedule-teacher-field,
 .schedule-entry-modal .schedule-subject-field,
@@ -4813,6 +5131,8 @@ onMounted(async () => {
 .icon-btn.consult-btn { width: 38px; height: 38px; border-radius: 8px; color: #fff; border-color: #3e4b55; background: linear-gradient(145deg,#62717b,#35434c); box-shadow: 0 3px 8px rgba(38,48,55,.17); }
 .icon-btn.lunch-break-toolbar-btn { width: 38px; height: 38px; justify-content: center; padding: 0; border-radius: 8px; color: #45545e; border-color: #c7d0d5; background: linear-gradient(145deg,#f8fafb,#e3e8ea); box-shadow: 0 3px 8px rgba(38,48,55,.1); }
 .icon-btn.lunch-break-toolbar-btn:hover { color: #263640; border-color: #99a7af; background: #fff; }
+.icon-btn.work-hours-toolbar-btn { width: 38px; height: 38px; justify-content: center; padding: 0; border-radius: 8px; color: #45545e; border-color: #c7d0d5; background: linear-gradient(145deg,#f8fafb,#e3e8ea); box-shadow: 0 3px 8px rgba(38,48,55,.1); }
+.icon-btn.work-hours-toolbar-btn:hover { color: #263640; border-color: #99a7af; background: #fff; }
 .main .sched-grid-wrap {
   width: 100%;
   margin: 0;
@@ -5726,6 +6046,12 @@ onMounted(async () => {
 .sched-grid td.td-cell { background-color: #f8f9fa; }
 .sched-grid td.td-cell:hover { background-color: #edf1f3; }
 .sched-grid td.td-cell.readonly-entry-cell:hover { background-color: #f8f9fa; }
+.sched-grid .work-hours-summary-row th { height: 34px; padding: 7px 5px; color: #40534e; border-bottom: 1px solid #d6e0dc; background: #e8efec; font-size: .66rem; font-weight: 680; white-space: nowrap; }
+.sched-grid .work-hours-summary-row th.th-time { color: #5d6c67; font-size: .61rem; }
+.sched-grid td.td-cell.faculty-work-hours-cell:not(.has-entry):not(.consult-cell) { background-color: #edf5f1; }
+.sched-grid td.td-cell.faculty-work-hours-cell:not(.has-entry):not(.consult-cell):hover { background-color: #e2eee8; }
+.sched-grid td.td-cell.faculty-outside-work-hours-cell:not(.has-entry):not(.consult-cell) { background-color: #f1f3f4; }
+.sched-grid td.td-cell.faculty-outside-work-hours-cell:not(.has-entry):not(.consult-cell):hover { background-color: #e9edef; }
 .consult-modal-content > .consult-right-pane { background: transparent !important; }
 .consult-empty .consult-empty-icon { display: grid !important; place-items: center; align-self: center; line-height: 0; }
 .consult-empty .consult-empty-icon svg { display: block; width: 28px; height: 28px; flex: 0 0 auto; margin: 0; }

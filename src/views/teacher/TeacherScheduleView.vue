@@ -94,6 +94,12 @@
                   @click="toggleExpand(day)"
                 >{{ day }}</th>
               </tr>
+              <tr class="work-hours-row">
+                <th class="th-time th-work-hours-label">Work hours</th>
+                <th v-for="day in DAYS" :key="`work-hours-${day}`" class="th-work-hours">
+                  {{ workHoursLabel(day) }}
+                </th>
+              </tr>
             </thead>
             <tbody>
               <tr v-for="(rowCells, ri) in tableMatrix" :key="ri" class="time-row" :class="{ 'half-hour': TIME_SLOTS[ri].start.endsWith(':30') }">
@@ -363,8 +369,27 @@ const DAY_SHORT = { Monday: 'Monday', Tuesday: 'Tues', Wednesday: 'Wed', Thursda
 /* ── Schedule data ── */
 const scheduleData = ref([])
 const consultationData = ref([])
+const workHoursByDay = ref({})
 const isLoading = ref(false)
 const loadError = ref('')
+
+function setWorkHoursFromTable(table) {
+  const savedByDay = table?.workHoursByDay
+  const hasDaySettings = savedByDay && typeof savedByDay === 'object'
+    && DAYS.some(day => savedByDay[day]?.startTime || savedByDay[day]?.endTime)
+  workHoursByDay.value = Object.fromEntries(DAYS.map(day => {
+    const settings = hasDaySettings
+      ? savedByDay[day]
+      : { startTime: table?.workStartTime, endTime: table?.workEndTime }
+    const startTime = String(settings?.startTime || '').trim()
+    const endTime = String(settings?.endTime || '').trim()
+    return [day, startTime && endTime ? `${startTime} – ${endTime}` : 'Not set']
+  }))
+}
+
+function workHoursLabel(day) {
+  return workHoursByDay.value[day] || 'Not set'
+}
 
 function to24Hour(value) {
   const normalized = (value || '').toString().trim()
@@ -641,16 +666,22 @@ async function loadSchedule() {
     }
 
     const dateStr = new Date().toLocaleDateString('en-CA')
-    const [directPayload, consultationPayload, requestPayload, substitutePayload] = await Promise.all([
+    const [directPayload, consultationPayload, requestPayload, substitutePayload, tablesPayload] = await Promise.all([
       apiRequest(`/schedules?teacher=${encodeURIComponent(teacherName)}`),
       apiRequest(`/consultations?teacher=${encodeURIComponent(teacherName)}`).catch(() => ({ consultations: [] })),
       apiRequest('/consultations/requests').catch(() => ({ requests: [] })),
       apiRequest(`/substitutes?date=${encodeURIComponent(dateStr)}&teacherId=${encodeURIComponent(user.value?.id || user.value?._id || '')}`).catch(() => ({ assignments: [] })),
+      apiRequest('/schedules/tables').catch(() => ({ tables: [] })),
     ])
     const apiEntries = Array.isArray(directPayload.entries) ? directPayload.entries : []
     const consultations = Array.isArray(consultationPayload.consultations) ? consultationPayload.consultations : []
     const requests = Array.isArray(requestPayload.requests) ? requestPayload.requests : []
     const substituteAssignments = Array.isArray(substitutePayload.assignments) ? substitutePayload.assignments : []
+    const normalizedTeacherName = teacherName.trim().toLocaleLowerCase()
+    const teacherTable = (tablesPayload.tables || []).find(table =>
+      String(table.teacher || table.label || '').trim().toLocaleLowerCase() === normalizedTeacherName
+    )
+    setWorkHoursFromTable(teacherTable)
     const approvedCountByAvailability = buildApprovedCountByAvailability(requests)
 
     // Show the relationship on the original teacher's class and add the same
@@ -1282,6 +1313,20 @@ function confirmLogout() {
 
 .th-day:hover { background: #6b7280; }
 .th-day-active { background: #6b7280; }
+.work-hours-row .th-time,
+.th-work-hours {
+  position: sticky;
+  top: 42px;
+  padding: 8px 6px;
+  color: #40534e;
+  border-bottom: 1px solid #d6e0dc;
+  background: #e8efec;
+  font-size: .68rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.work-hours-row .th-time { left: 0; z-index: 19; }
+.th-work-hours { z-index: 3; text-align: center; }
 
 /* ─ Body: Time Column ─ */
 .td-time {

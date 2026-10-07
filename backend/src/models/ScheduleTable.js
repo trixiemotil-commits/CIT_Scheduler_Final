@@ -13,6 +13,20 @@ const scheduleTableSchema = new mongoose.Schema(
       trim: true,
       unique: true,
     },
+    workStartTime: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    workEndTime: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    workHoursByDay: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   {
     timestamps: true,

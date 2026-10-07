@@ -10,6 +10,7 @@ const { notifyActiveAdmins } = require("../utils/adminNotification");
 
 const YEAR_VALUES = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 const MAX_TEACHER_UNITS = 30;
+const MAX_TEACHER_WEEKLY_HOURS = 44;
 const DAY_VALUES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 let ensureDefaultsPromise = null;
 
@@ -113,19 +114,36 @@ async function assertTeacherUnitLimit(docs, academicTermId, excludedIds = []) {
   const filter = { teacher, entryType: "class", academicTermId: academicTermId || null };
   if (excludedIds.length) filter._id = { $nin: excludedIds };
   const existing = await ScheduleEntry.find(filter)
-    .select("_id teacher entryType parallel parallelGroupId parallelCount roomType timeInMinutes timeOutMinutes")
+    .select("_id teacher entryType parallel parallelGroupId parallelCount roomType timeInMinutes timeOutMinutes timeIn timeOut")
     .lean();
-  const units = workloadForEntries(existing.concat(docs));
+  const combined = [...existing, ...docs];
+  const units = workloadForEntries(combined);
+  const totalHours = combined.reduce((sum, entry) => {
+    if (entry.entryType === "lunch") return sum;
+    const startMinutes = Number.isFinite(entry.timeInMinutes) ? entry.timeInMinutes : parseTimeToMinutes(entry.timeIn || "8:00 AM");
+    const endMinutes = Number.isFinite(entry.timeOutMinutes) ? entry.timeOutMinutes : parseTimeToMinutes(entry.timeOut || "8:00 AM");
+    return sum + Math.max(0, (endMinutes - startMinutes) / 60);
+  }, 0);
+
+  if (totalHours > MAX_TEACHER_WEEKLY_HOURS) {
+    throw new Error(`Teacher workload cannot exceed ${MAX_TEACHER_WEEKLY_HOURS} hours.`);
+  }
   if (units > MAX_TEACHER_UNITS) {
     throw new Error(`Teacher workload cannot exceed ${MAX_TEACHER_UNITS} units.`);
   }
 }
 
 function toClientTable(table) {
+  const workHoursByDay = table.workHoursByDay instanceof Map
+    ? Object.fromEntries(table.workHoursByDay)
+    : table.workHoursByDay || {};
   return {
     id: table._id.toString(),
     teacher: table.teacher,
     label: table.label,
+    workStartTime: table.workStartTime || "",
+    workEndTime: table.workEndTime || "",
+    workHoursByDay,
   };
 }
 
@@ -606,13 +624,55 @@ async function createScheduleTable(req, res) {
       return res.status(400).json({ message: "Teacher name is required." });
     }
 
-    const label = teacher;
+    const hasPerDayHours = req.body.workHoursByDay !== undefined;
+    const workStartTime = normalizeString(req.body.workStartTime || req.body.workStart || "");
+    const workEndTime = normalizeString(req.body.workEndTime || req.body.workEnd || "");
+    let workHoursByDay;
 
-    if (await ScheduleTable.exists({ label })) {
-      return res.status(409).json({ message: "A schedule table for this teacher already exists." });
+    if (hasPerDayHours) {
+      if (!req.body.workHoursByDay || typeof req.body.workHoursByDay !== "object" || Array.isArray(req.body.workHoursByDay)) {
+        return res.status(400).json({ message: "Work hours must be provided as a day-keyed object." });
+      }
+
+      workHoursByDay = {};
+      for (const day of DAY_VALUES) {
+        const value = req.body.workHoursByDay[day] || {};
+        const startTime = normalizeString(value.startTime || "");
+        const endTime = normalizeString(value.endTime || "");
+        if ((startTime && !endTime) || (!startTime && endTime)) {
+          return res.status(400).json({ message: `${day}: both work start and work end times are required.` });
+        }
+        if (startTime && endTime) {
+          try {
+            if (parseTimeToMinutes(endTime) <= parseTimeToMinutes(startTime)) {
+              return res.status(400).json({ message: `${day}: work end time must be later than work start time.` });
+            }
+          } catch (error) {
+            return res.status(400).json({ message: error.message });
+          }
+        }
+        workHoursByDay[day] = { startTime, endTime };
+      }
     }
 
-    const table = await ScheduleTable.create({ teacher, label });
+    if ((workStartTime || workEndTime) && (!workStartTime || !workEndTime)) {
+      return res.status(400).json({ message: "Both work start and work end times are required when setting teacher work hours." });
+    }
+    if (workStartTime && workEndTime && parseTimeToMinutes(workEndTime) <= parseTimeToMinutes(workStartTime)) {
+      return res.status(400).json({ message: "Work end time must be later than the work start time." });
+    }
+
+    const label = teacher;
+    const update = { teacher, label };
+    if (hasPerDayHours) update.workHoursByDay = workHoursByDay;
+    if (req.body.workStartTime !== undefined || req.body.workStart !== undefined) update.workStartTime = workStartTime;
+    if (req.body.workEndTime !== undefined || req.body.workEnd !== undefined) update.workEndTime = workEndTime;
+    const table = await ScheduleTable.findOneAndUpdate(
+      { label },
+      update,
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
     await logActivity({
       actor: req.user,
       action: `Assigned teacher ${teacher} to schedule`,
@@ -634,10 +694,6 @@ async function createScheduleTable(req, res) {
     }
     return res.status(201).json({ message: "Schedule table created.", table: toClientTable(table) });
   } catch (error) {
-    if (error?.code === 11000) {
-      return res.status(409).json({ message: "A schedule table for this teacher already exists." });
-    }
-
     console.error("Failed to create schedule table:", error);
     return res.status(500).json({ message: "Failed to create schedule table.", error: error.message });
   }

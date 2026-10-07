@@ -345,19 +345,17 @@
               <input v-model="workloadSearch" type="search" placeholder="Search name" aria-label="Search teachers by name" />
             </label>
             <label class="workload-filter-field">
-              <span>Workload</span>
-              <select v-model="workloadLevelFilter" aria-label="Filter teachers by workload level">
-                <option value="all">All levels</option>
-                <option value="normal">Normal · under 10h</option>
-                <option value="moderate">Moderate · 10–19h</option>
-                <option value="overloaded">Overloaded · 20h+</option>
+              <span>Hours shown</span>
+              <select v-model="workloadHoursFilter" aria-label="Choose workload hours to display">
+                <option value="all">All hours</option>
+                <option value="classes">Class hours</option>
+                <option value="work">Work hours</option>
               </select>
             </label>
           </div>
-          <div class="workload-legend" aria-label="Workload thresholds">
-            <span><i class="workload-dot workload-dot--normal"></i>Normal &lt;10h</span>
-            <span><i class="workload-dot workload-dot--moderate"></i>Moderate 10–19h</span>
-            <span><i class="workload-dot workload-dot--overloaded"></i>Overloaded 20h+</span>
+          <div class="workload-legend" aria-label="Teacher hours legend">
+            <span><i class="workload-dot workload-dot--work"></i>Work hours</span>
+            <span><i class="workload-dot workload-dot--classes"></i>Teaching hours</span>
             <span class="workload-result-count">{{ workloadChartItems.length }} teachers shown</span>
           </div>
           <div class="chart-wrap workload-chart-wrap" @wheel="scrollWorkloadHorizontally">
@@ -404,10 +402,28 @@
                 <span class="modal-teacher-name">{{ selectedTeacher.name }}</span>
               </div>
               <div class="modal-teacher-metrics">
-                <span class="modal-hours-badge"><strong>{{ selectedTeacher.totalHours }}h</strong><small>per week</small></span>
+                <span class="modal-hours-badge"><strong>{{ selectedTeacher.workHoursTotal }}h</strong><small>work / week</small></span>
+                <span class="modal-hours-badge"><strong>{{ selectedTeacher.totalHours }}h</strong><small>classes / week</small></span>
                 <span class="modal-units-badge">{{ selectedTeacher.units || 0 }} units</span>
               </div>
             </div>
+
+            <section class="modal-work-hours-section" aria-labelledby="modal-work-hours-title">
+              <div class="modal-section-heading">
+                <div>
+                  <h3 id="modal-work-hours-title">Faculty work hours</h3>
+                  <p>Saved work start and end times by day</p>
+                </div>
+                <span>{{ selectedTeacher.workHoursDays.length }} days set</span>
+              </div>
+              <div v-if="selectedTeacher.workHoursDays.length" class="modal-work-hours-grid">
+                <div v-for="workDay in selectedTeacher.workHoursDays" :key="workDay.day" class="modal-work-hours-day">
+                  <span>{{ workDay.day }}</span>
+                  <strong>{{ workDay.startTime }} – {{ workDay.endTime }}</strong>
+                </div>
+              </div>
+              <div v-else class="modal-work-hours-empty">No work hours configured for this teacher.</div>
+            </section>
 
             <!-- Schedule cards grid -->
             <div class="modal-section-heading">
@@ -441,8 +457,8 @@
                   <span class="modal-summary-val">{{ selectedTeacher.schedule.length }}</span>
                 </div>
                 <div class="modal-summary-item">
-                  <span class="modal-summary-key">Total Hours per Week</span>
-                  <span class="modal-summary-val">{{ selectedTeacher.totalHours }}h</span>
+                  <span class="modal-summary-key">Work Hours per Week</span>
+                  <span class="modal-summary-val">{{ selectedTeacher.workHoursTotal }}h</span>
                 </div>
                 <div class="modal-summary-item">
                   <span class="modal-summary-key">Days Teaching</span>
@@ -1014,7 +1030,7 @@ const consultationTrendPeriods = [
   { value: 'day', label: 'Day' },
 ]
 const workloadSearch = ref('')
-const workloadLevelFilter = ref('all')
+const workloadHoursFilter = ref('all')
 let workloadFilterRedrawTimer = null
 let lineChartInstance = null
 let barChartInstance = null
@@ -1032,6 +1048,7 @@ const selectedConsultationPeriodLabel = ref('')
 const selectedConsultationPeriodRequests = ref([])
 const liveTeacherWorkloads = ref([])
 const workloadUsers = ref([])
+const workloadScheduleTables = ref([])
 const academicTerms = ref([])
 const selectedWorkloadTermId = ref('')
 const publishedTermLabel = ref('')
@@ -1039,26 +1056,33 @@ const workloadChartWidth = computed(() => Math.max(760, (liveTeacherWorkloads.va
 const workloadChartItems = computed(() => liveTeacherWorkloads.value
   .filter(teacher => {
     const query = workloadSearch.value.trim().toLocaleLowerCase()
-    const hours = Number(teacher.totalHours) || 0
-    const matchesName = !query || String(teacher.name || '').toLocaleLowerCase().includes(query)
-    const matchesLevel = workloadLevelFilter.value === 'all'
-      || (workloadLevelFilter.value === 'normal' && hours < 10)
-      || (workloadLevelFilter.value === 'moderate' && hours >= 10 && hours < 20)
-      || (workloadLevelFilter.value === 'overloaded' && hours >= 20)
-    return matchesName && matchesLevel
+    return !query || String(teacher.name || '').toLocaleLowerCase().includes(query)
   })
   .slice()
-  .sort((first, second) => second.totalHours - first.totalHours || first.name.localeCompare(second.name)))
-const workloadHasAssignments = computed(() => liveTeacherWorkloads.value.some(teacher => Number(teacher.totalHours) > 0))
+  .sort((first, second) => {
+    const hoursFor = teacher => workloadHoursFilter.value === 'classes'
+      ? Number(teacher.totalHours) || 0
+      : Number(teacher.workHoursTotal) || 0
+    return hoursFor(second) - hoursFor(first) || first.name.localeCompare(second.name)
+  }))
+const workloadHasAssignments = computed(() => liveTeacherWorkloads.value.some(teacher => {
+  if (workloadHoursFilter.value === 'classes') return Number(teacher.totalHours) > 0
+  if (workloadHoursFilter.value === 'work') return Number(teacher.workHoursTotal) > 0
+  return Number(teacher.totalHours) > 0 || Number(teacher.workHoursTotal) > 0
+}))
 const workloadEmptyTitle = computed(() => {
   if (!liveTeacherWorkloads.value.length) return 'No workload data for this term'
+  if (workloadHoursFilter.value === 'work') return 'No work hours configured for this term'
+  if (workloadHoursFilter.value === 'classes') return 'No classes scheduled for this term'
   if (!workloadHasAssignments.value) return 'No classes scheduled for this term'
   return 'No teachers match these filters'
 })
 const workloadEmptyDescription = computed(() => {
   if (!liveTeacherWorkloads.value.length) return 'Check that active teacher accounts and schedule records are available, or choose another term.'
+  if (workloadHoursFilter.value === 'work') return 'Saved faculty work-hour settings appear here after they are configured.'
+  if (workloadHoursFilter.value === 'classes') return 'Weekly class hours appear here after classes are added to the selected academic term.'
   if (!workloadHasAssignments.value) return 'Weekly workload appears here after classes are added to the selected academic term.'
-  return 'Try another teacher name or workload level to see matching results.'
+  return 'Try another teacher name to see matching results.'
 })
 const workloadByTermCache = new Map()
 let workloadRequestId = 0
@@ -1236,7 +1260,60 @@ function minutesFromTime(value) {
   return hour * 60 + Number(match[2])
 }
 
-function calculateWorkloads(users, scheduleEntries) {
+const workloadWeekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+function workHoursForTable(table, scheduleEntries, teacherName) {
+  const savedByDay = table?.workHoursByDay
+  const hasDaySettings = savedByDay && typeof savedByDay === 'object'
+    && workloadWeekdays.some(day => savedByDay[day]?.startTime || savedByDay[day]?.endTime)
+  const workHoursDays = workloadWeekdays.flatMap(day => {
+    const settings = hasDaySettings
+      ? savedByDay[day]
+      : { startTime: table?.workStartTime, endTime: table?.workEndTime }
+    const startTime = String(settings?.startTime || '').trim()
+    const endTime = String(settings?.endTime || '').trim()
+    if (!startTime || !endTime || minutesFromTime(endTime) <= minutesFromTime(startTime)) return []
+    return [{ day, startTime, endTime }]
+  })
+  const lunchByDay = new Map()
+  ;(scheduleEntries || [])
+    .filter(entry => String(entry.teacher || '').trim().toLocaleLowerCase() === teacherName.trim().toLocaleLowerCase())
+    .filter(entry => entry.entryType === 'lunch' || /lunch\s*break/i.test(String(entry.subject || '')))
+    .forEach(entry => {
+      if (!workloadWeekdays.includes(entry.day)) return
+      const start = minutesFromTime(entry.timeIn)
+      const end = minutesFromTime(entry.timeOut)
+      if (end <= start) return
+      const intervals = lunchByDay.get(entry.day) || []
+      intervals.push({ start, end })
+      lunchByDay.set(entry.day, intervals)
+    })
+  const totalMinutes = workHoursDays.reduce((sum, workDay) => {
+    const start = minutesFromTime(workDay.startTime)
+    const end = minutesFromTime(workDay.endTime)
+    const lunchIntervals = (lunchByDay.get(workDay.day) || []).sort((left, right) => left.start - right.start)
+    let lunchMinutes = 0
+    let mergedLunch = null
+    lunchIntervals.forEach(interval => {
+      const clipped = { start: Math.max(start, interval.start), end: Math.min(end, interval.end) }
+      if (clipped.end <= clipped.start) return
+      if (mergedLunch && clipped.start <= mergedLunch.end) mergedLunch.end = Math.max(mergedLunch.end, clipped.end)
+      else {
+        if (mergedLunch) lunchMinutes += mergedLunch.end - mergedLunch.start
+        mergedLunch = clipped
+      }
+    })
+    if (mergedLunch) lunchMinutes += mergedLunch.end - mergedLunch.start
+    return sum + Math.max(0, end - start - lunchMinutes)
+  }, 0)
+  return { days: workHoursDays, totalHours: Number((totalMinutes / 60).toFixed(1)) }
+}
+
+function calculateWorkloads(users, scheduleEntries, scheduleTables = []) {
+  const scheduleTableByTeacher = new Map((scheduleTables || []).map(table => [
+    String(table.teacher || table.label || '').trim().toLocaleLowerCase(),
+    table,
+  ]))
   const groups = new Map()
   scheduleEntries
     .filter(entry => entry.entryType !== 'lunch' && entry.teacher && String(entry.teacher).toLowerCase() !== 'cit faculty')
@@ -1290,27 +1367,38 @@ function calculateWorkloads(users, scheduleEntries) {
     current.daysTeaching = new Set(current.schedule.map(entry => entry.day)).size
     workloads.set(first.teacher, current)
   })
-  return Array.from(workloads.values()).map(workload => ({
-    ...workload,
-    totalHours: Number(workload.totalHours.toFixed(1)),
-    units: Number(workload.units.toFixed(1)),
-    avatar: workload.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(workload.name)}&background=DDECE5&color=1B4332`,
-  }))
+  return Array.from(workloads.values()).map(workload => {
+    const workHours = workHoursForTable(
+      scheduleTableByTeacher.get(workload.name.trim().toLocaleLowerCase()),
+      scheduleEntries,
+      workload.name,
+    )
+    return {
+      ...workload,
+      totalHours: Number(workload.totalHours.toFixed(1)),
+      units: Number(workload.units.toFixed(1)),
+      workHoursDays: workHours.days,
+      workHoursTotal: workHours.totalHours,
+      avatar: workload.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(workload.name)}&background=DDECE5&color=1B4332`,
+    }
+  })
 }
 
 async function loadChartData() {
   isConsultationLoading.value = true
   consultationLoadError.value = false
   try {
-    const [termPayload, requestsPayload, usersPayload, termsPayload] = await Promise.all([
+    const [termPayload, requestsPayload, usersPayload, termsPayload, scheduleTablesPayload] = await Promise.all([
       apiRequest('/academic-terms/published'),
       apiRequest('/consultations/requests'),
       apiRequest('/users?role=teacher'),
       apiRequest('/academic-terms'),
+      apiRequest('/schedules/tables'),
     ])
     const publishedTerm = termPayload.term
     const termIdOf = term => String(term?._id || term?.id || '')
     academicTerms.value = termsPayload.terms || []
+    workloadScheduleTables.value = scheduleTablesPayload.tables || []
     const selectedTerm = academicTerms.value.find(term => termIdOf(term) === termIdOf(publishedTerm))
       || publishedTerm
       || academicTerms.value[0]
@@ -1365,7 +1453,7 @@ async function loadWorkloadTerm(termId) {
       ? `/schedules?academicTermId=${encodeURIComponent(selectedId)}`
       : '/schedules')
     if (requestId !== workloadRequestId) return
-    const workloads = calculateWorkloads(workloadUsers.value, schedulesPayload.entries || [])
+    const workloads = calculateWorkloads(workloadUsers.value, schedulesPayload.entries || [], workloadScheduleTables.value)
     workloadByTermCache.set(selectedId, workloads)
     liveTeacherWorkloads.value = workloads
     isWorkloadLoading.value = false
@@ -1466,60 +1554,83 @@ function compactTeacherLabel(name) {
   return `${first} ${lastInitial}.`
 }
 
-function workloadBarColor(hours) {
-  if (hours >= 20) return '#3d4247'
-  if (hours >= 10) return '#78848d'
-  return '#c0c7cc'
-}
-
 function createBarChart() {
   if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null }
   if (!barChartRef.value || !workloadHasAssignments.value || !workloadChartItems.value.length) return
   const expanded = expandedChart.value === 'bar'
   const workloadItems = workloadChartItems.value
+  const showWorkHours = workloadHoursFilter.value !== 'classes'
+  const showClassHours = workloadHoursFilter.value !== 'work'
+  const workDatasetIndex = showWorkHours ? 0 : -1
+  const classDatasetIndex = showClassHours ? (showWorkHours ? 1 : 0) : -1
   const labels = workloadItems.map(teacher => teacher.name)
   const yTickLabels = workloadItems.map(teacher => expanded ? teacher.name : compactTeacherLabel(teacher.name))
   const workloadMaximumHours = 44
+  const formatHoursLabel = hours => `${Number.isInteger(hours) ? hours : Number(hours.toFixed(1))}h`
   const workloadValueLabels = {
     id: 'workloadValueLabels',
     afterDatasetsDraw(chart) {
       const context = chart.ctx
-      const elements = chart.getDatasetMeta(0).data
-      context.save()
-      context.fillStyle = '#3e4548'
-      context.font = '600 11px Segoe UI, sans-serif'
-      context.textBaseline = 'middle'
-      elements.forEach((element, index) => {
-        const hours = workloadItems[index]?.totalHours || 0
-        const exactHours = Number.isInteger(hours) ? String(hours) : hours.toFixed(1)
-        const label = `${exactHours}h`
-        const labelWidth = context.measureText(label).width
+      const workElements = showWorkHours ? chart.getDatasetMeta(workDatasetIndex).data : []
+      const classElements = showClassHours ? chart.getDatasetMeta(classDatasetIndex).data : []
+      const drawLabel = (element, hours, category, verticalOffset = 0) => {
+        if (!element) return
         const isOverCap = hours > workloadMaximumHours
-        const labelX = isOverCap
-          ? Math.max(chart.chartArea.left + 4, element.x - labelWidth - 8)
-          : element.x + 8
-        context.fillStyle = isOverCap ? '#fff' : '#3e4548'
-        context.fillText(label, labelX, element.y)
+        const label = `${formatHoursLabel(hours)}${category ? ` ${category}` : ''}`
+        context.textAlign = isOverCap ? 'right' : 'left'
+        context.fillStyle = isOverCap && category === 'class' ? '#fff' : '#3e4548'
+        context.fillText(label, isOverCap ? element.x - 5 : element.x + 7, element.y + verticalOffset)
+      }
+      context.save()
+      context.font = `${workloadHoursFilter.value === 'all' ? '600 9px' : '600 11px'} Segoe UI, sans-serif`
+      context.textBaseline = 'middle'
+      workloadItems.forEach((teacher, index) => {
+        if (workloadHoursFilter.value === 'all') {
+          drawLabel(workElements[index], Number(teacher.workHoursTotal) || 0)
+          drawLabel(classElements[index], Number(teacher.totalHours) || 0)
+        } else if (workloadHoursFilter.value === 'work') {
+          drawLabel(workElements[index], Number(teacher.workHoursTotal) || 0)
+        } else {
+          drawLabel(classElements[index], Number(teacher.totalHours) || 0)
+        }
       })
       context.restore()
     },
   }
 
+  const datasets = []
+  if (showWorkHours) {
+    datasets.push({
+      label: 'Work hours',
+      data: workloadItems.map(teacher => Math.min(Number(teacher.workHoursTotal) || 0, workloadMaximumHours)),
+      backgroundColor: '#c0c7cc',
+      borderRadius: 5,
+      borderSkipped: false,
+      borderWidth: 0,
+      barThickness: workloadHoursFilter.value === 'all' ? 8 : 10,
+      maxBarThickness: workloadHoursFilter.value === 'all' ? 8 : 10,
+      grouped: true,
+      order: 0,
+    })
+  }
+  if (showClassHours) {
+    datasets.push({
+      label: 'Teaching hours',
+      data: workloadItems.map(teacher => Math.min(Number(teacher.totalHours) || 0, workloadMaximumHours)),
+      backgroundColor: '#4b535a',
+      borderRadius: 5,
+      borderSkipped: false,
+      borderWidth: 0,
+      barThickness: workloadHoursFilter.value === 'all' ? 8 : 10,
+      maxBarThickness: workloadHoursFilter.value === 'all' ? 8 : 10,
+      grouped: true,
+      order: 1,
+    })
+  }
+
   barChartInstance = new Chart(barChartRef.value, {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Teacher hours',
-        data: workloadItems.map(teacher => Math.min(teacher.totalHours, workloadMaximumHours)),
-        backgroundColor: workloadItems.map(teacher => workloadBarColor(teacher.totalHours)),
-        borderRadius: 5,
-        borderSkipped: false,
-        borderWidth: 0,
-        barThickness: 10,
-        maxBarThickness: 10
-      }]
-    },
+    data: { labels, datasets },
     options: {
       indexAxis: 'y',
       responsive: true,
@@ -1530,13 +1641,19 @@ function createBarChart() {
         tooltip: {
           callbacks: {
             title: (ctx) => ctx[0].label,
-            label: (ctx) => `Hours: ${workloadItems[ctx.dataIndex]?.totalHours ?? ctx.parsed.x}h`,
+            label: (ctx) => `${ctx.dataset.label}: ${formatHoursLabel(Number(ctx.raw) || 0)}`,
             afterLabel: (ctx) => {
               const teacher = workloadItems[ctx.dataIndex]
               const details = [...new Set((teacher?.schedule || []).map(entry =>
                 [entry.subject, entry.section].filter(Boolean).join(' · '),
               ).filter(Boolean))]
               return [
+                `Work hours: ${formatHoursLabel(Number(teacher?.workHoursTotal) || 0)}`,
+                `Class hours: ${formatHoursLabel(Number(teacher?.totalHours) || 0)}`,
+                'Configured work hours:',
+                ...(teacher?.workHoursDays?.length
+                  ? teacher.workHoursDays.map(workDay => `${workDay.day}: ${workDay.startTime} – ${workDay.endTime}`)
+                  : ['Not configured']),
                 `Units: ${teacher?.units || 0}`,
                 'Subjects / sections:',
                 ...(details.length ? details : ['No subject assignments']),
@@ -1593,8 +1710,6 @@ function createBarChart() {
         bar: {
           borderRadius: 5,
           borderSkipped: false,
-          barThickness: 10,
-          maxBarThickness: 10,
           borderWidth: 0,
         }
       }
@@ -1603,7 +1718,7 @@ function createBarChart() {
   })
 }
 
-watch([workloadSearch, workloadLevelFilter], async () => {
+watch([workloadSearch, workloadHoursFilter], async () => {
   if (workloadFilterRedrawTimer) window.clearTimeout(workloadFilterRedrawTimer)
   await nextTick()
   workloadFilterRedrawTimer = window.setTimeout(() => {
@@ -2743,9 +2858,8 @@ function confirmLogout() {
   flex: 0 0 8px;
   border-radius: 50%;
 }
-.workload-dot--normal { background: #c0c7cc; }
-.workload-dot--moderate { background: #78848d; }
-.workload-dot--overloaded { background: #3d4247; }
+.workload-dot--work { background: #c0c7cc; }
+.workload-dot--classes { background: #4b535a; }
 .chart-heading-main {
   display: flex;
   align-items: center;
@@ -3153,6 +3267,12 @@ function confirmLogout() {
 .modal-section-heading h3 { margin: 0; color: #2d3439; font-size: 1rem; font-weight: 750; }
 .modal-section-heading p { margin: 3px 0 0; color: #788188; font-size: .76rem; }
 .modal-section-heading > span { flex: 0 0 auto; padding: 6px 10px; border-radius: 999px; background: #eceff1; color: #58636a; font-size: .7rem; font-weight: 700; }
+.modal-work-hours-section { margin: 0 0 24px; }
+.modal-work-hours-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.modal-work-hours-day { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 10px 12px; border: 1px solid #dce1e4; border-radius: 9px; background: rgba(255,255,255,.82); }
+.modal-work-hours-day span { color: #667178; font-size: .72rem; font-weight: 650; }
+.modal-work-hours-day strong { color: #303a40; font-size: .72rem; font-weight: 700; text-align: right; white-space: nowrap; }
+.modal-work-hours-empty { padding: 14px; border: 1px dashed #cbd2d6; border-radius: 10px; color: #69747b; background: rgba(255,255,255,.65); font-size: .78rem; }
 .workload-modal .modal-schedule-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; margin-bottom: 22px; }
 .workload-modal .modal-sched-card {
   min-width: 0;
@@ -3183,6 +3303,7 @@ function confirmLogout() {
   .workload-modal-overlay { box-sizing: border-box; padding: 14px; }
   .workload-modal { --workload-modal-pad-inline: 20px; width: 100%; max-width: 100%; max-height: 92dvh; padding: 24px 20px 0; }
   .workload-modal .modal-schedule-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+  .modal-work-hours-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workload-modal .modal-summary-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 18px; }
   .workload-modal .modal-summary-item:nth-child(3) { padding-left: 0; border-left: 0; }
 }
@@ -3209,6 +3330,7 @@ function confirmLogout() {
   .modal-section-heading { align-items: flex-start; }
   .modal-section-heading p { max-width: 230px; line-height: 1.4; }
   .workload-modal .modal-schedule-grid { grid-template-columns: 1fr; gap: 9px; }
+  .modal-work-hours-grid { grid-template-columns: 1fr; }
   .workload-modal .modal-sched-card { padding: 13px; }
   .workload-modal .modal-summary { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
   .workload-modal .modal-summary-item { padding-inline: 10px; }

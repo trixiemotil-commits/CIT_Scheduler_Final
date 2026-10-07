@@ -10,13 +10,20 @@ const Notification = require('../models/Notification')
 const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins } = require('../utils/adminNotification')
 
+function isRecaptchaEnabled() {
+  return Boolean(process.env.RECAPTCHA_SECRET);
+}
+
 // Verify reCAPTCHA token with Google
 async function verifyRecaptcha(token, remoteIp = null) {
   try {
     const secret = process.env.RECAPTCHA_SECRET;
     if (!secret) {
-      console.warn('RECAPTCHA_SECRET not configured; skipping verification (unsafe).');
-      return false;
+      const allowLocalBypass = process.env.NODE_ENV !== 'production';
+      console.warn(allowLocalBypass
+        ? 'RECAPTCHA_SECRET not configured; allowing request in local development mode.'
+        : 'RECAPTCHA_SECRET not configured; reCAPTCHA verification is disabled because the secret is missing.');
+      return allowLocalBypass;
     }
 
     const params = new URLSearchParams();
@@ -274,7 +281,7 @@ async function register(req, res) {
       if (!validateMobileMathChallenge(req.body)) {
         return res.status(403).json({ message: "Incorrect math answer. Please try again." });
       }
-    } else {
+    } else if (isRecaptchaEnabled()) {
       const recaptchaToken = req.body?.recaptchaToken
       if (!recaptchaToken) {
         return res.status(400).json({ message: "reCAPTCHA token is missing. Please complete the reCAPTCHA challenge." });
@@ -366,7 +373,7 @@ async function login(req, res) {
       if (!validateMobileMathChallenge(req.body)) {
         return res.status(403).json({ message: "Incorrect math answer. Please try again." });
       }
-    } else {
+    } else if (isRecaptchaEnabled()) {
       if (!recaptchaToken) {
         return res.status(400).json({ message: "reCAPTCHA token is missing. Please complete the reCAPTCHA challenge." });
       }
