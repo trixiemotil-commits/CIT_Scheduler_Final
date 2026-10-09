@@ -141,7 +141,7 @@
               <button type="button" @click="selectStatusTab('All')">View all teachers</button>
             </div>
             <div
-              v-for="teacher in visibleTeachers"
+              v-for="teacher in (loadingTeachers ? [] : visibleTeachers)"
               :key="teacher.id"
               :class="['teacher-card', `card-${statusCssClass(displayTeacherStatus(teacher))}`]"
             >
@@ -184,7 +184,13 @@
 
               <!-- Substitute Teacher -->
               <div class="leave-coverage-block">
-                <div class="leave-coverage-notice" :class="{ 'is-unavailable': teacher.adminStatus !== 'On Leave' }">
+                <div
+                  class="leave-coverage-notice"
+                  :class="{
+                    'is-unavailable': teacher.adminStatus !== 'On Leave',
+                    'is-complete': isCoverageComplete(teacher),
+                  }"
+                >
                   <span class="leave-coverage-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M8 2v4M16 2v4M3 10h18" />
@@ -205,6 +211,7 @@
                     v-if="teacher.adminStatus === 'On Leave' && getTeacherWeeklySchedule(teacher).length"
                     type="button"
                     class="manage-coverage-btn"
+                    :class="{ 'is-complete': isCoverageComplete(teacher) }"
                     title="Manage substitute assignments"
                     @click="openCoverageModal(teacher)"
                   >
@@ -416,7 +423,6 @@
           <footer class="coverage-modal-footer">
             <span>Assignments are saved only when you confirm.</span>
             <div>
-              <button type="button" class="coverage-cancel-btn" @click="closeCoverageModal">Cancel</button>
               <button type="button" class="substitute-save-btn" :disabled="savingSubstitute[coverageTeacher.id]" @click="saveCoverageAndClose">
                 {{ savingSubstitute[coverageTeacher.id] ? 'Saving…' : 'Save assignments' }}
               </button>
@@ -523,6 +529,11 @@ function getCoverageProgress(teacher) {
   return total ? Math.round((getAssignedCoverageCount(teacher) / total) * 100) : 0
 }
 
+function isCoverageComplete(teacher) {
+  const total = getTeacherWeeklySchedule(teacher).length
+  return teacher.adminStatus === 'On Leave' && total > 0 && getAssignedCoverageCount(teacher) === total
+}
+
 function updateCoverageSubstitute(entry, substituteId) {
   if (!coverageTeacher.value) return
   updateEntrySubstitute(coverageTeacher.value, entry, substituteId)
@@ -531,7 +542,16 @@ function updateCoverageSubstitute(entry, substituteId) {
 
 async function saveCoverageAndClose() {
   if (!coverageTeacher.value) return
-  const saved = await saveSubstituteAssignment(coverageTeacher.value)
+  const teacher = coverageTeacher.value
+  const hasCurrentCoverage = getAssignedCoverageCount(teacher) > 0
+  const hadCoverageBeforeEditing = getTeacherWeeklySchedule(teacher).some(
+    (entry) => coverageSnapshot.value[getEntryKey(entry)]
+  )
+  if (!hasCurrentCoverage && !hadCoverageBeforeEditing) {
+    showTeacherToast('error', 'Assign a covering teacher to at least one class before saving.')
+    return
+  }
+  const saved = await saveSubstituteAssignment(teacher)
   if (saved) closeCoverageModal({ preserve: true })
 }
 
@@ -1125,25 +1145,16 @@ const saveSubstituteAssignment = async (teacher) => {
     if (unsavedChanges.value && unsavedChanges.value[teacher.id]) {
       delete unsavedChanges.value[teacher.id]
     }
-    await Swal.fire({
-      icon: 'success',
-      title: assignments.length ? 'Substitutes updated' : 'Substitutes removed',
-      text: assignments.length
+    showTeacherToast(
+      'success',
+      assignments.length
         ? `Substitute assignments have been updated for ${teacher.name}.`
-        : `All substitute assignments have been removed for ${teacher.name}.`,
-      confirmButtonColor: '#4b5563',
-      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
-    })
+        : `All substitute assignments have been removed for ${teacher.name}.`
+    )
     return true
   } catch (error) {
     console.error('Failed to save substitute assignment:', error)
-    await Swal.fire({
-      icon: 'error',
-      title: 'Save failed',
-      text: error.message || 'Failed to save substitute assignment.',
-      confirmButtonColor: '#4b5563',
-      customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
-    })
+    showTeacherToast('error', error.message || 'Failed to save substitute assignment.')
     return false
   } finally {
     savingSubstitute.value[teacher.id] = false
@@ -2558,16 +2569,21 @@ onUnmounted(() => {
 .leave-coverage-block { margin: 3px 0 13px; }
 .leave-coverage-notice { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid #e0d4d1; border-radius: 11px; background: #faf6f4; color: #4a3d3a; text-align: left; }
 .leave-coverage-notice.is-unavailable { border-color: #dce3e6; background: #f4f6f7; color: #52616a; }
+.leave-coverage-notice.is-complete { border-color: #bddbc8; background: #e8f5ed; color: #276842; }
 .leave-coverage-notice > span:nth-child(2) { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
-.leave-coverage-notice strong { font-size: .72rem; font-weight: 700; }
-.leave-coverage-notice small { color: #7f706b; font-size: .64rem; line-height: 1.35; }
+.leave-coverage-notice strong { font-size: .68rem; font-weight: 700; }
+.leave-coverage-notice small { color: #7f706b; font-size: .62rem; line-height: 1.35; }
 .leave-coverage-notice.is-unavailable small { color: #74818a; }
+.leave-coverage-notice.is-complete small { color: #3d7955; }
 .leave-coverage-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 9px; background: #eee2de; color: #75564d; }
 .leave-coverage-notice.is-unavailable .leave-coverage-icon { background: #e7ecef; color: #667680; }
+.leave-coverage-notice.is-complete .leave-coverage-icon { background: #d3eadb; color: #34754e; }
 .leave-coverage-icon svg { width: 17px; height: 17px; }
 .manage-coverage-btn { display: flex; min-height: 32px; align-items: center; justify-content: center; gap: 4px; padding: 6px 9px; flex: 0 0 auto; border: 1px solid #cdbdb7; border-radius: 8px; background: #fff; color: #624b44; font: inherit; font-size: .63rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 5px rgba(70,50,43,.06); transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.manage-coverage-btn.is-complete { border-color: #b5d5bf; color: #276842; box-shadow: 0 2px 5px rgba(39,104,66,.08); }
 .manage-coverage-btn svg { width: 15px; height: 15px; }
 .manage-coverage-btn:hover { border-color: #aeb9bf; background: #f6f8f9; transform: translateY(-1px); }
+.manage-coverage-btn.is-complete:hover { border-color: #8fc3a0; background: #f4fbf6; }
 .coverage-modal-overlay { padding: 24px; background: rgba(20, 28, 33, .58); backdrop-filter: blur(5px); }
 .coverage-modal { display: flex; width: min(760px, 96vw); max-height: min(760px, 90vh); flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,.72); border-radius: 20px; background: #f7f9fa; box-shadow: 0 28px 80px rgba(15, 23, 29, .3); text-align: left; }
 .coverage-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 26px 20px; border-bottom: 1px solid #e1e6e9; background: #fff; }
@@ -2595,8 +2611,6 @@ onUnmounted(() => {
 .coverage-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 26px; border-top: 1px solid #dfe5e8; background: #fff; }
 .coverage-modal-footer > span { color: #66737b; font-size: .7rem; }
 .coverage-modal-footer > div { display: flex; gap: 11px; }
-.coverage-cancel-btn { min-width: 105px; min-height: 46px; padding: 11px 20px; border: 1px solid #cbd4d9; border-radius: 10px; background: #fff; color: #3f4d55; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; }
-.coverage-cancel-btn:hover { background: #f2f5f6; }
 .coverage-modal .substitute-save-btn { min-width: 175px; min-height: 46px; padding: 11px 21px; border-radius: 10px; font-size: .78rem; }
 .substitute-teacher-wrap { display: block; margin: 7px 0 0; padding: 0; overflow: hidden; border: 1px solid #e1e6e9; border-radius: 11px; background: #f8fafb; }
 .coverage-summary { display: flex; min-height: 40px; align-items: center; justify-content: space-between; padding: 0 12px; color: #46545d; font-size: .68rem; font-weight: 700; cursor: pointer; list-style: none; }
@@ -2626,7 +2640,7 @@ onUnmounted(() => {
   .coverage-modal-row { grid-template-columns: 1fr; gap: 13px; }
   .coverage-modal-footer { align-items: stretch; flex-direction: column; }
   .coverage-modal-footer > div { justify-content: flex-end; }
-  .coverage-cancel-btn,.coverage-modal .substitute-save-btn { flex: 1; min-width: 0; }
+  .coverage-modal .substitute-save-btn { flex: 1; min-width: 0; }
 }
 .carousel-indicators { margin-top: 16px; }
 .indicator { width: 7px; height: 7px; background: #cbd2d6; }
@@ -2654,8 +2668,8 @@ onUnmounted(() => {
   .designated-label,
   .substitute-label { font-size: .68rem; }
   .area-tag { font-size: .73rem; }
-  .leave-coverage-notice strong { font-size: .8rem; }
-  .leave-coverage-notice small { font-size: .7rem; }
+  .leave-coverage-notice strong { font-size: .74rem; }
+  .leave-coverage-notice small { font-size: .66rem; }
   .manage-coverage-btn { font-size: .69rem; }
 }
 

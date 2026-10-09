@@ -935,4 +935,100 @@ onMounted(loadLogs)
     align-items: flex-start;
   }
 }
+
+/* Match the shared admin button system used on the other management pages. */
+.um-view-tab,
+.um-print-btn,
+.um-search-actions button,
+.um-page-controls button {
+  min-height: 42px;
+  border: 1px solid #dbe3e8;
+  border-radius: 12px;
+  font-family: inherit;
+  font-weight: 750;
+  transition: background .18s, border-color .18s, box-shadow .18s, transform .18s;
+}
+.um-view-tab:not(.um-view-tab--on),
+.um-clear-search,
+.um-page-controls button {
+  background: #fff;
+  color: #4f5b66;
+  box-shadow: 0 4px 10px rgba(88,99,108,.06);
+}
+.um-view-tab:not(.um-view-tab--on):hover,
+.um-clear-search:hover:not(:disabled),
+.um-page-controls button:hover:not(:disabled) {
+  border-color: #c7d1d8;
+  background: #f4f7f8;
+  box-shadow: 0 7px 14px rgba(64,76,86,.12);
+  transform: translateY(-1px);
+}
+.um-view-tab--on,
+.um-print-btn,
+.um-apply-search {
+  border-color: #3e4d58;
+  background: linear-gradient(145deg, #5c6771, #343e47);
+  color: #fff;
+  box-shadow: 0 7px 16px rgba(45,55,63,.16), inset 0 1px 0 rgba(255,255,255,.16);
+}
+.um-view-tab--on:hover,
+.um-print-btn:hover:not(:disabled),
+.um-apply-search:hover:not(:disabled) {
+  border-color: #34414b;
+  background: linear-gradient(145deg, #687580, #3d4852);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(45,55,63,.22), inset 0 1px 0 rgba(255,255,255,.2);
+}
+.um-search-actions button { min-height: 40px; }
+.um-search-actions .um-clear-search {
+  border-color: #dbe3e8;
+  background: #fff;
+  color: #4f5b66;
+}
+.um-search-actions .um-clear-search:hover:not(:disabled) {
+  border-color: #c7d1d8;
+  background: #f4f7f8;
+  box-shadow: 0 7px 14px rgba(64,76,86,.12);
+  transform: translateY(-1px);
+}
+.um-search-actions .um-apply-search {
+  border: 1px solid #3e4d58;
+  background: linear-gradient(145deg, #5c6771, #343e47);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(45,55,63,.2), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.um-search-actions .um-apply-search:hover:not(:disabled) {
+  border-color: #3e4d58;
+  background: linear-gradient(145deg, #687580, #3d4852);
+  box-shadow: 0 10px 22px rgba(45,55,63,.24), inset 0 1px 0 rgba(255,255,255,.2);
+  transform: translateY(-1px);
+}
+.um-search-actions .um-apply-search:active:not(:disabled) { transform: translateY(0); }
+.um-search-input::placeholder,
+.um-search-panel input::placeholder { color: #7b858d; opacity: 1; }
+.um-search-panel input,
+.um-search-input { color: #303b43; }
+.um-search-panel input::placeholder { color: #7b858d; }
+.um-search-panel .dt-trigger .placeholder { color: #7b858d; }
+.um-search-icon { color: #7b858d; }
+.um-search-icon svg { stroke: currentColor; }
+.um-search-panel .dt-trigger > svg:first-child { color: #65717a; stroke: currentColor; }
+.um-page-controls button { width: 36px; padding: 0; }
+.um-view-tab:focus-visible,
+.um-print-btn:focus-visible,
+.um-search-actions button:focus-visible,
+.um-page-controls button:focus-visible {
+  outline: 3px solid rgba(89,130,157,.32);
+  outline-offset: 2px;
+}
+.um-view-tab:disabled,
+.um-print-btn:disabled,
+.um-search-actions button:disabled,
+.um-page-controls button:disabled { opacity: .55; cursor: not-allowed; }
+
+@media (max-width: 800px) {
+  .um-view-tab,
+  .um-print-btn,
+  .um-search-actions button { min-height: 38px; padding: 8px 12px; font-size: .74rem; }
+}
 </style>

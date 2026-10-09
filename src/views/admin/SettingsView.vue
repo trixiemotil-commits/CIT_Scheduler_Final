@@ -76,23 +76,28 @@
             <div v-if="passwordStep === 1" class="settings-row settings-row--identity">
               <div class="settings-group">
                 <label class="settings-label">Current Password</label>
-                <div class="pw-input-wrap">
+                <div class="pw-input-wrap" :class="{ 'is-invalid': currentPasswordError }">
                   <input
+                    ref="currentPasswordInput"
                     v-model="passwordForm.current"
                     :type="showCurrent ? 'text' : 'password'"
                     class="settings-input"
                     placeholder="Enter current password"
+                    :aria-invalid="Boolean(currentPasswordError)"
+                    :aria-describedby="currentPasswordError ? 'change-password-current-error' : undefined"
+                    @input="currentPasswordError = ''"
                   />
                   <button type="button" class="pw-eye" @click="showCurrent = !showCurrent">
                     <svg v-if="!showCurrent" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                   </button>
                 </div>
+                <p v-if="currentPasswordError" id="change-password-current-error" class="change-password-field-error" role="alert">{{ currentPasswordError }}</p>
               </div>
               <div class="settings-group">
                 <label class="settings-label">6-Digit OTP</label>
                 <div class="otp-wrap">
-                  <div class="otp-boxes" role="group" aria-label="Six-digit one-time password">
+                  <div class="otp-boxes" :class="{ 'is-invalid': otpError }" role="group" aria-label="Six-digit one-time password">
                     <input
                       v-for="(_, index) in otpDigits"
                       :key="index"
@@ -113,6 +118,7 @@
                     <span>{{ isSendingOtp ? 'Sending...' : otpSecondsRemaining > 0 ? `Expires in ${formattedOtpTime}` : 'Send OTP' }}</span>
                   </button>
                 </div>
+                <p v-if="otpError" class="change-password-field-error" role="alert">{{ otpError }}</p>
                 <span v-if="otpSent" class="otp-expiry">Code expires in {{ formattedOtpTime }}.</span>
               </div>
             </div>
@@ -183,14 +189,15 @@
               <p class="verification-description">A one-time code will be sent to your PHINMA Gmail address whenever you log in.</p>
             </div>
             <label class="settings-label verification-password-label" for="two-factor-password">Confirm with your current password</label>
-            <div class="verification-password-wrap">
+            <div class="verification-password-wrap" :class="{ 'is-invalid': twoFactorPasswordError }">
               <svg class="verification-password-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              <input id="two-factor-password" v-model="twoFactorPassword" :type="showTwoFactorPassword ? 'text' : 'password'" class="settings-input" placeholder="Enter current password" />
+              <input id="two-factor-password" ref="twoFactorPasswordInput" v-model="twoFactorPassword" :type="showTwoFactorPassword ? 'text' : 'password'" class="settings-input" :aria-invalid="Boolean(twoFactorPasswordError)" :aria-describedby="twoFactorPasswordError ? 'two-factor-password-error' : undefined" placeholder="Enter current password" @input="twoFactorPasswordError = ''" />
               <button type="button" class="pw-eye" :aria-label="showTwoFactorPassword ? 'Hide current password' : 'Show current password'" @click="showTwoFactorPassword = !showTwoFactorPassword">
                 <svg v-if="!showTwoFactorPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
               </button>
             </div>
+            <p v-if="twoFactorPasswordError" id="two-factor-password-error" class="verification-password-error" role="alert">{{ twoFactorPasswordError }}</p>
             <p class="verification-help">Your password is used only to confirm this security setting.</p>
           </div>
         </div>
@@ -233,6 +240,17 @@
               </div>
             </div>
           </div>
+
+          <a class="settings-support-link" href="mailto:citscheduler@gmail.com">
+            <span class="settings-support-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+            </span>
+            <span class="settings-support-copy">
+              <strong>Need help?</strong>
+              <small>Contact support at citscheduler@gmail.com</small>
+            </span>
+            <svg class="settings-support-arrow" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
         </div>
 
       </div>
@@ -350,6 +368,9 @@ function confirmLogout() {
 /* ── Change Password ── */
 const passwordForm = ref({ current: '', otp: '', newPw: '', confirmPw: '' })
 const passwordStep = ref(1)
+const currentPasswordError = ref('')
+const currentPasswordInput = ref(null)
+const otpError = ref('')
 const showCurrent  = ref(false)
 const showNew      = ref(false)
 const showConfirm  = ref(false)
@@ -363,6 +384,8 @@ let otpTimer = null
 const formattedOtpTime = computed(() => `0:${String(otpSecondsRemaining.value).padStart(2, '0')}`)
 const twoFactorEnabled = ref(Boolean(user.twoFactorEnabled))
 const twoFactorPassword = ref('')
+const twoFactorPasswordError = ref('')
+const twoFactorPasswordInput = ref(null)
 const showTwoFactorPassword = ref(false)
 const isSavingTwoFactor = ref(false)
 
@@ -396,6 +419,7 @@ function showSettingsSuccess(message) {
 
 function syncOtpValue() {
   passwordForm.value.otp = otpDigits.value.join('')
+  if (passwordForm.value.otp) otpError.value = ''
 }
 
 function resetOtpDigits() {
@@ -429,9 +453,11 @@ function handleOtpPaste(event) {
 async function toggleTwoFactor() {
   const enabled = !twoFactorEnabled.value
   if (!twoFactorPassword.value) {
-    showSettingsError('Enter your current password to confirm this change.')
+    twoFactorPasswordError.value = 'Enter your current password to confirm this change.'
+    twoFactorPasswordInput.value?.focus()
     return
   }
+  twoFactorPasswordError.value = ''
   isSavingTwoFactor.value = true
   try {
     const response = await apiRequest('/auth/me', {
@@ -443,7 +469,8 @@ async function toggleTwoFactor() {
     twoFactorPassword.value = ''
     showSettingsSuccess(enabled ? 'Email verification enabled.' : 'Email verification disabled.')
   } catch (error) {
-    showSettingsError(error.message || 'Unable to update email verification.')
+    twoFactorPasswordError.value = error.message || 'Unable to update email verification.'
+    twoFactorPasswordInput.value?.focus()
   } finally {
     isSavingTwoFactor.value = false
   }
@@ -471,9 +498,11 @@ function startOtpTimer() {
 
 async function sendOtp() {
   if (!passwordForm.value.current) {
-    showSettingsError('Please enter your current password first.')
+    currentPasswordError.value = 'Please enter your current password first.'
+    currentPasswordInput.value?.focus()
     return
   }
+  currentPasswordError.value = ''
 
   isSendingOtp.value = true
   try {
@@ -493,14 +522,21 @@ async function sendOtp() {
 }
 
 function advancePasswordStep() {
-  if (!passwordForm.value.current || !passwordForm.value.otp) {
-    showSettingsError('Enter your current password and the OTP to continue.')
+  if (!passwordForm.value.current) {
+    currentPasswordError.value = 'Please enter your current password first.'
+    currentPasswordInput.value?.focus()
+    return
+  }
+  currentPasswordError.value = ''
+  if (!passwordForm.value.otp) {
+    otpError.value = 'Enter the OTP sent to your email to continue.'
     return
   }
   if (!/^\d{6}$/.test(passwordForm.value.otp)) {
-    showSettingsError('Enter the 6-digit OTP sent to your email.')
+    otpError.value = 'Enter the 6-digit OTP sent to your email.'
     return
   }
+  otpError.value = ''
   passwordStep.value = 2
 }
 
@@ -837,6 +873,12 @@ function highlightFaqText(text) {
   max-width: none;
   width: 100%;
 }
+.settings-body :deep(.device-panel) {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.settings-card-title { font-size: .88rem; }
+.verification-card .settings-card-title { font-size: .82rem; }
 
 /* ── Card ── */
 .settings-card {
@@ -976,6 +1018,20 @@ function highlightFaqText(text) {
   width: 100%;
   max-width: none;
   padding-right: 48px;
+}
+.pw-input-wrap.is-invalid .settings-input,
+.pw-input-wrap.is-invalid .settings-input:focus,
+.pw-input-wrap.is-invalid:focus-within .settings-input {
+  border: 1.5px solid #c62835 !important;
+  border-color: #c62835 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(198,40,53,.2), 0 3px 10px rgba(160,35,45,.12) !important;
+}
+.change-password-field-error { margin: 5px 0 0; color: #a92d35; font-size: .72rem; line-height: 1.4; }
+.otp-boxes.is-invalid .otp-digit,
+.otp-boxes.is-invalid .otp-digit:focus {
+  border-color: #c62835 !important;
+  box-shadow: 0 0 0 2px rgba(198,40,53,.16) !important;
 }
 .pw-eye {
   position: absolute;
@@ -1311,7 +1367,17 @@ function highlightFaqText(text) {
   padding-left: 40px;
   background: rgba(255,255,255,.9);
 }
+.verification-password-wrap.is-invalid .settings-input,
+.verification-password-wrap.is-invalid .settings-input:focus,
+.verification-password-wrap.is-invalid:focus-within .settings-input {
+  border: 1.5px solid #c62835 !important;
+  border-color: #c62835 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(198,40,53,.2), 0 3px 10px rgba(160,35,45,.12) !important;
+}
+.verification-password-wrap.is-invalid .verification-password-icon { color: #b93840; }
 .verification-password-wrap .pw-eye { right: 8px; }
+.verification-password-error { margin: 5px 0 0; color: #a92d35; font-size: .72rem; line-height: 1.4; }
 .verification-password-icon {
   position: absolute;
   left: 14px;
@@ -1491,6 +1557,40 @@ function highlightFaqText(text) {
 
 /* ── FAQ Section ── */
 .settings-faq-section { display: flex; flex-direction: column; gap: 0; padding: 4px 0 0; }
+.settings-support-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 15px 17px;
+  color: #34424b;
+  text-decoration: none;
+  background: rgba(255,255,255,.82);
+  border: 1px solid #d8e0e4;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(48,60,68,.05);
+  transition: border-color .18s, background .18s, transform .18s, box-shadow .18s;
+}
+.settings-support-link:hover {
+  background: #fff;
+  border-color: #aebbc3;
+  box-shadow: 0 6px 16px rgba(48,60,68,.1);
+  transform: translateY(-1px);
+}
+.settings-support-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  color: #4b5962;
+  background: #edf1f3;
+  border-radius: 10px;
+}
+.settings-support-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.settings-support-copy strong { color: #26323a; font-size: .86rem; font-weight: 800; }
+.settings-support-copy small { color: #66747d; font-size: .76rem; overflow-wrap: anywhere; }
+.settings-support-arrow { margin-left: auto; flex: 0 0 auto; color: #71808a; }
 .faq-header {
   display: flex;
   align-items: center;
@@ -1617,6 +1717,7 @@ function highlightFaqText(text) {
 
 /* ── Logout Modal ── */
 .logout-modal-box {
+  box-sizing: border-box;
   background: #fff;
   border-radius: 20px;
   padding: 36px 40px 32px;
@@ -1684,23 +1785,108 @@ function highlightFaqText(text) {
 @media (min-width: 1440px) {
   .settings-card-icon { width: 40px; height: 40px; }
   .settings-card-icon svg { width: 24px; height: 24px; }
-  .settings-card-title { font-size: 1.05rem; }
-  .verification-card .settings-card-title { font-size: 1.05rem; }
+  .settings-card-title { font-size: .3rem; }
+  .verification-card .settings-card-title { font-size: .3rem; }
+  :global(.layout:has(> .admin-sidebar) > .main .two-factor-card .settings-card-title),
+  :global(.layout:has(> .admin-sidebar) > .main .verification-card .settings-card-title) {
+    font-size: 1rem !important;
+    line-height: 1.2 !important;
+  }
   .faq-title { font-size: 1.55rem; }
 }
-@media (max-width: 1100px) {
-  .settings-body { grid-template-columns: 1fr; }
-  .settings-row { grid-template-columns: 1fr; }
-  .main { padding: 24px 18px 32px; }
+@media (max-width: 1200px) {
+  .settings-body { grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 10px; }
+  .main { padding: 24px clamp(14px, 2.2vw, 24px) 28px; }
+  .settings-card { height: auto; border-radius: 16px; padding: 14px 16px 16px; }
+  .settings-card-header { gap: 7px; }
+  .settings-card-title,
+  .verification-card .settings-card-title { font-size: .82rem; }
+  .settings-card-sub { font-size: .68rem; line-height: 1.4; }
+  .settings-label { font-size: .68rem; }
+  .settings-input { min-height: 38px; padding: 7px 10px; font-size: .78rem; }
+  .settings-form { gap: 9px; }
+  .settings-group { gap: 5px; }
+  .settings-row--identity { gap: 11px; }
+  .settings-step-label { font-size: .62rem; }
+  .otp-wrap { gap: 6px; }
+  .otp-boxes { flex-basis: 216px; width: min(100%, 216px); grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+  .otp-digit { height: 36px; font-size: 1rem; }
+  .otp-btn { min-width: 92px; min-height: 36px; gap: 5px; padding-inline: 8px; font-size: .68rem; }
+  .update-pw-btn, .password-back-btn { min-width: 138px; min-height: 36px; padding: 8px 14px; font-size: .74rem; }
+  .verification-content { gap: 9px; }
+  .verification-intro { padding: 10px 12px; }
+  .verification-badge { font-size: .62rem; }
+  .verification-description, .verification-help { font-size: .66rem; }
+  .verification-password-label { font-size: .66rem; }
+  .tfa-status { font-size: .62rem; }
+  .toggle-switch { transform: scale(.88); transform-origin: right center; }
+  .page-title { font-size: clamp(1.55rem, 2.4vw, 1.9rem); }
+  .page-sub { font-size: .78rem; }
+  .main-header { margin-bottom: 16px; }
+  :global(.layout:has(> .admin-sidebar) > .main) { padding: 16px 14px 24px !important; }
+  :global(.layout:has(> .admin-sidebar) > .main .page-title) { font-size: clamp(1.2rem, 2vw, 1.45rem) !important; }
+  :global(.layout:has(> .admin-sidebar) > .main .two-factor-card .settings-card-title),
+  :global(.layout:has(> .admin-sidebar) > .main .verification-card .settings-card-title) { font-size: .9rem !important; line-height: 1.2 !important; }
+  :global(.layout:has(> .admin-sidebar) > .main .settings-card-sub),
+  :global(.layout:has(> .admin-sidebar) > .main .page-sub) { font-size: .68rem !important; }
+  :global(.layout:has(> .admin-sidebar) > .main .settings-card-header) { gap: 6px; }
+  :global(.layout:has(> .admin-sidebar) > .main .settings-label),
+  :global(.layout:has(> .admin-sidebar) > .main .settings-step-label),
+  :global(.layout:has(> .admin-sidebar) > .main .verification-description),
+  :global(.layout:has(> .admin-sidebar) > .main .verification-help),
+  :global(.layout:has(> .admin-sidebar) > .main button),
+  :global(.layout:has(> .admin-sidebar) > .main input) { font-size: .66rem !important; }
+  :global(.layout:has(> .admin-sidebar) > .main .settings-card) { padding: 12px !important; }
 }
 @media (max-width: 520px) {
-  .settings-card { padding: 10px 12px 12px; }
-  .settings-card-title { font-size: 0.78rem; }
-  .verification-card .settings-card-title { font-size: .68rem; }
+  .settings-body { grid-template-columns: minmax(0, 1fr); }
+  .settings-row { grid-template-columns: minmax(0, 1fr); }
+  .main { padding: 18px 12px 24px; }
+  .main-header { margin-bottom: 14px; }
+  .settings-eyebrow { font-size: .62rem; }
+  .page-title { font-size: 1.65rem; }
+  .page-sub { font-size: .8rem; line-height: 1.45; }
+  .settings-body { gap: 10px; }
+  .settings-card { padding: 12px; border-radius: 14px; }
+  .settings-card-header { gap: 8px; margin-bottom: 9px; padding-bottom: 8px; }
+  .settings-card-icon { width: 30px; height: 30px; border-radius: 9px; }
+  .settings-card-icon svg { width: 17px; height: 17px; }
+  .settings-card-title,
+  .verification-card .settings-card-title { font-size: .82rem; }
+  .settings-card-sub { font-size: .72rem; line-height: 1.45; }
+  .settings-label { font-size: .7rem; }
+  .settings-input { min-height: 40px; padding: 8px 11px; font-size: .82rem; }
+  .settings-form { gap: 10px; }
+  .settings-group { gap: 6px; }
+  .settings-step-label { margin-bottom: 2px; }
+  .otp-wrap { flex-direction: column; gap: 8px; }
+  .otp-boxes { width: 100%; max-width: 100%; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+  .otp-digit { height: 38px; font-size: 1.05rem; }
+  .otp-btn, .update-pw-btn, .password-back-btn { min-height: 38px; font-size: .78rem; }
+  .otp-btn { width: 100%; }
+  .update-pw-btn { min-width: 0; padding: 9px 18px; }
+  .verification-content { gap: 10px; }
+  .verification-intro { padding: 10px 12px; }
+  .verification-description, .verification-help { font-size: .7rem; }
+  .settings-support-link { gap: 9px; margin-top: 16px; padding: 12px; }
+  .settings-support-icon { flex-basis: 34px; width: 34px; height: 34px; }
+  .settings-support-copy strong { font-size: .8rem; }
+  .settings-support-copy small { font-size: .68rem; }
+  .logout-modal-box { width: min(360px, calc(100vw - 28px)); padding: 22px 18px 18px; border-radius: 16px; gap: 8px; }
+  .logout-modal-icon { width: 52px; height: 52px; }
+  .logout-modal-icon svg { width: 26px; height: 26px; }
+  .logout-modal-title { font-size: 1.15rem; }
+  .logout-modal-sub { font-size: .8rem; }
+  .logout-modal-actions { gap: 10px; margin-top: 2px; }
+  .logout-cancel-btn, .logout-confirm-btn { font-size: .84rem; padding: 8px 14px; }
+  :global(.settings-alert-popup) { width: min(340px, calc(100vw - 28px)) !important; padding: 12px 14px 10px !important; border-radius: 14px !important; }
+  :global(.settings-alert-popup .settings-alert-icon) { width: 62px !important; height: 62px !important; }
+  :global(.settings-alert-symbol) { width: 60px; height: 60px; }
+  :global(.settings-alert-symbol svg) { width: 52px; height: 52px; }
+  :global(.settings-alert-popup .settings-alert-title) { font-size: .98rem !important; }
+  :global(.settings-alert-popup .settings-alert-text) { font-size: .76rem !important; }
+  :global(.settings-alert-popup .settings-alert-confirm) { min-width: 92px !important; padding: 6px 14px !important; font-size: .74rem !important; }
   .faq-question { font-size: 0.82rem; padding: 14px; }
   .faq-answer { font-size: 0.88rem; padding: 0 14px 14px; }
-  .otp-wrap { flex-direction: column; }
-  .otp-boxes { width: 100%; }
-  .otp-btn { width: 100%; }
 }
 </style>

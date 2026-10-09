@@ -1,13 +1,5 @@
 <template>
   <div class="layout">
-    <Transition name="toast">
-      <div v-if="toastMessage" class="um-toast" role="status" aria-live="polite">
-        <span class="um-toast-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        </span>
-        <span>{{ toastMessage }}</span>
-      </div>
-    </Transition>
     <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
     <aside class="sidebar admin-sidebar">
       <AdminSidebarToggle />
@@ -93,7 +85,10 @@
         </div>
         <div :class="['um-stat-card', 'um-stat-card--clickable', { 'um-stat-card--selected': userStatFilter === 'teachers' }]" role="button" tabindex="0" aria-label="Show teachers" @click="selectUserStat('teachers')" @keydown.enter="selectUserStat('teachers')" @keydown.space.prevent="selectUserStat('teachers')">
           <div class="um-stat-icon um-stat-icon--teacher">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="7.5" r="3.5"/>
+              <path d="M5 20v-1.5a7 7 0 0 1 14 0V20"/>
+            </svg>
           </div>
           <div class="um-stat-info">
             <div class="um-stat-val">{{ teacherUserCount }}</div>
@@ -211,7 +206,7 @@
 
       <!-- Table -->
       <div v-if="loadError" class="um-error-banner">{{ loadError }}</div>
-      <div v-else-if="autoRefreshNotice" class="um-info-banner">{{ autoRefreshNotice }}</div>
+      <div v-if="autoRefreshNotice" class="um-info-banner" role="status" aria-live="polite">{{ autoRefreshNotice }}</div>
       <div class="um-table-wrap">
         <table class="um-table" :class="{ 'um-table--selecting': isMultiSelectMode }">
           <thead>
@@ -325,6 +320,18 @@
     </main>
   </div>
 
+  <Teleport to="body">
+    <Transition name="toast">
+      <div v-if="toastMessage" :class="['um-toast', `um-toast--${toastType}`]" :role="toastType === 'error' ? 'alert' : 'status'" aria-live="polite">
+        <span class="um-toast-icon" aria-hidden="true">
+          <svg v-if="toastType === 'error'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6m0-6 6 6"/></svg>
+          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        <span>{{ toastMessage }}</span>
+      </div>
+    </Transition>
+  </Teleport>
+
   <!-- ═══ Add / Edit User Modal ═══ -->
   <Teleport to="body">
     <div v-if="showUserModal" class="modal-overlay" @click.self="showUserModal = false">
@@ -416,6 +423,7 @@
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
                 <option value="Denied">Denied</option>
+                <option value="Archived">Archived</option>
               </select>
             </div>
           </div>
@@ -479,10 +487,10 @@
             </div>
           </div>
 
-          <div v-if="formError" class="um-pw-error">{{ formError }}</div>
           <div class="form-actions">
             <button type="submit" class="um-submit-btn" :disabled="isSavingUser">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg v-if="isSavingUser" class="um-submit-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+              <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               {{ isSavingUser ? 'Saving...' : (editingUser ? 'Save Changes' : 'Register User') }}
             </button>
           </div>
@@ -548,7 +556,7 @@
     <div v-if="showArchiveModal" class="modal-overlay" @click.self="showArchiveModal = false">
       <div class="um-delete-box">
         <div class="um-delete-icon" style="background:#fff7ed;">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
         </div>
         <h2 class="um-delete-title">Archive User?</h2>
         <p class="um-delete-sub">This will archive <strong>{{ archiveTarget?.name }}</strong>. They will no longer have access but their data will be preserved.</p>
@@ -562,7 +570,7 @@
 
   <Teleport to="body">
     <div v-if="showBulkArchiveModal" class="modal-overlay" @click.self="showBulkArchiveModal = false">
-      <div class="um-delete-box" role="dialog" aria-modal="true" aria-labelledby="bulk-archive-title">
+      <div class="um-delete-box um-delete-box--bulk-archive" role="dialog" aria-modal="true" aria-labelledby="bulk-archive-title">
         <div class="um-delete-icon um-bulk-archive-icon">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
         </div>
@@ -641,7 +649,7 @@
   <!-- ═══ Sweet Alert — Register Confirm ═══ -->
   <Teleport to="body">
     <div v-if="showRegisterConfirm" class="modal-overlay">
-      <div class="swal-box" role="dialog" aria-modal="true" aria-labelledby="register-confirm-title" aria-describedby="register-confirm-description">
+      <div class="swal-box swal-box--register" role="dialog" aria-modal="true" aria-labelledby="register-confirm-title" aria-describedby="register-confirm-description">
         <div class="swal-icon swal-icon--warning" aria-hidden="true">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
         </div>
@@ -649,7 +657,7 @@
         <p id="register-confirm-description" class="swal-description">Please review the account details before continuing.</p>
         <div class="swal-actions">
           <button class="swal-cancel" @click="showRegisterConfirm = false">Cancel</button>
-          <button class="swal-continue swal-continue--success" @click="confirmSaveUser">Continue</button>
+          <button class="swal-continue" @click="confirmSaveUser">Continue</button>
         </div>
       </div>
     </div>
@@ -720,7 +728,7 @@
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
 import { initialsAvatar } from '@/utils/avatar.js'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -785,14 +793,21 @@ const users = ref([])
 const isLoadingUsers = ref(false)
 const loadError = ref('')
 const toastMessage = ref('')
+const toastType = ref('success')
 let toastTimer
 
-function showToast(message) {
+function showToast(message, type = 'success') {
   toastMessage.value = message
+  toastType.value = type
   clearTimeout(toastTimer)
   toastTimer = window.setTimeout(() => {
     toastMessage.value = ''
-  }, 2800)
+  }, 5000)
+}
+
+function showUserFormError(message) {
+  formError.value = message
+  showToast(message, 'error')
 }
 const autoRefreshNotice = ref('')
 const isBulkApproving = ref(false)
@@ -803,10 +818,13 @@ const PHINMA_EMAIL_REGEX = /^[a-z0-9._%+-]+\.au@phinmaed\.com$/i
 const VALID_LAST_NAME_REGEX = /^[\p{L}\p{M}]+(?:[ '\u2019.-][\p{L}\p{M}]+)*$/u
 const AUTO_REFRESH_MS = 10000
 let autoRefreshTimer = null
-let autoRefreshNoticeTimer = null
 
 const pendingCount = computed(() => {
   return users.value.filter((u) => u.status === 'Pending').length
+})
+
+watch(pendingCount, (count) => {
+  if (count === 0) autoRefreshNotice.value = ''
 })
 
 const adminUserCount = computed(() => users.value.filter(u => {
@@ -1044,12 +1062,6 @@ async function fetchUsers(options = {}) {
       if (currentPendingCount > previousPendingCount) {
         const diff = currentPendingCount - previousPendingCount
         autoRefreshNotice.value = `${diff} new pending student account${diff > 1 ? 's' : ''} detected.`
-        if (autoRefreshNoticeTimer) {
-          clearTimeout(autoRefreshNoticeTimer)
-        }
-        autoRefreshNoticeTimer = setTimeout(() => {
-          autoRefreshNotice.value = ''
-        }, 3500)
       }
     }
   } catch (error) {
@@ -1082,10 +1094,6 @@ function stopAutoRefreshUsers() {
     autoRefreshTimer = null
   }
 
-  if (autoRefreshNoticeTimer) {
-    clearTimeout(autoRefreshNoticeTimer)
-    autoRefreshNoticeTimer = null
-  }
 }
 
 function trimValue(value) {
@@ -1207,9 +1215,9 @@ function openEditUser(user) {
 
 async function validateCurrentAdminPassword() {
   if (!userForm.value.currentPassword) {
-    formError.value = editingUser.value
+    showUserFormError(editingUser.value
       ? 'Your current password is required to save changes.'
-      : 'Your current password is required to add a new user.'
+      : 'Your current password is required to add a new user.')
     return false
   }
 
@@ -1221,7 +1229,7 @@ async function validateCurrentAdminPassword() {
     })
     return true
   } catch (error) {
-    formError.value = error.message || 'Current admin password is incorrect.'
+    showUserFormError(error.message || 'Current admin password is incorrect.')
     return false
   }
 }
@@ -1233,37 +1241,37 @@ async function saveUser() {
   const normalizedLastName = trimValue(userForm.value.lastName).replace(/\s+/g, ' ')
 
   if (!VALID_LAST_NAME_REGEX.test(normalizedLastName)) {
-    formError.value = 'Last name may contain letters, spaces, hyphens, apostrophes, and periods only.'
+    showUserFormError('Last name may contain letters, spaces, hyphens, apostrophes, and periods only.')
     return
   }
 
   if (!trimmedSchoolId) {
-    formError.value = 'School ID Number is required.'
+    showUserFormError('School ID Number is required.')
     return
   }
 
   if (isTeacherRole.value && !/^AU\d{4}-\d{4,5}$/.test(trimmedSchoolId)) {
-    formError.value = 'Employee ID must use the format AU2025-0000 or AU2025-00000.'
+    showUserFormError('Employee ID must use the format AU2025-0000 or AU2025-00000.')
     return
   }
 
   if (!isTeacherRole.value && !/^\d{2}-\d{4}-\d{6}$/.test(trimmedSchoolId)) {
-    formError.value = 'School ID must use the format 00-0000-000000.'
+    showUserFormError('School ID must use the format 00-0000-000000.')
     return
   }
 
   if (!PHINMA_EMAIL_REGEX.test(normalizedEmail)) {
-    formError.value = 'PHINMA Email must end with .au@phinmaed.com.'
+    showUserFormError('PHINMA Email must end with .au@phinmaed.com.')
     return
   }
 
   if (!editingUser.value) {
     if (userForm.value.password !== userForm.value.confirmPassword) {
-      formError.value = 'Passwords do not match.'
+      showUserFormError('Passwords do not match.')
       return
     }
     if (!userForm.value.password || userForm.value.password.length < 8) {
-      formError.value = 'Password must be at least 8 characters.'
+      showUserFormError('Password must be at least 8 characters.')
       return
     }
   }
@@ -1477,7 +1485,7 @@ async function confirmSaveUser() {
     showUserModal.value = false
     showToast(wasEditing ? 'User updated successfully.' : 'User added successfully.')
   } catch (error) {
-    formError.value = error.message || 'Failed to save user.'
+    showUserFormError(error.message || 'Failed to save user.')
   } finally {
     isSavingUser.value = false
   }
@@ -1960,9 +1968,9 @@ function confirmRestoreUser() {
   margin-bottom: 14px;
 }
 .um-info-banner {
-  background: #f3f4f6;
-  border: 1px solid #b7dfca;
-  color: #4f575f;
+  background: #fff8e8;
+  border: 1px solid #e8cf91;
+  color: #76591d;
   padding: 12px 16px;
   border-radius: 12px;
   font-size: 0.9rem;
@@ -2409,7 +2417,7 @@ function confirmRestoreUser() {
 }
 .um-delete-confirm-btn:hover { background: #c1121f; }
 .um-archive-confirm-btn {
-  background: #f59e0b;
+  background: #d97706;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -2420,7 +2428,22 @@ function confirmRestoreUser() {
   cursor: pointer;
   transition: background 0.18s;
 }
-.um-archive-confirm-btn:hover { background: #d97706; }
+.um-archive-confirm-btn:hover { background: #b45309; }
+.um-delete-box--bulk-archive {
+  width: min(440px, calc(100vw - 32px));
+  padding-inline: clamp(20px, 5vw, 36px);
+}
+.um-delete-box--bulk-archive .um-delete-actions { gap: 10px; }
+.um-delete-box--bulk-archive .um-delete-actions > button {
+  min-width: 0;
+  flex: 1 1 0;
+  padding-inline: 14px;
+  white-space: nowrap;
+}
+@media (max-width: 420px) {
+  .um-delete-box--bulk-archive .um-delete-actions { flex-direction: column; }
+  .um-delete-box--bulk-archive .um-delete-actions > button { width: 100%; flex: 0 0 auto; }
+}
 
 /* ── OTP Input ── */
 .um-otp-hint {
@@ -2545,7 +2568,7 @@ function confirmRestoreUser() {
   position: fixed;
   top: 24px;
   right: 24px;
-  z-index: 3000;
+  z-index: 10000;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2569,6 +2592,15 @@ function confirmRestoreUser() {
   border-radius: 8px;
   background: #dff1e5;
   color: #2f8250;
+}
+.um-toast--error {
+  border-color: #f1c2c2;
+  background: #fff7f7;
+  color: #9f2f35;
+}
+.um-toast--error .um-toast-icon {
+  background: #fde5e5;
+  color: #c43f46;
 }
 .toast-enter-active,
 .toast-leave-active { transition: opacity .2s ease, transform .2s ease; }
@@ -3148,13 +3180,13 @@ function confirmRestoreUser() {
 .um-stat-card { justify-content: flex-start; }
 .um-stat-info {
   flex-direction: column-reverse;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   gap: 3px;
   flex-wrap: nowrap;
   flex: 1;
   min-width: 0;
-  text-align: center;
+  text-align: left;
 }
 
 @media (max-width: 1280px) {
@@ -3351,15 +3383,61 @@ function confirmRestoreUser() {
 }
 .swal-continue:hover { background: #35424d; }
 .swal-continue--success {
-  border-color: #176b3a;
-  background: #21834b;
+  border-color: #0f5132;
+  background: #176b3a;
 }
-.swal-continue--success:hover { background: #176b3a; }
+.swal-continue--success:hover { background: #10452f; }
 .swal-continue--danger {
-  border-color: #b52222;
-  background: #c62828;
+  border-color: #8f1d1d;
+  background: #a91f1f;
 }
-.swal-continue--danger:hover { background: #a51f1f; }
+.swal-continue--danger:hover { background: #861919; }
+
+/* Registration confirmation follows the app's neutral modal and button theme. */
+.swal-box--register {
+  width: min(410px, calc(100vw - 32px));
+  gap: 8px;
+  padding: clamp(20px, 3vw, 26px);
+  border-color: #d5dde1;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #f8fafb, #e7ebed);
+  box-shadow: 0 24px 60px rgba(34,45,54,.28), inset 0 1px 0 rgba(255,255,255,.85);
+}
+.swal-box:not(.swal-box--register) {
+  width: min(390px, calc(100vw - 32px));
+}
+.swal-box--register .swal-icon {
+  width: 68px;
+  height: 68px;
+  flex-basis: 68px;
+}
+.swal-box--register .swal-icon svg { width: 34px; height: 34px; }
+.swal-box--register .swal-text { margin-bottom: -4px; }
+.swal-box--register .swal-description { margin-top: 0; margin-bottom: 4px; }
+.swal-box .swal-text { margin-bottom: -4px; }
+.swal-box .swal-description { margin-top: 0; }
+.swal-box--register .swal-continue {
+  border-color: #3e4d58;
+  background: linear-gradient(145deg, #5c6771, #343e47);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(45,55,63,.18), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.swal-box--register .swal-continue:hover {
+  background: linear-gradient(145deg, #687580, #3d4852);
+}
+.swal-box--register .swal-cancel {
+  border-color: #d2dbe0;
+  background: #fff;
+  color: #4f5b66;
+}
+.swal-box--register .swal-cancel:hover { background: #eef2f4; }
+
+@media (max-width: 480px) {
+  .swal-box--register { gap: 10px; padding: 22px 18px 18px; }
+  .swal-box--register .swal-actions { gap: 8px; }
+  .swal-box--register .swal-cancel,
+  .swal-box--register .swal-continue { min-height: 46px; }
+}
 
 @media (min-width: 901px) {
   .um-view-tabs { flex: 0 0 160px; }
@@ -3377,4 +3455,255 @@ function confirmRestoreUser() {
   background: #14532d;
 }
 .um-approve-all-btn:hover { background: #0f3d22; }
+
+/* Keep the registration form usable on short screens and small devices. */
+.um-modal-box--wide {
+  width: min(840px, calc(100vw - 40px));
+  max-height: min(900px, calc(100dvh - 40px));
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.um-modal-box--wide .um-modal-banner { flex: 0 0 auto; }
+.um-modal-box--wide .um-form {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.um-modal-box--wide .form-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  margin: auto -30px 0;
+  padding: 14px 30px 18px;
+  border-top: 1px solid #dce3e7;
+  border-radius: 0 0 18px 18px;
+  background: rgba(247,249,250,.98);
+  box-shadow: 0 -8px 18px rgba(42,52,59,.06);
+}
+.um-modal-box--wide .um-submit-btn {
+  min-height: 46px;
+  min-width: 0;
+  padding: 0 18px;
+  gap: 8px;
+  border: 1px solid #3e4d58;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #5c6771, #343e47);
+  color: #fff;
+  font-family: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(45,55,63,.2), inset 0 1px 0 rgba(255,255,255,.3);
+  transition: background .18s, transform .18s, box-shadow .18s;
+}
+.um-modal-box--wide .um-submit-btn:hover:not(:disabled) {
+  background: linear-gradient(145deg, #687580, #3d4852);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(45,55,63,.24), inset 0 1px 0 rgba(255,255,255,.3);
+}
+.um-modal-box--wide .um-submit-btn:active:not(:disabled) { transform: translateY(0); }
+.um-submit-btn:disabled { cursor: wait; opacity: .78; }
+.um-submit-spinner { animation: um-submit-spin .8s linear infinite; }
+@keyframes um-submit-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 640px) {
+  .modal-overlay { align-items: flex-end; padding: 10px; }
+  .um-modal-box--wide {
+    width: 100%;
+    max-width: 560px;
+    max-height: calc(100dvh - 20px);
+    border-radius: 18px;
+  }
+  .um-modal-box--wide .um-modal-banner { min-height: 76px; padding: 14px 58px 14px 16px; }
+  .um-modal-banner-icon { width: 42px; height: 42px; flex: 0 0 42px; }
+  .um-modal-banner-title { font-size: 1.05rem; }
+  .um-modal-banner-sub { font-size: .76rem; }
+  .um-modal-close { top: 14px; right: 14px; }
+  .um-modal-box--wide .um-form { padding: 16px 16px 0; gap: 12px; }
+  .form-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .reg-avatar-row { gap: 12px; }
+  .um-modal-box--wide .form-actions { margin: auto -16px 0; padding: 12px 16px max(14px, env(safe-area-inset-bottom)); }
+  .um-submit-btn { width: 100%; min-width: 0; }
+  .um-toast { top: max(12px, env(safe-area-inset-top)); right: 12px; max-width: calc(100vw - 24px); }
+}
+
+@media (max-height: 620px) and (min-width: 641px) {
+  .modal-overlay { align-items: flex-start; padding-block: 12px; }
+  .um-modal-box--wide { max-height: calc(100dvh - 24px); }
+}
+
+@media (max-width: 1360px) {
+  .um-user-stats .um-stats-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 2px 8px;
+    scrollbar-width: thin;
+  }
+  .um-user-stats .um-stat-card {
+    flex: 0 0 132px;
+    min-width: 0;
+    min-height: 76px;
+    gap: 7px;
+    padding: 8px;
+    border-radius: 14px;
+  }
+  .um-user-stats .um-stat-icon {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border-radius: 11px;
+  }
+  .um-user-stats .um-stat-icon svg { width: 23px; height: 23px; }
+  .um-user-stats .um-stat-info { min-width: 0; gap: 2px; }
+  .um-user-stats .um-stat-val { font-size: 1.1rem; }
+  .um-user-stats .um-stat-label {
+    width: auto;
+    max-width: 100%;
+    font-size: .62rem;
+    line-height: 1.15;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+}
+
+@media (max-width: 900px) {
+  .um-user-stats .um-stat-card {
+    flex-basis: 116px;
+    min-height: 68px;
+    gap: 6px;
+    padding: 7px;
+  }
+  .um-user-stats .um-stat-icon {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+    border-radius: 9px;
+  }
+  .um-user-stats .um-stat-icon svg { width: 20px; height: 20px; }
+  .um-user-stats .um-stat-icon span { font-size: .67rem; }
+  .um-user-stats .um-stat-val { font-size: 1rem; }
+  .um-user-stats .um-stat-label { font-size: .58rem; }
+}
+
+@media (max-width: 1360px) {
+  .um-management-panel { min-width: 0; padding: 18px; }
+  .um-overview-heading h2 { font-size: 1.25rem; }
+  .um-overview-heading p { font-size: .72rem; }
+  .um-topbar { gap: 10px; margin-bottom: 14px; padding-bottom: 14px; }
+  .um-print-btn,
+  .um-select-mode-btn,
+  .um-approve-all-btn,
+  .um-approve-selected-btn,
+  .um-bulk-archive-btn {
+    min-height: 36px;
+    padding: 0 10px;
+    border-radius: 9px;
+    font-size: .68rem;
+  }
+  .um-print-btn svg,
+  .um-select-mode-btn svg,
+  .um-approve-all-btn svg,
+  .um-approve-selected-btn svg,
+  .um-bulk-archive-btn svg { width: 14px; height: 14px; }
+  .um-stats-actions { gap: 6px; margin-bottom: 10px; }
+  .um-stats-actions .um-select-mode-btn { flex: 0 0 auto; }
+  .um-stats-actions .um-search-wrap { flex: 1 1 150px; min-width: 130px; }
+  .um-stats-actions .um-search-input,
+  .um-stats-actions .um-filter-select { height: 36px; font-size: .7rem; }
+  .um-stats-actions .um-filter-select { flex: 1 1 105px; min-width: 95px; }
+  .um-stats-actions .um-filter-select--status { flex-basis: 110px; min-width: 100px; }
+  .um-stats-actions .um-approve-all-btn { margin-left: auto; }
+
+  .um-table-wrap { max-width: 100%; overflow-x: auto; }
+  .um-table { table-layout: fixed; }
+  .um-table th { padding: 8px 5px; font-size: .56rem; letter-spacing: .02em; white-space: nowrap; }
+  .um-table td { padding: 7px 5px; }
+  .um-table:not(.um-table--selecting) th:nth-child(1),
+  .um-table:not(.um-table--selecting) td:nth-child(1) { width: 23%; }
+  .um-table:not(.um-table--selecting) th:nth-child(2),
+  .um-table:not(.um-table--selecting) td:nth-child(2) { width: 25%; }
+  .um-table:not(.um-table--selecting) th:nth-child(3),
+  .um-table:not(.um-table--selecting) td:nth-child(3) { width: 12%; }
+  .um-table:not(.um-table--selecting) th:nth-child(4),
+  .um-table:not(.um-table--selecting) td:nth-child(4) { width: 14%; }
+  .um-table:not(.um-table--selecting) th:nth-child(5),
+  .um-table:not(.um-table--selecting) td:nth-child(5) { width: 12%; }
+  .um-table--selecting th:nth-child(1),
+  .um-table--selecting td:nth-child(1) { width: 28px; }
+  .um-table--selecting th:nth-child(2),
+  .um-table--selecting td:nth-child(2) { width: 21%; }
+  .um-table--selecting th:nth-child(3),
+  .um-table--selecting td:nth-child(3) { width: 23%; }
+  .um-table--selecting th:nth-child(4),
+  .um-table--selecting td:nth-child(4) { width: 12%; }
+  .um-table--selecting th:nth-child(5),
+  .um-table--selecting td:nth-child(5) { width: 14%; }
+  .um-table--selecting th:nth-child(6),
+  .um-table--selecting td:nth-child(6) { width: 12%; }
+  .um-table th:last-child,
+  .um-table td:last-child { width: 76px; }
+  .um-user-cell { gap: 5px; }
+  .um-user-avatar { width: 28px; height: 28px; min-width: 28px; flex-basis: 28px; }
+  .um-user-name,
+  .um-user-dept,
+  .um-email { font-size: .64rem; }
+  .um-role-badge,
+  .um-status-badge { max-width: 100%; padding: 3px 5px; font-size: .56rem; }
+  .um-actions-row { grid-template-columns: repeat(2, 24px); gap: 3px; }
+  .um-actions .um-btn { width: 24px !important; height: 24px; min-height: 24px; flex-basis: 24px; }
+  .um-actions .um-btn svg { width: 12px; height: 12px; }
+}
+
+@media (max-width: 760px) {
+  .um-management-panel { padding: 14px; }
+  .um-stats-actions .um-approve-all-btn { flex: 1 1 100%; }
+  .um-table { min-width: 680px; }
+}
+
+@media (min-width: 761px) and (max-width: 1360px) {
+  .um-modal-box--wide {
+    width: min(760px, calc(100vw - 36px));
+    max-height: min(720px, calc(100dvh - 32px));
+  }
+  .um-modal-box--wide .um-modal-banner {
+    min-height: 76px;
+    padding: 14px 22px;
+  }
+  .um-modal-banner-icon { width: 44px; height: 44px; }
+  .um-modal-banner-title { font-size: 1.12rem; }
+  .um-modal-banner-sub { font-size: .76rem; }
+  .um-modal-box--wide .um-form { padding: 14px 22px 0; gap: 9px; }
+  .reg-avatar-row { gap: 12px; padding: 10px 14px; }
+  .reg-avatar-wrap { width: 46px; height: 46px; }
+  .reg-avatar-wrap svg { width: 25px; height: 25px; }
+  .reg-avatar-name { font-size: .88rem; }
+  .reg-avatar-role { font-size: .7rem; }
+  .reg-section-title { margin: 3px 0 -2px; }
+  .reg-section-label { font-size: .62rem; }
+  .form-row { gap: 9px 14px; }
+  .form-group { gap: 4px; }
+  .form-label { font-size: .64rem; }
+  .form-input { min-height: 38px; padding: 7px 11px; font-size: .78rem; }
+  .user-email-input-wrap { min-height: 38px; }
+  .user-email-suffix { padding-inline: 9px; font-size: .74rem; }
+  .um-modal-box--wide .form-actions { margin-inline: -22px; padding: 10px 22px 12px; }
+  .um-modal-box--wide .um-submit-btn { min-height: 38px; font-size: .7rem; }
+}
+
+@media (max-width: 760px) {
+  .um-modal-box--wide {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+  .um-modal-box--wide .um-form { gap: 9px; }
+  .reg-avatar-row { padding: 9px 11px; }
+  .reg-avatar-wrap { width: 42px; height: 42px; }
+  .form-input { min-height: 38px; padding-block: 7px; }
+}
 </style>
