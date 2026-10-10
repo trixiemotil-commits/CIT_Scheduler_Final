@@ -290,7 +290,7 @@
               >{{ period.label }}</button>
             </div>
           </div>
-          <div class="chart-wrap">
+          <div class="chart-wrap" :class="{ 'is-loading': isConsultationLoading }">
             <div v-if="isConsultationLoading" class="chart-loading-overlay" role="status">
               <span class="chart-loading-spinner" aria-hidden="true"></span>
               <strong>Loading consultation trends</strong>
@@ -358,7 +358,7 @@
             <span><i class="workload-dot workload-dot--classes"></i>Teaching hours</span>
             <span class="workload-result-count">{{ workloadChartItems.length }} teachers shown</span>
           </div>
-          <div class="chart-wrap workload-chart-wrap" @wheel="scrollWorkloadHorizontally">
+          <div class="chart-wrap workload-chart-wrap" :class="{ 'is-loading': isWorkloadLoading }" @wheel="scrollWorkloadHorizontally">
             <div v-if="isWorkloadLoading" class="chart-loading-overlay" role="status">
               <span class="chart-loading-spinner" aria-hidden="true"></span>
               <strong>Loading teacher workload</strong>
@@ -455,18 +455,22 @@
                 <div class="modal-summary-item">
                   <span class="modal-summary-key">Total Classes</span>
                   <span class="modal-summary-val">{{ selectedTeacher.schedule.length }}</span>
+                  <svg class="modal-summary-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h3M8 17h7"/></svg>
                 </div>
                 <div class="modal-summary-item">
                   <span class="modal-summary-key">Work Hours per Week</span>
                   <span class="modal-summary-val">{{ selectedTeacher.workHoursTotal }}h</span>
+                  <svg class="modal-summary-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                 </div>
                 <div class="modal-summary-item">
                   <span class="modal-summary-key">Days Teaching</span>
                   <span class="modal-summary-val">{{ selectedTeacher.daysTeaching }}</span>
+                  <svg class="modal-summary-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h2M14 14h2M8 17h2"/></svg>
                 </div>
                 <div class="modal-summary-item">
                   <span class="modal-summary-key">Total Units</span>
                   <span class="modal-summary-val">{{ selectedTeacher.units || 0 }}</span>
+                  <svg class="modal-summary-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4.5 7.8 7.5 4.4 7.5-4.4M12 12.2V21"/></svg>
                 </div>
               </div>
             </div>
@@ -905,15 +909,41 @@ function notificationTimeLabel(createdAt) {
 }
 
 function notificationRoute(notification) {
+  if (!notification) return null
+  const type = String(notification.type || '').toLowerCase()
+  const isScheduleNotification = type.startsWith('schedule_') || type.startsWith('lunch_break_')
+  if (isScheduleNotification) {
+    const related = notification.related || {}
+    const teacherName = String(related.teacher || '').trim()
+    const isGenericFaculty = /^(?:cit|it)\s+faculty$/i.test(teacherName)
+    const hasStudentContext = Boolean(related.year && related.section)
+    const requestedMode = String(related.mode || related.targetMode || notification.data?.mode || '').toLowerCase()
+    const mode = isGenericFaculty && hasStudentContext
+      ? 'student'
+      : (['teacher', 'room', 'student'].includes(requestedMode)
+        ? requestedMode
+        : (hasStudentContext ? 'student' : (related.room && !related.teacher ? 'room' : (related.teacher ? 'teacher' : ''))))
+    const query = { source: 'current' }
+    if (mode) query.mode = mode
+    if (mode === 'teacher' && related.teacher) query.teacher = related.teacher
+    if (mode === 'room' && related.room) query.room = related.room
+    if (mode === 'student') {
+      if (related.year) query.year = related.year
+      if (related.section) query.section = related.section
+    }
+    return { path: '/admin/schedule/view', query }
+  }
+
   const route = notification.data?.route
   const isGenericConsultationRoute = route === '/admin/dashboard'
-    && String(notification.type || '').startsWith('consultation_')
+    && type.startsWith('consultation_')
   return isGenericConsultationRoute ? null : (route || null)
 }
 
 function normalizeNotification(notification) {
+  notification = notification || {}
   return {
-    id: notification.id,
+    id: notification.id || notification._id || null,
     type: notification.type || 'info',
     title: notification.title || notification.type || 'Notification',
     message: notification.message || 'You have a new notification.',
@@ -938,6 +968,7 @@ async function loadNotifications() {
   try {
     const payload = await apiRequest('/notifications')
     notifications.value = (Array.isArray(payload.notifications) ? payload.notifications : [])
+      .filter(Boolean)
       .map(normalizeNotification)
   } catch (error) {
     console.error('Failed to load notifications:', error)
@@ -999,6 +1030,7 @@ async function confirmClearNotifications() {
 }
 
 function openNotification(notification, event) {
+  if (!notification) return
   markNotificationRead(notification.id)
   if (notification.route) {
     selectedNotification.value = null
@@ -1573,25 +1605,66 @@ function createBarChart() {
       const context = chart.ctx
       const workElements = showWorkHours ? chart.getDatasetMeta(workDatasetIndex).data : []
       const classElements = showClassHours ? chart.getDatasetMeta(classDatasetIndex).data : []
-      const drawLabel = (element, hours, category, verticalOffset = 0) => {
+      const drawOverlayBar = (element, color) => {
         if (!element) return
-        const isOverCap = hours > workloadMaximumHours
-        const label = `${formatHoursLabel(hours)}${category ? ` ${category}` : ''}`
-        context.textAlign = isOverCap ? 'right' : 'left'
-        context.fillStyle = isOverCap && category === 'class' ? '#fff' : '#3e4548'
-        context.fillText(label, isOverCap ? element.x - 5 : element.x + 7, element.y + verticalOffset)
+        const { x, y, base, height } = element.getProps(['x', 'y', 'base', 'height'], true)
+        const left = Math.min(base, x)
+        const width = Math.abs(x - base)
+        if (!width || !height) return
+        const top = y - height / 2
+        const radius = Math.min(5, height / 2, width / 2)
+        context.save()
+        context.fillStyle = color
+        context.beginPath()
+        context.roundRect(left, top, width, height, radius)
+        context.fill()
+        context.restore()
+      }
+      const drawCenteredLabel = (element, hours, color, visibleStart, verticalOffset = 0) => {
+        if (!element) return
+        const label = formatHoursLabel(hours)
+        const { x, y, base } = element.getProps(['x', 'y', 'base'], true)
+        if (hours <= 0) {
+          context.textAlign = 'left'
+          context.fillStyle = '#3e4548'
+          context.fillText(label, base + 7, y + verticalOffset)
+          return
+        }
+        context.textAlign = 'center'
+        context.fillStyle = color === '#4b535a' ? '#fff' : '#3e4548'
+        context.fillText(label, (visibleStart + x) / 2, y + verticalOffset)
       }
       context.save()
       context.font = `${workloadHoursFilter.value === 'all' ? '600 9px' : '600 11px'} Segoe UI, sans-serif`
       context.textBaseline = 'middle'
       workloadItems.forEach((teacher, index) => {
         if (workloadHoursFilter.value === 'all') {
-          drawLabel(workElements[index], Number(teacher.workHoursTotal) || 0)
-          drawLabel(classElements[index], Number(teacher.totalHours) || 0)
+          const workHours = Number(teacher.workHoursTotal) || 0
+          const teachingHours = Number(teacher.totalHours) || 0
+          const workBar = workElements[index]
+          const teachingBar = classElements[index]
+          const hasWorkHours = workHours > 0
+          const hasTeachingHours = teachingHours > 0
+          if (workHours < teachingHours) {
+            drawOverlayBar(workBar, '#c0c7cc')
+            if (hasWorkHours) drawCenteredLabel(workBar, workHours, '#c0c7cc', workBar?.base ?? 0)
+            drawCenteredLabel(teachingBar, teachingHours, '#4b535a', workBar?.x ?? teachingBar?.base ?? 0)
+          } else if (teachingHours < workHours) {
+            drawOverlayBar(teachingBar, '#4b535a')
+            if (hasTeachingHours) drawCenteredLabel(teachingBar, teachingHours, '#4b535a', teachingBar?.base ?? 0)
+            drawCenteredLabel(workBar, workHours, '#c0c7cc', teachingBar?.x ?? workBar?.base ?? 0)
+          } else {
+            if (!hasWorkHours && !hasTeachingHours) {
+              drawCenteredLabel(workBar, 0, '#c0c7cc', workBar?.base ?? 0)
+            } else {
+              if (hasWorkHours) drawCenteredLabel(workBar, workHours, '#c0c7cc', workBar?.base ?? 0, -4)
+              if (hasTeachingHours) drawCenteredLabel(teachingBar, teachingHours, '#4b535a', teachingBar?.base ?? 0, 4)
+            }
+          }
         } else if (workloadHoursFilter.value === 'work') {
-          drawLabel(workElements[index], Number(teacher.workHoursTotal) || 0)
+          drawCenteredLabel(workElements[index], Number(teacher.workHoursTotal) || 0, '#c0c7cc', workElements[index]?.base ?? 0)
         } else {
-          drawLabel(classElements[index], Number(teacher.totalHours) || 0)
+          drawCenteredLabel(classElements[index], Number(teacher.totalHours) || 0, '#4b535a', classElements[index]?.base ?? 0)
         }
       })
       context.restore()
@@ -1607,9 +1680,9 @@ function createBarChart() {
       borderRadius: 5,
       borderSkipped: false,
       borderWidth: 0,
-      barThickness: workloadHoursFilter.value === 'all' ? 8 : 10,
-      maxBarThickness: workloadHoursFilter.value === 'all' ? 8 : 10,
-      grouped: true,
+      barThickness: workloadHoursFilter.value === 'all' ? 13 : 14,
+      maxBarThickness: workloadHoursFilter.value === 'all' ? 13 : 14,
+      grouped: false,
       order: 0,
     })
   }
@@ -1621,9 +1694,9 @@ function createBarChart() {
       borderRadius: 5,
       borderSkipped: false,
       borderWidth: 0,
-      barThickness: workloadHoursFilter.value === 'all' ? 8 : 10,
-      maxBarThickness: workloadHoursFilter.value === 'all' ? 8 : 10,
-      grouped: true,
+      barThickness: workloadHoursFilter.value === 'all' ? 13 : 14,
+      maxBarThickness: workloadHoursFilter.value === 'all' ? 13 : 14,
+      grouped: false,
       order: 1,
     })
   }
@@ -2923,6 +2996,7 @@ function confirmLogout() {
   height: 460px;
   position: relative;
 }
+.chart-wrap.is-loading canvas { visibility: hidden; }
 .chart-loading-overlay {
   position: absolute;
   z-index: 2;
@@ -2933,10 +3007,10 @@ function confirmLogout() {
   flex-direction: column;
   gap: 8px;
   border-radius: 12px;
-  background: rgba(247, 249, 249, .88);
+  background: #f7f9f9;
   color: #58656c;
   text-align: center;
-  backdrop-filter: blur(3px);
+  pointer-events: none;
 }
 .chart-empty-overlay {
   position: absolute;
@@ -3205,10 +3279,10 @@ function confirmLogout() {
   max-width: 1320px;
   max-height: min(90dvh, 960px);
   padding: clamp(22px, 3vw, 38px) clamp(22px, 3vw, 38px) 0;
-  border: 1px solid rgba(255,255,255,.86);
+  border: 1px solid #d6dde1;
   border-radius: 22px;
-  background: linear-gradient(155deg, #fff 0%, #fafbfb 58%, #f2f4f5 100%);
-  box-shadow: 0 28px 80px rgba(17,27,23,.32), inset 0 1px rgba(255,255,255,.95);
+  background: #fff;
+  box-shadow: 0 22px 56px rgba(28,36,42,.24);
   scrollbar-color: #aab6b0 transparent;
   scrollbar-width: thin;
 }
@@ -3221,7 +3295,7 @@ function confirmLogout() {
   place-items: center;
   border: 1px solid #d5ddda;
   border-radius: 11px;
-  background: rgba(255,255,255,.86);
+  background: #fff;
   color: #53615a;
   font-size: 1.05rem;
   transition: background .18s ease, color .18s ease, transform .18s ease;
@@ -3238,13 +3312,13 @@ function confirmLogout() {
   margin-left: calc(0px - var(--workload-modal-pad-inline));
   margin-right: calc(0px - var(--workload-modal-pad-inline));
   padding: 15px 17px;
-  border: 1px solid #000;
+  border: 1px solid #d6dde1;
   border-radius: 0;
-  background: #000;
-  box-shadow: inset 0 1px rgba(255,255,255,.1);
+  background: #fff;
+  box-shadow: none;
 }
 .workload-modal .modal-teacher-avatar { width: 58px; height: 58px; border-color: #cdd3d7; }
-.workload-modal .modal-teacher-name { color: #fff; font-size: clamp(1.05rem, 1.8vw, 1.3rem); overflow-wrap: anywhere; }
+.workload-modal .modal-teacher-name { color: #273139; font-size: clamp(1.05rem, 1.8vw, 1.3rem); overflow-wrap: anywhere; }
 .modal-teacher-metrics { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .workload-modal .modal-hours-badge,
 .modal-units-badge {
@@ -3269,21 +3343,21 @@ function confirmLogout() {
 .modal-section-heading > span { flex: 0 0 auto; padding: 6px 10px; border-radius: 999px; background: #eceff1; color: #58636a; font-size: .7rem; font-weight: 700; }
 .modal-work-hours-section { margin: 0 0 24px; }
 .modal-work-hours-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.modal-work-hours-day { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 10px 12px; border: 1px solid #dce1e4; border-radius: 9px; background: rgba(255,255,255,.82); }
+.modal-work-hours-day { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 10px 12px; border: 1px solid #dce1e4; border-radius: 9px; background: #fff; }
 .modal-work-hours-day span { color: #667178; font-size: .72rem; font-weight: 650; }
 .modal-work-hours-day strong { color: #303a40; font-size: .72rem; font-weight: 700; text-align: right; white-space: nowrap; }
-.modal-work-hours-empty { padding: 14px; border: 1px dashed #cbd2d6; border-radius: 10px; color: #69747b; background: rgba(255,255,255,.65); font-size: .78rem; }
+.modal-work-hours-empty { padding: 14px; border: 1px dashed #cbd2d6; border-radius: 10px; color: #69747b; background: #f8f9fa; font-size: .78rem; }
 .workload-modal .modal-schedule-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; margin-bottom: 22px; }
 .workload-modal .modal-sched-card {
   min-width: 0;
   padding: 15px 16px;
   border: 1px solid #dce1e4;
   border-radius: 14px;
-  background: rgba(255,255,255,.85);
-  box-shadow: 0 4px 12px rgba(36,53,44,.045);
-  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(36,43,48,.04);
+  transition: border-color .18s ease, box-shadow .18s ease;
 }
-.workload-modal .modal-sched-card:hover { border-color: #c5cdd1; box-shadow: 0 8px 18px rgba(36,43,48,.08); transform: translateY(-1px); }
+.workload-modal .modal-sched-card:hover { border-color: #c5cdd1; box-shadow: 0 3px 9px rgba(36,43,48,.07); }
 .workload-modal .modal-sched-top { justify-content: space-between; gap: 10px; margin-bottom: 13px; }
 .workload-modal .modal-day-badge { padding: 5px 10px; background: #eceff1; color: #4d5960; font-size: .7rem; font-weight: 750; }
 .modal-sched-time-meta { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
@@ -3291,14 +3365,15 @@ function confirmLogout() {
 .workload-modal .modal-sched-dur { color: #788188; font-size: .68rem; font-weight: 600; }
 .workload-modal .modal-sched-subject { margin: 0 0 7px; color: #293035; font-size: .93rem; line-height: 1.45; overflow-wrap: anywhere; }
 .workload-modal .modal-sched-section { color: #737d83; font-size: .76rem; line-height: 1.45; overflow-wrap: anywhere; }
-.workload-modal .modal-empty-schedule { margin: 0 0 22px; border-color: #d0d6d9; background: rgba(255,255,255,.72); color: #626d73; line-height: 1.5; }
-.workload-modal .modal-summary { box-sizing: border-box; width: auto; margin-left: calc(0px - var(--workload-modal-pad-inline)); margin-right: calc(0px - var(--workload-modal-pad-inline)); padding: 18px 20px; border: 1px solid #000; border-radius: 0; background: #000; box-shadow: inset 0 1px rgba(255,255,255,.12); }
-.workload-modal .modal-summary-label { margin-bottom: 15px; color: #fff; font-size: .9rem; }
+.workload-modal .modal-empty-schedule { margin: 0 0 22px; border-color: #d0d6d9; background: #f8f9fa; color: #626d73; line-height: 1.5; }
+.workload-modal .modal-summary { box-sizing: border-box; width: auto; margin-left: calc(0px - var(--workload-modal-pad-inline)); margin-right: calc(0px - var(--workload-modal-pad-inline)); padding: 18px 20px; border: 1px solid #d6dde1; border-radius: 0; background: #fff; box-shadow: none; }
+.workload-modal .modal-summary-label { margin-bottom: 15px; color: #35414a; font-size: .9rem; }
 .workload-modal .modal-summary-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.workload-modal .modal-summary-item { min-width: 0; align-items: flex-start; gap: 7px; padding: 0 14px; border-left: 1px solid rgba(255,255,255,.2); }
+.workload-modal .modal-summary-item { position: relative; min-width: 0; align-items: flex-start; gap: 7px; padding: 0 44px 0 14px; border-left: 1px solid rgba(91,103,112,.2); }
 .workload-modal .modal-summary-item:first-child { padding-left: 0; border-left: 0; }
-.workload-modal .modal-summary-key { color: rgba(255,255,255,.78); font-size: .72rem; line-height: 1.35; }
-.workload-modal .modal-summary-val { color: #fff; font-size: 1.7rem; }
+.workload-modal .modal-summary-key { color: #66727a; font-size: .72rem; line-height: 1.35; }
+.workload-modal .modal-summary-val { color: #273139; font-size: 1.7rem; }
+.workload-modal .modal-summary-icon { position: absolute; top: 50%; right: 8px; width: 25px; height: 25px; color: #77848c; transform: translateY(-50%); }
 @media (max-width: 760px) {
   .workload-modal-overlay { box-sizing: border-box; padding: 14px; }
   .workload-modal { --workload-modal-pad-inline: 20px; width: 100%; max-width: 100%; max-height: 92dvh; padding: 24px 20px 0; }

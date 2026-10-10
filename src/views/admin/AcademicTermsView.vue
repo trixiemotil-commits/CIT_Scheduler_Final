@@ -51,7 +51,7 @@
         <button v-if="!isCurrentTermSource" class="primary-btn new-term-btn" @click="openTermModal()"><span aria-hidden="true">+</span> New Term</button>
       </header>
 
-      <section v-if="workspaceTerm" class="workspace-card">
+      <section v-if="workspaceTerm" class="workspace-card" :class="{ 'workspace-card--has-results': workspaceMode && (workspaceMode !== 'student' || studentYearSelection), 'workspace-card--compact-results': compactResultsViewport && (workspaceMode !== 'student' || studentYearSelection) }">
         <div class="workspace-heading">
           <div class="workspace-heading__context">
             <button v-if="!isCurrentTermSource" class="back-btn" aria-label="Back to all academic terms" @click="closeWorkspace"><span aria-hidden="true">&larr;</span></button>
@@ -117,13 +117,13 @@
 
           <!-- Student: choose section for selected year -->
           <div v-else-if="workspaceMode === 'student' && studentYearSelection" class="preview-grid">
-            <div v-if="!filteredWorkspaceEntries.length" class="empty-state">No schedules found for this term.</div>
+            <div v-if="!filteredStudentSections.length" class="empty-state">No matching sections found for this year.</div>
             <div v-else class="section-grid">
-              <button v-for="s in (workspaceTerm.sectionNames?.[studentYearSelection] || [])" :key="s" class="preview-card" :disabled="!!openingScheduleKey" :aria-busy="openingScheduleKey === `student:${studentYearSelection}:${s}`" @click="openSchedule({ value: { year: studentYearSelection, section: s } }, `student:${studentYearSelection}:${s}`)">
+              <button v-for="section in pagedStudentSections" :key="section.name" class="preview-card" :disabled="!!openingScheduleKey" :aria-busy="openingScheduleKey === `student:${studentYearSelection}:${section.name}`" @click="openSchedule({ value: { year: studentYearSelection, section: section.name } }, `student:${studentYearSelection}:${section.name}`)">
                 <div class="preview-card-head">
                   <span class="preview-avatar"><span>{{ studentYearSelection.slice(0,1) }}</span></span>
-                  <div><strong>{{ studentYearSelection }} · {{ s }}</strong><small>{{ filteredWorkspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length }} scheduled class{{ filteredWorkspaceEntries.filter(e => e.year === studentYearSelection && e.section === s).length === 1 ? '' : 'es' }}</small></div>
-                  <span class="open-arrow" aria-hidden="true">{{ openingScheduleKey === `student:${studentYearSelection}:${s}` ? 'Opening…' : '→' }}</span>
+                  <div><strong>{{ studentYearSelection }} · {{ section.name }}</strong><small>{{ section.classCount }} scheduled class{{ section.classCount === 1 ? '' : 'es' }}</small></div>
+                  <span class="open-arrow" aria-hidden="true">{{ openingScheduleKey === `student:${studentYearSelection}:${section.name}` ? 'Opening…' : '→' }}</span>
                 </div>
               </button>
             </div>
@@ -132,14 +132,17 @@
           <div v-else-if="!pagedPreviewTargets.length" class="empty-state">No matching {{ workspaceMode === 'room' ? 'rooms' : (workspaceMode === 'teacher' ? 'teachers' : 'student groups') }} found.</div>
 
           <div v-else class="preview-grid">
-            <button v-for="target in pagedPreviewTargets" :key="target.key" class="preview-card" :disabled="!!openingScheduleKey" :aria-busy="openingScheduleKey === target.key" @click="openSchedule(target, target.key)">
+            <div v-for="target in pagedPreviewTargets" :key="target.key" class="preview-card preview-card--schedule">
               <div class="preview-card-head">
                 <span class="preview-avatar">
                   <span>{{ target.initials }}</span>
                   <img v-if="target.avatar" :src="target.avatar" :alt="`${target.label} profile photo`" @error="hideBrokenAvatar" />
                 </span>
                 <div><strong>{{ target.label }}</strong><small>{{ target.entries.length }} scheduled class{{ target.entries.length === 1 ? '' : 'es' }}</small></div>
-                <span class="open-arrow" aria-hidden="true">{{ openingScheduleKey === target.key ? 'Opening…' : '→' }}</span>
+                <button class="preview-action preview-action--inline" type="button" :disabled="!!openingScheduleKey" :aria-busy="openingScheduleKey === target.key" @click="openSchedule(target, target.key)">
+                  {{ openingScheduleKey === target.key ? 'Opening…' : 'Open schedule' }}
+                  <span aria-hidden="true">&rarr;</span>
+                </button>
               </div>
               <div class="mini-schedule">
                 <div v-for="day in weekdays" :key="day" class="mini-day">
@@ -150,14 +153,13 @@
                   <em v-if="!target.entries.some(item => item.day === day)">—</em>
                 </div>
               </div>
-              <span class="preview-action">{{ workspaceAction === 'add' ? 'Open schedule editor' : 'Open full schedule' }} <span aria-hidden="true">&rarr;</span></span>
-            </button>
+            </div>
           </div>
 
-          <footer v-if="previewTotalPages > 1 && workspaceMode !== 'student'" class="preview-pagination">
-            <button :disabled="previewPage <= 1" @click="previewPage--">&lt;</button>
-            <span>Page {{ previewPage }} of {{ previewTotalPages }}</span>
-            <button :disabled="previewPage >= previewTotalPages" @click="previewPage++">&gt;</button>
+          <footer v-if="activePreviewTotalPages > 1" class="preview-pagination">
+            <button :disabled="previewPage <= 1" aria-label="Previous page" @click="previewPage--">&lt;</button>
+            <span>Page {{ previewPage }} of {{ activePreviewTotalPages }}</span>
+            <button :disabled="previewPage >= activePreviewTotalPages" aria-label="Next page" @click="previewPage++">&gt;</button>
           </footer>
         </template>
       </section>
@@ -348,7 +350,12 @@ const workspacePendingMode = ref('')
 const openingScheduleKey = ref('')
 const previewSearch = ref('')
 const previewPage = ref(1)
-const previewPageSize = 4
+const compactResultsViewport = ref(false)
+function updateCompactResultsViewport() {
+  compactResultsViewport.value = window.innerWidth >= 901 && window.innerHeight <= 800
+}
+updateCompactResultsViewport()
+const previewPageSize = computed(() => compactResultsViewport.value && (workspaceMode.value !== 'student' || studentYearSelection.value) ? 2 : 4)
 const showTermModal = ref(false)
 const editingTermId = ref('')
 const editingTermSnapshot = ref('')
@@ -388,7 +395,9 @@ function showStatusToast(type, message) {
 
 onBeforeUnmount(() => {
   if (statusToastTimer) window.clearTimeout(statusToastTimer)
+  window.removeEventListener('resize', updateCompactResultsViewport)
 })
+window.addEventListener('resize', updateCompactResultsViewport, { passive: true })
 
 function toggleAllRooms(event) {
   selectedRooms.value = event.target.checked ? [...allRoomNames.value] : []
@@ -453,9 +462,27 @@ const previewTargets = computed(() => {
     .filter(target => target.label.toLowerCase().includes(query))
     .map(target => ({ ...target, entries: target.value.entries }))
 })
-const previewTotalPages = computed(() => Math.max(1, Math.ceil(previewTargets.value.length / previewPageSize)))
-const pagedPreviewTargets = computed(() => previewTargets.value.slice((previewPage.value - 1) * previewPageSize, previewPage.value * previewPageSize))
+const previewTotalPages = computed(() => Math.max(1, Math.ceil(previewTargets.value.length / previewPageSize.value)))
+const pagedPreviewTargets = computed(() => previewTargets.value.slice((previewPage.value - 1) * previewPageSize.value, previewPage.value * previewPageSize.value))
+const filteredStudentSections = computed(() => {
+  if (!studentYearSelection.value) return []
+  const query = previewSearch.value.toLowerCase()
+  return (workspaceTerm.value?.sectionNames?.[studentYearSelection.value] || [])
+    .filter(name => String(name).toLowerCase().includes(query))
+    .map(name => ({
+      name,
+      classCount: filteredWorkspaceEntries.value.filter(entry => entry.year === studentYearSelection.value && entry.section === name).length,
+    }))
+})
+const studentSectionTotalPages = computed(() => Math.max(1, Math.ceil(filteredStudentSections.value.length / previewPageSize.value)))
+const pagedStudentSections = computed(() => filteredStudentSections.value.slice((previewPage.value - 1) * previewPageSize.value, previewPage.value * previewPageSize.value))
+const activePreviewTotalPages = computed(() => {
+  if (workspaceMode.value !== 'student') return previewTotalPages.value
+  return studentYearSelection.value ? studentSectionTotalPages.value : 1
+})
 watch(previewSearch, () => { previewPage.value = 1 })
+watch(previewPageSize, () => { previewPage.value = 1 })
+watch(studentYearSelection, () => { previewPage.value = 1 })
 watch(
   () => [route.query.term, route.query.action],
   ([requestedId, action]) => {
@@ -1218,6 +1245,26 @@ loadPage()
   background: linear-gradient(180deg, rgba(250, 251, 251, .96), rgba(227, 233, 237, .95));
   box-shadow: 0 18px 44px rgba(39, 46, 52, .13), inset 0 1px 0 #fff;
 }
+.workspace-card--has-results {
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(600px, calc(100dvh - 260px), 900px);
+}
+.workspace-card--has-results:has(.preview-breadcrumb__current[aria-current="page"]) {
+  min-height: 0;
+}
+.workspace-card--has-results .preview-pagination { margin-top: auto; }
+.workspace-card--has-results > .preview-grid {
+  min-height: 0;
+  max-height: clamp(260px, 46vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.workspace-card--has-results > .preview-grid::-webkit-scrollbar { width: 8px; }
+.workspace-card--has-results > .preview-grid::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: #b9c2c8; background-clip: padding-box; }
+.workspace-card--has-results .preview-card { padding: 12px 14px; }
+.workspace-card--has-results .mini-day { min-height: 64px; }
 .workspace-heading {
   display: flex;
   align-items: center;
@@ -1476,6 +1523,19 @@ loadPage()
 .preview-card-head strong { color: #20282e; font-size: .82rem; font-weight: 700; }
 .preview-card-head small { margin-top: 2px; color: #7a848c; font-size: .64rem; }
 .preview-card-head > .open-arrow { display: none; }
+.preview-card--schedule { cursor: default; }
+.preview-card-head > div { min-width: 0; }
+.preview-action--inline {
+  min-height: 30px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: .62rem;
+  cursor: pointer;
+}
+.preview-action--inline:disabled { cursor: wait; opacity: .65; }
 .mini-schedule {
   display: grid;
   gap: 5px;
@@ -1540,6 +1600,9 @@ loadPage()
   align-items: center;
   justify-content: center;
   gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  flex: 0 0 auto;
   min-height: 58px;
   border-top: 1px solid #dde3e6;
   background: #f7f8f9;
@@ -1575,6 +1638,30 @@ loadPage()
 }
 .preview-pagination button:hover:not(:disabled) { border-color: #929fa7; transform: translateY(-1px); }
 .preview-pagination button:disabled { cursor: default; opacity: .45; }
+@media (max-width: 700px) {
+  .preview-pagination { min-height: 54px; gap: 10px; padding: 14px 12px; }
+  .preview-pagination span { white-space: nowrap; }
+  .preview-pagination button { width: 32px; height: 32px; flex: 0 0 32px; }
+}
+@media (max-width: 420px) {
+  .preview-pagination { min-height: 48px; gap: 9px; padding: 12px 8px; font-size: .66rem; }
+  .preview-pagination button { width: 30px; height: 30px; flex-basis: 30px; }
+}
+@media (min-width: 901px) and (max-height: 800px) {
+  .main { padding-top: 14px; padding-bottom: 20px; }
+  .page-header { margin-bottom: 14px; }
+  .workspace-card--compact-results { min-height: min(520px, calc(100dvh - 220px)); display: flex; flex-direction: column; }
+  .workspace-card--compact-results .workspace-heading { min-height: 64px; flex: 0 0 auto; padding-block: 9px; }
+  .workspace-card--compact-results .preview-toolbar { min-height: 54px; flex: 0 0 auto; margin: 4px 0; padding-block: 5px; }
+  .workspace-card--compact-results .preview-grid { flex: 0 0 auto; gap: 8px; padding: 8px 16px 10px; }
+  .workspace-card--compact-results .preview-card { padding: 8px 10px; }
+  .workspace-card--compact-results .preview-avatar { width: 30px; height: 30px; }
+  .workspace-card--compact-results .mini-schedule { gap: 2px; margin: 6px 0; }
+  .workspace-card--compact-results .mini-day { min-height: 44px; padding: 3px 2px; }
+  .workspace-card--compact-results .mini-day span { padding: 2px; font-size: .4rem; }
+  .workspace-card--compact-results .preview-action { min-height: 26px; padding-block: 4px; }
+  .workspace-card--compact-results .preview-pagination { min-height: 42px; flex: 0 0 auto; padding: 6px 14px; }
+}
 @media (max-width: 1200px) {
   .main { padding-inline: 28px; }
   .terms-card { padding: 24px; }

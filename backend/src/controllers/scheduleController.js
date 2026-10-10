@@ -681,12 +681,25 @@ async function createScheduleTable(req, res) {
       req,
     });
     try {
+      const targetMode = String(req.body.targetMode || "").toLowerCase();
+      const studentYear = normalizeString(req.body.year || req.body.baseYear || "");
+      const studentSection = normalizeString(req.body.section || "");
+      const isGenericFaculty = /^(?:cit|it)\s+faculty$/i.test(teacher);
+      const notificationMode = isGenericFaculty && studentYear && studentSection
+        ? "student"
+        : (["teacher", "room", "student"].includes(targetMode) ? targetMode : "teacher");
       await notifyActiveAdmins({
         actorId: req.user?.id,
         type: "schedule_table_created_admin",
         title: "Schedule table created",
         message: `A schedule table was created for ${teacher}.`,
-        related: { teacher },
+        related: {
+          mode: notificationMode,
+          teacher,
+          room: normalizeString(req.body.room || ""),
+          year: studentYear,
+          section: studentSection,
+        },
         route: "/admin/schedule/view",
       });
     } catch (notificationError) {
@@ -794,7 +807,16 @@ async function createSchedule(req, res) {
         message: isLunchBreak
           ? `A lunch break was added for ${docs[0]?.teacher || "a teacher"}.`
           : `A schedule was added for ${docs[0]?.teacher || "a teacher"}.`,
-        related: { teacher: docs[0]?.teacher || "" },
+        related: {
+          mode: ["teacher", "room", "student"].includes(String(payload.targetMode || "").toLowerCase())
+            ? String(payload.targetMode).toLowerCase()
+            : "teacher",
+          academicTermId: docs[0]?.academicTermId ? String(docs[0].academicTermId) : "",
+          teacher: docs[0]?.teacher || "",
+          room: docs[0]?.room || "",
+          year: docs[0]?.year || "",
+          section: docs[0]?.section || "",
+        },
         route: "/admin/schedule/view",
       });
     } catch (notificationError) {
@@ -920,7 +942,7 @@ async function updateLunchBreak(req, res) {
         type: "lunch_break_updated_admin",
         title: "Lunch break updated",
         message: `A lunch break was updated for ${existing.teacher || "a teacher"}.`,
-        related: { scheduleId: existing._id.toString(), teacher: existing.teacher || "" },
+        related: { mode: "teacher", scheduleId: existing._id.toString(), teacher: existing.teacher || "" },
         route: "/admin/schedule/view",
       });
     } catch (notificationError) {
@@ -1037,7 +1059,16 @@ async function replaceSchedule(req, res) {
         type: "schedule_updated_admin",
         title: "Schedule updated",
         message: `A schedule was updated for ${docs[0]?.teacher || "a teacher"}.`,
-        related: { teacher: docs[0]?.teacher || "" },
+        related: {
+          mode: ["teacher", "room", "student"].includes(String(next.targetMode || "").toLowerCase())
+            ? String(next.targetMode).toLowerCase()
+            : "teacher",
+          academicTermId: docs[0]?.academicTermId ? String(docs[0].academicTermId) : "",
+          teacher: docs[0]?.teacher || "",
+          room: docs[0]?.room || "",
+          year: docs[0]?.year || "",
+          section: docs[0]?.section || "",
+        },
         route: "/admin/schedule/view",
       });
     } catch (notificationError) {

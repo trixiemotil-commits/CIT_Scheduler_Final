@@ -3334,6 +3334,7 @@ function scheduleEditSignature(source) {
 function buildSchedulePayload(source) {
   const payload = {
     tableLabel: source.teacher,
+    targetMode: addMode.value || 'teacher',
     baseYear:   source.year,
     campus:     source.campus || 'South Campus',
     day:        source.day,
@@ -3637,6 +3638,9 @@ async function addEntry() {
       method: 'POST',
       body: JSON.stringify({
         teacher: addForm.teacher,
+        targetMode: payload.targetMode,
+        year: payload.baseYear,
+        section: payload.section || payload.parallelSlots?.find(slot => slot.section)?.section || '',
         workHoursByDay: workHoursForm.byDay,
       }),
     }).catch(() => {})

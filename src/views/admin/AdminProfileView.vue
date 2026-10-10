@@ -136,13 +136,19 @@
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Full Name</label>
-                <input v-model="editForm.fullName" class="edit-input" type="text" placeholder="Full name" />
+                <input v-model="editForm.fullName" class="edit-input" type="text" placeholder="Enter your full name" />
               </div>
             </div>
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Email</label>
-                <input v-model="editForm.email" class="edit-input" type="email" placeholder="Email address" />
+                <input v-model="editForm.email" class="edit-input" type="email" placeholder="Enter your email address" />
+              </div>
+            </div>
+            <div class="edit-row">
+              <div class="edit-field">
+                <label class="edit-label">Contact Number</label>
+                <input v-model="editForm.contact" class="edit-input" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="tel" placeholder="Enter your contact number" @input="formatContactNumber" />
               </div>
             </div>
             <div class="edit-row">
@@ -168,7 +174,7 @@
           </div>
           <div class="edit-modal-actions">
             <button class="edit-cancel-btn" @click="closeEdit">Cancel</button>
-            <button class="edit-save-btn" :disabled="isSaving" @click="saveProfile">{{ isSaving ? 'Saving...' : 'Save Changes' }}</button>
+            <button class="edit-save-btn" :disabled="isSaving || !hasEditChanges" @click="saveProfile">{{ isSaving ? 'Saving...' : 'Save Changes' }}</button>
           </div>
         </div>
       </div>
@@ -194,6 +200,14 @@
         </div>
       </div>
     </Teleport>
+    <Teleport to="body">
+      <Transition name="profile-toast">
+        <div v-if="statusToast" class="profile-status-toast" role="status" aria-live="polite">
+          <span class="profile-status-toast__icon" aria-hidden="true">✓</span>
+          <span>{{ statusToast }}</span>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -201,15 +215,30 @@
 import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
 import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route  = useRoute()
+const statusToast = ref('')
+let statusToastTimer = null
 const currentRoute = computed(() => route.path)
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const DEFAULT_AVATAR = initialsAvatar(user)
+
+function showSuccessToast(title) {
+  statusToast.value = title
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+  statusToastTimer = window.setTimeout(() => {
+    statusToast.value = ''
+    statusToastTimer = null
+  }, 5000)
+}
+
+onBeforeUnmount(() => {
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+})
 
 const navItems = [
   {
@@ -316,17 +345,26 @@ async function loadProfile() {
 /* â”€â”€ Edit modal â”€â”€ */
 const showEditModal = ref(false)
 const editForm = ref({})
+const initialEditSnapshot = ref(null)
 const avatarInput = ref(null)
+const editableFields = ['fullName', 'email', 'contact', 'gender', 'employeeId', 'avatar']
+const hasEditChanges = computed(() => {
+  if (!initialEditSnapshot.value) return false
+  return editableFields.some((field) => editForm.value[field] !== initialEditSnapshot.value[field])
+})
 
 function openEdit() {
   editForm.value = {
     ...profile.value,
+    contact: profile.value.contact === 'N/A' ? '' : profile.value.contact,
     employeeId: normalizeEmployeeId(profile.value.employeeId),
   }
+  initialEditSnapshot.value = { ...editForm.value }
   showEditModal.value = true
 }
 function closeEdit() {
   showEditModal.value = false
+  initialEditSnapshot.value = null
 }
 
 function formatEmployeeId() {
@@ -336,6 +374,10 @@ function formatEmployeeId() {
     return
   }
   editForm.value.employeeId = `AU${digits.slice(0, 4)}${digits.length > 4 ? `-${digits.slice(4, 9)}` : ''}`
+}
+
+function formatContactNumber() {
+  editForm.value.contact = String(editForm.value.contact || '').replace(/\D/g, '')
 }
 
 function normalizeEmployeeId(value) {
@@ -411,6 +453,7 @@ async function saveProfile() {
         firstName: nameParts[0],
         lastName: nameParts.slice(1).join(' '),
         email: editForm.value.email,
+        phone: editForm.value.contact || '',
         gender: editForm.value.gender === 'Not specified' ? '' : editForm.value.gender,
         employeeId: editForm.value.employeeId,
         avatar: editForm.value.avatar,
@@ -418,12 +461,7 @@ async function saveProfile() {
     })
     setProfile(saveMergedUser(response.user))
     closeEdit()
-    Swal.fire({
-      toast: true, position: 'top-end', icon: 'success',
-      title: 'Profile Updated', showConfirmButton: false,
-      timer: 2500, timerProgressBar: true,
-      background: '#4b5563', color: '#fff', iconColor: '#cbd5e1'
-    })
+    showSuccessToast('Profile Updated')
   } catch (error) {
     Swal.fire({ icon: 'error', title: 'Unable to update profile', text: error.message })
   } finally {
@@ -981,6 +1019,54 @@ onMounted(loadProfile)
 }
 .logout-confirm-btn:hover { background: #c1121f; }
 
+.profile-status-toast {
+  position: fixed;
+  z-index: 2000;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  display: flex;
+  width: min(380px, calc(100vw - 32px));
+  align-items: center;
+  gap: 11px;
+  overflow: hidden;
+  padding: 13px 16px;
+  border: 1px solid #d8dee2;
+  border-left: 3px solid #547b66;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .97);
+  box-shadow: 0 12px 34px rgba(27, 37, 45, .18);
+  color: #303a42;
+  font: 600 .82rem/1.45 'Poppins', sans-serif;
+}
+.profile-status-toast::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: #aeb5b9;
+  content: '';
+  transform-origin: left;
+  animation: profile-toast-progress 5s linear forwards;
+}
+.profile-status-toast__icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf0f2;
+  color: #303a42;
+  font-size: .82rem;
+  font-weight: 800;
+}
+.profile-toast-enter-active,
+.profile-toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.profile-toast-enter-from,
+.profile-toast-leave-to { opacity: 0; transform: translateY(-8px); }
+@keyframes profile-toast-progress { to { transform: scaleX(0); } }
+
 @media (max-width: 900px) {
   .main { padding: 24px 20px; }
   .sidebar { width: 220px; min-width: 220px; }
@@ -989,5 +1075,14 @@ onMounted(loadProfile)
   .info-item:nth-child(2n) { border-right: none; }
   .info-item:nth-last-child(-n+2) { border-bottom: 1px solid #e5e7eb; }
   .info-item:last-child { border-bottom: none; }
+}
+@media (max-width: 640px) {
+  .profile-status-toast {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    padding: 12px 14px;
+    font-size: .78rem;
+  }
 }
 </style>

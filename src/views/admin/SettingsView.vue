@@ -1792,6 +1792,8 @@ function highlightFaqText(text) {
     font-size: 1rem !important;
     line-height: 1.2 !important;
   }
+  .verification-card .settings-card-header { padding-top: 8px; }
+  .verification-card .settings-card-header { gap: 5px; }
   .faq-title { font-size: 1.55rem; }
 }
 @media (max-width: 1200px) {
@@ -1837,6 +1839,15 @@ function highlightFaqText(text) {
   :global(.layout:has(> .admin-sidebar) > .main button),
   :global(.layout:has(> .admin-sidebar) > .main input) { font-size: .66rem !important; }
   :global(.layout:has(> .admin-sidebar) > .main .settings-card) { padding: 12px !important; }
+}
+@media (min-width: 1201px) and (max-width: 1439px) {
+  :global(.layout:has(> .admin-sidebar) > .main .two-factor-card .settings-card-title),
+  :global(.layout:has(> .admin-sidebar) > .main .verification-card .settings-card-title) {
+    font-size: .86rem !important;
+    line-height: 1.3 !important;
+  }
+  .verification-card .toggle-switch { transform: scale(.82); transform-origin: right center; }
+  .verification-card .tfa-status { font-size: .62rem; }
 }
 @media (max-width: 520px) {
   .settings-body { grid-template-columns: minmax(0, 1fr); }
@@ -1886,7 +1897,7 @@ function highlightFaqText(text) {
   :global(.settings-alert-popup .settings-alert-title) { font-size: .98rem !important; }
   :global(.settings-alert-popup .settings-alert-text) { font-size: .76rem !important; }
   :global(.settings-alert-popup .settings-alert-confirm) { min-width: 92px !important; padding: 6px 14px !important; font-size: .74rem !important; }
-  .faq-question { font-size: 0.82rem; padding: 14px; }
-  .faq-answer { font-size: 0.88rem; padding: 0 14px 14px; }
+  .faq-question { font-size: 1rem; padding: 14px; }
+  .faq-answer { font-size: 0.9rem; padding: 0 14px 14px; }
 }
 </style>
