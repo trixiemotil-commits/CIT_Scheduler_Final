@@ -152,9 +152,6 @@
           </div>
         </div>
 
-        <div v-if="signUpSuccess" class="success-msg">{{ signUpSuccess }}</div>
-        <div v-if="signUpError" class="error-msg">{{ signUpError }}</div>
-
         <!-- sign up captcha -->
         <div v-if="siteKey" class="captcha-wrap" v-show="activeTab === 'signup'">
           <div ref="signupCaptchaRef" class="captcha-box"></div>
@@ -167,7 +164,8 @@
     </div>
 
     <!-- Login and reCAPTCHA alerts -->
-    <div v-if="loginAlert" class="login-alert-overlay" role="presentation" @click.self="closeLoginAlert">
+    <div v-if="loginAlert || signUpAlert" class="login-alert-overlay" role="presentation" @click.self="closeLoginAlert">
+      <template v-if="loginAlert">
       <section class="login-alert" role="alertdialog" aria-modal="true" aria-labelledby="login-alert-title" aria-describedby="login-alert-message">
         <div class="login-alert__icon" :class="`login-alert__icon--${loginAlert.type}`" aria-hidden="true">
           <svg v-if="loginAlert.type === 'captcha'" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 8.5 6M12 7v6M12 17h.01"/><path d="m17 3 3.5.5L20 7"/></svg>
@@ -176,6 +174,16 @@
         <h2 id="login-alert-title">{{ loginAlert.title }}</h2>
         <p id="login-alert-message" :class="{ 'login-alert__message--error': loginAlert.type === 'credentials' }">{{ loginAlert.message }}</p>
         <button type="button" @click="closeLoginAlert">Try again</button>
+      </section>
+      </template>
+      <section v-else class="login-alert" role="alertdialog" aria-modal="true" aria-labelledby="signup-alert-title" aria-describedby="signup-alert-message">
+        <div class="login-alert__icon" :class="`login-alert__icon--${signUpAlert.type}`" aria-hidden="true">
+          <svg v-if="signUpAlert.type === 'success'" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>
+          <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/></svg>
+        </div>
+        <h2 id="signup-alert-title">{{ signUpAlert.type === 'success' ? 'Account created' : 'Unable to sign up' }}</h2>
+        <p id="signup-alert-message" :class="{ 'login-alert__message--error': signUpAlert.type === 'error' }">{{ signUpAlert.message }}</p>
+        <button type="button" @click="closeLoginAlert">{{ signUpAlert.type === 'success' ? 'Continue' : 'Try again' }}</button>
       </section>
     </div>
 
@@ -392,6 +400,7 @@ const twoFactorCode = ref('')
 const twoFactorDigits = ref(['', '', '', '', '', ''])
 const twoFactorInputRefs = []
 const loginAlert = ref(null)
+const signUpAlert = ref(null)
 const signUpError = ref('')
 const signUpSuccess = ref('')
 const router = useRouter()
@@ -766,11 +775,18 @@ function routeByRole(role) {
 }
 
 function showLoginAlert(type, title, message) {
+  signUpAlert.value = null
   loginAlert.value = { type, title, message }
 }
 
 function closeLoginAlert() {
   loginAlert.value = null
+  signUpAlert.value = null
+}
+
+function showSignUpAlert(type, message) {
+  loginAlert.value = null
+  signUpAlert.value = { type, message }
 }
 
 function continueAfterLogin(user, skipRoleSelection = false) {
@@ -898,32 +914,32 @@ async function handleSignUp() {
   const email = signUp.email.trim().toLowerCase()
 
   if (!firstName || !lastName || !studentId || !email || !signUp.password) {
-    signUpError.value = 'Please complete all required fields.'
+    showSignUpAlert('error', 'Please complete all required fields.')
     return
   }
 
   if (!/^[0-9]{2}-[0-9]{4}-[0-9]{6}$/.test(studentId)) {
-    signUpError.value = 'Student ID must use the format 00-0000-000000 and only include numbers and dashes.'
+    showSignUpAlert('error', 'Student ID must use the format 00-0000-000000 and only include numbers and dashes.')
     return
   }
 
   if (!email.endsWith('@phinmaed.com')) {
-    signUpError.value = 'Sign up is only allowed with a @phinmaed.com email address.'
+    showSignUpAlert('error', 'Sign up is only allowed with a @phinmaed.com email address.')
     return
   }
 
   if (!STRONG_PASSWORD_REGEX.test(signUp.password)) {
-    signUpError.value = 'Password must be 8+ chars with uppercase, lowercase, number, and special character.'
+    showSignUpAlert('error', 'Password must be 8+ chars with uppercase, lowercase, number, and special character.')
     return
   }
 
   if (signUp.password !== signUp.confirmPassword) {
-    signUpError.value = 'Passwords do not match.'
+    showSignUpAlert('error', 'Passwords do not match.')
     return
   }
 
   if (isMobileApp && getMathAnswer('signup') !== signUpMathChallenge.value.answer) {
-    signUpError.value = 'Please enter the correct math answer.'
+    showSignUpAlert('error', 'Please enter the correct math answer.')
     return
   }
 
@@ -941,7 +957,7 @@ async function handleSignUp() {
     } catch (e) { /* ignore */ }
 
     if (!isMobileApp && !recaptchaToken) {
-      signUpError.value = 'Please complete the reCAPTCHA verification.'
+      showSignUpAlert('error', 'Please complete the reCAPTCHA verification.')
       return
     }
 
@@ -956,7 +972,8 @@ async function handleSignUp() {
         ? { client: 'mobile', mathChallenge: signUpMathChallenge.value.question.replace(' =', ''), mathAnswer: getMathAnswer('signup') }
         : { recaptchaToken })
     })
-    signUpSuccess.value = 'Account created successfully. Your account is pending admin approval.'
+    signUpSuccess.value = 'Account created successfully. Your account is pending admin approval. You will be notified by email when an admin approves it.'
+    showSignUpAlert('success', signUpSuccess.value)
     signUp.password = ''
     signUp.confirmPassword = ''
     signIn.email = email
@@ -964,11 +981,11 @@ async function handleSignUp() {
   } catch (error) {
     // Show as much detail as possible for debugging
     if (error && error.message) {
-      signUpError.value = error.message
+      showSignUpAlert('error', error.message)
     } else if (error && error.response && error.response.data && error.response.data.error) {
-      signUpError.value = error.response.data.error
+      showSignUpAlert('error', error.response.data.error)
     } else {
-      signUpError.value = 'Sign up failed. ' + JSON.stringify(error)
+      showSignUpAlert('error', 'Sign up failed. ' + JSON.stringify(error))
     }
   } finally {
     isSigningUp.value = false
@@ -1447,7 +1464,7 @@ watch(activeTab, (val) => {
 .login-alert__icon svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .login-alert h2 { margin: 0; color: #252d35; font-size: 1.3rem; font-weight: 750; letter-spacing: -.02em; }
 .login-alert p { margin: 8px auto 19px; color: #687580; font-size: .82rem; line-height: 1.5; }
-.login-alert .login-alert__message--error { color: #a52d2d; font-size: .9rem; font-weight: 700; }
+.login-alert .login-alert__message--error { color: #a52d2d; font-size: .9rem; font-weight: 400; }
 .login-alert > button {
   width: 100%;
   min-height: 42px;

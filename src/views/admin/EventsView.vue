@@ -724,12 +724,15 @@ async function loadEventTeachers() {
     if (!response.ok) throw new Error(payload.message || 'Unable to load teachers.')
 
     eventTeachers.value = (Array.isArray(payload.users) ? payload.users : [])
+      .filter((teacher) => teacher && typeof teacher === 'object')
       .filter((teacher) => String(teacher.account_status || 'Active') === 'Active')
       .filter((teacher) => String(teacher.teacher_status || '').trim() === 'On School')
       .map((teacher) => {
       const name = `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || teacher.name || teacher.email || 'Teacher'
-      return { id: teacher.id, name, initials: name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() }
+      const id = teacher.id || teacher._id
+      return id ? { id: String(id), name, initials: name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() } : null
       })
+      .filter(Boolean)
   } catch (_error) {
     eventTeachers.value = []
   }
@@ -778,7 +781,10 @@ async function loadEvents() {
   loadingEvents.value = true
   try {
     const payload = await eventRequest()
-    events.value = Array.isArray(payload.events) ? payload.events : []
+    events.value = (Array.isArray(payload.events) ? payload.events : [])
+      .filter((event) => event && typeof event === 'object')
+      .map((event) => ({ ...event, id: String(event.id || event._id || '') }))
+      .filter((event) => event.id)
   } catch (error) {
     window.alert(error.message)
   } finally {

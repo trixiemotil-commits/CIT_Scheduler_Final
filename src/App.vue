@@ -90,6 +90,7 @@ let activeScrollTarget = null
 let ionicScrollContents = []
 let securityPoll = null
 let splashTimer = null
+let securitySuccessTimer = null
 const securityMode = ref('review')
 const securityDetails = ref(null)
 const securityError = ref('')
@@ -256,6 +257,11 @@ async function trustCurrentDevice() {
     showSecurityWarning.value = false
     securityDismissed.value = false
     securitySuccess.value = body.message || 'This device sign-in was confirmed.'
+    if (securitySuccessTimer) window.clearTimeout(securitySuccessTimer)
+    securitySuccessTimer = window.setTimeout(() => {
+      securitySuccess.value = ''
+      securitySuccessTimer = null
+    }, 5000)
   } catch (error) {
     securityError.value = error.message
   } finally {
@@ -321,6 +327,7 @@ watch(() => route.fullPath, (path, previousPath) => {
 
 onUnmounted(() => {
   if (splashTimer) window.clearTimeout(splashTimer)
+  if (securitySuccessTimer) window.clearTimeout(securitySuccessTimer)
   if (securityPoll) window.clearInterval(securityPoll)
   document.removeEventListener('visibilitychange', checkForNewLogin)
   document.removeEventListener('scroll', handleDocumentScroll, true)
