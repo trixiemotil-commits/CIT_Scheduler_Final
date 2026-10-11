@@ -1673,6 +1673,31 @@ watch(activeTab, (val) => {
   .submit-btn { font-size: .88rem; }
 }
 
+/* Keep the full registration flow reachable on short landscape/tablet viewports. */
+@media (max-height: 800px) and (min-width: 521px) {
+  .page-bg { align-items: flex-start; padding-block: 24px; }
+  .card.card--wide {
+    width: min(76vw, 440px);
+    max-width: 440px;
+    padding: 20px 18px 20px;
+    gap: 6px;
+  }
+  .card.card--wide .login-brand { gap: 8px; }
+  .card.card--wide .login-brand__seal-wrap { width: 48px; height: 48px; flex-basis: 48px; }
+  .card.card--wide .login-brand__seal { width: 42px; height: 42px; }
+  .card.card--wide .title { font-size: 1.25rem; }
+  .card.card--wide .login-brand__copy > span { font-size: .48rem; }
+  .card.card--wide .tab-btn { padding: 5px 0; font-size: .82rem; }
+  .card.card--wide .form { gap: 4px; }
+  .card.card--wide .input-field { padding: 6px 38px 6px 14px; font-size: .76rem; }
+  .card.card--wide .student-signup-note { padding: 5px 8px; font-size: .64rem; }
+  .card.card--wide .password-requirements { gap: 1px; }
+  .card.card--wide .password-requirements li { font-size: .62rem; }
+  .card.card--wide .row-end { font-size: .75rem; }
+  .card.card--wide .captcha-wrap { transform: scale(.86); transform-origin: center; margin: -5px 0; }
+  .card.card--wide .submit-btn { padding: 7px; font-size: .78rem; }
+}
+
 @media (max-width: 520px) {
   .page-bg {
     align-items: center;
@@ -1738,6 +1763,11 @@ watch(activeTab, (val) => {
   .role-modal__title { font-size: 1.2rem; }
   .role-selection__button { padding: 14px 12px; gap: 11px; }
   .role-selection__description { line-height: 1.35; }
+}
+
+@media (max-height: 800px) and (max-width: 520px) {
+  .page-bg { padding-top: 24px; padding-bottom: 24px; }
+  .card.card--wide { padding-top: 20px; padding-bottom: 20px; }
 }
 
 @media (min-width: 301px) and (max-width: 330px) {

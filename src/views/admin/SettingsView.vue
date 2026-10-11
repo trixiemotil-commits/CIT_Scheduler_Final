@@ -1284,9 +1284,13 @@ function highlightFaqText(text) {
 .two-factor-card .settings-input { max-width: 420px; background: rgba(255,255,255,.82); }
 .verification-card .settings-row { grid-template-columns: minmax(0, 520px); }
 .verification-card { position: relative; }
-.verification-card .settings-card-header { margin-bottom: 18px; }
-.verification-card .settings-card-header { padding-right: 76px; }
-.verification-card .settings-card-header .tfa-control { position: absolute; top: 20px; right: 20px; }
+.verification-card .settings-card-header {
+  align-items: flex-start;
+  min-height: 52px;
+  margin-bottom: 14px;
+  padding: 0 118px 12px 0;
+}
+.verification-card .settings-card-header .tfa-control { position: absolute; top: 22px; right: 20px; }
 .verification-card .tfa-control {
   display: flex;
   flex-direction: column;
@@ -1323,7 +1327,7 @@ function highlightFaqText(text) {
   border-color: #aab4ba;
   background: linear-gradient(145deg, #f9fafb, #dce2e5);
 }
-.verification-card .settings-card-title { max-width: none; font-size: .72rem; white-space: nowrap; }
+.verification-card .settings-card-title { max-width: none; font-size: 1.05rem; white-space: normal; }
 .verification-content {
   display: flex;
   flex-direction: column;

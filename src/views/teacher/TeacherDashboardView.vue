@@ -1657,7 +1657,7 @@ function confirmLogout() {
   right: 4px;
   width: 13px;
   height: 13px;
-  background: #e8a020;
+  background: #e63946;
   border-radius: 50%;
   border: 1.5px solid #fff;
 }
@@ -1800,10 +1800,10 @@ function confirmLogout() {
   width: 8px;
   height: 10px;
   border-radius: 50%;
-  background: #e8a020;
+  background: #e63946;
   flex-shrink: 0;
   margin-top: 9px;
-  box-shadow: 0 0 0 3px rgba(232,160,32,.14);
+  box-shadow: 0 0 0 3px rgba(230,57,70,.14);
 }
 
 /* ── Stat Cards ── */
@@ -2186,9 +2186,28 @@ function confirmLogout() {
 @media (max-width: 900px) {
   .stat-cards { grid-template-columns: 1fr; }
 }
+@media (min-width: 901px) and (max-width: 1200px),
+       (min-width: 901px) and (max-height: 800px) {
+  .main { padding: 20px 24px 24px; }
+  .main-header { margin-bottom: 18px; }
+  .page-title { font-size: clamp(1.8rem, 3vw, 2.5rem); }
+  .page-sub { margin-top: 6px; font-size: .9rem; }
+  .stat-cards { gap: 14px; margin-bottom: 22px; }
+  .stat-card { padding: 16px 18px; }
+  .stat-icon { width: 60px; height: 60px; }
+  .today-class-header { margin-bottom: 14px; }
+  .legend { gap: 10px 14px; }
+  .legend-item { font-size: .72rem; }
+  .carousel-shell { min-height: 300px; }
+  .sidebar { width: 250px; min-width: 250px; padding: 16px 12px; }
+  .sidebar-profile { margin-bottom: 10px; }
+  .avatar-wrap { width: 58px; height: 58px; margin-bottom: 4px; }
+  .sidebar-nav { gap: 4px; }
+  .nav-item { min-height: 40px; padding: 8px 10px; }
+}
 @media (max-width: 600px) {
-  .main { padding: 20px 16px 32px; }
-  .sidebar { width: 200px; min-width: 200px; }
+  .layout { height: 100dvh; min-height: 100dvh; overflow: hidden; }
+  .main { height: 100dvh; padding: 20px 16px 32px; }
   .class-table { font-size: 0.78rem; }
 }
 </style>

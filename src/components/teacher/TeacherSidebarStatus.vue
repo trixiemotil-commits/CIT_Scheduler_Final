@@ -575,6 +575,22 @@ onBeforeUnmount(() => {
   line-height: 1.35;
 }
 
+@media (min-width: 601px) and (max-height: 800px) {
+  .teacher-sidebar-status { margin-bottom: 8px; padding-top: 4px; }
+  .sidebar-status-panel { padding: 8px 8px 7px; border-radius: 12px; }
+  .sidebar-status-panel + .sidebar-status-panel { margin-top: 6px; }
+  .sidebar-status-head { margin-bottom: 6px; font-size: .6rem; }
+  .sidebar-status-action-row { gap: 5px; }
+  .sidebar-status-value,
+  .sidebar-status-select { min-height: 30px; border-radius: 9px; font-size: .68rem; }
+  .sidebar-status-value { padding-inline: 8px; }
+  .sidebar-status-select { height: 30px; padding-left: 9px; padding-right: 24px; }
+  .sidebar-status-select-icon { right: 7px; width: 13px; height: 13px; }
+  .sidebar-status-button { min-width: 76px; height: 30px; padding-inline: 8px; border-radius: 9px; font-size: .64rem; }
+  .sidebar-time-in,
+  .sidebar-status-subtext { margin-top: 5px; font-size: .59rem; line-height: 1.25; }
+}
+
 .teacher-status-toast {
   position: fixed;
   top: 22px;

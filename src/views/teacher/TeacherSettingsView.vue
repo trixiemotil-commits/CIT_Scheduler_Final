@@ -156,6 +156,7 @@
             </div>
             <div>
               <h2 class="settings-card-title">Email verification</h2>
+              <p class="settings-card-sub verification-card-sub">Add a one-time verification step whenever you sign in.</p>
             </div>
             <div class="tfa-control">
               <span class="tfa-status">{{ twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span>
@@ -164,22 +165,22 @@
               </button>
             </div>
           </div>
-          <p class="settings-card-sub verification-card-sub">Add a one-time verification step whenever you sign in.</p>
           <div class="verification-content">
             <div class="verification-intro">
               <span class="verification-badge">Secure sign-in</span>
               <p class="verification-description">A one-time code will be sent to your PHINMA Gmail address whenever you log in.</p>
             </div>
             <label class="settings-label verification-password-label" for="teacher-two-factor-password">Confirm with your current password</label>
-            <div class="verification-password-wrap">
-              <input id="teacher-two-factor-password" v-model="twoFactorPassword" :type="showTwoFactorPassword ? 'text' : 'password'" class="settings-input" placeholder="Enter current password" />
+            <div class="verification-password-wrap" :class="{ 'is-invalid': twoFactorError }">
+              <input id="teacher-two-factor-password" ref="twoFactorPasswordInput" v-model="twoFactorPassword" :type="showTwoFactorPassword ? 'text' : 'password'" class="settings-input" :aria-invalid="Boolean(twoFactorError)" :aria-describedby="twoFactorError ? 'teacher-two-factor-password-error' : twoFactorSuccess ? 'teacher-two-factor-password-success' : undefined" placeholder="Enter current password" @input="twoFactorError = ''; twoFactorSuccess = ''" />
               <button type="button" class="pw-eye" :aria-label="showTwoFactorPassword ? 'Hide current password' : 'Show current password'" @click="showTwoFactorPassword = !showTwoFactorPassword">
                 <svg v-if="!showTwoFactorPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
               </button>
             </div>
-            <div v-if="twoFactorError" class="settings-msg settings-msg--error">{{ twoFactorError }}</div>
-            <div v-if="twoFactorSuccess" class="settings-msg settings-msg--success">{{ twoFactorSuccess }}</div>
+            <p class="verification-help">Your password is used only to confirm this security setting.</p>
+            <p v-if="twoFactorError" id="teacher-two-factor-password-error" class="verification-password-error" role="alert">{{ twoFactorError }}</p>
+            <p v-if="twoFactorSuccess" id="teacher-two-factor-password-success" class="verification-password-success" role="status">{{ twoFactorSuccess }}</p>
           </div>
         </div>
 
@@ -397,6 +398,7 @@ let otpTimer = null
 const formattedOtpTime = computed(() => `0:${String(otpSecondsRemaining.value).padStart(2, '0')}`)
 const twoFactorEnabled = ref(Boolean(user.twoFactorEnabled))
 const twoFactorPassword = ref('')
+const twoFactorPasswordInput = ref(null)
 const showTwoFactorPassword = ref(false)
 const twoFactorError = ref('')
 const twoFactorSuccess = ref('')
@@ -412,6 +414,7 @@ async function toggleTwoFactor() {
   const enabled = !twoFactorEnabled.value
   if (!twoFactorPassword.value) {
     twoFactorError.value = 'Enter your current password to confirm this change.'
+    twoFactorPasswordInput.value?.focus()
     return
   }
   isSavingTwoFactor.value = true
@@ -425,6 +428,7 @@ async function toggleTwoFactor() {
     twoFactorSuccess.value = enabled ? 'Email verification enabled.' : 'Email verification disabled.'
   } catch (error) {
     twoFactorError.value = error.message || 'Unable to update email verification.'
+    twoFactorPasswordInput.value?.focus()
   } finally {
     isSavingTwoFactor.value = false
   }
@@ -1451,15 +1455,31 @@ function highlightFaqText(text) {
 }
 .verification-card .tfa-status { min-width: 0; text-align: center; order: 2; }
 .verification-card .settings-card-icon { color: #4b5563; }
-.verification-card-sub { margin: -8px 0 18px; max-width: none; }
+.verification-card-sub { margin: 4px 0 0; max-width: none; }
 .verification-content { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .verification-intro { padding: 13px 14px; border: 1px solid rgba(112, 137, 123, .25); border-radius: 12px; background: rgba(240, 248, 243, .7); }
 .verification-badge { color: #37614b; font-size: .65rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .verification-description { margin: 9px 0 0; color: #5f7067; font-size: .74rem; line-height: 1.55; }
-.verification-password-wrap { position: relative; display: flex; align-items: center; width: 100%; }
+.verification-password-wrap { position: relative; display: flex; align-items: center; width: 100%; border-radius: 10px; }
 .verification-password-wrap .settings-input { padding-right: 48px; max-width: none; }
+.verification-password-wrap.is-invalid .settings-input,
+.verification-password-wrap.is-invalid .settings-input:focus,
+.verification-password-wrap.is-invalid:focus-within .settings-input {
+  border: 1.5px solid #c62835 !important;
+  border-color: #c62835 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(198, 40, 53, .2), 0 3px 10px rgba(160, 35, 45, .12) !important;
+}
+.verification-password-error,
+.verification-password-success { margin: 0; font-size: .72rem; line-height: 1.4; }
+.verification-password-error { color: #a92d35; }
+.verification-password-success { color: #28704f; }
 .verification-password-wrap .pw-eye { right: 8px; }
 .verification-help { margin: 0; color: #89958f; font-size: .67rem; line-height: 1.4; }
+.settings-body > :deep(.device-panel) {
+  grid-column: 1 / -1;
+  width: 100%;
+}
 .settings-faq-section { grid-column: 1 / -1; }
 
 @media (max-width: 800px) {

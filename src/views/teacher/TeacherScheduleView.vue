@@ -66,7 +66,12 @@
               </svg>
             </div>
             <button class="icon-btn print-btn" @click="printSchedule" :disabled="isLoading" title="Print schedule">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 22h12v-9H6z"/><path d="M6 14h12"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M7 8V3h10v5" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v5a2 2 0 0 1-2 2h-2" />
+                <path d="M7 14h10v7H7z" />
+                <path d="M18 11h.01" />
+              </svg>
               Print
             </button>
           </div>
@@ -1117,8 +1122,8 @@ function confirmLogout() {
   border-radius: 18px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
   padding: 28px 28px 20px;
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: max-content;
   display: flex;
   flex-direction: column;
   overflow: visible;
@@ -1214,6 +1219,24 @@ function confirmLogout() {
 
 .print-btn {
   white-space: nowrap;
+  border: 1px solid #9fc4ee;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(145deg, #eef6ff, #d8eaff);
+  color: #2f7ed8;
+  box-shadow: 0 3px 8px rgba(47, 126, 216, 0.12), inset 0 1px rgba(255, 255, 255, 0.8);
+}
+
+.print-btn:hover:not(:disabled) {
+  border-color: #6ea8e8;
+  background: linear-gradient(145deg, #f6fbff, #cfe5ff);
+  color: #1f6ec4;
+  transform: translateY(-1px);
+}
+
+.print-btn:disabled {
+  opacity: .65;
+  cursor: not-allowed;
 }
 
 .schedule-color-legend {
@@ -1256,9 +1279,9 @@ function confirmLogout() {
 .table-scroll {
   width: 100%;
   overflow-x: auto;
-  overflow-y: auto;
-  max-height: 72vh;
-  min-height: 420px;
+  overflow-y: visible;
+  max-height: none;
+  min-height: 0;
   margin-top: 8px;
   position: relative;
   border-radius: 12px;
@@ -1315,8 +1338,7 @@ function confirmLogout() {
 .th-day-active { background: #6b7280; }
 .work-hours-row .th-time,
 .th-work-hours {
-  position: sticky;
-  top: 42px;
+  position: static;
   padding: 8px 6px;
   color: #40534e;
   border-bottom: 1px solid #d6e0dc;
@@ -1324,9 +1346,39 @@ function confirmLogout() {
   font-size: .68rem;
   font-weight: 650;
   white-space: nowrap;
+  min-width: 0;
 }
 .work-hours-row .th-time { left: 0; z-index: 19; }
 .th-work-hours { z-index: 3; text-align: center; }
+
+/* Keep the work-hours labels legible when the timetable is viewed on a phone. */
+@media (max-width: 600px) {
+  .table-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .sched-table {
+    min-width: 760px;
+  }
+
+  .th-time,
+  .work-hours-row .th-time {
+    width: 82px;
+    min-width: 82px;
+    padding-inline: 6px;
+  }
+
+  .th-day,
+  .th-work-hours {
+    min-width: 112px;
+    padding: 8px 6px;
+  }
+
+  .th-work-hours {
+    font-size: .72rem;
+  }
+}
 
 /* ─ Body: Time Column ─ */
 .td-time {
@@ -1902,6 +1954,38 @@ function confirmLogout() {
 @media (max-width: 900px) {
   .main { padding: 20px 16px 32px; }
   .sidebar { width: 200px; min-width: 200px; }
+}
+
+@media (min-width: 901px) and (max-width: 1200px),
+       (min-width: 901px) and (max-height: 800px) {
+  .main { padding: 20px 24px 24px; }
+  .main-header { margin-bottom: 16px; }
+  .schedule-card { padding: 18px 18px 16px; border-radius: 16px; }
+  .sched-topbar { align-items: center; gap: 10px; margin-bottom: 10px; }
+  .sched-topbar-left { min-width: 0; }
+  .sched-grid-title { font-size: 1.35rem; }
+  .sched-grid-sub { font-size: .76rem; }
+  .sched-topbar-right { gap: 8px; }
+  .subject-select { min-width: 170px; padding: 6px 28px 6px 10px; font-size: .78rem; }
+  .icon-btn { min-height: 34px; padding-inline: 9px; }
+  .schedule-color-legend { gap: 8px 12px; margin-bottom: 8px; padding: 7px 9px; font-size: .68rem; }
+  .schedule-color-legend span { gap: 6px; }
+  .legend-swatch { width: 10px; height: 10px; }
+  .table-scroll { min-height: 0; max-height: none; margin-top: 4px; }
+  .sched-table { min-width: 720px; }
+  .th-time { width: 78px; padding: 8px 5px; font-size: .72rem; }
+  .th-day { padding: 8px 4px; font-size: .78rem; }
+  .th-work-hours-label,
+  .th-work-hours { padding: 6px 3px; font-size: .62rem; }
+  .td-time { padding: 6px 3px; font-size: .68rem; }
+  .td-empty:not(.col-expanded) { width: auto; min-width: 0; padding: 3px 2px; }
+  .free-time-label { font-size: .66rem; }
+  .td-class { padding: 4px 3px; font-size: .66rem; }
+  .sidebar { width: 250px; min-width: 250px; padding: 16px 12px; }
+  .sidebar-profile { margin-bottom: 10px; }
+  .avatar-wrap { width: 58px; height: 58px; margin-bottom: 4px; }
+  .sidebar-nav { gap: 4px; }
+  .nav-item { min-height: 40px; padding: 8px 10px; }
 }
 
 @media print {

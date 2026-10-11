@@ -1111,6 +1111,9 @@ async function requestPasswordReset(req, res) {
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
+    if (!/^[a-z0-9._%+-]+\.au@phinmaed\.com$/.test(normalizedEmail)) {
+      return res.status(400).json({ message: "Email must end with .au@phinmaed.com." });
+    }
     const user = await User.findOne({ email: normalizedEmail }).select("+email +passwordHash +passwordOtpHash +passwordOtpExpiresAt +passwordOtpLastSentAt +passwordOtpAttempts +account_status");
 
     if (!user) {

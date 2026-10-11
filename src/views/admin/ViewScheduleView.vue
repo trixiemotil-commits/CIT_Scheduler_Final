@@ -147,7 +147,7 @@
               <p class="sched-grid-sub">{{ selectedFloor }} &bull; Read-only view</p>
             </div>
             <div class="sched-topbar-right">
-              <button class="icon-btn" title="Print" aria-label="Print schedule" @click="printSchedule">
+              <button class="icon-btn schedule-print-btn" title="Print" aria-label="Print schedule" @click="printSchedule">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 <span>Print</span>
               </button>
@@ -239,7 +239,7 @@
               <p class="sched-grid-sub">Student group · Read-only view</p>
             </div>
             <div class="sched-topbar-right">
-              <button class="icon-btn" title="Print" aria-label="Print schedule" @click="printSchedule">
+              <button class="icon-btn schedule-print-btn" title="Print" aria-label="Print schedule" @click="printSchedule">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 <span>Print</span>
               </button>
@@ -322,7 +322,7 @@
               <p class="sched-grid-sub">Read-only view</p>
             </div>
             <div class="sched-topbar-right">
-              <button class="icon-btn" title="Print" aria-label="Print schedule" @click="printSchedule">
+              <button class="icon-btn schedule-print-btn" title="Print" aria-label="Print schedule" @click="printSchedule">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 <span>Print</span>
               </button>
@@ -592,13 +592,19 @@ function selectTerm(term) {
 }
 
 watch(selectedTerm, async () => {
-  if (viewMode.value === 'room' || viewMode.value === 'teacher') {
-    await loadScheduleData()
-  }
-  if (viewMode.value === 'teacher') {
-    teacherList.value = []
-    await loadTeachers()
-    await fetchConsultationsForTeacher()
+  try {
+    if (viewMode.value === 'room' || viewMode.value === 'teacher') {
+      await loadScheduleData()
+    }
+    if (viewMode.value === 'teacher') {
+      teacherList.value = []
+      await loadTeachers()
+      const matchedTeacher = teacherList.value.find(teacher => teacher.name === selectedTeacher.value)
+      selectedTeacherId.value = matchedTeacher?.id || null
+      await fetchConsultationsForTeacher()
+    }
+  } catch (error) {
+    console.error('Unable to refresh schedule for selected term:', error)
   }
 })
 
@@ -738,6 +744,7 @@ const selectedTeacherId = ref(null)
 const teacherList      = ref([])
 const teacherSearchQuery = ref('')
 const loadingTeachers  = ref(false)
+let teacherLoadPromise = null
 
 const filteredTeacherList = computed(() => {
   const query = teacherSearchQuery.value.trim().toLowerCase()
@@ -854,8 +861,10 @@ async function applyRouteContext() {
   } else if (requestedMode === 'teacher') {
     viewMode.value = 'teacher'
     await loadTeachers()
-    selectedTeacher.value = String(route.query.teacher || '') || null
-    selectedTeacherId.value = teacherList.value.find(teacher => teacher.name === selectedTeacher.value)?.id || null
+    const requestedTeacher = String(route.query.teacher || '').trim()
+    const matchedTeacher = teacherList.value.find(teacher => teacher.name.toLowerCase() === requestedTeacher.toLowerCase())
+    selectedTeacher.value = matchedTeacher?.name || requestedTeacher || null
+    selectedTeacherId.value = matchedTeacher?.id || null
   } else if (requestedMode === 'student') {
     viewMode.value = 'student'
     selectedStudentYear.value = String(route.query.year || '')
@@ -865,18 +874,21 @@ async function applyRouteContext() {
 
 async function loadTeachers() {
   if (teacherList.value.length) return
+  if (teacherLoadPromise) return teacherLoadPromise
   loadingTeachers.value = true
-  try {
-    const termId = getSelectedTermId()
-    const scheduleQuery = termId ? `?academicTermId=${encodeURIComponent(termId)}` : ''
-    const [res, schedulePayload] = await Promise.all([
-      apiRequest('/users?role=teacher'),
-      apiRequest(`/schedules${scheduleQuery}`),
-    ])
-    const scheduledTeacherNames = new Set((schedulePayload.entries || []).map(entry => String(entry.teacher || '').trim()).filter(Boolean))
-    const viewingHistoricalTerm = Boolean(termId && getTermId(publishedTerm.value) && termId !== getTermId(publishedTerm.value))
-    if (res.users && Array.isArray(res.users)) {
+  teacherLoadPromise = (async () => {
+    try {
+      const termId = getSelectedTermId()
+      const scheduleQuery = termId ? `?academicTermId=${encodeURIComponent(termId)}` : ''
+      const [res, schedulePayload] = await Promise.all([
+        apiRequest('/users?role=teacher'),
+        apiRequest(`/schedules${scheduleQuery}`),
+      ])
+      const scheduledTeacherNames = new Set((schedulePayload.entries || []).filter(Boolean).map(entry => String(entry.teacher || '').trim()).filter(Boolean))
+      const viewingHistoricalTerm = Boolean(termId && getTermId(publishedTerm.value) && termId !== getTermId(publishedTerm.value))
+      if (res.users && Array.isArray(res.users)) {
         teacherList.value = res.users
+          .filter(Boolean)
           .filter(u => {
             const isTeacher = Array.isArray(u.roles) ? u.roles.includes('teacher') : u.role === 'Teacher'
             const name = `${u.firstName || ''} ${u.lastName || ''}`.trim()
@@ -886,16 +898,22 @@ async function loadTeachers() {
           .map(u => {
             const name = `${u.firstName} ${u.lastName}`.trim()
             return {
-              id: u._id || u.id,
+              id: u._id || u.id || null,
               name,
               avatar: getTeacherAvatar(name, u.avatar || ''),
             }
           })
-        .filter(teacher => teacher.name.length > 0)
-        .sort((a, b) => a.name.localeCompare(b.name))
+          .filter(teacher => teacher.name.length > 0)
+          .sort((a, b) => a.name.localeCompare(b.name))
+      }
+    } catch (error) {
+      console.error('Unable to load teachers for schedule view:', error)
+    } finally {
+      loadingTeachers.value = false
+      teacherLoadPromise = null
     }
-  } catch (_) {}
-  loadingTeachers.value = false
+  })()
+  return teacherLoadPromise
 }
 
 async function fetchConsultationsForTeacher() {
@@ -1283,10 +1301,14 @@ async function loadScheduleData() {
 }
 
 onMounted(async () => {
-  await loadTermContext()
-  await applyRouteContext()
-  await ensureTermSelection()
-  await loadScheduleData()
+  try {
+    await loadTermContext()
+    await applyRouteContext()
+    await ensureTermSelection()
+    await loadScheduleData()
+  } catch (error) {
+    console.error('Unable to initialize schedule view:', error)
+  }
 })
 
 function exportScheduleExcel() {
@@ -1731,6 +1753,19 @@ function printSchedule() {
   color: #1f6ec4;
   background: linear-gradient(145deg, #f6fbff, #cfe5ff);
   transform: translateY(-1px);
+}
+.schedule-print-btn {
+  background: linear-gradient(145deg, #eef6ff, #d8eaff);
+  border: 1px solid #9fc4ee;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #2f7ed8;
+  box-shadow: 0 3px 8px rgba(47, 126, 216, 0.12), inset 0 1px rgba(255,255,255,0.8);
+}
+.schedule-print-btn:hover {
+  border-color: #6ea8e8;
+  color: #1f6ec4;
+  background: linear-gradient(145deg, #f6fbff, #cfe5ff);
 }
 .sched-topbar-right .icon-btn[title="Print"] { gap: 5px; }
 .sched-topbar-right .icon-btn[title="Print"] span { font-weight: 700; }

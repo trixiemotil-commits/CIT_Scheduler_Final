@@ -1,6 +1,14 @@
 <template>
   <div class="page-bg">
     <canvas ref="tronCanvas" class="tron-canvas" aria-hidden="true"></canvas>
+    <div v-if="feedback.open" class="feedback-backdrop" @click.self="closeFeedback">
+      <section class="feedback-modal" role="alertdialog" aria-modal="true" :aria-labelledby="'feedback-title'">
+        <div class="feedback-icon" :class="feedback.type" aria-hidden="true">{{ feedback.type === 'success' ? '✓' : '!' }}</div>
+        <h2 id="feedback-title">{{ feedbackTitle }}</h2>
+        <p :class="{ 'feedback-error-text': feedback.type === 'error' }">{{ feedback.text }}</p>
+        <button type="button" class="submit-btn feedback-button" @click="closeFeedback">OK</button>
+      </section>
+    </div>
     <div class="card">
 
       <!-- ══════════════════════════════
@@ -16,15 +24,14 @@
         <h2 class="step-title">Step 1: Verify Your Email</h2>
         <p class="step-desc">Enter the email address linked to your account. We'll send a 6-digit verification code.</p>
 
-        <div v-if="error" class="error-msg">{{ error }}</div>
-        <div v-if="message" class="success-msg">{{ message }}</div>
-
         <form class="form" @submit.prevent="goToStep2">
           <div class="input-wrapper">
             <input
               v-model="email"
               type="email"
               placeholder="e.g juan.delacruz.au@phinmaed.com"
+              :pattern="EMAIL_PATTERN"
+              title="Use your .au@phinmaed.com email address."
               class="input-field"
               autocomplete="email"
               required
@@ -47,9 +54,6 @@
         </div>
         <h2 class="step-title">Step 2: OTP</h2>
         <p class="step-desc">Enter the 6-digit verification code sent to your email. The code expires in 5 minutes.</p>
-
-        <div v-if="error" class="error-msg">{{ error }}</div>
-        <div v-if="message" class="success-msg">{{ message }}</div>
 
         <form class="form" @submit.prevent="goToStep3">
           <div class="pin-row">
@@ -140,8 +144,6 @@
             <span>{{ passwordsMatch ? 'Passwords match' : 'Passwords do not match' }}</span>
           </div>
 
-          <div v-if="error" class="error-msg">{{ error }}</div>
-          <div v-if="message" class="success-msg">{{ message }}</div>
           <button type="submit" class="submit-btn" :disabled="isResetting || !canReset">{{ isResetting ? 'RESETTING...' : 'RESET PASSWORD' }}</button>
           <RouterLink to="/" class="cancel-link">Cancel</RouterLink>
         </form>
@@ -180,6 +182,13 @@ const step = ref(1)
 const email = ref('')
 const error = ref('')
 const message = ref('')
+const EMAIL_PATTERN = "[a-zA-Z0-9._%+-]+\\.au@phinmaed\\.com"
+const feedback = ref({ open: false, type: 'error', text: '' })
+const feedbackTitle = computed(() => {
+  if (feedback.value.type === 'success') return 'Success'
+  if (feedback.value.text.toLowerCase().includes('email must end with')) return 'Email Format Issue'
+  return 'Request Failed'
+})
 const isSending = ref(false)
 const isResetting = ref(false)
 
@@ -224,6 +233,17 @@ const canReset = computed(() => allRequirementsMet.value && passwordsMatch.value
 const router = useRouter()
 const tronCanvas = ref(null)
 let tronFrame = null
+
+function showFeedback(type, text) {
+  feedback.value = { open: true, type, text, action: null }
+}
+
+function closeFeedback() {
+  feedback.value.open = false
+  if (feedback.value.type === 'success' && feedback.value.action === 'login') {
+    router.push('/')
+  }
+}
 
 function initialiseTronBackground() {
   const canvas = tronCanvas.value
@@ -300,6 +320,12 @@ async function goToStep2() {
 
   if (!email.value.trim()) {
     error.value = 'Please enter your registered email address.'
+    showFeedback('error', error.value)
+    return
+  }
+  if (!/^[a-z0-9._%+-]+\.au@phinmaed\.com$/i.test(email.value.trim())) {
+    error.value = 'Email must end with .au@phinmaed.com.'
+    showFeedback('error', error.value)
     return
   }
 
@@ -308,8 +334,10 @@ async function goToStep2() {
     const response = await requestPasswordReset(email.value.trim())
     message.value = response.message
     step.value = 2
+    showFeedback('success', response.message || 'Verification code sent.')
   } catch (err) {
     error.value = err.message || 'Unable to send OTP. Please try again.'
+    showFeedback('error', error.value)
   } finally {
     isSending.value = false
   }
@@ -319,14 +347,17 @@ async function goToStep3() {
   error.value = ''
   if (otp.value.length < 6) {
     error.value = 'Enter the full 6-digit code.'
+    showFeedback('error', error.value)
     return
   }
   isSending.value = true
   try {
     await verifyPasswordOtp({ email: email.value.trim(), otp: otp.value })
     step.value = 3
+    showFeedback('success', 'Email verified successfully.')
   } catch (err) {
     error.value = err.message || 'This verification code is invalid or expired.'
+    showFeedback('error', error.value)
   } finally {
     isSending.value = false
   }
@@ -338,6 +369,7 @@ async function handleReset() {
 
   if (!canReset.value) {
     error.value = 'Please complete the form and enter the 6-digit code.'
+    showFeedback('error', error.value)
     return
   }
 
@@ -349,9 +381,11 @@ async function handleReset() {
       newPassword: newPassword.value,
     })
     message.value = response.message || 'Password has been reset successfully.'
-    setTimeout(() => router.push('/'), 800)
+    showFeedback('success', message.value)
+    feedback.value.action = 'login'
   } catch (err) {
     error.value = err.message || 'Unable to reset password. Please try again.'
+    showFeedback('error', error.value)
   } finally {
     isResetting.value = false
   }
@@ -463,18 +497,41 @@ async function handleReset() {
   pointer-events: none;
 }
 
-.error-msg {
-  font-size: 0.86rem;
-  color: #e63946;
-  text-align: center;
-  margin-top: -4px;
+.feedback-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 12, 16, .62);
+  backdrop-filter: blur(4px);
 }
-.success-msg {
-  font-size: 0.86rem;
-  color: #4f575f;
+.feedback-modal {
+  width: min(100%, 380px);
+  padding: 30px;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, .3);
   text-align: center;
-  margin-top: -4px;
 }
+.feedback-modal h2 { margin: 12px 0 8px; color: #111827; font-size: 1.25rem; }
+.feedback-modal p { margin: 0 0 22px; color: #59616b; line-height: 1.5; }
+.feedback-modal p.feedback-error-text { color: #e63946; font-size: 0.82rem; }
+.feedback-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin: 0 auto;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+.feedback-icon.error { color: #e63946; }
+.feedback-icon.success { color: #25845b; }
+.feedback-button { max-width: 220px; }
 .icon-btn {
   position: absolute;
   right: 13px;
