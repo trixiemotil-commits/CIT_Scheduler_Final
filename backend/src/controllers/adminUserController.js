@@ -55,6 +55,7 @@ function toClientUser(user) {
     phone: user.phone || "",
     account_status: user.account_status || fallbackAccountStatus(user.role),
     teacher_status: user.teacher_status || (getUserRoles(user).includes("teacher") ? "On School" : ""),
+    teacher_admin_status: user.teacher_admin_status || "",
     teacher_availability: user.teacher_availability || (getUserRoles(user).includes("teacher") ? "Available" : ""),
     teacher_time_in: user.teacher_time_in || null,
     teacher_clocked_out: Boolean(user.teacher_clocked_out),
@@ -525,15 +526,20 @@ async function unlockUser(req, res) {
 async function updateTeacherStatus(req, res) {
   try {
     const { id } = req.params;
-    const nextStatus = sanitizeTeacherStatus(req.body?.teacher_status || req.body?.status);
+    const requestedStatus = req.body?.teacher_admin_status || req.body?.teacher_status || req.body?.status;
+    const isOfflineRequest = requestedStatus === "Offline";
+    const nextStatus = isOfflineRequest ? "Offline" : sanitizeTeacherStatus(requestedStatus);
     const user = await User.findById(id);
 
     if (!user || !(getUserRoles(user).includes("teacher"))) {
       return res.status(404).json({ message: "Teacher not found." });
     }
 
-    user.teacher_status = nextStatus;
-    user.teacher_clocked_out = false;
+    if (isOfflineRequest && user.teacher_admin_status !== "On Leave") {
+      return res.status(400).json({ message: "Teachers can only be manually set to Offline while On Leave." });
+    }
+
+    user.teacher_admin_status = nextStatus;
     await user.save();
 
     await logActivity({

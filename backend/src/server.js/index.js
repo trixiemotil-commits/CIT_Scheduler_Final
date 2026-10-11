@@ -123,14 +123,24 @@ async function autoClockOutTeachers() {
         $or: [{ role: "teacher" }, { roles: "teacher" }],
         teacher_clocked_out: { $ne: true },
       },
-      {
-        $set: {
-          teacher_clocked_out: true,
-          teacher_time_in: null,
-          teacher_status: "On Leave",
-          teacher_availability: "Unavailable",
+      [
+        {
+          $set: {
+            teacher_clocked_out: true,
+            teacher_time_in: null,
+            teacher_status: "On Leave",
+            teacher_availability: "Unavailable",
+            teacher_admin_status: {
+              $cond: [
+                { $eq: ["$teacher_admin_status", "On School"] },
+                null,
+                "$teacher_admin_status",
+              ],
+            },
+          },
         },
-      }
+      ],
+      { updatePipeline: true }
     );
 
     if (result.modifiedCount > 0) {

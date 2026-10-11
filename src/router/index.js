@@ -76,6 +76,7 @@ const router = createRouter({
         { path: 'notifications', name: 'student-notifications', component: StudentNotificationsView },
       ],
     },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ]
 })
 

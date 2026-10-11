@@ -143,6 +143,11 @@ const userSchema = new mongoose.Schema(
       enum: TEACHER_STATUS_VALUES,
       default: undefined,
     },
+    teacher_admin_status: {
+      type: String,
+      enum: ["On School", "On Meeting", "On Leave", "Offline"],
+      default: null,
+    },
     teacher_availability: {
       type: String,
       enum: TEACHER_AVAILABILITY_VALUES,

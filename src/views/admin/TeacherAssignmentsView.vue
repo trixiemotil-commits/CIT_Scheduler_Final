@@ -92,6 +92,7 @@
             <span class="summary-count available"><b>{{ teachers.filter(item => ['On School', 'On Event'].includes(normalizeTeacherStatus(displayTeacherStatus(item)))).length }}</b><small>On School</small></span>
             <span class="summary-count summary-count--event"><b>{{ teachers.filter(item => normalizeTeacherStatus(displayTeacherStatus(item)) === 'On Event').length }}</b><small>On Event</small></span>
             <span class="summary-count summary-count--leave"><b>{{ teachers.filter(item => item.adminStatus === 'On Leave').length }}</b><small>On leave</small></span>
+            <span class="summary-count summary-count--offline"><b>{{ teachers.filter(item => normalizeTeacherStatus(displayTeacherStatus(item)) === 'Offline').length }}</b><small>Offline</small></span>
           </div>
         </div>
 
@@ -178,7 +179,7 @@
                   <option value="On School">On School</option>
                   <option value="On Leave">On Leave</option>
                   <option value="On Meeting">On Meeting</option>
-                  <option value="Offline" disabled>Offline</option>
+                  <option value="Offline" :disabled="teacher.adminStatus !== 'On Leave'">Offline</option>
                 </select>
               </div>
 
@@ -458,7 +459,6 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import useNotifications from '@/composables/useNotifications'
 import { initialsAvatar } from '@/utils/avatar.js'
-import Swal from 'sweetalert2'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -564,7 +564,7 @@ function canAutoRefresh() {
   return !Object.keys(unsavedChanges.value || {}).length
 }
 
-const statusTabs = ['All', 'On School', 'On Event', 'On Meeting', 'On Leave']
+const statusTabs = ['All', 'On School', 'On Event', 'On Meeting', 'On Leave', 'Offline']
 
 function normalizeTeacherStatus(status) {
   if (!status) return 'On School'
@@ -590,6 +590,7 @@ const emptyStatusDescription = computed(() => {
     'On School': 'currently on school',
     'On Meeting': 'currently in a meeting',
     'On Leave': 'currently on leave',
+    Offline: 'currently offline',
   }
   return descriptions[normalizeTeacherStatus(activeTab.value)] || 'available'
 })
@@ -754,10 +755,13 @@ function hasSubstituteConflict(candidate, leaveEntries) {
 function mapTeacherStatusToApi(status) {
   if (status === 'On Meeting' || status === 'On-Meeting') return 'On Meeting'
   if (status === 'On Leave') return 'On Leave'
+  if (status === 'Offline') return 'Offline'
   return 'On School'
 }
 
 function mapTeacherFromApi(user) {
+  if (!user || typeof user !== 'object' || !user.id) return null
+
   const firstName = (user.firstName || '').trim()
   const lastName = (user.lastName || '').trim()
   const fullName = `${firstName} ${lastName}`.trim()
@@ -765,12 +769,15 @@ function mapTeacherFromApi(user) {
     ? user.designatedAreas
     : (user.department ? [user.department] : [])
 
-  // Keep the admin's selectable status separate from the effective badge.
-  const adminStatus = mapTeacherStatus(user.teacher_status)
-  const isClockedOut = Boolean(
-    user.teacher_clocked_out
-    || (adminStatus === 'On Leave' && !user.teacher_time_in)
-  )
+  const isClockedOut = Boolean(user.teacher_clocked_out)
+  const isClockedIn = Boolean(user.teacher_time_in) && !isClockedOut
+  const clockStatus = !isClockedIn
+    ? 'Offline'
+    : mapTeacherStatus(user.teacher_status === 'On Leave' ? 'On School' : user.teacher_status)
+  const adminStatus = user.teacher_admin_status
+    ? mapTeacherStatus(user.teacher_admin_status)
+    : clockStatus
+  const status = clockStatus
 
   return {
     id: user.id,
@@ -781,8 +788,9 @@ function mapTeacherFromApi(user) {
     college: user.department || 'College of Information Technology',
     email: user.email || '',
     avatar: user.avatar || initialsAvatar(fullName),
-    status: isClockedOut ? 'Offline' : mapTeacherStatus(user.teacher_status),
+    status,
     adminStatus,
+    clockStatus,
     currentStatus: 'Offline',
     account_status: user.account_status || 'Active',
     teacher_status: user.teacher_status || 'On School',
@@ -805,13 +813,20 @@ function isTeacherActive(teacher) {
 }
 
 function getActualTeacherStatus(teacher) {
-  if (teacher.teacher_clocked_out || (teacher.adminStatus === 'On Leave' && !teacher.teacher_time_in)) return 'Offline'
-  return normalizeTeacherStatus(teacher.status) || 'On School'
+  if (teacher.teacher_clocked_out || !teacher.teacher_time_in) return 'Offline'
+  const status = normalizeTeacherStatus(teacher.clockStatus || teacher.status) || 'On School'
+  return status === 'On Leave' ? 'On School' : status
 }
 
 function displayTeacherStatus(teacher) {
-  if (teacher.adminStatus === 'On Leave') return getActualTeacherStatus(teacher)
-  return eventStatusByTeacherId.value[String(teacher.id)] || getActualTeacherStatus(teacher)
+  if (teacher.teacher_clocked_out) return 'Offline'
+  const adminStatus = normalizeTeacherStatus(teacher.adminStatus)
+  if (adminStatus === 'On Leave' || adminStatus === 'Offline') return adminStatus
+  const eventStatus = eventStatusByTeacherId.value[String(teacher.id)]
+  if (eventStatus) return eventStatus
+  if (adminStatus === 'On School' || adminStatus === 'On Meeting') return adminStatus
+  const actualStatus = getActualTeacherStatus(teacher)
+  return actualStatus
 }
 
 function parseEventTime(value) {
@@ -924,8 +939,9 @@ async function loadTeachers() {
     const payload = await apiRequest('/users?role=teacher')
     teachers.value = Array.isArray(payload.users)
       ? payload.users
-        .filter(user => String(user.account_status || 'Active') === 'Active')
+        .filter(user => user && user.id && String(user.account_status || 'Active') === 'Active')
         .map(mapTeacherFromApi)
+        .filter(Boolean)
       : []
 
     await Promise.all(teachers.value.map((teacher) => loadTeacherSchedule(teacher.name)))
@@ -1028,16 +1044,22 @@ const previousTeachers = () => {
 }
 
 const updateTeacherStatus = async (teacher) => {
+  if (!teacher?.id) {
+    showTeacherToast('error', 'Unable to update teacher status because this teacher record is missing an ID.')
+    return
+  }
+
   const previousStatus = teacher._lastStatus || teacher.adminStatus
 
   try {
     const response = await apiRequest(`/users/${teacher.id}/teacher-status`, {
       method: 'PATCH',
-      body: JSON.stringify({ teacher_status: mapTeacherStatusToApi(teacher.adminStatus) }),
+      body: JSON.stringify({ teacher_admin_status: mapTeacherStatusToApi(teacher.adminStatus) }),
     })
 
     if (response?.user) {
       const mapped = mapTeacherFromApi(response.user)
+      if (!mapped) throw new Error('The updated teacher record is missing an ID.')
       Object.assign(teacher, mapped)
       teacher.currentStatus = getActualTeacherStatus(teacher)
       return
@@ -1093,6 +1115,12 @@ const updateSubstituteTeacher = (teacher, substituteName) => {
 }
 
 const saveSubstituteAssignment = async (teacher) => {
+  const teacherId = teacher?.id
+  if (!teacherId) {
+    showTeacherToast('error', 'Unable to save substitute coverage because this teacher record is missing an ID.')
+    return false
+  }
+
   const eligibleEntryKeys = new Set(getTeacherWeeklySchedule(teacher).map(getEntryKey))
   const substituteAssignments = Object.fromEntries(
     Object.entries(teacher.substituteAssignments || {}).filter(
@@ -1101,7 +1129,7 @@ const saveSubstituteAssignment = async (teacher) => {
   )
   teacher.substituteAssignments = substituteAssignments
 
-  savingSubstitute.value[teacher.id] = true
+  savingSubstitute.value[teacherId] = true
   try {
     const scheduleByKey = new Map(
       getTeacherWeeklySchedule(teacher).map((entry) => [getEntryKey(entry), entry])
@@ -1135,15 +1163,15 @@ const saveSubstituteAssignment = async (teacher) => {
     await apiRequest('/substitutes', {
       method: 'PUT',
       body: JSON.stringify({
-        originalTeacher: teacher.id,
+        originalTeacher: teacherId,
         date: new Date().toLocaleDateString('en-CA'),
         substituteAssignments,
         assignments,
       }),
     })
 
-    if (unsavedChanges.value && unsavedChanges.value[teacher.id]) {
-      delete unsavedChanges.value[teacher.id]
+    if (unsavedChanges.value && unsavedChanges.value[teacherId]) {
+      delete unsavedChanges.value[teacherId]
     }
     showTeacherToast(
       'success',
@@ -1157,7 +1185,7 @@ const saveSubstituteAssignment = async (teacher) => {
     showTeacherToast('error', error.message || 'Failed to save substitute assignment.')
     return false
   } finally {
-    savingSubstitute.value[teacher.id] = false
+    savingSubstitute.value[teacherId] = false
   }
 }
 

@@ -979,6 +979,9 @@ async function updateMe(req, res) {
       if (clockOut) {
         user.teacher_clocked_out = true;
         user.teacher_time_in = null;
+        if (user.teacher_admin_status === "On School") {
+          user.teacher_admin_status = null;
+        }
       } else if (teacherStatus === "On School") {
         user.teacher_clocked_out = false;
       }
