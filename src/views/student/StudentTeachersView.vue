@@ -356,17 +356,17 @@ function normalizeTeacherStatus(statusOrObj) {
     if (account && account !== 'Active') return 'Offline'
 
     const resolvedStatus = String(t.status || '').trim().toLowerCase()
-    if (resolvedStatus === 'offline') return 'Offline'
+    if (resolvedStatus === 'on leave') return 'On Leave'
+    if (resolvedStatus === 'on meeting') return 'On Meeting'
     if (resolvedStatus === 'on event') return 'On Event'
+    if (resolvedStatus === 'on school' || resolvedStatus === 'in school') return 'In School'
+    if (resolvedStatus === 'offline') return 'Offline'
     if (t.teacher_clocked_out || (
       String(t.teacher_status || '').toLowerCase() === 'on leave'
       && !t.teacher_time_in
     )) {
       return 'Offline'
     }
-    if (resolvedStatus === 'on school' || resolvedStatus === 'in school') return 'In School'
-    if (resolvedStatus === 'on meeting') return 'On Meeting'
-
     if (t.teacher_status_expires_at) {
       try {
         const expires = new Date(t.teacher_status_expires_at)

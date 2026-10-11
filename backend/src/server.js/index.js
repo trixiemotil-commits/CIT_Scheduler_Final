@@ -132,7 +132,7 @@ async function autoClockOutTeachers() {
             teacher_availability: "Unavailable",
             teacher_admin_status: {
               $cond: [
-                { $eq: ["$teacher_admin_status", "On School"] },
+                { $in: ["$teacher_admin_status", ["On School", "On Meeting"]] },
                 null,
                 "$teacher_admin_status",
               ],
