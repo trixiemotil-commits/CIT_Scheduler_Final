@@ -139,8 +139,7 @@ async function autoClockOutTeachers() {
             },
           },
         },
-      ],
-      { updatePipeline: true }
+      ]
     );
 
     if (result.modifiedCount > 0) {
