@@ -88,11 +88,12 @@
             </p>
           </div>
           <div class="summary-counts">
-            <span class="summary-count summary-count--total"><b>{{ teachers.length }}</b><small>Total</small></span>
-            <span class="summary-count available"><b>{{ teachers.filter(item => ['On School', 'On Event'].includes(normalizeTeacherStatus(displayTeacherStatus(item)))).length }}</b><small>On School</small></span>
-            <span class="summary-count summary-count--event"><b>{{ teachers.filter(item => normalizeTeacherStatus(displayTeacherStatus(item)) === 'On Event').length }}</b><small>On Event</small></span>
-            <span class="summary-count summary-count--leave"><b>{{ teachers.filter(item => item.adminStatus === 'On Leave').length }}</b><small>On leave</small></span>
-            <span class="summary-count summary-count--offline"><b>{{ teachers.filter(item => normalizeTeacherStatus(displayTeacherStatus(item)) === 'Offline').length }}</b><small>Offline</small></span>
+            <span class="summary-count summary-count--total"><b>{{ teacherStatusCounts.All }}</b><small>Total</small></span>
+            <span class="summary-count available"><b>{{ teacherStatusCounts['On School'] }}</b><small>On School</small></span>
+            <span class="summary-count summary-count--event"><b>{{ teacherStatusCounts['On Event'] }}</b><small>On Event</small></span>
+            <span class="summary-count summary-count--meeting"><b>{{ teacherStatusCounts['On Meeting'] }}</b><small>On Meeting</small></span>
+            <span class="summary-count summary-count--leave"><b>{{ teacherStatusCounts['On Leave'] }}</b><small>On Leave</small></span>
+            <span class="summary-count summary-count--offline"><b>{{ teacherStatusCounts.Offline }}</b><small>Offline</small></span>
           </div>
         </div>
 
@@ -105,7 +106,7 @@
             @click="selectStatusTab(tab)"
           >
             {{ statusTabLabel(tab) }}
-            <span>{{ tab === 'All' ? teachers.length : tab === 'On School' ? teachers.filter(item => ['On School', 'On Event'].includes(normalizeTeacherStatus(displayTeacherStatus(item)))).length : tab === 'On Leave' ? teachers.filter(item => item.adminStatus === 'On Leave').length : teachers.filter(item => normalizeTeacherStatus(displayTeacherStatus(item)) === normalizeTeacherStatus(tab)).length }}</span>
+            <span>{{ teacherStatusCounts[tab] }}</span>
           </button>
         </div>
 
@@ -174,12 +175,13 @@
                 <select
                   v-model="teacher.adminStatus"
                   :class="['status-dropdown', `status-${statusCssClass(teacher.adminStatus)}`]"
+                  :disabled="statusSavingByTeacherId[teacher.id]"
                   @change="updateTeacherStatus(teacher)"
                 >
                   <option value="On School">On School</option>
                   <option value="On Leave">On Leave</option>
                   <option value="On Meeting">On Meeting</option>
-                  <option value="Offline" :disabled="teacher.adminStatus !== 'On Leave'">Offline</option>
+                  <option value="Offline" :disabled="teacher._lastStatus !== 'On Leave'">Offline</option>
                 </select>
               </div>
 
@@ -597,6 +599,7 @@ const emptyStatusDescription = computed(() => {
 
 const teachers = ref([])
 const loadingTeachers = ref(false)
+const statusSavingByTeacherId = ref({})
 const scheduleCache = ref({})
 const scheduleLoading = ref({})
 const currentTime = ref(new Date())
@@ -819,15 +822,28 @@ function getActualTeacherStatus(teacher) {
 }
 
 function displayTeacherStatus(teacher) {
-  if (teacher.teacher_clocked_out) return 'Offline'
   const adminStatus = normalizeTeacherStatus(teacher.adminStatus)
-  if (adminStatus === 'On Leave' || adminStatus === 'Offline') return adminStatus
+  if (adminStatus === 'On Leave') return 'On Leave'
+  if (adminStatus === 'On Meeting') return 'On Meeting'
+  if (adminStatus === 'Offline' || teacher.teacher_clocked_out) return 'Offline'
   const eventStatus = eventStatusByTeacherId.value[String(teacher.id)]
   if (eventStatus) return eventStatus
-  if (adminStatus === 'On School' || adminStatus === 'On Meeting') return adminStatus
+  if (adminStatus === 'On School') return adminStatus
   const actualStatus = getActualTeacherStatus(teacher)
   return actualStatus
 }
+
+const teacherStatusCounts = computed(() => {
+  const counts = Object.fromEntries(statusTabs.map((status) => [status, 0]))
+  counts.All = teachers.value.length
+
+  teachers.value.forEach((teacher) => {
+    const status = normalizeTeacherStatus(displayTeacherStatus(teacher))
+    if (status in counts) counts[status] += 1
+  })
+
+  return counts
+})
 
 function parseEventTime(value) {
   const match = String(value || '').match(/^(\d{2}):(\d{2})$/)
@@ -902,6 +918,8 @@ function getTeacherNameById(id) {
 }
 
 function getAvailableSubstitutesForEntry(currentTeacher, entry) {
+  if (!currentTeacher?.id || !entry) return []
+
   const candidates = teachers.value.filter((t) => t.id !== currentTeacher.id && normalizeTeacherStatus(displayTeacherStatus(t)) === 'On School')
 
   const filtered = candidates.filter((candidate) => {
@@ -974,10 +992,6 @@ const filteredTeachers = computed(() => {
   })
 
   if (activeTab.value === 'All') return sortTeachers(teachers.value)
-  if (activeTab.value === 'On School') {
-    return sortTeachers(teachers.value.filter(t => ['On School', 'On Event'].includes(normalizeTeacherStatus(displayTeacherStatus(t)))))
-  }
-  if (activeTab.value === 'On Leave') return sortTeachers(teachers.value.filter(t => t.adminStatus === 'On Leave'))
   return sortTeachers(teachers.value.filter(t => normalizeTeacherStatus(displayTeacherStatus(t)) === normalizeTeacherStatus(activeTab.value)))
 })
 
@@ -1050,6 +1064,17 @@ const updateTeacherStatus = async (teacher) => {
   }
 
   const previousStatus = teacher._lastStatus || teacher.adminStatus
+  const teacherId = String(teacher.id)
+  if (statusSavingByTeacherId.value[teacherId]) return
+
+
+  if (teacher.adminStatus === 'Offline' && previousStatus !== 'On Leave') {
+    teacher.adminStatus = previousStatus
+    showTeacherToast('error', 'Set the teacher to On Leave before setting them Offline.')
+    return
+  }
+
+  statusSavingByTeacherId.value[teacherId] = true
 
   try {
     const response = await apiRequest(`/users/${teacher.id}/teacher-status`, {
@@ -1062,19 +1087,25 @@ const updateTeacherStatus = async (teacher) => {
       if (!mapped) throw new Error('The updated teacher record is missing an ID.')
       Object.assign(teacher, mapped)
       teacher.currentStatus = getActualTeacherStatus(teacher)
+      currentIndex.value = 0
       return
     }
 
     teacher._lastStatus = teacher.adminStatus
     teacher.currentStatus = getActualTeacherStatus(teacher)
+    currentIndex.value = 0
   } catch (error) {
     teacher.adminStatus = previousStatus
     console.error('Failed to update teacher status:', error)
-    alert(error.message || 'Failed to update teacher status.')
+    showTeacherToast('error', error.message || 'Failed to update teacher status.')
+  } finally {
+    statusSavingByTeacherId.value[teacherId] = false
   }
 }
 
 const getAvailableSubstitutes = (currentTeacher) => {
+  if (!currentTeacher?.id) return []
+
   const todayEntries = getTeacherWeeklySchedule(currentTeacher)
   const candidates = teachers.value.filter((t) => t.id !== currentTeacher.id && normalizeTeacherStatus(t.status) === 'On School')
 

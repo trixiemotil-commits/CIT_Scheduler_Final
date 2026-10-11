@@ -20,13 +20,16 @@ async function listNotifications(req, res) {
         .lean()
       : []
     const requestById = new Map(requests.map((request) => [String(request._id), request]))
+    const employeeIds = [...new Set(requests.map((request) => request.employeeId).filter(Boolean))]
+    const teachers = employeeIds.length
+      ? await User.find({ employeeId: { $in: employeeIds } }).select('employeeId firstName lastName avatar').lean()
+      : []
+    const teacherByEmployeeId = new Map(teachers.map((teacher) => [teacher.employeeId, teacher]))
 
-    return res.json({ notifications: await Promise.all(docs.map(async (d) => {
+    return res.json({ notifications: docs.map((d) => {
       const request = requestById.get(String(d.related?.consultationRequestId))
       const student = request?.studentId
-      const teacher = request?.employeeId
-        ? await User.findOne({ employeeId: request.employeeId }).select('firstName lastName avatar').lean()
-        : null
+      const teacher = teacherByEmployeeId.get(request?.employeeId)
       const actor = d.actorId && typeof d.actorId === 'object' ? d.actorId : null
       const data = {
         ...(d.data || {}),
@@ -56,7 +59,7 @@ async function listNotifications(req, res) {
       read: Boolean(d.read),
       createdAt: d.createdAt,
       }
-    })) })
+    }) })
   } catch (error) {
     console.error('listNotifications error:', error)
     return res.status(500).json({ message: 'Failed to load notifications.', error: error.message })

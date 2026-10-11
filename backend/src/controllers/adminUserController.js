@@ -535,11 +535,29 @@ async function updateTeacherStatus(req, res) {
       return res.status(404).json({ message: "Teacher not found." });
     }
 
-    if (isOfflineRequest && user.teacher_admin_status !== "On Leave") {
+    const wasOnLeave = user.teacher_admin_status === "On Leave" || user.teacher_status === "On Leave";
+    if (isOfflineRequest && !wasOnLeave) {
       return res.status(400).json({ message: "Teachers can only be manually set to Offline while On Leave." });
     }
 
     user.teacher_admin_status = nextStatus;
+    if (nextStatus === "On School") {
+      user.teacher_status = "On School";
+      user.teacher_time_in = new Date();
+      user.teacher_clocked_out = false;
+      user.teacher_status_expires_at = null;
+    } else if (nextStatus === "On Meeting") {
+      user.teacher_status = "On Meeting";
+      user.teacher_time_in = new Date();
+      user.teacher_clocked_out = false;
+      user.teacher_status_expires_at = null;
+    } else if (nextStatus === "On Leave") {
+      user.teacher_status = "On Leave";
+      user.teacher_availability = "Unavailable";
+      user.teacher_time_in = null;
+      user.teacher_clocked_out = true;
+      user.teacher_status_expires_at = null;
+    }
     await user.save();
 
     await logActivity({

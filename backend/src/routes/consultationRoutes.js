@@ -9,6 +9,7 @@ const {
   getWeeklySummary,
   listTeachersForStudents,
   createConsultationRequest,
+  getConsultationRequestSummary,
   listConsultationRequests,
   updateConsultationRequestByStudent,
   updateConsultationRequestStatus,
@@ -17,6 +18,7 @@ const {
 
 router.get("/teachers", authRequired, authorizeRoles("student", "teacher", "admin"), listTeachersForStudents);
 router.post("/requests", authRequired, authorizeRoles("student"), createConsultationRequest);
+router.get("/requests/summary", authRequired, authorizeRoles("teacher", "admin"), getConsultationRequestSummary);
 router.get("/requests", authRequired, authorizeRoles("student", "teacher", "admin"), listConsultationRequests);
 router.put("/requests/:id", authRequired, authorizeRoles("student"), updateConsultationRequestByStudent);
 router.patch("/requests/:id/status", authRequired, authorizeRoles("student", "teacher", "admin"), updateConsultationRequestStatus);

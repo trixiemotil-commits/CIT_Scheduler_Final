@@ -365,24 +365,12 @@ const pendingRequestCount = ref(0)
 const upcomingConsultCount = ref(0)
 const consultationStatsLoading = ref(true)
 let consultationStatsRefreshTimer
-
-function consultationDateOnly(value) {
-  const text = String(value || '')
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(text)
-  if (!match) return null
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-  return Number.isNaN(date.getTime()) ? null : date
-}
+let consultationStatsInFlight = false
 
 async function loadConsultationStats() {
+  if (document.visibilityState === 'hidden' || consultationStatsInFlight) return
+  consultationStatsInFlight = true
   try {
-    const payload = await apiRequest('/consultations/requests')
-    const requests = Array.isArray(payload.requests) ? payload.requests : []
-
-    pendingRequestCount.value = requests.filter(
-      (request) => String(request.status || '').toUpperCase() === 'PENDING'
-    ).length
-
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const endOfWeek = new Date(today)
@@ -390,16 +378,17 @@ async function loadConsultationStats() {
     endOfWeek.setDate(today.getDate() + daysUntilSunday)
     endOfWeek.setHours(23, 59, 59, 999)
 
-    upcomingConsultCount.value = requests.filter((request) => {
-      if (String(request.status || '').toUpperCase() !== 'APPROVED') return false
-      const consultationDate = consultationDateOnly(request.consultationDate)
-      return consultationDate && consultationDate >= today && consultationDate <= endOfWeek
-    }).length
+    const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    const params = new URLSearchParams({ from: dateKey(today), to: dateKey(endOfWeek) })
+    const payload = await apiRequest(`/consultations/requests/summary?${params}`)
+    pendingRequestCount.value = Number(payload.pending) || 0
+    upcomingConsultCount.value = Number(payload.upcoming) || 0
   } catch (error) {
     console.error('Unable to load teacher consultation statistics:', error)
     pendingRequestCount.value = 0
     upcomingConsultCount.value = 0
   } finally {
+    consultationStatsInFlight = false
     consultationStatsLoading.value = false
   }
 }
@@ -437,6 +426,7 @@ const isClearingNotifications = ref(false)
 const clearNotificationsError = ref('')
 const readNotificationIds = ref(new Set(JSON.parse(localStorage.getItem('cit_teacher_read_notifications') || '[]')))
 let notificationRefreshTimer
+let notificationRefreshInFlight = false
 const unreadNotifs = computed(() => notifications.value.filter(n => !n.read))
 const readNotifs = computed(() => notifications.value.filter(n => n.read))
 const newNotifs    = computed(() => notifications.value.filter(n => n.group === 'new'))
@@ -449,6 +439,8 @@ function notificationGroup(createdAt) {
 }
 
 async function loadConsultationNotifications() {
+  if (document.visibilityState === 'hidden' || notificationRefreshInFlight) return
+  notificationRefreshInFlight = true
   try {
     const payload = await apiRequest(`/notifications?updatedAt=${Date.now()}`, {
       cache: 'no-store',
@@ -471,6 +463,8 @@ async function loadConsultationNotifications() {
     })
   } catch (_) {
     notifications.value = []
+  } finally {
+    notificationRefreshInFlight = false
   }
 }
 
@@ -499,6 +493,12 @@ function _onNotif(n) {
     loadConsultationNotifications()
     loadConsultationStats()
   } catch (_) {}
+}
+
+function refreshDashboardWhenVisible() {
+  if (document.visibilityState !== 'visible') return
+  loadConsultationNotifications()
+  loadConsultationStats()
 }
 
 function notificationStudentName(notification) {
@@ -1311,8 +1311,9 @@ onMounted(() => {
   loadConsultationNotifications()
   loadConsultationStats()
   loadEvents()
-  notificationRefreshTimer = window.setInterval(loadConsultationNotifications, 15000)
-  consultationStatsRefreshTimer = window.setInterval(loadConsultationStats, 15000)
+  notificationRefreshTimer = window.setInterval(loadConsultationNotifications, 30000)
+  consultationStatsRefreshTimer = window.setInterval(loadConsultationStats, 30000)
+  document.addEventListener('visibilitychange', refreshDashboardWhenVisible)
   initDailyStatusTimers()
   useNotifications.addNotificationListener(_onNotif)
 })
@@ -1320,6 +1321,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.clearInterval(notificationRefreshTimer)
   window.clearInterval(consultationStatsRefreshTimer)
+  document.removeEventListener('visibilitychange', refreshDashboardWhenVisible)
   useNotifications.removeNotificationListener(_onNotif)
   useNotifications.closeNotifications()
 })

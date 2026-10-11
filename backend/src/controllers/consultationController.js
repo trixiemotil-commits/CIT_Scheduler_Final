@@ -1117,6 +1117,53 @@ async function createConsultationRequest(req, res) {
   }
 }
 
+// GET /api/consultations/requests/summary
+async function getConsultationRequestSummary(req, res) {
+  try {
+    const from = dateOnlyToUtc(req.query.from);
+    const through = dateOnlyToUtc(req.query.to);
+    if (!from || !through || from > through) {
+      return res.status(400).json({ message: "A valid from/to date range is required." });
+    }
+
+    const filter = {};
+    if (req.user?.role === "teacher") {
+      const teacherUser = await User.findById(req.user.id)
+        .select("firstName lastName employeeId")
+        .lean();
+
+      if (!teacherUser) {
+        return res.status(404).json({ message: "Teacher profile not found." });
+      }
+
+      filter.employeeId = {
+        $in: [teacherUser.employeeId, normalizeTeacherFullName(teacherUser)]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean),
+      };
+    } else if (req.query.employeeId) {
+      filter.employeeId = req.query.employeeId;
+    }
+
+    const until = new Date(through);
+    until.setUTCDate(until.getUTCDate() + 1);
+
+    const [pending, upcoming] = await Promise.all([
+      ConsultationRequest.countDocuments({ ...filter, status: "PENDING" }),
+      ConsultationRequest.countDocuments({
+        ...filter,
+        status: "APPROVED",
+        consultationDate: { $gte: from, $lt: until },
+      }),
+    ]);
+
+    return res.json({ pending, upcoming });
+  } catch (error) {
+    console.error("getConsultationRequestSummary error:", error);
+    return res.status(500).json({ message: "Failed to fetch consultation summary." });
+  }
+}
+
 // GET /api/consultations/requests
 async function listConsultationRequests(req, res) {
   try {
@@ -1768,6 +1815,7 @@ module.exports = {
   getWeeklySummary,
   listTeachersForStudents,
   createConsultationRequest,
+  getConsultationRequestSummary,
   listConsultationRequests,
   updateConsultationRequestByStudent,
   updateConsultationRequestStatus,

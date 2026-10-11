@@ -87,6 +87,8 @@ const error = ref(false)
 const showCollapsedStatusModal = ref(false)
 const showCollapsedOfficeModal = ref(false)
 let messageTimer
+let statusRefreshTimer
+let statusLoadInFlight = false
 
 function normalizeTeacherStatus(statusOrObj) {
   // Accept either a status string or a user object similar to server-side logic.
@@ -199,6 +201,8 @@ function showMessage(text, isError = false) {
 }
 
 async function loadStatus() {
+  if (statusLoadInFlight) return
+  statusLoadInFlight = true
   try {
     const payload = await apiRequest('/auth/me')
     const currentUser = saveMergedUser(payload.user || {})
@@ -208,7 +212,13 @@ async function loadStatus() {
     teacherTimeIn.value = currentUser.teacher_time_in || null
   } catch (_err) {
     // Session values are enough for the sidebar if the network is briefly unavailable.
+  } finally {
+    statusLoadInFlight = false
   }
+}
+
+function refreshStatusWhenVisible() {
+  if (!document.hidden) loadStatus()
 }
 
 async function saveStatus() {
@@ -301,10 +311,16 @@ function closeCollapsedStatusModal(event) {
 
 onMounted(() => {
   loadStatus()
+  statusRefreshTimer = window.setInterval(refreshStatusWhenVisible, 15000)
+  window.addEventListener('focus', refreshStatusWhenVisible)
+  document.addEventListener('visibilitychange', refreshStatusWhenVisible)
   document.addEventListener('click', closeCollapsedStatusModal)
 })
 
 onBeforeUnmount(() => {
+  window.clearInterval(statusRefreshTimer)
+  window.removeEventListener('focus', refreshStatusWhenVisible)
+  document.removeEventListener('visibilitychange', refreshStatusWhenVisible)
   document.removeEventListener('click', closeCollapsedStatusModal)
 })
 </script>
