@@ -56,6 +56,8 @@ import { getToken, logout } from '@/auth.js'
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+const emit = defineEmits(['initial-load-complete'])
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const router = useRouter()
 const sessions = ref([])
@@ -121,7 +123,10 @@ async function confirmLogoutDevice() {
   }
 }
 
-onMounted(loadDevices)
+onMounted(async () => {
+  await loadDevices()
+  emit('initial-load-complete')
+})
 </script>
 
 <style scoped>

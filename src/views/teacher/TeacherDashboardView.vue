@@ -55,10 +55,11 @@
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <span v-if="unreadNotifs.length" class="notif-dot"></span>
+            <span v-if="unreadNotifs.length" class="notif-dot">{{ unreadNotifs.length }}</span>
           </button>
 
           <!-- Notification Dropdown -->
+          <Transition name="notif-panel">
           <div v-if="showNotif" class="notif-panel">
             <div class="notif-panel-header">
               <div>
@@ -133,6 +134,7 @@
               </template>
             </div>
           </div>
+          </Transition>
           <div v-if="showClearNotificationsDialog" class="notif-clear-overlay" role="presentation" @click.self="closeClearNotificationsDialog">
             <section class="notif-clear-dialog" role="alertdialog" aria-modal="true" aria-labelledby="teacher-clear-notifications-title" aria-describedby="teacher-clear-notifications-description">
               <div class="notif-clear-icon" aria-hidden="true">
@@ -153,8 +155,18 @@
       </header>
 
       <!-- ── Stat Cards ── -->
-      <section class="stat-cards">
-        <div class="stat-card">
+      <section v-if="dashboardLoading" class="stat-cards dashboard-stat-skeleton" aria-hidden="true">
+        <div v-for="card in 2" :key="card" class="stat-card dashboard-stat-placeholder">
+          <div class="dashboard-stat-lines">
+            <span class="skeleton-shimmer dashboard-stat-label-skeleton"></span>
+            <span class="skeleton-shimmer dashboard-stat-value-skeleton"></span>
+            <span class="skeleton-shimmer dashboard-stat-caption-skeleton"></span>
+          </div>
+          <span class="skeleton-shimmer dashboard-stat-icon-skeleton"></span>
+        </div>
+      </section>
+      <section v-else class="stat-cards">
+        <RouterLink class="stat-card stat-card-link" :to="{ path: '/teacher/consultation', query: { tab: 'pending' } }" aria-label="View pending consultation requests">
           <div class="stat-left">
             <div class="stat-label">Pending Requests</div>
             <div class="stat-value">{{ consultationStatsLoading ? '—' : pendingRequestCount }}</div>
@@ -172,9 +184,9 @@
               <line x1="52" y1="22" x2="62" y2="22" stroke="#626a72" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </div>
-        </div>
+        </RouterLink>
 
-        <div class="stat-card">
+        <RouterLink class="stat-card stat-card-link" :to="{ path: '/teacher/consultation', query: { tab: 'approved' } }" aria-label="View upcoming approved consultations">
           <div class="stat-left">
             <div class="stat-label">Upcoming Consults</div>
             <div class="stat-value">{{ consultationStatsLoading ? '—' : upcomingConsultCount }}</div>
@@ -202,11 +214,47 @@
               <circle cx="58" cy="56" r="1.5" fill="#e8a020"/>
             </svg>
           </div>
-        </div>
+        </RouterLink>
       </section>
 
       <!-- ── Today's Class ── -->
-      <section class="today-class">
+      <section v-if="dashboardLoading" class="today-class dashboard-schedule-skeleton" aria-hidden="true">
+        <div class="today-class-header">
+          <div class="dashboard-heading-skeleton">
+            <span class="skeleton-shimmer dashboard-section-title-skeleton"></span>
+            <span class="skeleton-shimmer dashboard-section-subtitle-skeleton"></span>
+          </div>
+          <div class="dashboard-legend-skeleton">
+            <span v-for="item in 4" :key="item" class="skeleton-shimmer dashboard-legend-item-skeleton"></span>
+          </div>
+        </div>
+        <div class="carousel-shell">
+          <div class="carousel-topbar">
+            <span class="skeleton-shimmer dashboard-nav-skeleton"></span>
+            <span class="skeleton-shimmer dashboard-day-skeleton"></span>
+            <span class="skeleton-shimmer dashboard-nav-skeleton"></span>
+          </div>
+          <div class="carousel-content">
+            <div class="schedule-skeleton">
+              <div v-for="row in 2" :key="row" class="schedule-skeleton-row">
+                <div class="schedule-skeleton-time skeleton-shimmer"></div>
+                <div class="schedule-skeleton-details">
+                  <div class="schedule-skeleton-title skeleton-shimmer"></div>
+                  <div class="schedule-skeleton-subtitle skeleton-shimmer"></div>
+                </div>
+                <div class="schedule-skeleton-meta">
+                  <div class="schedule-skeleton-tag skeleton-shimmer"></div>
+                  <div class="schedule-skeleton-room skeleton-shimmer"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="dashboard-indicators-skeleton">
+            <span v-for="item in 7" :key="item" class="skeleton-shimmer"></span>
+          </div>
+        </div>
+      </section>
+      <section v-else class="today-class">
         <div class="today-class-header">
           <div>
             <h2 class="today-class-title">Today's Schedule</h2>
@@ -236,9 +284,31 @@
           </div>
 
           <div class="carousel-content">
-            <div v-if="classesLoading" class="carousel-state">Loading classes...</div>
+            <div v-if="classesLoading" class="schedule-skeleton" role="status" aria-label="Loading schedule">
+              <div v-for="row in 2" :key="row" class="schedule-skeleton-row">
+                <div class="schedule-skeleton-time skeleton-shimmer"></div>
+                <div class="schedule-skeleton-details">
+                  <div class="schedule-skeleton-title skeleton-shimmer"></div>
+                  <div class="schedule-skeleton-subtitle skeleton-shimmer"></div>
+                </div>
+                <div class="schedule-skeleton-meta">
+                  <div class="schedule-skeleton-tag skeleton-shimmer"></div>
+                  <div class="schedule-skeleton-room skeleton-shimmer"></div>
+                </div>
+              </div>
+            </div>
             <div v-else-if="classesError" class="carousel-state">{{ classesError }}</div>
-            <div v-else-if="!activeCarouselClasses.length" class="carousel-state">No classes scheduled for {{ activeCarouselDay }}.</div>
+            <div v-else-if="activeCarouselDay === 'Sunday' || !activeCarouselClasses.length" class="carousel-state carousel-empty-state">
+              <span class="carousel-empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="5" width="18" height="16" rx="2" />
+                  <path d="M16 3v4M8 3v4M3 10h18M9 15l2 2 4-4" />
+                </svg>
+              </span>
+              <strong>No classes scheduled for {{ activeCarouselDay }}</strong>
+              <span v-if="activeCarouselDay === 'Sunday'">Sunday is a day off. Your regular teaching schedule resumes on Monday.</span>
+              <span v-else>Your schedule is clear for {{ activeCarouselDay }}. Select another day to view its classes or consultation hours.</span>
+            </div>
             <div v-else class="classes-grid">
               <div v-for="(cls, i) in activeCarouselClasses" :key="`${activeCarouselDay}-${i}`" class="class-item" @click="goToSchedule(cls)" style="cursor: pointer;">
                 <div class="class-time-badge">
@@ -364,6 +434,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const pendingRequestCount = ref(0)
 const upcomingConsultCount = ref(0)
 const consultationStatsLoading = ref(true)
+const dashboardLoading = ref(true)
 let consultationStatsRefreshTimer
 let consultationStatsInFlight = false
 
@@ -1040,7 +1111,7 @@ const classesLoading = ref(false)
 const classesError = ref('')
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const todayDayName = ref(dayNames[new Date().getDay()])
-const carouselDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const carouselDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const activeCarouselIndex = ref(0)
 const dayClasses = ref({})
 const activeCarouselDay = computed(() => carouselDays[activeCarouselIndex.value] || carouselDays[0])
@@ -1057,7 +1128,7 @@ function getWeekStartDate(referenceDate = new Date()) {
 
 function formatCarouselDate(dayName) {
   const weekStart = getWeekStartDate()
-  const dayIndex = carouselDays.indexOf(dayName)
+  const dayIndex = dayName === 'Sunday' ? 6 : carouselDays.indexOf(dayName)
   if (dayIndex < 0) return ''
   const date = new Date(weekStart)
   date.setDate(weekStart.getDate() + dayIndex)
@@ -1302,6 +1373,7 @@ async function loadTodayClasses() {
     classesError.value = error.message || 'Unable to load classes.'
   } finally {
     classesLoading.value = false
+    dashboardLoading.value = false
   }
 }
 
@@ -1653,13 +1725,29 @@ function confirmLogout() {
 .notif-btn:hover { color: #30353a; }
 .notif-dot {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 13px;
-  height: 13px;
+  top: -3px;
+  right: -5px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
   background: #e63946;
-  border-radius: 50%;
-  border: 1.5px solid #fff;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 20px;
+  text-align: center;
+  white-space: nowrap;
+  animation: notif-badge-pop 360ms cubic-bezier(.2, .9, .3, 1.35) both;
+}
+@keyframes notif-badge-pop {
+  0% { opacity: 0; transform: scale(.35); }
+  70% { opacity: 1; transform: scale(1.16); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notif-dot { animation: none; }
 }
 
 /* Notification Panel */
@@ -1676,6 +1764,20 @@ function confirmLogout() {
   z-index: 5000;
   overflow: hidden;
   max-height: min(680px, calc(100vh - 110px));
+}
+.notif-panel-enter-active,
+.notif-panel-leave-active {
+  transform-origin: top right;
+  transition: opacity .22s ease, transform .26s cubic-bezier(.2, .75, .25, 1);
+}
+.notif-panel-enter-from,
+.notif-panel-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scale(.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .notif-panel-enter-active,
+  .notif-panel-leave-active { transition-duration: .01ms; }
 }
 .notif-panel-header {
   display: flex;
@@ -1797,7 +1899,7 @@ function confirmLogout() {
   font-size: 0;
 }
 .notif-unread-dot {
-  width: 8px;
+  width: 10px;
   height: 10px;
   border-radius: 50%;
   background: #e63946;
@@ -1825,6 +1927,8 @@ function confirmLogout() {
   gap: 16px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+.stat-card-link { color: inherit; text-decoration: none; cursor: pointer; }
+.stat-card-link:focus-visible { outline: 3px solid rgba(62, 101, 128, .45); outline-offset: 3px; }
 .stat-card:hover {
   transform: translateY(-1px);
   box-shadow: 0 14px 28px rgba(38, 44, 50, 0.09), inset 0 1px 0 rgba(255,255,255,0.94);
@@ -1939,6 +2043,63 @@ function confirmLogout() {
   border: 1px solid #e1e5e8;
   padding: 18px;
 }
+.schedule-skeleton {
+  display: grid;
+  min-height: 260px;
+  align-content: center;
+  gap: 12px;
+}
+.schedule-skeleton-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 170px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 78px;
+  padding: 15px 16px;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 13px;
+  background: rgba(255,255,255,.78);
+  box-shadow: 0 4px 12px rgba(38,44,49,.05), inset 0 1px rgba(255,255,255,.9);
+}
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #e7ebed 20%, #f5f7f8 38%, #e7ebed 60%);
+  background-size: 200% 100%;
+  animation: schedule-shimmer 1.5s ease-in-out infinite;
+}
+.schedule-skeleton-time { width: 100%; height: 42px; }
+.schedule-skeleton-details { display: grid; gap: 9px; }
+.schedule-skeleton-title { width: min(250px, 75%); height: 17px; }
+.schedule-skeleton-subtitle { width: min(130px, 42%); height: 12px; }
+.schedule-skeleton-meta { display: flex; align-items: center; gap: 9px; }
+.schedule-skeleton-tag { width: 92px; height: 30px; border-radius: 9px; }
+.schedule-skeleton-room { width: 54px; height: 30px; border-radius: 9px; }
+.dashboard-heading-skeleton { display: grid; justify-items: start; gap: 12px; }
+.dashboard-stat-skeleton { align-items: stretch; }
+.dashboard-stat-placeholder { min-height: 202px; }
+.dashboard-stat-lines { display: grid; width: min(58%, 300px); align-content: center; gap: 15px; }
+.dashboard-stat-label-skeleton { width: 70%; height: 18px; border-radius: 6px; }
+.dashboard-stat-value-skeleton { width: 70px; height: 52px; border-radius: 9px; }
+.dashboard-stat-caption-skeleton { width: 58%; height: 15px; border-radius: 6px; }
+.dashboard-stat-icon-skeleton { width: 88px; height: 88px; border-radius: 22px; }
+.dashboard-schedule-skeleton { display: flex; flex-direction: column; }
+.dashboard-section-title-skeleton { display: block; width: 260px; max-width: 52vw; height: 32px; border-radius: 8px; }
+.dashboard-section-subtitle-skeleton { display: block; width: 190px; max-width: 45vw; height: 15px; margin-top: 10px; border-radius: 6px; }
+.dashboard-legend-skeleton { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 14px; }
+.dashboard-legend-item-skeleton { width: 92px; height: 14px; border-radius: 6px; }
+.dashboard-nav-skeleton { width: 44px; height: 44px; border-radius: 12px; }
+.dashboard-day-skeleton { width: 250px; max-width: 48vw; height: 48px; border-radius: 11px; }
+.dashboard-indicators-skeleton { display: flex; justify-content: center; gap: 8px; padding: 18px 0 4px; }
+.dashboard-indicators-skeleton span { width: 11px; height: 11px; border-radius: 50%; }
+.dashboard-indicators-skeleton span:first-child { width: 28px; border-radius: 999px; }
+@keyframes schedule-shimmer {
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer { animation: none; }
+}
 .carousel-state {
   display: flex;
   align-items: center;
@@ -1948,9 +2109,45 @@ function confirmLogout() {
   font-weight: 500;
   text-align: center;
 }
+.carousel-empty-state {
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+}
+.carousel-empty-state strong {
+  color: #3f4a53;
+  font-size: 1rem;
+  font-weight: 800;
+}
+.carousel-empty-state > span:last-child {
+  max-width: 360px;
+  color: #76808b;
+  font-size: .88rem;
+  line-height: 1.5;
+}
+.carousel-empty-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 4px;
+  place-items: center;
+  border: 1px solid #dce2e6;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #fff, #e9edef);
+  color: #66737d;
+}
+.carousel-empty-icon svg { width: 25px; height: 25px; }
 .classes-grid {
   display: grid;
   gap: 12px;
+}
+@media (max-width: 700px) {
+  .schedule-skeleton-row { grid-template-columns: minmax(105px, 130px) minmax(0, 1fr); gap: 12px; }
+  .schedule-skeleton-meta { display: none; }
+  .dashboard-stat-placeholder { min-height: 150px; }
+  .dashboard-stat-icon-skeleton { width: 60px; height: 60px; border-radius: 16px; }
+  .dashboard-section-title-skeleton { height: 27px; }
+  .dashboard-legend-skeleton { display: none; }
 }
 .class-item {
   display: grid;

@@ -123,7 +123,7 @@
               </div>
             </div>
 
-            <div v-else class="settings-row">
+            <div v-else class="settings-row settings-row--password">
               <div class="settings-group">
                 <label class="settings-label">New Password</label>
                 <div class="pw-input-wrap">
@@ -968,6 +968,56 @@ function highlightFaqText(text) {
 .settings-row--identity {
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
+}
+.settings-row--password {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.settings-row--password .settings-group,
+.settings-row--password .pw-input-wrap,
+.settings-row--password .settings-input {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+.settings-row--password .pw-input-wrap {
+  box-sizing: border-box;
+  min-height: 42px;
+  border: 1px solid #acb7be;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #f4f5f6, #e5e8ea);
+  box-shadow: inset 0 1px 2px rgba(42, 52, 58, .08), 0 1px rgba(255,255,255,.8);
+  overflow: hidden;
+}
+.settings-row--password .pw-input-wrap:focus-within {
+  border-color: #687780;
+  box-shadow: 0 0 0 3px rgba(90, 105, 114,.13), inset 0 1px 2px rgba(42, 52, 58, .06);
+}
+.settings-row--password .pw-input-wrap .settings-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100%;
+  box-sizing: border-box;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 8px;
+  padding-right: 48px;
+  appearance: none;
+}
+.settings-row--password .pw-input-wrap .settings-input:focus {
+  border: 0;
+  box-shadow: none;
+}
+.settings-row--password .pw-input-wrap.is-invalid {
+  border: 1.5px solid #c62835;
+  box-shadow: 0 0 0 3px rgba(198,40,53,.2), 0 3px 10px rgba(160,35,45,.12);
+}
+.settings-row--password .pw-eye {
+  right: 6px;
 }
 .settings-row--identity .settings-group {
   width: 100%;

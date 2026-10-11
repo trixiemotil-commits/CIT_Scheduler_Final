@@ -83,7 +83,7 @@
           <div>
             <h2 class="events-section-title">Events overview</h2>
             <p class="events-section-sub">
-              <template v-if="loadingEvents">Loading events...</template>
+              <span v-if="loadingEvents" class="events-overview-skeleton" aria-hidden="true"></span>
               <template v-else>
                 {{ eventsTab === 'active' ? activeEvents.length : eventsTab === 'ended' ? endedEvents.length : archivedEvents.length }}
                 {{ eventsTab === 'active' ? 'active' : eventsTab === 'ended' ? 'ended' : 'archived' }}
@@ -98,15 +98,18 @@
           <div class="events-tabs">
             <button :class="['ev-tab', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">
               Active Events
-              <span class="ev-tab-count">{{ activeEvents.length }}</span>
+              <span v-if="loadingEvents" class="event-tab-count-skeleton" aria-hidden="true"></span>
+              <span v-else class="ev-tab-count">{{ activeEvents.length }}</span>
             </button>
             <button :class="['ev-tab', { active: eventsTab === 'ended' }]" @click="eventsTab = 'ended'">
               Ended
-              <span class="ev-tab-count">{{ endedEvents.length }}</span>
+              <span v-if="loadingEvents" class="event-tab-count-skeleton" aria-hidden="true"></span>
+              <span v-else class="ev-tab-count">{{ endedEvents.length }}</span>
             </button>
             <button :class="['ev-tab', { active: eventsTab === 'archived' }]" @click="eventsTab = 'archived'">
               Archived
-              <span class="ev-tab-count">{{ archivedEvents.length }}</span>
+              <span v-if="loadingEvents" class="event-tab-count-skeleton" aria-hidden="true"></span>
+              <span v-else class="ev-tab-count">{{ archivedEvents.length }}</span>
             </button>
           </div>
         </div>
@@ -684,7 +687,7 @@ function formatDisplayTime(time24) {
 }
 
 const events = ref([])
-const loadingEvents = ref(false)
+const loadingEvents = ref(true)
 const now = ref(new Date())
 
 function isEventEnded(event) {
@@ -2852,10 +2855,26 @@ onMounted(() => {
 
 .event-skeleton-cover,
 .event-skeleton-line,
-.event-skeleton-meta {
+.event-skeleton-meta,
+.events-overview-skeleton,
+.event-tab-count-skeleton {
   background: linear-gradient(100deg, #edf1f3 25%, #f8fafb 45%, #edf1f3 65%);
   background-size: 220% 100%;
   animation: eventSkeletonShimmer 1.35s ease-in-out infinite;
+}
+.events-overview-skeleton {
+  display: inline-block;
+  width: 128px;
+  height: 12px;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+.event-tab-count-skeleton {
+  display: inline-block;
+  width: 22px;
+  height: 20px;
+  border-radius: 999px;
+  vertical-align: middle;
 }
 
 .event-skeleton-cover { min-height: 174px; }
@@ -2880,6 +2899,14 @@ onMounted(() => {
 @keyframes eventSkeletonShimmer {
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-skeleton-cover,
+  .event-skeleton-line,
+  .event-skeleton-meta,
+  .events-overview-skeleton,
+  .event-tab-count-skeleton { animation: none; }
 }
 
 @media (max-width: 700px) {

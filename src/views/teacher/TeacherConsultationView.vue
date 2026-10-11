@@ -37,6 +37,20 @@
 
     <!-- ═══════════════════ MAIN ═══════════════════ -->
     <main class="main">
+      <Teleport to="body">
+        <Transition name="teacher-status-toast">
+          <div
+            v-if="statusToast"
+            class="teacher-status-toast"
+            :class="`is-${statusToast.type}`"
+            :role="statusToast.type === 'error' ? 'alert' : 'status'"
+            aria-live="polite"
+          >
+            <span class="teacher-status-toast__icon" aria-hidden="true">{{ statusToast.type === 'success' ? '✓' : '!' }}</span>
+            <span>{{ statusToast.message }}</span>
+          </div>
+        </Transition>
+      </Teleport>
       <header class="main-header">
         <div>
           <span class="page-eyebrow">Student support</span>
@@ -46,34 +60,41 @@
       </header>
 
       <!-- Consultation Card -->
-      <section class="consult-card">
+      <section class="consult-card" :aria-busy="isLoadingRequests">
         <div class="card-header">
           <div class="card-heading">
-            <div class="card-heading-icon" aria-hidden="true">
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 8h8M8 12h5"/></svg>
-            </div>
             <div>
-              <div class="card-title">Consultation Requests</div>
-              <div class="card-sub">Keep track of incoming student appointments and follow-ups.</div>
+              <template v-if="isLoadingRequests">
+                <span class="skeleton card-title-skeleton" aria-hidden="true"></span>
+                <span class="skeleton card-sub-skeleton" aria-hidden="true"></span>
+              </template>
+              <template v-else>
+                <div class="card-title">Consultation Requests</div>
+                <div class="card-sub">Keep track of incoming student appointments and follow-ups.</div>
+              </template>
             </div>
           </div>
         </div>
 
         <!-- Filter + bulk action row -->
         <div class="controls-row">
-          <div class="filter-tabs">
+          <div v-if="isLoadingRequests" class="filter-tabs filter-tabs-skeleton" aria-hidden="true">
+            <span v-for="width in [66, 103, 91, 112, 104, 100]" :key="width" class="skeleton filter-tab-skeleton" :style="{ width: `${width}px` }"></span>
+          </div>
+          <div v-else class="filter-tabs">
             <button
               v-for="tab in tabs"
               :key="tab.key"
               :class="['filter-tab', { active: activeTab === tab.key }]"
               @click="activeTab = tab.key"
             >
-              {{ tab.label }}({{ tab.count }})
+              <span>{{ tab.label }}</span>
+              <span class="filter-tab-count">{{ tab.count }}</span>
             </button>
           </div>
 
           <button
-            v-if="pendingIncomingCount > 0"
+            v-if="!isLoadingRequests && pendingIncomingCount > 0"
             class="btn-approve-all"
             :disabled="isBulkApproving"
             @click="approveAllIncoming"
@@ -83,30 +104,59 @@
         </div>
 
         <!-- Request List -->
-        <div class="request-list">
-          <div v-if="isLoadingRequests" class="empty-state">Loading consultation requests...</div>
-          <div v-else-if="requestsError" class="empty-state">{{ requestsError }}</div>
+        <div class="request-list" :aria-busy="isLoadingRequests">
+          <div v-if="isLoadingRequests" class="consult-skeleton-list" aria-hidden="true">
+            <article v-for="index in 3" :key="`skeleton-${index}`" class="request-card consult-skeleton-card">
+              <div class="skeleton-card-top">
+                <div class="skeleton skeleton-avatar"></div>
+                <div class="skeleton-card-info">
+                  <div class="skeleton-row">
+                    <span class="skeleton skeleton-name"></span>
+                    <span class="skeleton skeleton-status"></span>
+                  </div>
+                  <span class="skeleton skeleton-id"></span>
+                  <span class="skeleton skeleton-ticket"></span>
+                  <span v-if="index === 1" class="skeleton skeleton-queue"></span>
+                </div>
+                <div class="skeleton-actions">
+                  <span class="skeleton skeleton-action skeleton-action-wide"></span>
+                  <span class="skeleton skeleton-action"></span>
+                </div>
+              </div>
+              <div class="skeleton-card-footer">
+                <span class="skeleton skeleton-time"></span>
+                <span class="skeleton skeleton-details"></span>
+              </div>
+            </article>
+          </div>
+          <div v-else-if="requestsError" class="empty-state" role="alert">{{ requestsError }}</div>
+          <template v-else>
           <div
-            v-if="!isLoadingRequests && !requestsError"
             v-for="req in filteredRequests"
             :key="req.id"
             :class="['request-card', `border-${req.status}`]"
-            @click="openDetail(req)"
+            :aria-expanded="expandedRequestId === req.id"
+            @click="toggleRequestDetails(req.id)"
           >
-            <!-- Top row: avatar + name + badge + actions -->
             <div class="req-top">
-              <div class="req-avatar-wrap">
-                <img :src="req.avatar" class="req-avatar" alt="" />
-              </div>
-              <div class="req-info">
-                <div class="req-name-row">
-                  <span class="req-name">{{ req.name }}</span>
-                  <span :class="['status-badge', `badge-${req.status}`]">{{ statusLabel(req.status) }}</span>
+              <div class="req-student">
+                <div class="req-avatar-wrap">
+                  <img :src="req.avatar" class="req-avatar" alt="" />
                 </div>
-                <div class="req-id">{{ req.studentId }}</div>
-                <div v-if="req.ticketNumber" class="req-ticket">Ticket: {{ req.ticketNumber }}</div>
-                <div v-if="req.status === 'approved' && req.queuePosition" class="req-queue">
-                  Queue #{{ req.queuePosition }}<span v-if="req.queueTotal"> of {{ req.queueTotal }}</span>
+                <div class="req-info">
+                  <div class="req-name-row">
+                    <span class="req-name">{{ req.name }}</span>
+                    <span :class="['status-badge', `badge-${req.status}`]">{{ statusLabel(req.status) }}</span>
+                  </div>
+                  <div class="req-id">Student ID: {{ req.studentId }}</div>
+                  <div v-if="req.ticketNumber" class="req-ticket">Ticket: {{ req.ticketNumber }}</div>
+                  <div
+                    v-if="req.status === 'approved' && req.queuePosition"
+                    class="req-queue"
+                    :class="Number(req.queuePosition) === 1 && Number(req.queueTotal) === 1 ? 'req-queue--solo' : 'req-queue--waiting'"
+                  >
+                    Queue: #{{ req.queuePosition }}<span v-if="req.queueTotal">{{ ` of ${req.queueTotal}` }}</span>
+                  </div>
                 </div>
               </div>
               <div class="req-actions">
@@ -118,38 +168,59 @@
                   </button>
                   <button class="btn-reject" @click.stop="reject(req.id)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    Resched
+                    Reschedule
                   </button>
                 </template>
-                <!-- Approved actions -->
-                <template v-else-if="req.status === 'approved'">
+                <!-- Allow approved and rescheduled requests to have their status edited. -->
+                <template v-else-if="req.status === 'approved' || req.status === 'resched'">
                   <button class="btn-edit" :title="'Update status'" @click.stop="editReq(req.id)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    <span>Update</span>
+                    <span>Update Status</span>
                   </button>
-                  <button v-if="Number(req.queuePosition) === 1" class="btn-done" @click.stop="openDoneModal(req.id)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    Done
-                  </button>
+                  <template v-if="req.status === 'approved'">
+                    <button class="btn-reject" @click.stop="reject(req.id)">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6m0-6 6 6"/></svg>
+                      Reschedule
+                    </button>
+                    <button v-if="Number(req.queuePosition) === 1" class="btn-done" @click.stop="openDoneModal(req.id)">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      Mark as Done
+                    </button>
+                  </template>
                 </template>
               </div>
             </div>
 
-            <!-- Body -->
-            <div class="req-subject">{{ req.subject }}</div>
-            <div class="req-message">{{ req.message }}</div>
+            <Transition name="request-details-expand">
+              <div v-if="expandedRequestId === req.id" class="req-details">
+                <div class="req-detail-row req-subject">
+                  <span class="req-detail-label">Subject</span>
+                  <span class="req-detail-value">{{ req.subject }}</span>
+                </div>
+                <div class="req-detail-row req-message">
+                  <span class="req-detail-label">Reason</span>
+                  <span class="req-detail-value">{{ req.reason || 'Not provided' }}</span>
+                </div>
+                <div v-if="req.description" class="req-detail-row req-message req-description">
+                  <span class="req-detail-label">Description</span>
+                  <span class="req-detail-value">{{ req.description }}</span>
+                </div>
+              </div>
+            </Transition>
             <div class="req-time">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
               </svg>
-              {{ req.schedule || req.date }}
+              <span>{{ req.schedule || req.date }}</span>
+              <span class="req-details-hint">{{ expandedRequestId === req.id ? 'Hide details' : 'View details' }}</span>
             </div>
           </div>
 
-          <div v-if="!isLoadingRequests && !requestsError && filteredRequests.length === 0" class="empty-state">
+          <div v-if="filteredRequests.length === 0" class="empty-state">
             No {{ activeTab === 'all' ? '' : activeTab }} requests.
           </div>
+          </template>
         </div>
       </section>
     </main>
@@ -166,8 +237,10 @@
           <h3 class="approve-modal-title">Approve Request</h3>
           <p class="approve-modal-text">Are you sure you want to approve this consultation request?</p>
           <div class="approve-modal-actions">
-            <button class="approve-cancel-btn" @click="cancelApprove">Cancel</button>
-            <button class="approve-ok-btn" @click="confirmApprove">Yes, Approve</button>
+            <button class="approve-cancel-btn" :disabled="isApproving" @click="cancelApprove">Cancel</button>
+            <button class="approve-ok-btn" :disabled="isApproving" @click="confirmApprove">
+              {{ isApproving ? 'Approving...' : 'Yes, Approve' }}
+            </button>
           </div>
         </div>
       </div>
@@ -177,6 +250,9 @@
     <Teleport to="body">
       <div v-if="showDoneModal" class="modal-overlay" @click.self="closeDoneModal">
         <div class="done-modal">
+          <button type="button" class="done-modal-close" aria-label="Close dialog" :disabled="isCompleting" @click="closeDoneModal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 6-12 12M6 6l12 12"/></svg>
+          </button>
           <div class="done-modal-icon">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"/>
@@ -196,26 +272,30 @@
           <div class="done-note-count">{{ doneNotes.length }}/500</div>
 
           <div class="done-modal-actions">
-            <button class="done-cancel-btn" @click="closeDoneModal">Cancel</button>
-            <button class="done-confirm-btn" @click="confirmDone">Mark as Done</button>
+            <button class="done-confirm-btn" :disabled="isCompleting" @click="confirmDone">
+              {{ isCompleting ? 'Saving...' : 'Mark as Done' }}
+            </button>
           </div>
         </div>
       </div>
     </Teleport>
 
-    <!-- ═══ Resched Consultation Modal ═══ -->
+    <!-- ═══ Reschedule Consultation Modal ═══ -->
     <Teleport to="body">
       <div v-if="showRejectModal" class="modal-overlay" @click.self="closeRejectModal">
         <div class="reject-modal">
-          <h2 class="reject-modal-title">Resched Consultation Request</h2>
+          <h2 class="reject-modal-title">Reschedule Consultation Request</h2>
           <p class="reject-modal-sub">Provide a reason for rescheduling this consultation request</p>
 
           <div class="reject-student-box">
-            <div class="reject-student-name">{{ rejectTarget?.name }}</div>
-            <div class="reject-student-subject">{{ rejectTarget?.subject }}</div>
+            <img :src="rejectTarget?.avatar" class="reject-student-avatar" alt="" />
+            <div class="reject-student-copy">
+              <div class="reject-student-name">{{ rejectTarget?.name }}</div>
+              <div class="reject-student-subject">{{ rejectTarget?.subject }}</div>
+            </div>
           </div>
 
-          <label class="reject-label">Resched Reason <span class="reject-required">*</span></label>
+          <label class="reject-label">Reschedule Reason <span class="reject-required">*</span></label>
           <div class="reject-select-wrap">
             <select class="reject-select" v-model="rejectionReason">
               <option value="" disabled>Select a reason...</option>
@@ -229,29 +309,29 @@
           </div>
 
           <div v-if="rejectionReason === 'Other'" class="reject-other-wrap">
-            <input
+            <textarea
               v-model="otherReason"
               class="reject-other-input"
-              type="text"
+              rows="3"
               placeholder="Please specify your reason..."
               maxlength="200"
-            />
+            ></textarea>
           </div>
 
           <p v-if="rejectReasonError" class="reject-reason-error">Please select a rejection reason before continuing.</p>
 
           <div class="reject-modal-actions">
-            <button class="reject-cancel-btn" @click="closeRejectModal">Cancel</button>
-            <button class="reject-confirm-btn" @click="submitReject">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Resched request
+            <button class="reject-cancel-btn" :disabled="isRescheduling" @click="closeRejectModal">Cancel</button>
+            <button class="reject-confirm-btn" :disabled="isRescheduling" @click="submitReject">
+              <svg class="reject-confirm-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6m0-6 6 6"/></svg>
+              {{ isRescheduling ? 'Rescheduling...' : 'Reschedule request' }}
             </button>
           </div>
         </div>
       </div>
     </Teleport>
 
-    <!-- ═══ Confirm Resched Modal ═══ -->
+    <!-- ═══ Confirm Reschedule Modal ═══ -->
     <Teleport to="body">
       <div v-if="showConfirmModal" class="modal-overlay" @click.self="cancelConfirm">
         <div class="confirm-modal">
@@ -262,61 +342,13 @@
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
           </div>
-          <h3 class="confirm-modal-title">Resched Request</h3>
-          <p class="confirm-modal-text">Are you sure you want to resched this consultation request?</p>
+          <h3 class="confirm-modal-title">Reschedule Request</h3>
+          <p class="confirm-modal-text">Are you sure you want to reschedule this consultation request?</p>
           <div class="confirm-modal-actions">
-            <button class="confirm-cancel-btn" @click="cancelConfirm">Cancel</button>
-            <button class="confirm-ok-btn" @click="confirmReject">Yes, Resched</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- ═══ Detail Modal ═══ -->
-    <Teleport to="body">
-      <div v-if="showDetailModal" class="modal-overlay" @click.self="closeDetail">
-        <div class="detail-modal">
-          <button class="detail-close" @click="closeDetail">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-          <div class="detail-head">
-            <img :src="selectedRequest?.avatar" class="detail-avatar" alt="" />
-            <div class="detail-identity">
-              <div class="detail-name">{{ selectedRequest?.name }}</div>
-              <div class="detail-sid">{{ selectedRequest?.studentId }}</div>
-              <span :class="['status-badge', `badge-${selectedRequest?.status}`]">{{ statusLabel(selectedRequest?.status || '') }}</span>
-            </div>
-          </div>
-          <div class="detail-divider"></div>
-          <div class="detail-row">
-            <div class="detail-label">Subject</div>
-            <div class="detail-value placeholder-box">
-              {{ selectedRequest?.subject || 'Subject not provided' }}
-            </div>
-          </div>
-          <div class="detail-row">
-            <div class="detail-label">Message</div>
-            <div class="detail-value detail-msg placeholder-box placeholder-box--message">
-              {{ selectedRequest?.message || 'No message provided by the student.' }}
-            </div>
-          </div>
-          <div class="detail-row">
-            <div class="detail-label">Consultation Schedule</div>
-            <div class="detail-value placeholder-box">
-              {{ selectedRequest?.schedule || selectedRequest?.date || 'No schedule available' }}
-            </div>
-          </div>
-          <div v-if="selectedRequest?.ticketNumber" class="detail-row">
-            <div class="detail-label">Ticket Number</div>
-            <div class="detail-value placeholder-box">
-              {{ selectedRequest?.ticketNumber }}
-            </div>
-          </div>
-          <div v-if="selectedRequest?.status === 'resched' && selectedRequest?.rejectionReason" class="detail-row">
-            <div class="detail-label detail-label-reject">Resched Reason</div>
-            <div class="detail-value detail-reject-reason placeholder-box placeholder-box--warning">
-              {{ selectedRequest?.rejectionReason }}
-            </div>
+            <button class="confirm-cancel-btn" :disabled="isRescheduling" @click="cancelConfirm">Cancel</button>
+            <button class="confirm-ok-btn" :disabled="isRescheduling" @click="confirmReject">
+              {{ isRescheduling ? 'Rescheduling...' : 'Yes, Reschedule' }}
+            </button>
           </div>
         </div>
       </div>
@@ -328,10 +360,10 @@
         <div class="edit-modal">
           <div class="edit-modal-header">
             <div>
-              <h2 class="edit-modal-title">Edit Consultation</h2>
-              <p class="edit-modal-sub">Update the details for this request</p>
+              <h2 class="edit-modal-title">Update Consultation Status</h2>
+              <p class="edit-modal-sub">Choose the current status for this consultation request.</p>
             </div>
-            <button class="edit-modal-close" @click="closeEditModal">
+            <button class="edit-modal-close" :disabled="isSavingStatus" @click="closeEditModal">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -352,10 +384,9 @@
           </div>
 
           <div class="edit-modal-actions">
-            <button class="edit-cancel-btn" @click="closeEditModal">Cancel</button>
-            <button class="edit-save-btn" @click="saveEdit">
+            <button class="edit-save-btn" :disabled="isSavingStatus || editForm.status === editTarget?.status" @click="saveEdit">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-              Save Changes
+              {{ isSavingStatus ? 'Saving...' : 'Update Status' }}
             </button>
           </div>
         </div>
@@ -390,13 +421,30 @@ import { getToken, getUser, logout } from '@/auth.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route  = useRoute()
 const currentRoute = computed(() => route.path)
 const user = getUser() || {}
+const statusToast = ref(null)
+let statusToastTimer = null
+let statusToastId = 0
+
+function showStatusToast(type, message) {
+  statusToast.value = { type, message }
+  const toastId = ++statusToastId
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+  statusToastTimer = window.setTimeout(() => {
+    if (toastId === statusToastId) statusToast.value = null
+    statusToastTimer = null
+  }, 5000)
+}
+
+onBeforeUnmount(() => {
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+})
 
 /* ── Nav ── */
 const navItems = [
@@ -426,7 +474,7 @@ const navItems = [
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const requests = ref([])
-const isLoadingRequests = ref(false)
+const isLoadingRequests = ref(true)
 const requestsError = ref('')
 
 function mapStatusFromApi(status) {
@@ -452,6 +500,15 @@ function parseReschedReason(text) {
     .split('\n')
     .find((line) => line.toLowerCase().startsWith('resched reason:'))
     ?.replace(/^resched reason:\s*/i, '') || ''
+}
+
+function parseRequestDetails(text) {
+  const value = String(text || '').trim()
+  const match = value.match(/^\s*Reason:\s*([\s\S]*?)(?:\s+Description:\s*([\s\S]*))?\s*$/i)
+  if (match) {
+    return { reason: match[1].trim(), description: (match[2] || '').trim() }
+  }
+  return { reason: value, description: '' }
 }
 
 function formatRequestDate(consultationDate, requestDate) {
@@ -522,6 +579,7 @@ function buildAvatar(name, avatarUrl) {
 
 function mapRequest(doc) {
   const parsedReason = parseReschedReason(doc.purpose)
+  const requestDetails = parseRequestDetails(doc.purpose)
   const studentName = String(doc.studentName || '').trim() || 'Student'
   return {
     id: doc.id,
@@ -534,6 +592,8 @@ function mapRequest(doc) {
     isSubjectTeacher: Boolean(doc.isSubjectTeacher),
     subject: doc.subject || 'Consultation',
     message: doc.purpose || 'No message provided.',
+    reason: requestDetails.reason,
+    description: requestDetails.description,
     date: formatRequestDate(doc.consultationDate, doc.requestDate),
     schedule: formatScheduleLabel(doc),
     avatar: buildAvatar(studentName, doc.studentAvatar),
@@ -589,13 +649,15 @@ async function loadRequests() {
 }
 
 /* ── Active filter tab ── */
-const activeTab = ref('all')
+const consultationTabs = ['all', 'pending', 'approved', 'resched', 'completed', 'cancelled']
+const initialConsultationTab = String(route.query.tab || 'all')
+const activeTab = ref(consultationTabs.includes(initialConsultationTab) ? initialConsultationTab : 'all')
 
 const tabs = computed(() => [
   { key: 'all',       label: 'All',       count: requests.value.length },
   { key: 'pending',   label: 'Requested', count: requests.value.filter(r => r.status === 'pending').length },
   { key: 'approved',  label: 'Approved',  count: requests.value.filter(r => r.status === 'approved').length },
-  { key: 'resched',   label: 'Resched',   count: requests.value.filter(r => r.status === 'resched').length },
+  { key: 'resched',   label: 'Reschedule', count: requests.value.filter(r => r.status === 'resched').length },
   { key: 'completed', label: 'Completed', count: requests.value.filter(r => r.status === 'completed').length },
   { key: 'cancelled', label: 'Cancelled', count: requests.value.filter(r => r.status === 'cancelled').length },
 ])
@@ -617,7 +679,7 @@ const isBulkApproving = ref(false)
 
 function statusLabel(status) {
   const normalized = String(status || '').toLowerCase()
-  if (normalized === 'resched') return 'Resched'
+  if (normalized === 'resched') return 'Reschedule'
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
@@ -629,23 +691,13 @@ async function patchRequestStatus(id, nextStatus, successTitle = 'Status Updated
 
   await loadRequests()
 
-  Swal.fire({
-    toast: true,
-    position: 'top-end',
-    icon: 'success',
-    title: successTitle,
-    showConfirmButton: false,
-    timer: 2500,
-    timerProgressBar: true,
-    background: '#4b5563',
-    color: '#fff',
-    iconColor: '#cbd5e1',
-  })
+  showStatusToast('success', successTitle)
 }
 
 /* ── Actions ── */
 const showApproveModal  = ref(false)
 const pendingApproveId  = ref(null)
+const isApproving = ref(false)
 
 function approve(id) {
   pendingApproveId.value = id
@@ -653,19 +705,23 @@ function approve(id) {
 }
 
 function cancelApprove() {
+  if (isApproving.value) return
   showApproveModal.value = false
   pendingApproveId.value = null
 }
 
 async function confirmApprove() {
-  showApproveModal.value = false
-  if (!pendingApproveId.value) return
+  if (!pendingApproveId.value || isApproving.value) return
+  isApproving.value = true
   try {
     await patchRequestStatus(pendingApproveId.value, 'approved', 'Approve Successful')
+    showApproveModal.value = false
+    pendingApproveId.value = null
   } catch (error) {
     Swal.fire('Unable to approve', error.message || 'Failed to update request status.', 'error')
+  } finally {
+    isApproving.value = false
   }
-  pendingApproveId.value = null
 }
 
 async function approveAllIncoming() {
@@ -679,7 +735,7 @@ async function approveAllIncoming() {
     showCancelButton: true,
     cancelButtonText: 'Cancel',
     confirmButtonText: 'Yes, approve all',
-    confirmButtonColor: '#4b5563',
+    confirmButtonColor: '#ed9b38',
     customClass: { cancelButton: 'swal-cancel-text', popup: 'swal-rounded' },
     reverseButtons: false,
   })
@@ -724,18 +780,27 @@ const rejectTarget     = ref(null)
 const rejectionReason  = ref('')
 const otherReason      = ref('')
 const rejectReasonError = ref(false)
+const rescheduleOpenedFromEdit = ref(false)
+const isRescheduling = ref(false)
 
-function reject(id) {
+function reject(id, { fromEdit = false } = {}) {
   rejectTarget.value     = requests.value.find(r => r.id === id) || null
   rejectionReason.value  = ''
   otherReason.value      = ''
   rejectReasonError.value = false
+  rescheduleOpenedFromEdit.value = fromEdit
   showRejectModal.value  = true
 }
 
 function closeRejectModal() {
+  if (isRescheduling.value) return
   showRejectModal.value = false
-  rejectTarget.value    = null
+  if (rescheduleOpenedFromEdit.value && editTarget.value) {
+    showEditModal.value = true
+    rescheduleOpenedFromEdit.value = false
+    return
+  }
+  rejectTarget.value = null
 }
 
 /* Reject flow — step 2: open confirm modal */
@@ -750,7 +815,7 @@ function submitReject() {
   }
   rejectReasonError.value   = false
   pendingRejectTarget.value = rejectTarget.value
-  closeRejectModal()
+  showRejectModal.value = false
   showConfirmModal.value = true
 }
 
@@ -763,21 +828,41 @@ function getRejectReasonText() {
 }
 
 function cancelConfirm() {
+  if (isRescheduling.value) return
   showConfirmModal.value = false
+  if (pendingRejectTarget.value) {
+    rejectTarget.value = pendingRejectTarget.value
+    showRejectModal.value = true
+  }
   pendingRejectTarget.value = null
 }
 
 async function confirmReject() {
-  showConfirmModal.value = false
+  if (isRescheduling.value) return
   if (!pendingRejectTarget.value?.id) {
+    showConfirmModal.value = false
     pendingRejectTarget.value = null
     return
   }
 
+  isRescheduling.value = true
   try {
-    await patchRequestStatus(pendingRejectTarget.value.id, 'resched', 'Resched Successful', getRejectReasonText())
+    await patchRequestStatus(pendingRejectTarget.value.id, 'resched', 'Reschedule Successful', getRejectReasonText())
+    showConfirmModal.value = false
+    showRejectModal.value = false
+    if (rescheduleOpenedFromEdit.value) {
+      rescheduleOpenedFromEdit.value = false
+      editTarget.value = null
+    }
   } catch (error) {
-    Swal.fire('Unable to resched', error.message || 'Failed to update request status.', 'error')
+    showConfirmModal.value = false
+    if (rescheduleOpenedFromEdit.value) {
+      rescheduleOpenedFromEdit.value = false
+      showEditModal.value = true
+    }
+    Swal.fire('Unable to reschedule', error.message || 'Failed to update request status.', 'error')
+  } finally {
+    isRescheduling.value = false
   }
 
   pendingRejectTarget.value = null
@@ -786,6 +871,7 @@ async function confirmReject() {
 const showDoneModal = ref(false)
 const doneTargetId = ref(null)
 const doneNotes = ref('')
+const isCompleting = ref(false)
 
 function openDoneModal(id) {
   doneTargetId.value = id
@@ -794,19 +880,25 @@ function openDoneModal(id) {
 }
 
 function closeDoneModal() {
+  if (isCompleting.value) return
   showDoneModal.value = false
   doneTargetId.value = null
   doneNotes.value = ''
 }
 
 async function confirmDone() {
-  if (!doneTargetId.value) return
+  if (!doneTargetId.value || isCompleting.value) return
 
+  isCompleting.value = true
   try {
     await patchRequestStatus(doneTargetId.value, 'completed', 'Marked as Done', doneNotes.value.trim())
-    closeDoneModal()
+    showDoneModal.value = false
+    doneTargetId.value = null
+    doneNotes.value = ''
   } catch (error) {
     Swal.fire('Unable to mark done', error.message || 'Failed to update request status.', 'error')
+  } finally {
+    isCompleting.value = false
   }
 }
 
@@ -814,11 +906,12 @@ async function confirmDone() {
 const showEditModal = ref(false)
 const editTarget    = ref(null)
 const editForm      = ref({ status: '' })
+const isSavingStatus = ref(false)
 
 const statusOptions = [
   { value: 'pending',   label: 'Pending'   },
   { value: 'approved',  label: 'Approved'  },
-  { value: 'resched',   label: 'Resched'   },
+  { value: 'resched',   label: 'Reschedule' },
   { value: 'completed', label: 'Completed' },
 ]
 
@@ -831,50 +924,59 @@ function editReq(id) {
 }
 
 function closeEditModal() {
+  if (isSavingStatus.value) return
   showEditModal.value = false
   editTarget.value    = null
 }
 
 async function saveEdit() {
-  if (!editTarget.value) return
+  if (!editTarget.value || isSavingStatus.value || editForm.value.status === editTarget.value.status) return
   if (editForm.value.status === 'resched') {
     const targetId = editTarget.value.id
-    closeEditModal()
-    reject(targetId)
+    showEditModal.value = false
+    reject(targetId, { fromEdit: true })
     return
   }
   const label = statusOptions.find(o => o.value === editForm.value.status)?.label ?? editForm.value.status
-  const result = await Swal.fire({
-    title: `Set as ${label}?`,
-    text: `This will update the request status to "${label}".`,
-    icon: 'question',
-    showCancelButton: true,
-    cancelButtonText: 'Cancel',
-    confirmButtonText: 'Yes, update',
-    confirmButtonColor: '#4b5563',
-    customClass: { cancelButton: 'swal-cancel-text', popup: 'swal-rounded' },
-    reverseButtons: false
-  })
-  if (!result.isConfirmed) return
+  let didUpdate = false
   try {
-    await patchRequestStatus(editTarget.value.id, editForm.value.status, 'Status Updated')
-    closeEditModal()
+    const result = await Swal.fire({
+      title: `Set as ${label}?`,
+      text: `This will update the request status to "${label}".`,
+      icon: 'question',
+      showCancelButton: true,
+      cancelButtonText: 'Cancel',
+      confirmButtonText: 'Yes, update',
+      confirmButtonColor: '#ed9b38',
+      allowOutsideClick: () => !Swal.isLoading(),
+      preConfirm: async () => {
+        isSavingStatus.value = true
+        const confirmButton = Swal.getConfirmButton()
+        if (confirmButton) confirmButton.textContent = 'Updating...'
+        try {
+          await patchRequestStatus(editTarget.value.id, editForm.value.status, 'Status Updated')
+        } catch (error) {
+          Swal.showValidationMessage(error.message || 'Failed to update request status.')
+          return false
+        } finally {
+          isSavingStatus.value = false
+        }
+      },
+      customClass: { cancelButton: 'swal-cancel-text', popup: 'swal-rounded consult-status-confirm' },
+      reverseButtons: false
+    })
+    didUpdate = result.isConfirmed
   } catch (error) {
     Swal.fire('Unable to update', error.message || 'Failed to update request status.', 'error')
   }
+  if (didUpdate) closeEditModal()
 }
 
-/* ── Detail Modal ── */
-const selectedRequest = ref(null)
-const showDetailModal = ref(false)
+/* ── Inline request details ── */
+const expandedRequestId = ref(null)
 
-function openDetail(req) {
-  selectedRequest.value = req
-  showDetailModal.value = true
-}
-function closeDetail() {
-  showDetailModal.value = false
-  selectedRequest.value = null
+function toggleRequestDetails(requestId) {
+  expandedRequestId.value = expandedRequestId.value === requestId ? null : requestId
 }
 
 onMounted(() => {
@@ -891,6 +993,122 @@ function confirmLogout() {
 </script>
 
 <style scoped>
+.teacher-status-toast {
+  position: fixed;
+  z-index: 12000;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  display: flex;
+  width: min(380px, calc(100vw - 32px));
+  align-items: center;
+  gap: 11px;
+  padding: 13px 16px;
+  border: 1px solid #d8dee2;
+  border-left: 3px solid #547b66;
+  border-radius: 12px;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 12px 34px rgba(27,37,45,.18);
+  color: #303a42;
+  font: 600 .82rem/1.45 'Poppins', sans-serif;
+}
+.teacher-status-toast.is-error { border-left-color: #a84c4c; }
+.teacher-status-toast__icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #e8f2ec;
+  color: #3e7657;
+  font-size: .82rem;
+  font-weight: 800;
+}
+.teacher-status-toast.is-error .teacher-status-toast__icon { background: #f7eaea; color: #a84c4c; }
+.teacher-status-toast-enter-active,
+.teacher-status-toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.teacher-status-toast-enter-from,
+.teacher-status-toast-leave-to { opacity: 0; transform: translateY(-8px); }
+@media (max-width: 600px) {
+  .teacher-status-toast {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    padding: 12px 14px;
+    font-size: .78rem;
+  }
+}
+
+:global(.consult-status-confirm) {
+  width: min(390px, calc(100vw - 32px)) !important;
+  padding: 25px 26px 23px !important;
+  border: 1px solid #edf0f2 !important;
+  border-radius: 18px !important;
+  background: #fff !important;
+  box-shadow: 0 14px 38px rgba(25, 35, 42, .18) !important;
+}
+:global(.consult-status-confirm .swal2-icon) {
+  width: 48px !important;
+  height: 48px !important;
+  margin: 0 auto 13px !important;
+  border-color: #ed9b38 !important;
+  color: #ed9b38 !important;
+  font-size: 1.1rem !important;
+}
+:global(.consult-status-confirm .swal2-title) {
+  margin: 0 0 4px !important;
+  color: #27313a !important;
+  font-size: 1.12rem !important;
+  font-weight: 700 !important;
+}
+:global(.consult-status-confirm .swal2-html-container) {
+  margin: 0 !important;
+  color: #77818a !important;
+  font-size: .78rem !important;
+  line-height: 1.45 !important;
+}
+:global(.consult-status-confirm .swal2-actions) {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 9px !important;
+  width: 100% !important;
+  justify-content: flex-start !important;
+  margin: 18px 0 0 !important;
+}
+:global(.consult-status-confirm .swal2-confirm),
+:global(.consult-status-confirm .swal2-cancel) {
+  min-width: 0 !important;
+  min-height: 38px !important;
+  flex: 1 1 0 !important;
+  margin: 0 !important;
+  padding: 8px 14px !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  font-size: .78rem !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+:global(.consult-status-confirm .swal2-confirm) {
+  order: 1 !important;
+  background: #ed9b38 !important;
+  color: #fff !important;
+}
+:global(.consult-status-confirm .swal2-cancel) {
+  order: 0 !important;
+  background: #f3f4f5 !important;
+  color: #4c565e !important;
+}
+:global(.consult-status-confirm .swal2-confirm:hover),
+:global(.consult-status-confirm .swal2-cancel:hover) {
+  filter: brightness(.95);
+}
+@media (max-width: 520px) {
+  :global(.consult-status-confirm) { padding: 22px 18px 20px !important; }
+  :global(.consult-status-confirm .swal2-actions) { width: 100% !important; gap: 8px !important; justify-content: flex-start !important; }
+  :global(.consult-status-confirm .swal2-confirm),
+  :global(.consult-status-confirm .swal2-cancel) { min-width: 0 !important; flex: 1 1 0 !important; padding-inline: 8px !important; }
+}
+
 /* ── Layout ── */
 .layout {
   display: flex;
@@ -1002,7 +1220,7 @@ function confirmLogout() {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 .page-title {
   font-size: clamp(2.1rem, 2.5vw, 3rem);
@@ -1024,16 +1242,59 @@ function confirmLogout() {
   text-transform: uppercase;
 }
 
+.skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: #e3e8ec;
+  border-radius: 8px;
+}
+.skeleton::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
+  animation: consultation-skeleton-shimmer 1.35s ease-in-out infinite;
+}
+@keyframes consultation-skeleton-shimmer {
+  100% { transform: translateX(100%); }
+}
+.card-title-skeleton { width: 196px; height: 22px; margin-bottom: 8px; }
+.card-sub-skeleton { width: min(390px, 72vw); height: 15px; }
+.filter-tabs-skeleton { min-height: 56px; }
+.filter-tab-skeleton { height: 38px; flex: 0 0 auto; border-radius: 10px; }
+.consult-skeleton-list { display: flex; flex-direction: column; gap: 14px; }
+.consult-skeleton-card { cursor: default; }
+.skeleton-card-top { display: flex; align-items: flex-start; gap: 13px; }
+.skeleton-avatar { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 50%; }
+.skeleton-card-info { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: 8px; padding-top: 2px; }
+.skeleton-row { display: flex; align-items: center; gap: 10px; }
+.skeleton-name { width: 218px; max-width: 42vw; height: 18px; }
+.skeleton-status { width: 76px; height: 26px; border-radius: 999px; }
+.skeleton-id { width: 180px; max-width: 38vw; height: 13px; }
+.skeleton-ticket { width: 138px; height: 12px; }
+.skeleton-queue { width: 100px; height: 24px; border-radius: 999px; }
+.skeleton-actions { display: flex; gap: 9px; margin-left: auto; }
+.skeleton-action { width: 118px; height: 42px; border-radius: 11px; }
+.skeleton-action-wide { width: 150px; }
+.skeleton-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 14px; border-top: 1px solid #e8edf1; }
+.skeleton-time { width: min(370px, 58%); height: 15px; }
+.skeleton-details { width: 82px; height: 13px; }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; transform: none; opacity: .35; }
+}
+
 /* ── Consultation Card ── */
 .consult-card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.95));
-  border: 1px solid #e7edf2;
+  background: linear-gradient(160deg, rgba(255,255,255,.96), rgba(244,247,249,.94));
+  border: 1px solid rgba(255,255,255,.82);
   border-radius: 22px;
-  padding: 24px 24px 28px;
-  flex: 1;
+  padding: 22px 24px 24px;
+  flex: 0 0 auto;
   min-height: 0;
-  overflow-y: auto;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255,255,255,0.7);
+  overflow: visible;
+  box-shadow: 0 14px 32px rgba(47, 58, 66, .09), inset 0 1px 0 rgba(255,255,255,.9);
 }
 
 .card-header {
@@ -1041,8 +1302,8 @@ function confirmLogout() {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 18px;
-  padding-bottom: 16px;
+  margin-bottom: 14px;
+  padding-bottom: 13px;
   border-bottom: 1px solid #e8edf1;
 }
 .card-heading { display: flex; min-width: 0; align-items: center; gap: 12px; }
@@ -1085,8 +1346,8 @@ function confirmLogout() {
 .filter-tabs {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px;
+  gap: 4px;
+  padding: 5px;
   background: linear-gradient(180deg, #f5f7f8, #eef2f5);
   border: 1px solid #e2e7eb;
   border-radius: 14px;
@@ -1125,7 +1386,11 @@ function confirmLogout() {
 }
 
 .filter-tab {
-  padding: 9px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 13px;
   border: none;
   border-radius: 10px;
   font-family: inherit;
@@ -1137,31 +1402,48 @@ function confirmLogout() {
   transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   white-space: nowrap;
 }
+.filter-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border: 1px solid #d8e0e5;
+  border-radius: 50%;
+  background: #fff;
+  color: #52616b;
+  font-size: .67rem;
+  font-weight: 750;
+  line-height: 1;
+}
 .filter-tab:hover { background: rgba(148, 163, 184, 0.08); color: #374151; }
 .filter-tab.active { background: linear-gradient(180deg, #4f5b66, #374752); color: #fff; box-shadow: 0 8px 16px rgba(55, 71, 82, 0.18); }
+.filter-tab.active .filter-tab-count { border-color: rgba(255,255,255,.7); background: rgba(255,255,255,.96); color: #46545d; }
 
 /* ── Request List ── */
 .request-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 /* Request Card */
 .request-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 18px 18px 16px;
-  border-radius: 18px;
-  border: 1px solid #e7edf2;
-  border-left-width: 6px;
-  background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 17px;
+  border: 1px solid rgba(190, 201, 209, .56);
+  border-left-width: 4px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafb 100%);
   transition: box-shadow 0.16s ease, transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(31, 41, 55, 0.04);
+  box-shadow: 0 6px 16px rgba(31, 41, 55, 0.045);
 }
-.request-card:hover { border-color: #ccd5dc; box-shadow: 0 12px 26px rgba(51, 65, 85, 0.1); transform: translateY(-1px); }
+.request-card:hover { border-color: #c5d0d8; box-shadow: 0 12px 24px rgba(51, 65, 85, 0.1); transform: translateY(-1px); }
 
 .border-pending   { border-left-color: #e8a020; background: linear-gradient(180deg, #fffdf9 0%, #fffaf1 100%); }
 .border-approved  { border-left-color: #2c9c73; background: linear-gradient(180deg, #f7fffb 0%, #f0faf7 100%); }
@@ -1172,13 +1454,22 @@ function confirmLogout() {
 /* Top row */
 .req-top {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid rgba(148, 163, 184, .22);
+}
+.req-student {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  min-width: 0;
 }
 
 .req-avatar-wrap {
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
@@ -1197,9 +1488,20 @@ function confirmLogout() {
   flex-wrap: wrap;
 }
 .req-name { font-size: 0.98rem; font-weight: 700; color: #27333c; }
-.req-id   { font-size: 0.8rem; color: #6b7280; margin-top: 2px; }
-.req-ticket { font-size: 0.77rem; color: #5e6d7a; font-weight: 600; margin-top: 4px; }
-.req-queue { font-size: 0.78rem; color: #4a5562; font-weight: 600; margin-top: 4px; }
+.req-id   { font-size: 0.76rem; color: #6b7280; margin-top: 4px; }
+.req-ticket { font-size: 0.74rem; color: #5e6d7a; font-weight: 600; margin-top: 3px; }
+.req-queue {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 6px;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: .7rem;
+  font-weight: 700;
+}
+.req-queue--solo { color: #167347; background: #e9f8ef; border-color: #c4ead2; }
+.req-queue--waiting { color: #2563a6; background: #edf5ff; border-color: #cfdef3; }
 
 /* Status badges */
 .status-badge {
@@ -1227,7 +1529,7 @@ function confirmLogout() {
 /* Action buttons */
 .req-actions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-end;
   gap: 8px;
   flex-shrink: 0;
@@ -1300,32 +1602,82 @@ function confirmLogout() {
   background: linear-gradient(180deg, #5a6775, #4c5963);
   color: #fff;
 }
+.req-actions .btn-reject,
+.req-actions .btn-done {
+  gap: 4px;
+  padding: 7px 10px;
+  font-size: .76rem;
+}
+.req-actions .btn-reject svg { width: 16px; height: 16px; }
 
-/* Card body */
-.req-subject {
-  font-size: 0.9rem;
+/* Request details */
+.req-details { display: flex; flex-direction: column; gap: 8px; }
+.req-details {
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .5);
+}
+.request-details-expand-enter-active,
+.request-details-expand-leave-active {
+  overflow: hidden;
+  transition: max-height .32s cubic-bezier(.2, .75, .25, 1), opacity .22s ease, transform .32s ease, padding .32s ease, border-color .32s ease;
+}
+.request-details-expand-enter-from,
+.request-details-expand-leave-to {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-color: transparent;
+  opacity: 0;
+  transform: translateY(-7px);
+}
+.request-details-expand-enter-to,
+.request-details-expand-leave-from { max-height: 800px; opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .request-details-expand-enter-active,
+  .request-details-expand-leave-active { transition-duration: .01ms; }
+}
+.req-detail-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: start;
+  column-gap: 8px;
+  row-gap: 2px;
+}
+.req-detail-label {
+  padding-top: 2px;
+  color: #75818a;
+  font-size: .7rem;
   font-weight: 700;
-  color: #5d6d7b;
-  margin-bottom: 2px;
+  letter-spacing: .035em;
+  text-transform: uppercase;
 }
+.req-detail-value { min-width: 0; color: #34424b; font-size: .84rem; font-weight: 600; }
+.req-subject .req-detail-value { color: #34424b; font-size: .88rem; font-weight: 700; }
 .req-message {
-  font-size: 0.88rem;
-  color: #4b5961;
-  line-height: 1.6;
-  margin-bottom: 4px;
-  background: rgba(148, 163, 184, 0.04);
-  border: 1px solid rgba(148, 163, 184, 0.08);
-  border-radius: 10px;
-  padding: 9px 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, .2);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .58);
 }
+.req-message .req-detail-value {
+  color: #4b5961;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.req-description { background: rgba(255, 255, 255, .38); }
 .req-time {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  color: #6b7280;
+  gap: 7px;
+  padding: 2px 1px 0;
+  color: #586772;
+  font-size: .78rem;
   font-weight: 600;
 }
+.req-time > svg { flex: 0 0 auto; color: #75818a; }
+.req-details-hint { margin-left: auto; color: #65747f; font-size: .7rem; font-weight: 700; }
 
 /* Empty state */
 .empty-state {
@@ -1346,6 +1698,10 @@ function confirmLogout() {
   justify-content: center;
   z-index: 1000;
   padding: 24px;
+}
+.modal-overlay button:disabled {
+  cursor: wait;
+  opacity: .72;
 }
 .logout-modal-box {
   background: #fff;
@@ -1409,6 +1765,7 @@ function confirmLogout() {
 
 /* ── Reject Consultation Modal ── */
 .reject-modal {
+  position: relative;
   width: 460px;
   max-width: 94vw;
   padding: 36px 40px 32px;
@@ -1427,19 +1784,33 @@ function confirmLogout() {
 }
 
 .reject-modal-sub {
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   color: #888;
   text-align: center;
   margin: 0 0 22px;
 }
 
 .reject-student-box {
+  display: flex;
+  align-items: center;
+  gap: 13px;
   padding: 14px 18px;
-  border: 1.5px solid #e63946;
+  border: 1px solid #dfe4e8;
   border-radius: 10px;
   margin-bottom: 22px;
-  background: #fff;
+  background: #f8fafb;
 }
+.reject-student-avatar {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e7ecef;
+  box-shadow: 0 3px 9px rgba(45, 57, 65, .14);
+}
+.reject-student-copy { min-width: 0; }
 
 .reject-student-name    { font-size: 1rem; font-weight: 600; color: #111; margin-bottom: 4px; }
 .reject-student-subject { font-size: 0.9rem; color: #444; }
@@ -1484,14 +1855,18 @@ function confirmLogout() {
 .reject-modal-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
+  justify-content: stretch;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
 }
 
 .reject-cancel-btn {
-  padding: 9px 22px;
-  background: none;
-  border: 1.5px solid #d0d0d0;
+  flex: 1 1 0;
+  min-height: 46px;
+  padding: 9px 18px;
+  background: #f7f8f9;
+  border: 1px solid #d7dde1;
   border-radius: 10px;
   font-family: inherit;
   font-size: 0.9rem;
@@ -1500,39 +1875,49 @@ function confirmLogout() {
   cursor: pointer;
   transition: background 0.15s;
 }
-.reject-cancel-btn:hover { background: #f5f5f5; }
+.reject-cancel-btn:hover { background: #edf0f2; border-color: #c5cdd2; }
 
 .reject-confirm-btn {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 9px 22px;
-  background: #e63946;
+  min-height: 46px;
+  padding: 9px 8px;
+  background: #d92f3b;
   color: #fff;
   border: none;
   border-radius: 10px;
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s;
 }
-.reject-confirm-btn:hover { background: #c1121f; }
+.reject-confirm-btn:hover { background: #bd2632; }
 
 /* Other reason input */
 .reject-other-wrap {
-  margin-top: -16px;
-  margin-bottom: 28px;
+  margin-top: 10px;
+  margin-bottom: 18px;
 }
 .reject-other-input {
   width: 100%;
-  padding: 10px 14px;
+  min-height: 88px;
+  padding: 11px 14px;
   border: 1.5px solid #d0d0d0;
   border-radius: 8px;
   font-family: inherit;
   font-size: 0.88rem;
+  line-height: 1.5;
   color: #333;
+  background: #fff;
   outline: none;
+  resize: vertical;
+  box-sizing: border-box;
   transition: border-color 0.15s;
 }
 .reject-other-input::placeholder { color: #bbb; }
@@ -1615,40 +2000,51 @@ function confirmLogout() {
 .reject-reason-error {
   font-size: 0.82rem;
   color: #e63946;
-  margin: -12px 0 16px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.reject-reason-error::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #e63946;
-  flex-shrink: 0;
+  margin: -22px 0 16px;
 }
 
 /* ── Mark done modal ── */
 .done-modal {
+  position: relative;
   width: 460px;
   max-width: 94vw;
-  background: #fff;
-  border-radius: 20px;
-  padding: 28px 28px 24px;
-  border: 1px solid #eef0f1;
-  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.16);
+  background: linear-gradient(160deg, #fff 0%, #f8fafb 100%);
+  border-radius: 22px;
+  padding: 24px 28px 22px;
+  border: 1px solid rgba(255,255,255,.92);
+  box-shadow: 0 24px 64px rgba(22, 32, 41, .22), inset 0 1px rgba(255,255,255,.95);
+}
+.done-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #e1e6e9;
+  border-radius: 11px;
+  background: #f4f6f7;
+  color: #596772;
+  cursor: pointer;
+  transition: background .16s, color .16s, border-color .16s, transform .16s;
+}
+.done-modal-close:hover {
+  background: #e9eef1;
+  border-color: #cbd4da;
+  color: #34424b;
+  transform: translateY(-1px);
 }
 .done-modal-icon {
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  background: #e9ebec;
+  background: linear-gradient(145deg, #edf0f2, #e1e6e9);
+  color: #4b5962;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 14px;
+  margin: 0 auto 10px;
 }
 .done-modal-title {
   margin: 0;
@@ -1658,7 +2054,8 @@ function confirmLogout() {
   color: #111;
 }
 .done-modal-sub {
-  margin: 8px 0 18px;
+  max-width: 360px;
+  margin: 6px auto 14px;
   color: #666;
   font-size: 0.9rem;
   line-height: 1.5;
@@ -1680,7 +2077,8 @@ function confirmLogout() {
   font-size: 0.88rem;
   line-height: 1.45;
   color: #2b2f33;
-  background: #fbfcfb;
+  background: #f8fafb;
+  box-shadow: inset 0 1px 2px rgba(42, 52, 58, .04);
   resize: vertical;
   box-sizing: border-box;
   min-height: 112px;
@@ -1689,21 +2087,19 @@ function confirmLogout() {
   outline: none;
   border-color: #4b5563;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(48, 53, 58, 0.12);
+  box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.12);
 }
 .done-note-count {
-  margin-top: 6px;
+  margin-top: 4px;
   text-align: right;
   font-size: 0.76rem;
   color: #98a0a7;
 }
 .done-modal-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
+  justify-content: center;
+  margin-top: 12px;
 }
-.done-cancel-btn,
 .done-confirm-btn {
   border: 1px solid transparent;
   border-radius: 10px;
@@ -1714,17 +2110,21 @@ function confirmLogout() {
   cursor: pointer;
   transition: all 0.16s ease;
 }
-.done-cancel-btn {
-  background: #f3f4f5;
-  border-color: #e0e3e6;
-  color: #555;
-}
-.done-cancel-btn:hover { background: #eceff1; }
 .done-confirm-btn {
-  background: #4b5563;
+  min-width: 164px;
+  width: 100%;
+  min-height: 46px;
+  border-color: #394650;
+  background: linear-gradient(145deg, #5e6b75, #3f4b54);
   color: #fff;
+  box-shadow: 0 7px 15px rgba(48, 58, 66, .18);
 }
-.done-confirm-btn:hover { background: #245a42; }
+.done-confirm-btn:hover {
+  background: linear-gradient(145deg, #6d7a84, #4d5a64);
+  border-color: #4d5a64;
+  box-shadow: 0 9px 18px rgba(48, 58, 66, .22);
+  transform: translateY(-1px);
+}
 
 /* ── Confirm Modal ── */
 .confirm-modal {
@@ -2052,7 +2452,7 @@ function confirmLogout() {
 .edit-modal-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
   padding: 18px 28px 26px;
 }
@@ -2088,6 +2488,7 @@ function confirmLogout() {
   box-shadow: 0 6px 14px rgba(75, 85, 99, 0.16);
 }
 .edit-save-btn:hover { transform: translateY(-1px); filter: brightness(1.02); }
+.edit-save-btn:disabled { cursor: not-allowed; opacity: .55; box-shadow: none; transform: none; filter: none; }
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
@@ -2104,8 +2505,21 @@ function confirmLogout() {
   .card-header { gap: 12px; }
   .card-total { padding: 6px 8px; }
   .card-total span { font-size: .57rem; }
-  .req-top { align-items: flex-start; }
-  .req-actions { margin-left: auto; }
+  .req-top { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 10px; align-items: flex-start; }
+  .req-student { flex: 1 1 100%; }
+  .req-avatar-wrap { width: 42px; height: 42px; }
+  .req-actions { justify-content: flex-start; margin-left: 52px; }
+  .request-card { padding: 15px 13px; }
+  .req-detail-row { grid-template-columns: max-content minmax(0, 1fr); column-gap: 6px; }
+  .req-message { padding: 9px 10px; }
+  .req-details-hint { font-size: .64rem; }
+  .req-name { font-size: .9rem; }
+  .filter-tabs { flex: 0 0 auto; max-width: 100%; }
+  .skeleton-card-top { flex-wrap: wrap; }
+  .skeleton-card-info { flex: 1 1 calc(100% - 62px); }
+  .skeleton-actions { margin-left: 61px; }
+  .skeleton-action { width: 88px; height: 36px; }
+  .skeleton-action-wide { width: 118px; }
   .btn-approve,
   .btn-reject,
   .btn-done { padding: 7px 9px; font-size: .72rem; }

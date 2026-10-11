@@ -50,7 +50,7 @@
           <div class="sched-topbar-left">
             <div>
               <h2 class="sched-grid-title">Prof. {{ userName || 'Teacher' }}</h2>
-              <p class="sched-grid-sub">{{ loadError || (isLoading ? 'Loading schedule...' : 'Read-only view') }}</p>
+              <p class="sched-grid-sub">{{ loadError || 'Read-only view' }}</p>
             </div>
           </div>
           <div class="sched-topbar-right">
@@ -82,26 +82,51 @@
           <span><i class="legend-swatch legend-lab" aria-hidden="true"></i>Laboratory</span>
           <span><i class="legend-swatch legend-consultation" aria-hidden="true"></i>Consultation</span>
           <span><i class="legend-swatch legend-main-campus" aria-hidden="true"></i>Main Campus</span>
+          <span><i class="legend-swatch legend-lunch" aria-hidden="true"></i>Lunch Break</span>
           <span><i class="legend-swatch legend-free" aria-hidden="true"></i>Free time</span>
         </div>
 
         <!-- Grid -->
         <div class="table-scroll">
-          <table class="sched-table">
+          <table v-if="isLoading && !hasLoadedSchedule" class="sched-table schedule-loading-table" aria-hidden="true">
+            <thead>
+              <tr>
+                <th class="th-time"><span class="schedule-skeleton-block schedule-shimmer"></span></th>
+                <th v-for="day in DAYS" :key="`loading-${day}`" class="th-day">
+                  <span class="schedule-skeleton-block schedule-skeleton-day schedule-shimmer"></span>
+                </th>
+              </tr>
+              <tr class="work-hours-row">
+                <th class="th-time th-work-hours-label"><span class="schedule-skeleton-block schedule-shimmer"></span></th>
+                <th v-for="day in DAYS" :key="`loading-work-${day}`" class="th-work-hours">
+                  <span class="schedule-skeleton-block schedule-skeleton-work schedule-shimmer"></span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="slot in TIME_SLOTS" :key="`loading-slot-${slot.start}`" class="time-row">
+                <td class="td-time"><span class="schedule-skeleton-block schedule-skeleton-time schedule-shimmer"></span></td>
+                <td v-for="day in DAYS" :key="`loading-cell-${day}-${slot.start}`" class="td-empty schedule-skeleton-cell">
+                  <span class="schedule-skeleton-block schedule-skeleton-content schedule-shimmer"></span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="isLoading && !hasLoadedSchedule" class="sr-only" role="status">Loading schedule</div>
+          <table v-else class="sched-table">
             <thead>
               <tr>
                 <th class="th-time">Time</th>
                 <th
                   v-for="day in DAYS"
                   :key="day"
-                  class="th-day"
-                  :style="expandedDay === day ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
+                  :class="['th-day', { 'col-expanded': expandedDay === day, 'col-collapsed': expandedDay && expandedDay !== day }]"
                   @click="toggleExpand(day)"
                 >{{ day }}</th>
               </tr>
               <tr class="work-hours-row">
                 <th class="th-time th-work-hours-label">Work hours</th>
-                <th v-for="day in DAYS" :key="`work-hours-${day}`" class="th-work-hours">
+                <th v-for="day in DAYS" :key="`work-hours-${day}`" :class="['th-work-hours', { 'col-expanded': expandedDay === day, 'col-collapsed': expandedDay && expandedDay !== day }]">
                   {{ workHoursLabel(day) }}
                 </th>
               </tr>
@@ -115,7 +140,6 @@
                     v-if="cell.type === 'start'"
                     :rowspan="cell.rowspan"
                     :data-focus-key="buildClassFocusKey(cell.cls)"
-                    :style="expandedDay === DAYS[ci] ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
                     :class="[
                       'td-class',
                       cell.cls.color === 'gray'
@@ -125,16 +149,27 @@
                           : cell.cls.color === 'yellow'
                             ? 'cell-yellow'
                             : 'cell-green',
-                      { 'col-expanded': expandedDay === DAYS[ci], 'is-focus': isFocusedClassCell(cell), 'is-focus-animate': isFocusedClassCell(cell) }
+                      { 'col-expanded': expandedDay === DAYS[ci], 'col-collapsed': expandedDay && expandedDay !== DAYS[ci], 'is-focus': isFocusedClassCell(cell), 'is-focus-animate': isFocusedClassCell(cell) }
                     ]"
                     @click="toggleExpand(DAYS[ci])"
                   >
+                    <!-- Keep other days uncluttered while one day is expanded. -->
+                    <template v-if="expandedDay && expandedDay !== DAYS[ci]">
+                      <span class="compressed-cell-indicator" :title="cell.cls.subject" :aria-label="cell.cls.subject">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M9 15l2 2 4-4"/></svg>
+                        <small>{{ cell.cls.entryType === 'lunch' ? 'Break' : 'Scheduled' }}</small>
+                      </span>
+                    </template>
                     <!-- Compact view -->
-                    <template v-if="expandedDay !== DAYS[ci]">
+                    <template v-else-if="!expandedDay">
                       <div v-if="cell.cls.isSubstitute" class="teacher-subbed-indication">{{ cell.cls.subbedLabel }}</div>
-                      <div v-if="cell.cls.room" class="cell-room-sm">{{ cell.cls.room }}</div>
+                      <div v-if="cell.cls.room" class="cell-room-sm">{{ formatRoomLabel(cell.cls.room) }}</div>
                       <div class="cell-subject-sm">{{ cell.cls.subject }}</div>
-                      <div v-if="cell.cls.year || cell.cls.section" class="cell-tag-sm">{{ cell.cls.year || '--' }} • {{ cell.cls.section || '--' }}</div>
+                      <div v-if="cell.cls.year || cell.cls.section" class="cell-tag-sm cell-year-section">{{ cell.cls.year || '--' }} • {{ cell.cls.section || '--' }}</div>
+                      <div class="cell-time-range-sm">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        <span>{{ formatTimeRange12(cell.cls.start, cell.cls.end) }}</span>
+                      </div>
                     </template>
                     <!-- Expanded view -->
                     <template v-else>
@@ -152,16 +187,23 @@
                           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
                           <polyline points="9 22 9 12 15 12 15 22"/>
                         </svg>
-                        <span class="cell-exp-room">{{ cell.cls.room }}</span>
+                        <span class="cell-exp-room">{{ formatRoomLabel(cell.cls.room) }}</span>
                       </div>
                       <div class="cell-exp-line">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cell-exp-icon">
+                        <svg v-if="cell.cls.entryType === 'lunch'" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cell-exp-icon" aria-hidden="true">
+                          <path d="M3 2v7a3 3 0 0 0 6 0V2M6 2v20M21 2v6a4 4 0 0 1-4 4h-1V2M18 2v20" />
+                        </svg>
+                        <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cell-exp-icon" aria-hidden="true">
                           <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
                           <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
                         </svg>
                         <strong class="cell-exp-subject">{{ cell.cls.subject }}</strong>
                       </div>
-                      <div v-if="cell.cls.year || cell.cls.section" class="cell-exp-section">{{ cell.cls.year || '--' }} • {{ cell.cls.section || '--' }}</div>
+                      <div v-if="cell.cls.year || cell.cls.section" class="cell-exp-section cell-year-section">{{ cell.cls.year || '--' }} • {{ cell.cls.section || '--' }}</div>
+                      <div class="cell-exp-time">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        <span>{{ formatTimeRange12(cell.cls.start, cell.cls.end) }}</span>
+                      </div>
                     </template>
                   </td>
                   <!-- Consultation cell -->
@@ -169,13 +211,17 @@
                     v-else-if="cell.type === 'consult'"
                     :rowspan="cell.rowspan"
                     :data-focus-key="buildConsultFocusKey(cell.consult)"
-                    :style="expandedDay === DAYS[ci] ? { width: '320px' } : expandedDay ? { width: '92px' } : {}"
-                    :class="['td-class', 'cell-blue', { 'col-expanded': expandedDay === DAYS[ci], 'is-focus': isFocusedConsultCell(cell), 'is-focus-animate': isFocusedConsultCell(cell) }]"
+                    :class="['td-class', 'cell-blue', { 'col-expanded': expandedDay === DAYS[ci], 'col-collapsed': expandedDay && expandedDay !== DAYS[ci], 'is-focus': isFocusedConsultCell(cell), 'is-focus-animate': isFocusedConsultCell(cell) }]"
                     @click="toggleExpand(DAYS[ci])"
                   >
-                    <template v-if="expandedDay !== DAYS[ci]">
+                    <template v-if="expandedDay && expandedDay !== DAYS[ci]">
+                      <span class="compressed-cell-indicator" title="Consultation Hours" aria-label="Consultation Hours">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M9 15l2 2 4-4"/></svg>
+                        <small>Consult</small>
+                      </span>
+                    </template>
+                    <template v-else-if="!expandedDay">
                       <div class="cell-room-sm">Consultation</div>
-                      <div class="cell-subject-sm">{{ formatTimeRange12(cell.consult.start, cell.consult.end) }}</div>
                       <div class="consult-approved-chip" title="Approved consultation requests">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="consult-approved-icon">
                           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -185,12 +231,12 @@
                         </svg>
                         <span>{{ cell.consult.approvedCount }}</span>
                       </div>
-                      <div class="cell-tag-sm">Office Hours</div>
+                      <div class="cell-time-range-sm">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        <span>{{ formatTimeRange12(cell.consult.start, cell.consult.end) }}</span>
+                      </div>
                     </template>
                     <template v-else>
-                      <div class="cell-badge-row">
-                        <span class="cell-badge badge-consult">Consultation</span>
-                      </div>
                       <div class="cell-exp-line">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cell-exp-icon">
                           <circle cx="12" cy="12" r="9"/>
@@ -198,7 +244,6 @@
                         </svg>
                         <strong class="cell-exp-subject">Consultation Hours</strong>
                       </div>
-                      <div class="cell-exp-section">{{ formatTimeRange12(cell.consult.start, cell.consult.end) }}</div>
                       <div class="consult-approved-chip consult-approved-chip-expanded" title="Approved consultation requests">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="consult-approved-icon">
                           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -208,12 +253,16 @@
                         </svg>
                         <span>{{ cell.consult.approvedCount }} approved</span>
                       </div>
+                      <div class="cell-exp-time">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        <span>{{ formatTimeRange12(cell.consult.start, cell.consult.end) }}</span>
+                      </div>
                     </template>
                   </td>
                   <!-- Empty cell -->
                   <td
                     v-else-if="cell.type === 'empty'"
-                    :class="['td-empty', { 'col-expanded': expandedDay === DAYS[ci] }]"
+                    :class="['td-empty', { 'col-expanded': expandedDay === DAYS[ci], 'col-collapsed': expandedDay && expandedDay !== DAYS[ci] }]"
                   >
                     <span class="free-time-label">Free time</span>
                   </td>
@@ -375,7 +424,8 @@ const DAY_SHORT = { Monday: 'Monday', Tuesday: 'Tues', Wednesday: 'Wed', Thursda
 const scheduleData = ref([])
 const consultationData = ref([])
 const workHoursByDay = ref({})
-const isLoading = ref(false)
+const isLoading = ref(true)
+const hasLoadedSchedule = ref(false)
 const loadError = ref('')
 
 function setWorkHoursFromTable(table) {
@@ -436,7 +486,13 @@ function formatTimeRange12(start, end) {
   if (!start12 && !end12) {
     return ''
   }
-  return `${start12}-${end12}`
+  return `${start12} – ${end12}`
+}
+
+function formatRoomLabel(room) {
+  const value = String(room || '').trim()
+  if (!value) return ''
+  return /^room\b/i.test(value) ? value : `Room ${value}`
 }
 
 function isGreenComlabRoom(room) {
@@ -747,6 +803,7 @@ async function loadSchedule() {
     loadError.value = error.message || 'Unable to load schedule.'
   } finally {
     isLoading.value = false
+    hasLoadedSchedule.value = true
   }
 }
 
@@ -929,21 +986,33 @@ const tableMatrix = computed(() => {
   const consultations = filteredConsultations.value
   const occupied = Array.from({ length: DAYS.length }, () => new Array(TIME_SLOTS.length).fill(false))
 
+  const getDisplaySpan = (item, actualSpan, day) => {
+    const nextSlot = item.startIndex + actualSpan
+    if (nextSlot >= TIME_SLOTS.length) return actualSpan
+
+    const nextSlotHasClass = data.some((other) => other !== item && other.day === day && other.startIndex === nextSlot)
+    const nextSlotHasConsultation = consultations.some((other) => other !== item && other.day === day && other.startIndex === nextSlot)
+    return nextSlotHasClass || nextSlotHasConsultation ? actualSpan : actualSpan + 1
+  }
+
   return TIME_SLOTS.map((slot, ri) =>
     DAYS.map((day, ci) => {
       if (occupied[ci][ri]) return { type: 'occupied' }
 
       const cls = data.find((c) => c.day === day && c.startIndex === ri)
       if (cls) {
-        const span = Math.max(1, Number(cls.rowspan) || 1)
+        const actualSpan = Math.max(1, Number(cls.rowspan) || 1)
+        const span = getDisplaySpan(cls, actualSpan, day)
         for (let r = ri + 1; r < ri + span && r < TIME_SLOTS.length; r++) occupied[ci][r] = true
         return { type: 'start', cls, rowspan: span }
       }
 
       const consult = consultations.find((slotItem) => slotItem.day === day && slotItem.startIndex === ri)
       if (consult) {
-        for (let r = ri + 1; r < ri + consult.rowspan && r < TIME_SLOTS.length; r++) occupied[ci][r] = true
-        return { type: 'consult', consult, rowspan: consult.rowspan }
+        const actualSpan = Math.max(1, Number(consult.rowspan) || 1)
+        const span = getDisplaySpan(consult, actualSpan, day)
+        for (let r = ri + 1; r < ri + span && r < TIME_SLOTS.length; r++) occupied[ci][r] = true
+        return { type: 'consult', consult, rowspan: span }
       }
 
       return { type: 'empty' }
@@ -1273,6 +1342,7 @@ function confirmLogout() {
 .legend-lab { background: #1f6b45; }
 .legend-consultation { background: #4a90d9; }
 .legend-main-campus { background: #f0843d; }
+.legend-lunch { background: #626c76; }
 .legend-free { background: #7b5ea7; }
 
 /* ── Table ── */
@@ -1299,6 +1369,30 @@ function confirmLogout() {
   border-collapse: collapse;
   table-layout: fixed;
   min-width: 820px;
+}
+.schedule-skeleton-block {
+  display: block;
+  height: 12px;
+  margin: 0 auto;
+  border-radius: 6px;
+}
+.schedule-loading-table .schedule-skeleton-block {
+  background: linear-gradient(90deg, #e1e5e8 20%, #f5f7f8 38%, #e1e5e8 60%);
+  background-size: 200% 100%;
+}
+.schedule-loading-table .schedule-shimmer {
+  animation: schedule-table-shimmer 1.5s ease-in-out infinite;
+}
+.schedule-skeleton-day { width: min(76%, 94px); background-color: rgba(255,255,255,.22); }
+.schedule-skeleton-work { width: min(74%, 82px); background-color: rgba(73,91,86,.16); }
+.schedule-skeleton-time { width: 58px; }
+.schedule-skeleton-content { width: 66%; min-width: 32px; }
+.schedule-loading-table .schedule-skeleton-cell { background: #f1eff7; }
+@keyframes schedule-table-shimmer {
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .schedule-loading-table .schedule-shimmer { animation: none; }
 }
 
 /* ─ Header: Time Column ─ */
@@ -1331,8 +1425,11 @@ function confirmLogout() {
   top: 0;
   z-index: 2;
   user-select: none;
-  transition: background 0.2s ease, width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 120px;
+  transition: background 0.2s ease, width 0.55s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.55s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
+.th-day.col-expanded { width: 320px; min-width: 320px; max-width: 320px; }
+.th-day.col-collapsed { width: 92px; min-width: 92px; max-width: 92px; }
 
 .th-day:hover { background: #6b7280; }
 .th-day-active { background: #6b7280; }
@@ -1350,6 +1447,9 @@ function confirmLogout() {
 }
 .work-hours-row .th-time { left: 0; z-index: 19; }
 .th-work-hours { z-index: 3; text-align: center; }
+.th-work-hours { transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.55s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.55s cubic-bezier(0.22, 1, 0.36, 1); }
+.th-work-hours.col-expanded { width: 320px; min-width: 320px; max-width: 320px; }
+.th-work-hours.col-collapsed { width: 92px; min-width: 92px; max-width: 92px; }
 
 /* Keep the work-hours labels legible when the timetable is viewed on a phone. */
 @media (max-width: 600px) {
@@ -1405,16 +1505,17 @@ function confirmLogout() {
   height: 48px;
   padding: 4px;
   background: linear-gradient(135deg, rgba(238, 232, 255, 0.9), rgba(245, 241, 255, 0.75));
-  border-radius: 6px;
+  border-radius: 0;
   box-sizing: border-box;
   overflow: hidden;
-  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.35s cubic-bezier(0.22, 1, 0.36, 1), padding 0.35s ease, transform 0.35s ease;
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.55s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.55s cubic-bezier(0.22, 1, 0.36, 1), padding 0.45s ease, transform 0.45s ease;
 }
 
 .td-empty.col-expanded {
-  width: 300px;
-  min-width: 300px;
+  width: 320px;
+  min-width: 320px;
 }
+.td-empty.col-collapsed { width: 92px; min-width: 92px; max-width: 92px; }
 
 .free-time-label {
   display: grid;
@@ -1436,13 +1537,14 @@ function confirmLogout() {
   vertical-align: middle;
   padding: 4px 6px;
   cursor: pointer;
+  text-align: center;
   width: 120px;
   min-width: 120px;
   max-width: 120px;
-  border-radius: 6px;
+  border-radius: 0;
   box-sizing: border-box;
   overflow: hidden;
-  transition: filter 0.2s ease, width 0.35s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.35s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.35s cubic-bezier(0.22, 1, 0.36, 1), padding 0.35s ease, transform 0.35s ease;
+  transition: filter 0.2s ease, width 0.55s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.55s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.55s cubic-bezier(0.22, 1, 0.36, 1), padding 0.45s ease, transform 0.45s ease;
   will-change: width, min-width, max-width, padding;
 }
 
@@ -1477,10 +1579,37 @@ function confirmLogout() {
 }
 
 .td-class.col-expanded {
-  width: 300px;
-  min-width: 300px;
-  max-width: 300px;
+  width: 320px;
+  min-width: 320px;
+  max-width: 320px;
   padding: 14px 16px;
+}
+.td-class.col-collapsed { width: 92px; min-width: 92px; max-width: 92px; padding-inline: 3px; }
+.compressed-cell-indicator {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 38px;
+  margin: auto;
+  padding: 5px 8px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid currentColor;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .17);
+  color: inherit;
+  line-height: 1;
+}
+.compressed-cell-indicator svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.compressed-cell-indicator small { font-size: .55rem; font-weight: 800; letter-spacing: .025em; white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .th-day,
+  .th-work-hours,
+  .td-empty,
+  .td-class { transition-duration: 0.01ms; }
 }
 
 .td-class.is-focus,
@@ -1519,6 +1648,11 @@ function confirmLogout() {
   color: #fff;
 }
 
+.cell-gray {
+  background: #626c76;
+  color: #fff;
+}
+
 .cell-yellow {
   background: #e9c46a;
   color: #5a3e00;
@@ -1539,7 +1673,7 @@ function confirmLogout() {
   font-size: 0.73rem;
   font-weight: 700;
   margin-bottom: 3px;
-  text-align: left;
+  text-align: center;
   line-height: 1.2;
 }
 
@@ -1547,7 +1681,7 @@ function confirmLogout() {
   font-size: 0.74rem;
   line-height: 1.35;
   margin-bottom: 4px;
-  text-align: left;
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1556,9 +1690,31 @@ function confirmLogout() {
 .cell-tag-sm {
   font-size: 0.68rem;
   opacity: 0.85;
-  text-align: left;
+  text-align: center;
   line-height: 1.25;
 }
+.cell-year-section { font-weight: 800; }
+.cell-time-range-sm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 5px auto 0;
+  padding: 3px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .14);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  opacity: 0.9;
+}
+.cell-time-range-sm svg,
+.cell-exp-time svg { width: 12px; height: 12px; flex: 0 0 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .cell-campus-sm {
   font-size: 0.68rem;
@@ -1566,7 +1722,7 @@ function confirmLogout() {
   letter-spacing: 0.03em;
   text-transform: uppercase;
   margin: 1px 0 4px;
-  text-align: left;
+  text-align: center;
 }
 
 .consult-approved-chip {
@@ -1582,11 +1738,12 @@ function confirmLogout() {
   font-weight: 700;
   color: #fff;
   width: fit-content;
+  margin-inline: auto;
 }
 
 .consult-approved-chip-expanded {
   margin-top: 8px;
-  margin-left: 24px;
+  margin-inline: auto;
   font-size: 0.74rem;
 }
 
@@ -1598,7 +1755,7 @@ function confirmLogout() {
 /* ─ Expanded View: Badge ─ */
 .cell-badge-row {
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   margin-bottom: 10px;
 }
 
@@ -1628,14 +1785,17 @@ function confirmLogout() {
 .badge-consult {
   background: rgba(255, 255, 255, 0.92);
   color: #2f6fb0;
+  font-size: 0.66rem;
 }
 
 /* ─ Expanded View: Info Lines ─ */
 .cell-exp-line {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
   margin-bottom: 8px;
+  text-align: center;
 }
 
 .cell-exp-icon {
@@ -1657,8 +1817,29 @@ function confirmLogout() {
 .cell-exp-section {
   font-size: 0.82rem;
   opacity: 0.85;
+  width: 100%;
   margin-top: 4px;
-  margin-left: 24px;
+  margin-left: 0;
+  text-align: center;
+}
+.cell-exp-time {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 9px auto 0;
+  padding: 5px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .14);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  opacity: 0.9;
 }
 
 .cell-yellow .cell-room-sm,
@@ -1699,15 +1880,18 @@ function confirmLogout() {
 .cell-blue .cell-tag-sm,
 .cell-blue .cell-exp-room,
 .cell-blue .cell-exp-subject,
-.cell-blue .cell-exp-section {
+.cell-blue .cell-exp-section,
+.cell-blue .cell-time-range-sm,
+.cell-blue .cell-exp-time {
   color: #ffffff;
   opacity: 1;
 }
 
 .cell-blue .cell-room-sm {
-  font-size: 0.8rem;
+  font-size: 0.68rem;
   font-weight: 800;
 }
+.cell-blue .cell-exp-subject { font-size: 0.82rem; }
 
 .cell-blue .cell-subject-sm {
   font-size: 0.8rem;
@@ -1726,6 +1910,43 @@ function confirmLogout() {
 .cell-blue .consult-approved-chip {
   background: rgba(17, 57, 103, 0.52);
   border-color: rgba(255, 255, 255, 0.62);
+}
+
+/* Keep schedule details readable inside narrower day columns. */
+@media (max-width: 1200px), (max-height: 800px) {
+  .cell-room-sm { font-size: .64rem; margin-bottom: 2px; }
+  .cell-subject-sm { font-size: .64rem; line-height: 1.2; margin-bottom: 2px; }
+  .cell-tag-sm { font-size: .59rem; line-height: 1.15; }
+  .cell-campus-sm { font-size: .58rem; margin-bottom: 2px; }
+  .cell-time-range-sm { gap: 2px; margin-top: 3px; padding: 2px 4px; font-size: .53rem; line-height: 1.1; }
+  .cell-time-range-sm svg,
+  .cell-exp-time svg { width: 10px; height: 10px; flex-basis: 10px; }
+  .consult-approved-chip { gap: 3px; margin: 1px auto 2px; padding: 2px 6px; font-size: .61rem; }
+  .consult-approved-icon { width: 12px; height: 12px; }
+  .cell-badge-row { margin-bottom: 6px; }
+  .cell-badge { padding: 2px 7px; font-size: .61rem; }
+  .cell-exp-line { gap: 4px; margin-bottom: 5px; }
+  .cell-exp-icon { width: 14px; height: 14px; }
+  .cell-exp-room { font-size: .78rem; }
+  .cell-exp-subject { font-size: .8rem; line-height: 1.2; }
+  .cell-exp-section { font-size: .7rem; margin-top: 2px; }
+  .cell-exp-time { gap: 4px; margin-top: 6px; padding: 3px 7px; font-size: .65rem; }
+  .compressed-cell-indicator { min-height: 32px; padding: 3px 6px; gap: 2px; }
+  .compressed-cell-indicator svg { width: 13px; height: 13px; }
+  .compressed-cell-indicator small { font-size: .49rem; }
+}
+
+@media (max-width: 600px) {
+  .cell-room-sm { font-size: .59rem; }
+  .cell-subject-sm { font-size: .58rem; }
+  .cell-tag-sm { font-size: .54rem; }
+  .cell-time-range-sm { padding: 2px 3px; font-size: .49rem; }
+  .cell-exp-room { font-size: .7rem; }
+  .cell-exp-subject { font-size: .72rem; }
+  .cell-exp-section { font-size: .63rem; }
+  .cell-exp-time { padding: 2px 5px; font-size: .58rem; }
+  .consult-approved-chip { padding: 2px 5px; font-size: .56rem; }
+  .cell-badge { padding: 2px 5px; font-size: .56rem; }
 }
 
 /* ── Modals — overlay ── */

@@ -37,7 +37,14 @@
 
     <!-- ═══════════════════ MAIN ═══════════════════ -->
     <main class="main">
-      <header class="main-header">
+      <header v-if="isSettingsLoading" class="main-header" aria-hidden="true">
+        <div class="settings-page-heading-skeleton">
+          <span class="settings-skeleton-shimmer settings-eyebrow-skeleton"></span>
+          <span class="settings-skeleton-shimmer settings-title-skeleton"></span>
+          <span class="settings-skeleton-shimmer settings-subtitle-skeleton"></span>
+        </div>
+      </header>
+      <header v-else class="main-header">
         <div>
           <span class="page-eyebrow">Account &amp; security</span>
           <h1 class="page-title">Settings</h1>
@@ -45,7 +52,81 @@
         </div>
       </header>
 
-      <div class="settings-body">
+      <div v-if="isSettingsLoading" class="settings-body settings-loading-skeleton" aria-busy="true" aria-label="Loading settings">
+        <span class="settings-skeleton-sr-only" role="status">Loading settings</span>
+        <div class="settings-skeleton-grid">
+          <section class="settings-card settings-skeleton-card settings-skeleton-password">
+            <div class="settings-skeleton-card-heading">
+              <span class="settings-skeleton-shimmer settings-skeleton-icon"></span>
+              <div class="settings-skeleton-heading-lines">
+                <span class="settings-skeleton-shimmer settings-skeleton-heading"></span>
+                <span class="settings-skeleton-shimmer settings-skeleton-description"></span>
+              </div>
+            </div>
+            <div class="settings-skeleton-step-row">
+              <span class="settings-skeleton-shimmer settings-skeleton-step"></span>
+            </div>
+            <div class="settings-skeleton-field">
+              <span class="settings-skeleton-shimmer settings-skeleton-label"></span>
+              <span class="settings-skeleton-shimmer settings-skeleton-input"></span>
+            </div>
+            <div class="settings-skeleton-field">
+              <span class="settings-skeleton-shimmer settings-skeleton-label settings-skeleton-otp-label"></span>
+              <div class="settings-skeleton-otp-row">
+                <div class="settings-skeleton-otp-boxes">
+                  <span v-for="box in 6" :key="box" class="settings-skeleton-shimmer settings-skeleton-otp-box"></span>
+                </div>
+                <span class="settings-skeleton-shimmer settings-skeleton-send"></span>
+              </div>
+            </div>
+            <span class="settings-skeleton-shimmer settings-skeleton-button"></span>
+          </section>
+
+          <section class="settings-card settings-skeleton-card settings-skeleton-verification">
+            <div class="settings-skeleton-card-heading">
+              <span class="settings-skeleton-shimmer settings-skeleton-icon"></span>
+              <div class="settings-skeleton-heading-lines">
+                <span class="settings-skeleton-shimmer settings-skeleton-heading"></span>
+                <span class="settings-skeleton-shimmer settings-skeleton-description"></span>
+              </div>
+              <span class="settings-skeleton-shimmer settings-skeleton-toggle"></span>
+            </div>
+            <span class="settings-skeleton-shimmer settings-skeleton-info"></span>
+            <span class="settings-skeleton-shimmer settings-skeleton-label"></span>
+            <span class="settings-skeleton-shimmer settings-skeleton-input"></span>
+            <span class="settings-skeleton-shimmer settings-skeleton-help"></span>
+          </section>
+        </div>
+
+        <section class="settings-card settings-skeleton-device-card">
+          <div class="settings-skeleton-device-heading">
+            <div>
+              <span class="settings-skeleton-shimmer settings-skeleton-heading"></span>
+              <span class="settings-skeleton-shimmer settings-skeleton-description"></span>
+            </div>
+            <span class="settings-skeleton-shimmer settings-skeleton-refresh"></span>
+          </div>
+          <div v-for="row in 3" :key="row" class="settings-skeleton-device-row">
+            <span class="settings-skeleton-shimmer settings-skeleton-device-icon"></span>
+            <div class="settings-skeleton-device-lines">
+              <span class="settings-skeleton-shimmer settings-skeleton-device-name"></span>
+              <span class="settings-skeleton-shimmer settings-skeleton-device-meta"></span>
+              <span class="settings-skeleton-shimmer settings-skeleton-device-date"></span>
+            </div>
+            <span class="settings-skeleton-shimmer settings-skeleton-logout"></span>
+          </div>
+        </section>
+
+        <section class="settings-card settings-skeleton-faq">
+          <span class="settings-skeleton-shimmer settings-skeleton-heading"></span>
+          <div v-for="row in 3" :key="row" class="settings-skeleton-faq-item">
+            <span class="settings-skeleton-shimmer settings-skeleton-faq-row"></span>
+            <span class="settings-skeleton-shimmer settings-skeleton-faq-chevron"></span>
+          </div>
+        </section>
+      </div>
+
+      <div v-show="!isSettingsLoading" class="settings-body">
 
         <!-- ── Change Password ── -->
         <div class="settings-card two-factor-card">
@@ -59,29 +140,33 @@
             </div>
           </div>
 
-          <form class="settings-form" @submit.prevent="handleUpdatePassword">
-            <div class="settings-step-label"><span>{{ otpSent ? 'Step 2 of 2' : 'Step 1 of 2' }}</span></div>
-            <div class="settings-row settings-row--identity">
+          <form class="settings-form" @submit.prevent="passwordStep === 1 ? advancePasswordStep() : handleUpdatePassword()">
+            <div class="settings-step-label"><span>Step {{ passwordStep }} of 2</span></div>
+            <div v-if="passwordStep === 1" class="settings-row settings-row--identity">
               <div class="settings-group">
                 <label class="settings-label">Current Password</label>
-                <div class="pw-input-wrap">
+                <div class="pw-input-wrap" :class="{ 'is-invalid': pwErrorField === 'current' }">
                   <input
+                    ref="currentPasswordInput"
                     v-model="passwordForm.current"
                     :type="showCurrent ? 'text' : 'password'"
                     class="settings-input"
                     placeholder="Enter current password"
-                    :disabled="otpSent"
+                    :aria-invalid="pwErrorField === 'current'"
+                    :aria-describedby="pwErrorField === 'current' ? 'teacher-current-password-error' : undefined"
+                    @input="clearPasswordError('current')"
                   />
                   <button type="button" class="pw-eye" @click="showCurrent = !showCurrent">
                     <svg v-if="!showCurrent" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                   </button>
                 </div>
+                <p v-if="pwErrorField === 'current'" id="teacher-current-password-error" class="change-password-field-error" role="alert">{{ pwError }}</p>
               </div>
               <div class="settings-group">
                 <label class="settings-label">6-Digit OTP</label>
                 <div class="otp-entry-wrap">
-                  <div class="otp-boxes" role="group" aria-label="Six-digit one-time password">
+                  <div class="otp-boxes" :class="{ 'is-invalid': pwErrorField === 'otp' }" role="group" aria-label="Six-digit one-time password">
                     <input
                       v-for="(_, index) in pwOtpCode"
                       :key="index"
@@ -92,59 +177,73 @@
                       inputmode="numeric"
                       maxlength="1"
                       :aria-label="`OTP digit ${index + 1}`"
+                      :aria-invalid="pwErrorField === 'otp'"
+                      :aria-describedby="pwErrorField === 'otp' ? 'teacher-password-otp-error' : undefined"
                       @input="onPwOtpInput(index)"
                       @keydown.backspace="onPwOtpBackspace(index)"
                     />
                   </div>
-                  <button type="button" class="send-otp-btn" @click="otpSent ? resetOtp() : sendOtp">
+                  <button type="button" class="send-otp-btn" :disabled="isSendingPasswordOtp" @click="sendOtp">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-                    <span>{{ otpSent ? 'Resend OTP' : 'Send OTP' }}</span>
+                    <span>{{ isSendingPasswordOtp ? 'Sending…' : otpSent ? 'Resend OTP' : 'Send OTP' }}</span>
                   </button>
                 </div>
+                <p v-if="pwErrorField === 'otp'" id="teacher-password-otp-error" class="change-password-field-error" role="alert">{{ pwError }}</p>
                 <span v-if="otpSent" class="otp-expiry">Expires in {{ formattedOtpTime }}.</span>
               </div>
             </div>
 
-            <template v-if="otpSent">
-              <div class="settings-row">
+            <template v-else-if="passwordStep === 2">
+              <div class="settings-row settings-row--password">
                 <div class="settings-group">
                   <label class="settings-label">New Password</label>
-                  <div class="pw-input-wrap">
+                  <div class="pw-input-wrap" :class="{ 'is-invalid': pwErrorField === 'newPw' }">
                     <input
+                      ref="newPasswordInput"
                       v-model="passwordForm.newPw"
                       :type="showNew ? 'text' : 'password'"
                       class="settings-input"
                       placeholder="Enter new password"
+                      :aria-invalid="pwErrorField === 'newPw'"
+                      :aria-describedby="pwErrorField === 'newPw' ? 'teacher-new-password-error' : undefined"
+                      @input="clearPasswordError('newPw')"
                     />
                     <button type="button" class="pw-eye" @click="showNew = !showNew">
                       <svg v-if="!showNew" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     </button>
                   </div>
+                  <p v-if="pwErrorField === 'newPw'" id="teacher-new-password-error" class="change-password-field-error" role="alert">{{ pwError }}</p>
                 </div>
                 <div class="settings-group">
                   <label class="settings-label">Confirm New Password</label>
-                  <div class="pw-input-wrap">
+                  <div class="pw-input-wrap" :class="{ 'is-invalid': pwErrorField === 'confirmPw' }">
                     <input
+                      ref="confirmPasswordInput"
                       v-model="passwordForm.confirmPw"
                       :type="showConfirm ? 'text' : 'password'"
                       class="settings-input"
                       placeholder="Confirm new password"
+                      :aria-invalid="pwErrorField === 'confirmPw'"
+                      :aria-describedby="pwErrorField === 'confirmPw' ? 'teacher-confirm-password-error' : undefined"
+                      @input="clearPasswordError('confirmPw')"
                     />
                     <button type="button" class="pw-eye" @click="showConfirm = !showConfirm">
                       <svg v-if="!showConfirm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     </button>
                   </div>
+                  <p v-if="pwErrorField === 'confirmPw'" id="teacher-confirm-password-error" class="change-password-field-error" role="alert">{{ pwError }}</p>
                 </div>
               </div>
             </template>
 
-            <div v-if="pwError"   class="settings-msg settings-msg--error">{{ pwError }}</div>
-            <div v-if="pwSuccess" class="settings-msg settings-msg--success">{{ pwSuccess }}</div>
+            <div v-if="pwSuccess && passwordStep === 2" class="settings-msg settings-msg--success">{{ pwSuccess }}</div>
 
             <div class="settings-form-footer">
-              <button type="submit" class="update-pw-btn">{{ otpSent ? 'Update Password' : 'Continue' }}</button>
+              <button v-if="passwordStep === 2" type="button" class="password-back-btn" @click="passwordStep = 1">Back</button>
+              <button v-if="passwordStep === 1" type="button" class="update-pw-btn" @click="advancePasswordStep">Continue</button>
+              <button v-else type="submit" class="update-pw-btn">Update Password</button>
             </div>
           </form>
         </div>
@@ -178,16 +277,16 @@
                 <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
               </button>
             </div>
-            <p class="verification-help">Your password is used only to confirm this security setting.</p>
             <p v-if="twoFactorError" id="teacher-two-factor-password-error" class="verification-password-error" role="alert">{{ twoFactorError }}</p>
             <p v-if="twoFactorSuccess" id="teacher-two-factor-password-success" class="verification-password-success" role="status">{{ twoFactorSuccess }}</p>
+            <p class="verification-help">Your password is used only to confirm this security setting.</p>
           </div>
         </div>
 
 
 
         <!-- ── FAQs ── -->
-        <RecentDevices />
+        <RecentDevices @initial-load-complete="finishSettingsLoading" />
 
         <div class="settings-faq-section">
           <div class="faq-header">
@@ -307,6 +406,7 @@ import RecentDevices from '@/components/RecentDevices.vue'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { initialsAvatar } from '@/utils/avatar.js'
 import { computed, onUnmounted, ref } from 'vue'
+import Swal from 'sweetalert2'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -370,6 +470,11 @@ const navItems = [
 
 /* ── Logout ── */
 const showLogoutModal = ref(false)
+const isSettingsLoading = ref(true)
+
+function finishSettingsLoading() {
+  isSettingsLoading.value = false
+}
 function confirmLogout() {
   showLogoutModal.value = false
   logout()
@@ -382,7 +487,13 @@ const showCurrent  = ref(false)
 const showNew      = ref(false)
 const showConfirm  = ref(false)
 const pwError      = ref('')
+const pwErrorField = ref('')
 const pwSuccess    = ref('')
+const currentPasswordInput = ref(null)
+const newPasswordInput = ref(null)
+const confirmPasswordInput = ref(null)
+const passwordStep = ref(1)
+const isSendingPasswordOtp = ref(false)
 const otpSent      = ref(false)
 const pwOtpCode    = ref(['', '', '', '', '', ''])
 const pwOtpRefs    = ref([])
@@ -448,13 +559,17 @@ const maskedEmail = computed(() => {
 })
 
 async function sendOtp() {
+  pwError.value = ''
+  pwErrorField.value = ''
   if (!passwordForm.value.current) {
-    pwError.value   = 'Please enter your current password first.'
+    pwError.value = 'Please enter your current password first.'
+    pwErrorField.value = 'current'
     pwSuccess.value = ''
+    currentPasswordInput.value?.focus()
     return
   }
-  pwError.value = ''
   pwSuccess.value = ''
+  isSendingPasswordOtp.value = true
   try {
     const response = await apiRequest('/auth/request-password-otp', {
       method: 'POST',
@@ -464,9 +579,49 @@ async function sendOtp() {
     pwOtpCode.value = ['', '', '', '', '', '']
     startOtpTimer()
     pwSuccess.value = response.message
+    await Swal.fire({
+      iconHtml: '<span class="teacher-settings-alert-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></span>',
+      title: 'Success',
+      text: `OTP sent to ${maskedEmail.value}.`,
+      confirmButtonText: 'OK',
+      confirmButtonColor: '#4b5563',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'teacher-settings-alert-popup',
+        icon: 'teacher-settings-alert-icon',
+        title: 'teacher-settings-alert-title',
+        htmlContainer: 'teacher-settings-alert-text',
+        confirmButton: 'teacher-settings-alert-confirm',
+      },
+    })
   } catch (error) {
     pwError.value = error.message || 'Unable to send the OTP.'
+    pwErrorField.value = 'current'
+    currentPasswordInput.value?.focus()
+  } finally {
+    isSendingPasswordOtp.value = false
   }
+}
+
+function advancePasswordStep() {
+  pwError.value = ''
+  pwErrorField.value = ''
+  pwSuccess.value = ''
+  if (!passwordForm.value.current) {
+    pwError.value = 'Please enter your current password first.'
+    pwErrorField.value = 'current'
+    currentPasswordInput.value?.focus()
+    return
+  }
+  if (!otpSent.value || !/^\d{6}$/.test(pwOtpCode.value.join(''))) {
+    pwError.value = otpSent.value
+      ? 'Please enter the 6-digit OTP sent to your email.'
+      : 'Send an OTP to your email, then enter the 6-digit code.'
+    pwErrorField.value = 'otp'
+    pwOtpRefs.value[0]?.focus()
+    return
+  }
+  passwordStep.value = 2
 }
 
 function clearOtpTimer() {
@@ -483,7 +638,9 @@ function startOtpTimer() {
     if (otpSecondsRemaining.value <= 0) {
       clearOtpTimer()
       resetOtp()
+      passwordStep.value = 1
       pwError.value = 'OTP expired. Send a new code to continue.'
+      pwErrorField.value = 'otp'
     }
   }, 1000)
 }
@@ -496,6 +653,7 @@ function resetOtp() {
 }
 
 function onPwOtpInput(i) {
+  if (pwErrorField.value === 'otp') clearPasswordError('otp')
   if (pwOtpCode.value[i] && i < 5) pwOtpRefs.value[i + 1]?.focus()
 }
 function onPwOtpBackspace(i) {
@@ -504,22 +662,37 @@ function onPwOtpBackspace(i) {
 
 async function handleUpdatePassword() {
   pwError.value   = ''
+  pwErrorField.value = ''
   pwSuccess.value = ''
   const enteredOtp = pwOtpCode.value.join('')
   if (enteredOtp.length < 6) {
     pwError.value = 'Please enter the 6-digit OTP sent to your email.'
+    pwErrorField.value = 'otp'
+    pwOtpRefs.value[0]?.focus()
     return
   }
-  if (!passwordForm.value.newPw || !passwordForm.value.confirmPw) {
-    pwError.value = 'Please fill in the new password fields.'
+  if (!passwordForm.value.newPw) {
+    pwError.value = 'Please enter a new password.'
+    pwErrorField.value = 'newPw'
+    newPasswordInput.value?.focus()
+    return
+  }
+  if (!passwordForm.value.confirmPw) {
+    pwError.value = 'Please confirm your new password.'
+    pwErrorField.value = 'confirmPw'
+    confirmPasswordInput.value?.focus()
     return
   }
   if (passwordForm.value.newPw !== passwordForm.value.confirmPw) {
     pwError.value = 'New passwords do not match.'
+    pwErrorField.value = 'confirmPw'
+    confirmPasswordInput.value?.focus()
     return
   }
   if (passwordForm.value.newPw.length < 6) {
     pwError.value = 'New password must be at least 8 characters.'
+    pwErrorField.value = 'newPw'
+    newPasswordInput.value?.focus()
     return
   }
 
@@ -536,12 +709,33 @@ async function handleUpdatePassword() {
     pwSuccess.value = 'Password updated successfully.'
     passwordForm.value = { current: '', newPw: '', confirmPw: '' }
     otpSent.value      = false
+    passwordStep.value = 1
     clearOtpTimer()
     pwOtpCode.value    = ['', '', '', '', '', '']
     setTimeout(() => { pwSuccess.value = '' }, 4000)
   } catch (error) {
     pwError.value = error.message || 'Unable to update password.'
+    const message = pwError.value.toLowerCase()
+    if (message.includes('current password')) {
+      passwordStep.value = 1
+      pwErrorField.value = 'current'
+      currentPasswordInput.value?.focus()
+    } else if (message.includes('new password')) {
+      passwordStep.value = 2
+      pwErrorField.value = 'newPw'
+      newPasswordInput.value?.focus()
+    } else {
+      passwordStep.value = 1
+      pwErrorField.value = 'otp'
+      pwOtpRefs.value[0]?.focus()
+    }
   }
+}
+
+function clearPasswordError(field) {
+  if (pwErrorField.value !== field) return
+  pwError.value = ''
+  pwErrorField.value = ''
 }
 
 onUnmounted(clearOtpTimer)
@@ -737,6 +931,8 @@ function highlightFaqText(text) {
 /* ── Main ── */
 .main {
   flex: 1;
+  container-type: inline-size;
+  container-name: teacher-settings-content;
   padding: 40px 44px 32px;
   overflow-y: auto;
   min-width: 0;
@@ -771,6 +967,57 @@ function highlightFaqText(text) {
   color: #6a7279;
   margin: 6px 0 0;
 }
+
+.settings-page-heading-skeleton { display: grid; justify-items: start; gap: 8px; }
+.settings-skeleton-shimmer { position: relative; display: block; overflow: hidden; background: #e1e6e9; }
+.settings-skeleton-shimmer::after { position: absolute; inset: 0; content: ''; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent); animation: settings-skeleton-shimmer 1.35s ease-in-out infinite; }
+.settings-eyebrow-skeleton { width: 178px; height: 12px; border-radius: 6px; }
+.settings-title-skeleton { width: 300px; max-width: 62vw; height: 46px; border-radius: 10px; }
+.settings-subtitle-skeleton { width: min(570px, 78vw); height: 18px; border-radius: 8px; }
+.settings-loading-skeleton { pointer-events: none; }
+.settings-loading-skeleton.settings-body { gap: 18px; }
+.settings-skeleton-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: stretch; gap: 18px; }
+.settings-skeleton-card { display: flex; min-height: 0; flex-direction: column; gap: 12px; }
+.settings-skeleton-password,
+.settings-skeleton-verification { min-height: 350px; }
+.settings-skeleton-card-heading { display: flex; align-items: center; gap: 12px; min-height: 48px; margin: 0 0 1px; padding-bottom: 12px; border-bottom: 1px solid rgba(129,140,148,.22); }
+.settings-skeleton-icon { width: 42px; height: 42px; flex: 0 0 auto; border-radius: 11px; }
+.settings-skeleton-heading-lines { display: grid; flex: 1; gap: 7px; }
+.settings-skeleton-heading { width: min(210px, 70%); height: 16px; border-radius: 6px; }
+.settings-skeleton-description { width: min(330px, 90%); height: 11px; border-radius: 5px; }
+.settings-skeleton-step-row { display: flex; justify-content: flex-end; margin-top: -2px; }
+.settings-skeleton-step { width: 94px; height: 28px; border-radius: 999px; }
+.settings-skeleton-field { display: grid; gap: 7px; }
+.settings-skeleton-label { width: 112px; height: 12px; border-radius: 5px; }
+.settings-skeleton-otp-label { width: 84px; }
+.settings-skeleton-input { width: 100%; height: 42px; border-radius: 9px; }
+.settings-skeleton-otp-row { display: flex; align-items: stretch; gap: 10px; }
+.settings-skeleton-otp-boxes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; width: min(100%, 287px); }
+.settings-skeleton-otp-box { min-width: 0; height: 42px; border-radius: 10px; }
+.settings-skeleton-send { flex: 1 1 auto; min-width: 105px; height: 42px; border-radius: 10px; }
+.settings-skeleton-button { width: 180px; height: 40px; align-self: center; margin-top: 5px; border-radius: 10px; }
+.settings-skeleton-toggle { width: 62px; height: 32px; flex: 0 0 auto; border-radius: 999px; }
+.settings-skeleton-info { width: 100%; height: 88px; border: 1px solid rgba(112,137,123,.2); border-radius: 12px; background: #e6eeea; }
+.settings-skeleton-help { width: 84%; height: 11px; margin-top: -3px; border-radius: 5px; }
+.settings-skeleton-device-card { min-height: 0; }
+.settings-skeleton-device-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 0; padding-bottom: 12px; border-bottom: 1px solid rgba(129,140,148,.22); }
+.settings-skeleton-device-heading > div { display: grid; flex: 1; gap: 8px; }
+.settings-skeleton-refresh { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 10px; }
+.settings-skeleton-device-row { display: flex; align-items: center; gap: 14px; min-height: 78px; border-bottom: 1px solid rgba(129,140,148,.16); }
+.settings-skeleton-device-icon { width: 42px; height: 42px; flex: 0 0 auto; border-radius: 10px; }
+.settings-skeleton-device-lines { display: grid; flex: 1; gap: 7px; }
+.settings-skeleton-device-name { width: min(290px, 65%); height: 14px; border-radius: 5px; }
+.settings-skeleton-device-meta { width: min(235px, 55%); height: 11px; border-radius: 5px; }
+.settings-skeleton-device-date { width: min(190px, 45%); height: 10px; border-radius: 5px; }
+.settings-skeleton-logout { width: 72px; height: 36px; flex: 0 0 auto; border-radius: 8px; }
+.settings-skeleton-faq { min-height: 0; gap: 10px; }
+.settings-skeleton-faq > .settings-skeleton-heading { margin-bottom: 2px; }
+.settings-skeleton-faq-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 42px; padding: 0 12px; border: 1px solid rgba(133,145,153,.24); border-radius: 9px; background: rgba(255,255,255,.34); }
+.settings-skeleton-faq-row { width: min(440px, 75%); height: 12px; border-radius: 5px; }
+.settings-skeleton-faq-chevron { width: 9px; height: 9px; flex: 0 0 auto; border-right: 2px solid #d4dadd; border-bottom: 2px solid #d4dadd; transform: rotate(45deg) translateY(-2px); }
+.settings-skeleton-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+@keyframes settings-skeleton-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .settings-skeleton-shimmer::after { animation: none; } }
 
 /* ── Settings body ── */
 .settings-body { display: flex; flex-direction: column; gap: 24px; }
@@ -840,6 +1087,14 @@ function highlightFaqText(text) {
 /* eye toggle */
 .pw-input-wrap { position: relative; display: flex; align-items: center; width: min(100%, 350px); }
 .pw-input-wrap .settings-input { width: 100%; padding-right: 54px; }
+.pw-input-wrap.is-invalid .settings-input,
+.pw-input-wrap.is-invalid .settings-input:focus,
+.pw-input-wrap.is-invalid:focus-within .settings-input {
+  border: 1.5px solid #c62835 !important;
+  border-color: #c62835 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(198, 40, 53, .2), 0 3px 10px rgba(160, 35, 45, .12) !important;
+}
 .pw-eye {
   position: absolute;
   top: 50%;
@@ -1077,7 +1332,7 @@ function highlightFaqText(text) {
   border: none;
   padding: 18px 20px;
   font-family: inherit;
-  font-size: 1.03rem;
+  font-size: .9rem;
   font-weight: 600;
   color: #222;
   text-align: left;
@@ -1329,7 +1584,7 @@ function highlightFaqText(text) {
 .settings-body {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  align-items: stretch;
+  align-items: start;
   gap: 18px;
   width: 100%;
 }
@@ -1340,7 +1595,7 @@ function highlightFaqText(text) {
   background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(235,239,242,.9));
   border: 1px solid rgba(133, 145, 153, .42);
   border-radius: 18px;
-  padding: 25px 30px 28px;
+  padding: 18px 22px 20px;
   box-shadow: inset 0 1px rgba(255,255,255,.92), 0 12px 30px rgba(47, 58, 66, .1);
 }
 .settings-card-header {
@@ -1382,6 +1637,51 @@ function highlightFaqText(text) {
   text-transform: uppercase;
 }
 .settings-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 28px; justify-content: start; }
+.settings-row--password {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  row-gap: 0;
+  align-content: start;
+}
+.settings-row--password .settings-group { gap: 2px; margin: 0; }
+.settings-row--password .settings-group + .settings-group { margin-top: -6px; }
+.settings-row--password .settings-group,
+.settings-row--password .pw-input-wrap,
+.settings-row--password .settings-input { width: 100%; min-width: 0; max-width: none; }
+.settings-row--password .pw-input-wrap {
+  box-sizing: border-box;
+  min-height: 42px;
+  border: 1px solid #acb7be;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #f4f5f6, #e5e8ea);
+  box-shadow: inset 0 1px 2px rgba(42, 52, 58, .08), 0 1px rgba(255,255,255,.8);
+  overflow: hidden;
+}
+.settings-row--password .pw-input-wrap:focus-within {
+  border-color: #687780;
+  box-shadow: 0 0 0 3px rgba(90, 105, 114,.13), inset 0 1px 2px rgba(42, 52, 58, .06);
+}
+.settings-row--password .pw-input-wrap .settings-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100%;
+  box-sizing: border-box;
+  border: 0;
+  outline: 0;
+  border-radius: 8px;
+  padding-right: 48px;
+  background: transparent;
+  box-shadow: none;
+  appearance: none;
+}
+.settings-row--password .pw-input-wrap .settings-input:focus { border: 0; box-shadow: none; }
+.settings-row--password .pw-input-wrap.is-invalid {
+  border: 1.5px solid #c62835;
+  box-shadow: 0 0 0 3px rgba(198,40,53,.2), 0 3px 10px rgba(160,35,45,.12);
+}
+.settings-row--password .pw-eye { right: 6px; }
 .settings-row--identity,
 .two-factor-card .settings-row--identity { grid-template-columns: minmax(0, 1fr); row-gap: 8px; }
 .settings-row--identity .settings-group,
@@ -1389,6 +1689,20 @@ function highlightFaqText(text) {
 .settings-row--identity .pw-input-wrap .settings-input { max-width: none; }
 .settings-step-label + .settings-row { margin-top: -10px; }
 .settings-input { background: rgba(255,255,255,.82); border-color: #acb7be; }
+.two-factor-card .settings-card-header,
+.verification-card .settings-card-header { margin-bottom: 10px; }
+.two-factor-card .settings-card-title,
+.verification-card .settings-card-title { font-size: .98rem; }
+.two-factor-card .settings-card-sub,
+.verification-card .settings-card-sub { font-size: .72rem; line-height: 1.35; }
+.two-factor-card .settings-form { gap: 10px; }
+.two-factor-card .settings-label,
+.verification-card .settings-label { font-size: .72rem; }
+.verification-content { gap: 7px; }
+.verification-intro { padding: 10px 12px; }
+.verification-description { margin-top: 6px; font-size: .7rem; line-height: 1.4; }
+.verification-card .verification-password-label { margin-top: 0; }
+.verification-help { font-size: .63rem; }
 .otp-entry-wrap { display: flex; align-items: stretch; gap: 10px; width: 100%; }
 .otp-boxes { display: grid; grid-template-columns: repeat(6, minmax(0, 42px)); gap: 7px; width: min(100%, 287px); }
 .otp-digit {
@@ -1407,6 +1721,14 @@ function highlightFaqText(text) {
   box-shadow: inset 0 1px 2px rgba(42, 52, 58, .08), 0 1px rgba(255,255,255,.8);
 }
 .otp-digit:focus { border-color: #687780; box-shadow: 0 0 0 3px rgba(90, 105, 114, .13); }
+.otp-boxes.is-invalid .otp-digit,
+.otp-boxes.is-invalid .otp-digit:focus {
+  border: 1.5px solid #c62835;
+  color: #a92d35;
+  background: rgba(255, 245, 245, .95);
+  box-shadow: 0 0 0 2px rgba(198, 40, 53, .14), inset 0 1px 2px rgba(42, 52, 58, .08);
+}
+.change-password-field-error { margin: 0; color: #c62835; font-size: .74rem; line-height: 1.4; }
 .send-otp-btn {
   flex: 1 1 auto;
   width: auto;
@@ -1434,15 +1756,29 @@ function highlightFaqText(text) {
   transform: translateY(-1px);
   box-shadow: inset 0 1px rgba(255,255,255,.34), 0 6px 14px rgba(48, 53, 58, .22);
 }
-.settings-form-footer { justify-content: center; }
+.settings-form-footer { justify-content: center; gap: 10px; }
+.password-back-btn {
+  min-width: 96px;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid #aab7be;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .82);
+  color: #53616a;
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.password-back-btn:hover { background: #f1f4f5; border-color: #87949c; }
 .two-factor-card { position: relative; }
-.two-factor-card .settings-card-header { width: 100%; padding-right: 118px; }
+.two-factor-card .settings-card-header { width: 100%; margin-bottom: 9px; padding-bottom: 9px; padding-right: 118px; }
 .two-factor-card .settings-card-header .tfa-control { position: absolute; top: 30px; right: 30px; margin-left: 0; }
 .two-factor-card .tfa-control { display: flex; align-items: center; gap: 10px; }
 .toggle-switch { border: 1px solid #89959d; background: #aeb7bd; }
 .toggle-switch--on { background: linear-gradient(145deg, #78a889, #4e8062); border-color: #47745a; box-shadow: inset 0 1px rgba(255,255,255,.28), 0 3px 9px rgba(57, 105, 75, .22); }
 .verification-card { position: relative; display: flex; flex-direction: column; }
-.verification-card .settings-card-header { align-items: flex-start; min-height: 52px; margin-bottom: 14px; padding-bottom: 12px; padding-right: 118px; }
+.verification-card .settings-card-header { align-items: flex-start; min-height: 44px; margin-bottom: 8px; padding-bottom: 8px; padding-right: 118px; }
 .verification-card .settings-card-header .tfa-control {
   position: absolute;
   top: 22px;
@@ -1456,8 +1792,8 @@ function highlightFaqText(text) {
 .verification-card .tfa-status { min-width: 0; text-align: center; order: 2; }
 .verification-card .settings-card-icon { color: #4b5563; }
 .verification-card-sub { margin: 4px 0 0; max-width: none; }
-.verification-content { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.verification-intro { padding: 13px 14px; border: 1px solid rgba(112, 137, 123, .25); border-radius: 12px; background: rgba(240, 248, 243, .7); }
+.verification-content { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.verification-intro { padding: 9px 11px; border: 1px solid rgba(112, 137, 123, .25); border-radius: 12px; background: rgba(240, 248, 243, .7); }
 .verification-badge { color: #37614b; font-size: .65rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .verification-description { margin: 9px 0 0; color: #5f7067; font-size: .74rem; line-height: 1.55; }
 .verification-password-wrap { position: relative; display: flex; align-items: center; width: 100%; border-radius: 10px; }
@@ -1482,12 +1818,274 @@ function highlightFaqText(text) {
 }
 .settings-faq-section { grid-column: 1 / -1; }
 
+/* Compact the settings cards based on the space left beside the sidebar,
+   which can be narrow even when the preview's outer viewport is desktop-sized. */
+@container teacher-settings-content (max-width: 780px) {
+  .main { padding: 22px 18px 30px; }
+  .main-header { margin-bottom: 18px; }
+  .page-title { font-size: clamp(1.65rem, 5cqw, 2.1rem); }
+  .page-sub { font-size: .84rem; }
+  .settings-body { gap: 14px; }
+  .settings-card { padding: 16px 18px 18px; border-radius: 16px; }
+  .settings-card-header { gap: 10px; }
+  .settings-card-title { font-size: .94rem; }
+  .settings-card-sub { font-size: .69rem; }
+  .verification-card .settings-card-header { gap: 7px; padding-right: 72px; }
+  .verification-card .settings-card-header > div:nth-child(2) { min-width: 0; }
+  .verification-card .settings-card-title { font-size: .72rem; line-height: 1.15; white-space: nowrap; }
+  .verification-card .settings-card-sub { max-width: 145px; font-size: .56rem; line-height: 1.2; }
+  .verification-card .settings-card-header .tfa-control { top: 17px; right: 12px; gap: 2px; }
+  .verification-card .toggle-switch { width: 30px; height: 17px; }
+  .verification-card .toggle-thumb { top: 2px; left: 2px; width: 13px; height: 13px; }
+  .verification-card .toggle-switch--on .toggle-thumb { transform: translateX(13px); }
+  .verification-card .tfa-status { font-size: .52rem; }
+  .verification-intro { padding: 8px 10px; }
+  .verification-description { font-size: .64rem; }
+  .verification-card .settings-label { font-size: .64rem; }
+  .verification-password-wrap .settings-input { min-height: 38px; font-size: .78rem; }
+  .verification-password-wrap .pw-eye svg { width: 14px; height: 14px; }
+  .verification-help,
+  .verification-password-error,
+  .verification-password-success { font-size: .58rem; }
+  .toggle-switch { width: 36px; height: 20px; }
+  .toggle-thumb { top: 2px; left: 2px; width: 16px; height: 16px; }
+  .toggle-switch--on .toggle-thumb { transform: translateX(16px); }
+  .settings-input { min-height: 40px; font-size: .84rem; }
+  .settings-label { font-size: .68rem; }
+  .otp-boxes { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+  .otp-digit { height: 38px; }
+  .send-otp-btn { min-height: 38px; font-size: .74rem; }
+  .update-pw-btn,
+  .password-back-btn { min-height: 36px; padding: 7px 12px; font-size: .72rem; }
+}
+
+/* Keep the verification heading usable when its card sits in a narrow grid column. */
+@container teacher-settings-content (max-width: 980px) {
+  .verification-card .settings-card-header {
+    padding-right: 0;
+    align-items: center;
+  }
+  .verification-card .settings-card-header > div:nth-child(2) {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .verification-card .settings-card-title {
+    white-space: normal;
+    font-size: .88rem;
+    line-height: 1.2;
+  }
+  .verification-card .settings-card-sub {
+    max-width: none;
+    font-size: .68rem;
+    line-height: 1.35;
+  }
+  .verification-card .settings-card-header .tfa-control {
+    position: static;
+    flex: 0 0 auto;
+    margin-left: 4px;
+    gap: 3px;
+  }
+  .verification-card .toggle-switch { width: 34px; height: 19px; }
+  .verification-card .toggle-thumb { top: 2px; left: 2px; width: 15px; height: 15px; }
+  .verification-card .toggle-switch--on .toggle-thumb { transform: translateX(15px); }
+  .verification-card .tfa-status { font-size: .58rem; }
+}
+
+:global(.teacher-settings-alert-popup) {
+  width: min(390px, calc(100vw - 32px)) !important;
+  gap: 0 !important;
+  padding: 14px 18px 12px !important;
+  border: 1px solid rgba(255,255,255,.76) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(145deg, #f0f2f3 0%, #d9dddf 54%, #c4c9cc 100%) !important;
+  box-shadow: 0 18px 42px rgba(35,43,49,.24), inset 0 1px rgba(255,255,255,.9) !important;
+  text-align: center !important;
+}
+:global(.teacher-settings-alert-popup .teacher-settings-alert-icon) {
+  width: 86px !important;
+  height: 86px !important;
+  margin: 0 auto !important;
+  border: 0 !important;
+  color: #43845d !important;
+}
+:global(.teacher-settings-alert-symbol) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 82px;
+  height: 82px;
+  color: #43845d;
+  animation: teacher-settings-alert-pop .35s cubic-bezier(.2,.8,.2,1) both;
+}
+:global(.teacher-settings-alert-symbol svg) { width: 58px; height: 58px; }
+:global(.teacher-settings-alert-popup .teacher-settings-alert-title) {
+  margin: 0 !important;
+  color: #263139 !important;
+  font-size: 1.1rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -.02em !important;
+}
+:global(.teacher-settings-alert-popup .teacher-settings-alert-text) {
+  margin: 0 !important;
+  color: #66737b !important;
+  font-size: .82rem !important;
+  line-height: 1.4 !important;
+}
+:global(.teacher-settings-alert-popup .teacher-settings-alert-confirm) {
+  min-width: 108px !important;
+  margin: 4px 0 0 !important;
+  padding: 6px 18px !important;
+  border: 1px solid #3f4b54 !important;
+  border-radius: 9px !important;
+  background: linear-gradient(145deg, #687780, #3f4b54) !important;
+  color: #fff !important;
+  font-family: inherit !important;
+  font-size: .78rem !important;
+  font-weight: 700 !important;
+  box-shadow: 0 5px 12px rgba(48, 53, 58, .2) !important;
+}
+:global(.teacher-settings-alert-popup .teacher-settings-alert-confirm:hover) {
+  background: linear-gradient(145deg, #75838b, #4a5861) !important;
+}
+@keyframes teacher-settings-alert-pop {
+  0% { opacity: 0; transform: scale(.68); }
+  70% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
 @media (max-width: 800px) {
   .settings-body { grid-template-columns: 1fr; }
+  .settings-skeleton-grid { grid-template-columns: 1fr; }
+  .settings-skeleton-password,
+  .settings-skeleton-verification { min-height: 300px; }
   .settings-row { grid-template-columns: 1fr; }
-  .main { padding: 24px 18px 32px; }
+  .main { padding: 22px 18px 30px; }
+  .main-header { margin-bottom: 18px; }
+  .page-title { font-size: clamp(1.65rem, 5vw, 2.1rem); }
+  .page-sub { max-width: 58ch; font-size: .84rem; }
+  .settings-card { padding: 16px 18px 18px; border-radius: 16px; }
+  .settings-body { gap: 14px; }
+  .settings-card-header { gap: 10px; }
+  .settings-card-title { font-size: .94rem; }
+  .settings-card-sub { font-size: .69rem; }
+  .settings-form { gap: 9px; }
+  .settings-skeleton-card { padding: 16px 18px 18px; }
+  .verification-card .settings-card-header { gap: 7px; padding-right: 74px; }
+  .verification-card .settings-card-header > div:nth-child(2) { min-width: 0; }
+  .verification-card .settings-card-title { font-size: .78rem; line-height: 1.15; white-space: nowrap; }
+  .verification-card .settings-card-sub { max-width: 155px; font-size: .6rem; line-height: 1.25; }
+  .verification-card .settings-card-header .tfa-control { top: 18px; right: 12px; gap: 2px; }
+  .verification-card .toggle-switch { width: 32px; height: 18px; }
+  .verification-card .toggle-thumb { top: 2px; left: 2px; width: 14px; height: 14px; }
+  .verification-card .toggle-switch--on .toggle-thumb { transform: translateX(14px); }
+  .verification-card .tfa-status { font-size: .56rem; }
+  .verification-intro { padding: 8px 10px; }
+  .verification-description { font-size: .68rem; }
+  .settings-input { min-height: 40px; font-size: .86rem; }
+  .otp-boxes { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+  .otp-digit { height: 40px; }
+  .send-otp-btn { min-height: 40px; font-size: .78rem; }
+  .update-pw-btn,
+  .password-back-btn { min-height: 38px; padding: 8px 14px; font-size: .76rem; }
+  .faq-title { font-size: 1.15rem; }
+  .faq-list { gap: 9px; }
+  .faq-question { padding: 12px 14px; font-size: .84rem; }
 }
 @media (max-width: 520px) {
+  .main { padding: 18px 12px 24px; }
+  .main-header { margin-bottom: 14px; }
+  .page-eyebrow { font-size: .62rem; }
+  .page-title { font-size: 1.55rem; }
+  .page-sub { margin-top: 4px; font-size: .76rem; line-height: 1.45; }
+  .settings-card { padding: 13px 14px 15px; border-radius: 14px; }
+  .settings-body { gap: 11px; }
+  .settings-card-header,
+  .two-factor-card .settings-card-header,
+  .verification-card .settings-card-header { gap: 8px; margin-bottom: 8px; padding-bottom: 8px; }
+  .settings-card-icon { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 9px; }
+  .settings-card-icon svg { width: 17px; height: 17px; }
+  .settings-card-title,
+  .two-factor-card .settings-card-title,
+  .verification-card .settings-card-title { font-size: .58rem; line-height: 1.1; white-space: nowrap; }
+  .settings-card-sub,
+  .two-factor-card .settings-card-sub { font-size: .5rem; line-height: 1.2; }
+  .verification-card .settings-card-sub { max-width: 130px; font-size: .46rem; line-height: 1.15; }
+  .verification-card .settings-card-header { min-height: 36px; gap: 5px; padding-right: 62px; }
+  .verification-card .settings-card-header > div:nth-child(2) { min-width: 0; }
+  .verification-card .settings-card-header .tfa-control { top: 12px; right: 10px; gap: 1px; }
+  .verification-card .toggle-switch { width: 30px; height: 17px; }
+  .verification-card .toggle-thumb { top: 2px; left: 2px; width: 13px; height: 13px; }
+  .verification-card .toggle-switch--on .toggle-thumb { transform: translateX(13px); }
+  .verification-card .tfa-status { font-size: .52rem; }
+  .settings-step-label span { padding: 3px 7px; font-size: .58rem; }
+  .settings-label,
+  .two-factor-card .settings-label,
+  .verification-card .settings-label { font-size: .65rem; }
+  .settings-input { min-height: 37px; padding: 8px 36px 8px 10px; font-size: .78rem; }
+  .pw-eye { width: 28px; }
+  .otp-entry-wrap { gap: 7px; }
+  .otp-boxes { gap: 5px; }
+  .otp-digit { height: 36px; border-radius: 8px; font-size: .9rem; }
+  .send-otp-btn { min-height: 36px; font-size: .72rem; }
+  .settings-form-footer { margin-top: 2px; }
+  .update-pw-btn,
+  .password-back-btn { min-height: 35px; padding: 7px 12px; font-size: .7rem; }
+  .verification-intro { padding: 7px 9px; }
+  .verification-badge { font-size: .58rem; }
+  .verification-description { margin-top: 5px; font-size: .64rem; }
+  .verification-help { font-size: .6rem; }
+  .settings-faq-section { gap: 2px; }
+  .faq-header { gap: 8px; margin-bottom: 10px; }
+  .faq-header-icon { width: 32px; height: 32px; border-radius: 9px; }
+  .faq-header-icon svg { width: 18px; height: 18px; }
+  .faq-title { font-size: 1rem; }
+  .faq-category-group + .faq-category-group { margin-top: 16px; }
+  .faq-list { gap: 7px; }
+  .faq-question { gap: 8px; padding: 10px 11px; font-size: .74rem; }
+  .faq-chevron { width: 15px; height: 15px; flex: 0 0 auto; }
+  .faq-bullets { padding-left: 18px; font-size: .7rem; line-height: 1.45; }
+  .faq-answer { padding: 0 11px 11px; }
+  .faq-category-divider { margin-bottom: 7px; font-size: .58rem; }
+  .verification-password-label { font-size: .62rem; line-height: 1.3; }
+  .verification-password-wrap .pw-eye svg { width: 14px; height: 14px; }
+  .verification-password-error,
+  .verification-password-success { font-size: .64rem; }
+  .change-password-field-error { font-size: .64rem; }
+  .otp-expiry { font-size: .62rem; }
+  .settings-msg { padding: 7px 9px; font-size: .68rem; }
+  .settings-skeleton-title { width: min(245px, 62vw); height: 36px; }
+  .settings-skeleton-subtitle { height: 15px; }
+  .settings-skeleton-card { padding: 13px 14px 15px; }
+  .settings-skeleton-password,
+  .settings-skeleton-verification { min-height: 270px; }
+  .settings-skeleton-card-heading { gap: 8px; }
+  .settings-skeleton-icon { width: 34px; height: 34px; }
+  .settings-skeleton-heading { height: 14px; }
+  .settings-skeleton-description { height: 9px; }
+  .settings-skeleton-input { height: 37px; }
+  .settings-skeleton-otp-box { height: 36px; }
+  .settings-skeleton-send { height: 36px; }
+  .settings-skeleton-button { height: 35px; }
+  .settings-skeleton-info { height: 76px; }
+  .settings-skeleton-device-row { gap: 9px; }
+  .settings-skeleton-device-icon { width: 34px; height: 34px; }
+  .settings-skeleton-logout { width: 54px; }
+  .settings-skeleton-otp-row { align-items: stretch; flex-direction: column; }
+  .settings-skeleton-send { width: 100%; }
+  :deep(.device-panel) { padding: 12px; border-radius: 14px; }
+  :deep(.device-panel__header h2) { font-size: .82rem; }
+  :deep(.device-panel__description) { font-size: .64rem; }
+  :deep(.device-refresh) { width: 30px; height: 30px; }
+  :deep(.device-refresh svg) { width: 14px; height: 14px; }
+  :deep(.device-row) { align-items: flex-start; gap: 8px; padding: 10px 0; }
+  :deep(.device-icon) { width: 30px; height: 30px; border-radius: 8px; }
+  :deep(.device-icon svg) { width: 15px; height: 15px; }
+  :deep(.device-name) { gap: 5px; font-size: .68rem; }
+  :deep(.device-current) { padding: 2px 5px; font-size: .54rem; }
+  :deep(.device-meta),
+  :deep(.device-time) { font-size: .6rem; }
+  :deep(.device-logout) { align-self: center; min-height: 28px; padding: 4px 7px; font-size: .6rem; }
+  :deep(.device-message) { font-size: .68rem; }
   .otp-entry-wrap { flex-direction: column; }
   .otp-boxes,
   .send-otp-btn { width: 100%; }

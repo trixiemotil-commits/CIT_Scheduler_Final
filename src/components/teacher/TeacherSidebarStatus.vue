@@ -42,17 +42,15 @@
         <span>Office Hours</span>
         <span :class="['sidebar-status-dot', availabilityDotClass]"></span>
       </div>
-      <div class="sidebar-status-select-wrap">
+      <div :class="['sidebar-status-select-wrap', availabilityDotClass]">
         <select v-model="availabilityChoice" class="sidebar-status-select" aria-label="Office hours availability" @pointerdown="handleOfficeHoursPointerDown">
           <option value="Available" :disabled="!canChangeAvailability">Open for consultations</option>
           <option value="Unavailable" :disabled="!canChangeAvailability">Closed for consultations</option>
         </select>
         <svg class="sidebar-status-select-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
         <svg class="sidebar-status-office-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20 12a8 8 0 1 0-8 8" />
-          <path d="M12 7v4H8" />
-          <rect x="10" y="12" width="11" height="8" rx="1.5" />
-          <path d="M13 12v-1.2A1.8 1.8 0 0 1 14.8 9h1.4a1.8 1.8 0 0 1 1.8 1.8V12M10 15h11" />
+          <rect x="4" y="6" width="16" height="15" rx="2" />
+          <path d="M8 3v6M16 3v6M4 11h16M8 15h3M8 18h5" />
         </svg>
         <div v-if="showCollapsedOfficeModal" class="collapsed-office-modal" role="dialog" aria-label="Office hours" @click.stop>
           <div class="collapsed-status-modal-head">
@@ -256,24 +254,43 @@ async function clockOut() {
     showCancelButton: true,
     confirmButtonText: 'Yes, Clock Out',
     cancelButtonText: 'Stay Clocked In',
-    confirmButtonColor: '#4b5563',
+    showLoaderOnConfirm: true,
+    reverseButtons: true,
+    allowOutsideClick: () => !Swal.isLoading(),
+    preConfirm: async () => {
+      Swal.getConfirmButton().textContent = 'Clocking out...'
+      try {
+        const payload = await apiRequest('/auth/me', {
+          method: 'PUT',
+          body: JSON.stringify({
+            teacher_status: 'On Leave',
+            teacher_availability: 'Unavailable',
+            clockOut: true,
+          }),
+        })
+        return payload.user || {}
+      } catch (err) {
+        Swal.showValidationMessage(err.message || 'Unable to clock out.')
+        return false
+      }
+    },
+    buttonsStyling: false,
+    customClass: {
+      popup: 'teacher-clockout-alert-popup',
+      icon: 'teacher-clockout-alert-icon',
+      title: 'teacher-clockout-alert-title',
+      htmlContainer: 'teacher-clockout-alert-text',
+      actions: 'teacher-clockout-alert-actions',
+      confirmButton: 'teacher-clockout-alert-confirm',
+      cancelButton: 'teacher-clockout-alert-cancel',
+    },
   })
   if (!result.isConfirmed) return
-  teacherStatus.value = 'On Leave'
-  teacherAvailability.value = 'Unavailable'
   try {
-    const payload = await apiRequest('/auth/me', {
-      method: 'PUT',
-      body: JSON.stringify({
-        teacher_status: teacherStatus.value,
-        teacher_availability: teacherAvailability.value,
-        clockOut: true,
-      }),
-    })
-    const updatedUser = saveMergedUser(payload.user || {})
+    const updatedUser = saveMergedUser(result.value || {})
     user.value = updatedUser
-    teacherStatus.value = updatedUser.teacher_status || teacherStatus.value
-    teacherAvailability.value = updatedUser.teacher_availability || teacherAvailability.value
+    teacherStatus.value = updatedUser.teacher_status || 'On Leave'
+    teacherAvailability.value = updatedUser.teacher_availability || 'Unavailable'
     teacherTimeIn.value = updatedUser.teacher_time_in || null
     showMessage('Clocked out.')
   } catch (err) {
@@ -565,6 +582,71 @@ onBeforeUnmount(() => {
   color: #687582;
   font-size: .72rem;
   line-height: 1.35;
+}
+
+:global(.teacher-clockout-alert-popup) {
+  width: min(440px, calc(100vw - 32px)) !important;
+  padding: 20px 24px 18px !important;
+  border: 1px solid rgba(255,255,255,.76) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(145deg, #f0f2f3 0%, #d9dddf 54%, #c4c9cc 100%) !important;
+  box-shadow: 0 18px 42px rgba(35,43,49,.24), inset 0 1px rgba(255,255,255,.9) !important;
+  text-align: center !important;
+}
+:global(.teacher-clockout-alert-popup .teacher-clockout-alert-icon) {
+  width: 66px !important;
+  height: 66px !important;
+  margin: 0 auto 8px !important;
+  border-color: #d79a4b !important;
+  color: #d79a4b !important;
+}
+:global(.teacher-clockout-alert-popup .teacher-clockout-alert-title) {
+  margin: 0 !important;
+  color: #263139 !important;
+  font-size: 1.35rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -.02em !important;
+}
+:global(.teacher-clockout-alert-popup .teacher-clockout-alert-text) {
+  margin: 4px 0 0 !important;
+  color: #59666e !important;
+  font-size: .92rem !important;
+  line-height: 1.5 !important;
+}
+:global(.teacher-clockout-alert-actions) {
+  display: flex !important;
+  width: 100% !important;
+  gap: 10px !important;
+  margin-top: 18px !important;
+}
+:global(.teacher-clockout-alert-popup .teacher-clockout-alert-confirm),
+:global(.teacher-clockout-alert-popup .teacher-clockout-alert-cancel) {
+  min-height: 42px !important;
+  flex: 1 1 0 !important;
+  width: 50% !important;
+  margin: 0 !important;
+  padding: 9px 16px !important;
+  border: 1px solid #3f4b54 !important;
+  border-radius: 9px !important;
+  color: #fff !important;
+  font-family: inherit !important;
+  font-size: .82rem !important;
+  font-weight: 700 !important;
+  box-shadow: 0 5px 12px rgba(48,53,58,.16) !important;
+}
+:global(.teacher-clockout-alert-popup .teacher-clockout-alert-confirm) {
+  border-color: #c77a24 !important;
+  background: linear-gradient(145deg, #f2a43b, #d87918) !important;
+}
+:global(.teacher-clockout-alert-popup .teacher-clockout-alert-cancel) {
+  border-color: #89959d !important;
+  background: linear-gradient(145deg, #687780, #3f4b54) !important;
+}
+:global(.teacher-clockout-alert-popup .teacher-clockout-alert-confirm:hover) {
+  background: linear-gradient(145deg, #f7b451, #df851f) !important;
+}
+:global(.teacher-clockout-alert-popup .teacher-clockout-alert-cancel:hover) {
+  background: linear-gradient(145deg, #75838b, #4a5861) !important;
 }
 
 .sidebar-time-in,

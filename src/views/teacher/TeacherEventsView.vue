@@ -50,23 +50,42 @@
         <div class="events-section-header">
           <div>
             <h2 class="events-section-title">Events overview</h2>
-            <p class="events-section-sub">{{ eventsTab === 'active' ? activeEvents.length : endedEvents.length }} {{ eventsTab === 'active' ? 'active' : 'ended' }} event{{ (eventsTab === 'active' ? activeEvents.length : endedEvents.length) === 1 ? '' : 's' }} shown</p>
+            <p v-if="!isLoading" class="events-section-sub">{{ eventsTab === 'active' ? activeEvents.length : endedEvents.length }} {{ eventsTab === 'active' ? 'active' : 'ended' }} event{{ (eventsTab === 'active' ? activeEvents.length : endedEvents.length) === 1 ? '' : 's' }} shown</p>
+            <div v-else class="event-skeleton-line event-skeleton-summary event-skeleton-shimmer" aria-hidden="true"></div>
           </div>
           <div class="event-summary-counts">
-            <span class="event-summary-count event-summary-count--active"><b>{{ activeEvents.length }}</b><small>Active</small></span>
-            <span class="event-summary-count"><b>{{ endedEvents.length }}</b><small>Ended</small></span>
+            <span v-if="isLoading" class="event-summary-count"><i class="event-skeleton-line event-skeleton-count event-skeleton-shimmer" aria-hidden="true"></i></span>
+            <span v-else class="event-summary-count event-summary-count--active"><b>{{ activeEvents.length }}</b><small>Active</small></span>
+            <span v-if="isLoading" class="event-summary-count"><i class="event-skeleton-line event-skeleton-count event-skeleton-shimmer" aria-hidden="true"></i></span>
+            <span v-else class="event-summary-count"><b>{{ endedEvents.length }}</b><small>Ended</small></span>
           </div>
         </div>
 
         <div class="events-topbar">
           <div class="events-tabs">
-            <button :class="['ev-tab', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active Events <span class="ev-tab-count">{{ activeEvents.length }}</span></button>
-            <button :class="['ev-tab', { active: eventsTab === 'ended' }]" @click="eventsTab = 'ended'">Ended <span class="ev-tab-count">{{ endedEvents.length }}</span></button>
+            <button :class="['ev-tab', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active Events <span v-if="!isLoading" class="ev-tab-count">{{ activeEvents.length }}</span><i v-else class="event-skeleton-line event-skeleton-tab-count event-skeleton-shimmer" aria-hidden="true"></i></button>
+            <button :class="['ev-tab', { active: eventsTab === 'ended' }]" @click="eventsTab = 'ended'">Ended <span v-if="!isLoading" class="ev-tab-count">{{ endedEvents.length }}</span><i v-else class="event-skeleton-line event-skeleton-tab-count event-skeleton-shimmer" aria-hidden="true"></i></button>
           </div>
         </div>
 
       <!-- Events Grid -->
       <div class="events-grid">
+        <template v-if="isLoading">
+          <div v-for="index in 3" :key="`event-skeleton-${index}`" class="event-skeleton-card" aria-hidden="true">
+            <div class="event-skeleton-cover event-skeleton-shimmer"></div>
+            <div class="event-skeleton-content">
+              <div class="event-skeleton-line event-skeleton-badge event-skeleton-shimmer"></div>
+              <div class="event-skeleton-line event-skeleton-title event-skeleton-shimmer"></div>
+              <div class="event-skeleton-line event-skeleton-description event-skeleton-shimmer"></div>
+              <div class="event-skeleton-line event-skeleton-description event-skeleton-description-short event-skeleton-shimmer"></div>
+              <div class="event-skeleton-meta">
+                <div class="event-skeleton-line event-skeleton-meta-item event-skeleton-shimmer"></div>
+                <div class="event-skeleton-line event-skeleton-meta-item event-skeleton-shimmer"></div>
+              </div>
+            </div>
+          </div>
+        </template>
+        <template v-else>
         <div v-for="ev in displayedEvents" :key="ev.id" :class="['event-card', 'event-card--clickable', { 'event-card--ended': eventsTab === 'ended' }]" @click="openViewEvent(ev)">
             <div v-if="ev.image" class="event-card-img-wrap">
               <img :src="ev.image" class="event-card-img" alt="" />
@@ -95,9 +114,13 @@
             </div>
         </div>
         <div v-if="!displayedEvents.length" class="events-empty">
-          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <div class="events-empty-icon">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
           <span>{{ eventsTab === 'active' ? 'No active events have been posted.' : 'No ended events yet.' }}</span>
+          <small>School announcements and activities will appear here.</small>
         </div>
+        </template>
       </div>
       </section>
     </main>
@@ -155,9 +178,6 @@
                 Description
               </div>
               <p class="ev-view-desc">{{ viewEvent.description }}</p>
-            </div>
-            <div class="ev-view-actions">
-              <button class="ev-view-close-btn" @click="showViewModal = false">Close</button>
             </div>
           </div>
         </div>
@@ -438,6 +458,7 @@ function confirmTime() {
 }
 
 const events = ref([])
+const isLoading = ref(true)
 const eventsTab = ref('active')
 const now = ref(new Date())
 const activeEvents = computed(() => events.value.filter(e => e.status === 'active' && !isEventEnded(e)))
@@ -470,11 +491,14 @@ async function eventRequest(path = '', options = {}) {
 }
 
 async function loadEvents() {
+  isLoading.value = true
   try {
     const payload = await eventRequest()
     events.value = Array.isArray(payload.events) ? payload.events : []
   } catch (error) {
     window.alert(error.message)
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -940,44 +964,56 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 
 /* Reference-style event overview */
 .events-section {
+  position: relative;
+  overflow: hidden;
   width: 100%;
-  padding: 18px 26px 24px;
-  border: 1px solid #d4dbe1;
-  border-radius: 20px;
-  background: linear-gradient(145deg, #fbfcfd, #e9edef);
-  box-shadow: 0 12px 30px rgba(51, 65, 85, .1), inset 0 1px #fff;
+  padding: 24px 28px 28px;
+  border: 1px solid rgba(202, 212, 220, .9);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(239,243,245,.94));
+  box-shadow: 0 16px 38px rgba(51, 65, 85, .09), inset 0 1px #fff;
   box-sizing: border-box;
+}
+.events-section::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #374151, #4b5563 55%, #6b7280);
 }
 .events-section-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #d9e0e5;
+  gap: 24px;
+  padding: 2px 0 18px;
+  border-bottom: 1px solid #dce3e7;
 }
-.events-section-title { margin: 0; color: #1f2933; font-size: 1.1rem; font-weight: 750; }
-.events-section-sub { margin: 4px 0 0; color: #7b8790; font-size: .72rem; }
-.event-summary-counts { display: flex; align-items: center; gap: 8px; }
+.events-section-title { margin: 0; color: #202b33; font-size: 1.2rem; font-weight: 750; letter-spacing: -.025em; }
+.events-section-sub { margin: 5px 0 0; color: #75838c; font-size: .78rem; }
+.event-summary-counts { display: flex; align-items: center; gap: 10px; }
 .event-summary-count {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 7px;
-  min-width: 70px;
-  justify-content: center;
-  padding: 7px 10px;
-  border: 1px solid #d9e1e6;
-  border-radius: 10px;
-  background: #f8fafb;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 82px;
+  justify-content: flex-start;
+  padding: 9px 12px;
+  border: 1px solid #dce4e8;
+  border-radius: 12px;
+  background: rgba(255,255,255,.72);
   color: #52616b;
+  box-shadow: 0 2px 5px rgba(45,58,66,.035);
 }
-.event-summary-count b { font-size: .9rem; }
-.event-summary-count small { font-size: .62rem; font-weight: 700; }
-.event-summary-count--active { border-color: #c7e6d4; color: #28744d; background: #f2fbf5; }
+.event-summary-count b { font-size: 1rem; line-height: 1; }
+.event-summary-count small { font-size: .68rem; font-weight: 700; }
+.event-summary-count--active { border-color: #c7e6d4; color: #28744d; background: linear-gradient(145deg, #f4fcf7, #eaf7ef); }
 .event-summary-count--archived { border-color: #eadab7; color: #876526; background: #fffaf0; }
-.events-section .events-topbar { margin: 15px 0 18px; }
-.events-section .ev-tab { padding: 8px 12px; border: 1px solid #d9e1e6; background: #f8fafb; color: #60707b; font-size: .72rem; }
-.events-section .ev-tab.active { border-color: #465761; background: #465761; color: #fff; box-shadow: 0 4px 10px rgba(45, 58, 66, .18); }
+.events-section .events-topbar { display: flex; align-items: center; margin: 16px 0 18px; }
+.events-section .events-tabs { display: inline-flex; gap: 5px; padding: 4px; border: 1px solid #dfe5e9; border-radius: 13px; background: #edf1f3; }
+.events-section .ev-tab { padding: 8px 13px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #66747d; font-size: .74rem; font-weight: 650; transition: background .18s ease, box-shadow .18s ease, color .18s ease; }
+.events-section .ev-tab:hover:not(.active) { background: rgba(255,255,255,.72); color: #34434b; }
+.events-section .ev-tab.active { border-color: #465761; background: #465761; color: #fff; box-shadow: 0 3px 8px rgba(45, 58, 66, .17); }
 .events-section .ev-tab-count { padding: 1px 6px; background: rgba(255,255,255,.9); color: #52616b; font-size: .62rem; }
 .events-section .ev-tab.active .ev-tab-count { color: #465761; }
 .events-grid { display: flex; flex-direction: column; gap: 16px; }
@@ -1013,18 +1049,94 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 .event-card-default-cover span { font-size: 2rem; font-weight: 800; }
 .event-card-default-cover small { margin-top: 5px; font-size: .55rem; font-weight: 750; letter-spacing: .12em; }
 .events-section .event-badge { font-size: .61rem; padding: 4px 10px; }
+.events-empty {
+  min-height: 250px;
+  box-sizing: border-box;
+  padding: 38px 20px;
+  gap: 10px;
+  border: 1px dashed #d5dfe4;
+  border-radius: 17px;
+  background: linear-gradient(145deg, rgba(255,255,255,.58), rgba(245,248,249,.78));
+  color: #52616b;
+}
+.events-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 3px;
+  border: 1px solid #dfe7eb;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #fff, #edf2f4);
+  color: #72838d;
+  box-shadow: 0 5px 14px rgba(51,65,85,.07), inset 0 1px #fff;
+}
+.events-empty span { color: #465761; font-size: .9rem; font-weight: 650; }
+.events-empty small { color: #87949b; font-size: .73rem; text-align: center; }
+
+.event-skeleton-card {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  column-gap: 17px;
+  min-height: 168px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 17px;
+  background: linear-gradient(145deg, #f9fafb, #e2e6e9);
+  box-shadow: 0 7px 18px rgba(51,65,85,.08), inset 0 1px #fff;
+}
+.event-skeleton-cover {
+  width: 190px;
+  height: 168px;
+}
+.event-skeleton-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 17px 16px 14px 0;
+}
+.event-skeleton-line {
+  display: block;
+  border-radius: 999px;
+  background: linear-gradient(100deg, #dfe4e7 20%, #f5f7f8 42%, #dfe4e7 64%);
+  background-size: 220% 100%;
+}
+.event-skeleton-shimmer { animation: event-skeleton-shimmer 1.45s ease-in-out infinite; }
+.event-skeleton-summary { width: 112px; height: 11px; margin-top: 8px; }
+.event-skeleton-count { width: 30px; height: 14px; }
+.event-skeleton-tab-count { width: 22px; height: 18px; border-radius: 20px; vertical-align: middle; }
+.event-skeleton-badge { width: 78px; height: 19px; }
+.event-skeleton-title { width: min(52%, 250px); height: 17px; margin-top: 1px; }
+.event-skeleton-description { width: min(90%, 500px); height: 11px; border-radius: 6px; }
+.event-skeleton-description-short { width: min(62%, 340px); }
+.event-skeleton-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+.event-skeleton-meta-item { width: 112px; height: 25px; border-radius: 999px; }
+@keyframes event-skeleton-shimmer { to { background-position: -220% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .event-skeleton-shimmer { animation: none; }
+}
 
 @media (max-width: 700px) {
-  .events-section { padding: 16px 14px 18px; }
+  .events-section { padding: 20px 14px 16px; border-radius: 18px; }
   .events-section-header { flex-direction: column; }
+  .events-section-header { align-items: stretch; gap: 14px; }
   .event-summary-counts { width: 100%; }
   .event-summary-count { flex: 1; }
+  .events-section .events-topbar { margin: 14px 0; }
+  .events-section .events-tabs { width: 100%; }
+  .events-section .ev-tab { flex: 1; padding-inline: 8px; }
+  .events-empty { min-height: 210px; padding: 28px 14px; }
   .events-section .event-card { grid-template-columns: 112px minmax(0, 1fr); min-height: 132px; column-gap: 12px; padding-right: 10px; }
   .events-section .event-card-img-wrap,
   .events-section .event-card-default-cover { width: 112px; height: 132px; }
   .events-section .event-card-title { font-size: .82rem; }
   .events-section .event-card-desc { font-size: .68rem; }
   .events-section .event-meta-item { font-size: .58rem; }
+  .event-skeleton-card { grid-template-columns: 112px minmax(0, 1fr); min-height: 132px; column-gap: 12px; }
+  .event-skeleton-cover { width: 112px; height: 132px; }
+  .event-skeleton-content { gap: 8px; padding: 13px 10px 10px 0; }
+  .event-skeleton-meta-item { width: 84px; height: 22px; }
 }
 
 /* ═══ VIEW EVENT MODAL ═══ */
@@ -1163,28 +1275,6 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 }
 .ev-view-desc { font-size: 0.92rem; color: #444; line-height: 1.7; margin: 0; }
 
-.ev-view-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 6px;
-  border-top: 1.5px solid #f0f0f0;
-  margin-top: 2px;
-}
-.ev-view-close-btn {
-  background: none;
-  border: 1.5px solid #e0e0e0;
-  font-family: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #666;
-  cursor: pointer;
-  padding: 10px 22px;
-  border-radius: 10px;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.ev-view-close-btn:hover { background: #f5f5f5; border-color: #bbb; color: #333; }
 .ev-view-edit-btn {
   display: flex;
   align-items: center;

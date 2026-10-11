@@ -1641,11 +1641,31 @@ body,
   height: 28px;
   padding: 0;
   font-size: 0;
-  border-radius: 8px;
+  border-radius: 0;
   border-color: transparent;
   background: transparent;
-  color: #59656d;
+  color: #171a1c;
   box-shadow: none;
+}
+.teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-button::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -6px;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(255,255,255,.95);
+  border-radius: 50%;
+  background: #40916c;
+  box-shadow: 0 0 0 1px rgba(41, 57, 48, .18);
+}
+.teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-button:disabled::after { background: #98a2b3; }
+.teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-button:disabled {
+  opacity: 1;
+  background: transparent;
+  border-color: transparent;
+  color: #171a1c;
+  cursor: pointer;
 }
 .teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-button::before { content: none; }
 .teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-clock-icon {
@@ -1657,6 +1677,9 @@ body,
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 .teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-button span { display: none; }
 .teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-button:hover:not(:disabled) {
@@ -1692,6 +1715,15 @@ body,
   display: block !important;
 }
 .teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-select-wrap { width: 34px; margin: 0 auto; }
+.teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-select-wrap {
+  height: 28px;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+}
+.teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-select-wrap:hover {
+  background: transparent;
+}
 .teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-select-wrap,
 .teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-select,
 .teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-office-icon {
@@ -1717,13 +1749,29 @@ body,
   width: 24px;
   height: 24px;
   fill: none;
-  stroke: #59656d;
+  stroke: #171a1c;
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: none;
   transform: translate(-50%, -50%);
 }
+.teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-select-wrap::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -6px;
+  z-index: 2;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(255,255,255,.95);
+  border-radius: 50%;
+  background: #40916c;
+  box-shadow: 0 0 0 1px rgba(41, 57, 48, .18);
+  pointer-events: none;
+}
+.teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-select-wrap.is-on-leave::after { background: #e63946; }
+.teacher-sidebar-collapsed .teacher-sidebar .sidebar-status-select-wrap.is-offline::after { background: #98a2b3; }
 
 .teacher-sidebar-collapsed .teacher-sidebar .nav-item {
   min-height: 48px !important;
