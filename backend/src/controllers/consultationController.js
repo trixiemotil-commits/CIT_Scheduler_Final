@@ -428,9 +428,14 @@ async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTea
     return "Offline";
   }
 
+  const adminStatus = String(userDoc.teacher_admin_status || "").trim();
+  if (adminStatus === "On Leave") return "On Leave";
+  if (adminStatus === "Offline") return "Offline";
   if (userDoc.teacher_clocked_out) {
     return "Offline";
   }
+
+  if (adminStatus === "On Meeting") return "On Meeting";
 
   const configuredStatus = String(userDoc.teacher_status || "").trim();
   if (configuredStatus === "On Leave") {
@@ -439,6 +444,7 @@ async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTea
   if (allTeachersOnEvent || eventTeacherIds.has(String(userDoc._id))) {
     return "On Event";
   }
+  if (adminStatus === "On School") return "On School";
   if (["On School", "On Meeting", "On Leave"].includes(configuredStatus)) {
     return configuredStatus;
   }
@@ -736,7 +742,7 @@ async function listTeachersForStudents(req, res) {
       : { year: "", section: "" };
 
     const teacherUsers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
-      .select("role roles firstName lastName employeeId department account_status teacher_status teacher_time_in teacher_clocked_out teacher_status_expires_at teacher_availability avatar")
+      .select("role roles firstName lastName employeeId department account_status teacher_status teacher_admin_status teacher_time_in teacher_clocked_out teacher_status_expires_at teacher_availability avatar")
       .lean();
     const activeAcademicTermId = await getActiveAcademicTermReference();
     const { activeEventTeacherIds, allTeachersOnEvent } = await getActiveEventTeacherContext();
