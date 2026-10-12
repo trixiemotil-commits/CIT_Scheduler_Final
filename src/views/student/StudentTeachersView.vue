@@ -52,7 +52,7 @@
           <strong>{{ selectedTeacher.name }}</strong>
           <span>{{ bookingTeacherType }}</span>
         </div>
-        <span :class="['status-pill', statusClass(selectedTeacher.status)]">{{ teacherStatusLabel(selectedTeacher.status) }}</span>
+        <span :class="['status-pill', statusClass(selectedTeacher.statusDisplay || selectedTeacher.status)]">{{ teacherDisplayStatus(selectedTeacher) }}</span>
       </div>
 
       <div class="field-group">
@@ -178,7 +178,7 @@
                 <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
               </div>
             </div>
-            <span :class="['status-pill', statusClass(t.status)]">{{ teacherStatusLabel(t.status) }}</span>
+            <span :class="['status-pill', statusClass(t.statusDisplay || t.status)]">{{ teacherDisplayStatus(t) }}</span>
           </div>
           <div v-if="t.isSubjectTeacher && t.status === 'In School' && t.consultationSlots.length" class="consultation-hours">
             <div class="hours-label">
@@ -217,7 +217,7 @@
               <span class="stars">★★★★</span>
               <span class="rating">{{ selectedTeacher?.rating }} ({{ selectedTeacher?.reviews }} reviews)</span>
             </div>
-            <span :class="['status-pill', statusClass(selectedTeacher?.status)]" style="margin-top:8px">{{ selectedTeacher?.status }}</span>
+            <span :class="['status-pill', statusClass(selectedTeacher?.statusDisplay || selectedTeacher?.status)]" style="margin-top:8px">{{ teacherDisplayStatus(selectedTeacher) }}</span>
             <div :class="['consultation-availability', selectedTeacher?.available ? 'is-open' : 'is-closed']">
               <span class="consultation-availability-dot" aria-hidden="true"></span>
               {{ consultationAvailabilityLabel(selectedTeacher) }}
@@ -317,6 +317,10 @@ function teacherStatusLabel(status) {
   return status === 'In School' ? 'On School' : status
 }
 
+function teacherDisplayStatus(teacher) {
+  return teacher?.statusDisplay || teacherStatusLabel(teacher?.status)
+}
+
 function isAvailableTeacher(teacher) {
   return Boolean(teacher?.available)
 }
@@ -326,6 +330,7 @@ function consultationAvailabilityLabel(teacher) {
 }
 
 function canBookTeacher(teacher) {
+  if (['On School - In Class', 'Off Campus'].includes(teacherDisplayStatus(teacher))) return false
   if (!teacher?.available) return false
   if (!teacher?.isSubjectTeacher) return true
   return Boolean(teacher.consultationSlots?.length)
@@ -451,10 +456,14 @@ function mapTeacher(teacher) {
 
   const hasSlots = consultationSlots.length > 0
   const statusAllowsConsultation = resolvedStatus === 'In School'
+  const scheduleAllowsConsultation = !['On School - In Class', 'Off Campus'].includes(
+    teacher.statusDisplay || teacher.status_display || ''
+  )
   const availabilityAllowsConsultation = typeof teacher.available === 'boolean'
     ? teacher.available
     : teacherAvailability.toLowerCase() !== 'unavailable'
   const isAvailable = statusAllowsConsultation
+    && scheduleAllowsConsultation
     && availabilityAllowsConsultation
 
   return {
@@ -466,6 +475,7 @@ function mapTeacher(teacher) {
     initials: initialsFor(teacher.name),
     color: colorForName(teacher.name),
     status: resolvedStatus,
+    statusDisplay: teacher.statusDisplay || teacher.status_display || '',
     available: isAvailable,
     hasConsultationSlots: hasSlots,
     tags: resolvedSubjects.slice(0, 3),
@@ -619,7 +629,10 @@ function hiddenSubjectCount(teacher) {
 }
 
 function statusClass(s) {
+  if (s === 'On School - In Class') return 'pill-green'
+  if (s === 'Off Campus') return 'pill-yellow'
   return {
+    'On School': 'pill-green',
     'In School': 'pill-green',
     'On Meeting': 'pill-yellow',
     'On Event': 'pill-blue',
@@ -1059,12 +1072,20 @@ onUnmounted(() => {
   line-height: 1.2;
 }
 .status-pill {
-  font-size: 0.68rem; font-weight: 700;
-  padding: 5px 9px; border-radius: 8px;
-  max-width: 88px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap; flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 42%;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  flex: 0 1 auto;
 }
 .pill-green  { background: #e0f2e7; color: #287344; }
 .pill-orange { background: #fff3e0; color: #b35e00; }
@@ -1182,7 +1203,7 @@ onUnmounted(() => {
 .teacher-type-pill { margin-top: 6px; padding: 4px 9px; border-radius: 999px; background: #e1e7ed !important; color: #4b6784 !important; }
 .teacher-type-pill.available { background: #fff1c2 !important; color: #735900 !important; }
 .subject-chip { border-color: #cdd4d9; border-radius: 999px; background: rgba(245,247,247,.7); color: #56616b; }
-.status-pill { border: 1px solid rgba(255,255,255,.7); border-radius: 999px; padding: 6px 10px; }
+.status-pill { border: 1px solid rgba(255,255,255,.7); border-radius: 999px; padding: 6px 9px; }
 .pill-green { background: #e0eee5; color: #397051; }
 .pill-gray { background: #e3e6e8; color: #68727a; }
 .consultation-hours { border-color: #cbded2; border-radius: 14px; background: #edf6f0; }
@@ -1366,6 +1387,7 @@ onUnmounted(() => {
   border-radius: 14px;
   background: linear-gradient(145deg, #fafafa 0%, #e8eaeb 100%);
 }
+.booking-selected-teacher .status-pill { max-width: 42%; }
 
 .booking-selected-teacher .teacher-avatar {
   flex: 0 0 44px;

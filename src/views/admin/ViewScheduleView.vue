@@ -167,9 +167,8 @@
               </div>
             </div>
           </div>
-          <div v-if="loading" class="loading-state">
-            <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
-            Loading schedule…
+          <div v-if="loading" class="sched-grid-wrap schedule-skeleton-wrap" aria-hidden="true">
+            <div class="current-schedule-skeleton"><div class="current-schedule-skeleton-head"><i v-for="day in 7" :key="`room-head-${day}`"></i></div><div v-for="slot in timeSlots30" :key="`room-row-${slot}`" class="current-schedule-skeleton-row"><i class="time"></i><i v-for="day in 6" :key="`room-cell-${slot}-${day}`" :class="{ block: (timeSlots30.indexOf(slot) + day * 2) % 6 === 0 }"></i></div></div>
           </div>
           <div v-else-if="roomHasNoEntries" class="empty-state">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -177,7 +176,7 @@
           </div>
           <div v-else class="sched-grid-wrap">
             <table class="sched-grid">
-              <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day" :class="{ 'current-day-header': day === highlightedTeacherDay }">{{ day }}</th></tr></thead>
+              <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day">{{ day }}</th></tr></thead>
               <tbody>
                 <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
                   <td class="td-time">{{ slot }}</td>
@@ -253,11 +252,13 @@
               </div>
             </div>
           </div>
-          <div v-if="loading" class="loading-state">Loading schedule…</div>
+          <div v-if="loading" class="sched-grid-wrap schedule-skeleton-wrap" aria-hidden="true">
+            <div class="current-schedule-skeleton"><div class="current-schedule-skeleton-head"><i v-for="day in 7" :key="`student-head-${day}`"></i></div><div v-for="slot in timeSlots30" :key="`student-row-${slot}`" class="current-schedule-skeleton-row"><i class="time"></i><i v-for="day in 6" :key="`student-cell-${slot}-${day}`" :class="{ block: (timeSlots30.indexOf(slot) + day) % 5 === 0 }"></i></div></div>
+          </div>
           <div v-else-if="studentHasNoEntries" class="empty-state"><p>No schedules found for <strong>{{ selectedStudentYear }} · {{ selectedStudentSection }}</strong>.</p></div>
           <div v-else class="sched-grid-wrap">
             <table class="sched-grid">
-              <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day">{{ day }}</th></tr></thead>
+              <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day" :class="{ 'current-day-header': day === highlightedTeacherDay }">{{ day }}</th></tr></thead>
               <tbody>
                 <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
                   <td class="td-time">{{ slot }}</td>
@@ -342,9 +343,8 @@
               </div>
             </div>
           </div>
-          <div v-if="loading" class="loading-state">
-            <svg class="spin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity=".2"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
-            Loading schedule…
+          <div v-if="loading" class="sched-grid-wrap schedule-skeleton-wrap" aria-hidden="true">
+            <div class="current-schedule-skeleton"><div class="current-schedule-skeleton-head"><i v-for="day in 7" :key="`teacher-head-${day}`"></i></div><div v-for="slot in timeSlots30" :key="`teacher-row-${slot}`" class="current-schedule-skeleton-row"><i class="time"></i><i v-for="day in 6" :key="`teacher-cell-${slot}-${day}`" :class="{ block: (timeSlots30.indexOf(slot) + day * 2) % 5 === 0 }"></i></div></div>
           </div>
           <div v-else-if="teacherHasNoEntries" class="empty-state">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -352,7 +352,7 @@
           </div>
           <div v-else class="sched-grid-wrap">
             <table class="sched-grid">
-              <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day">{{ day }}</th></tr></thead>
+              <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day" :class="{ 'current-day-header': day === highlightedTeacherDay }">{{ day }}</th></tr></thead>
               <tbody>
                 <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
                   <td class="td-time">{{ slot }}</td>
@@ -613,7 +613,7 @@ const timeSlots30 = timeOptions
 
 const showLogoutModal = ref(false)
 const selectedScheduleEntries = ref([])
-const loading = ref(false)
+const loading = ref(true)
 const consultationSlots = ref([])
 
 const selectedScheduleEntry = computed(() => selectedScheduleEntries.value[0] || null)
@@ -2161,6 +2161,19 @@ function printSchedule() {
   border-radius: 0 0 17px 17px;
   box-shadow: none;
 }
+.schedule-skeleton-wrap { display: block; }
+.current-schedule-skeleton { min-width: 800px; overflow: hidden; border: 1px solid #ccd4d9; border-radius: 12px; background: #fff; }
+.current-schedule-skeleton-head,
+.current-schedule-skeleton-row { display: grid; grid-template-columns: 90px repeat(6, minmax(0, 1fr)); }
+.current-schedule-skeleton-head { height: 48px; background: #424c55; }
+.current-schedule-skeleton-head i { width: 54%; height: 13px; margin: 16px auto; border-radius: 6px; background: rgba(255,255,255,.2); }
+.current-schedule-skeleton-row { height: 44px; }
+.current-schedule-skeleton-row > i { position: relative; overflow: hidden; margin: 1px; background: #f7f8f9; }
+.current-schedule-skeleton-row > i.time { background: #edf0f2; }
+.current-schedule-skeleton-row > i.block { margin: 3px; border-radius: 8px; background: #ead18a; }
+.current-schedule-skeleton-row > i::after { position: absolute; inset: 0; content: ''; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.64), transparent); animation: current-schedule-skeleton-shimmer 1.35s ease-in-out infinite; }
+@keyframes current-schedule-skeleton-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .current-schedule-skeleton-row > i::after { animation: none; } }
 .schedule-card--student .sched-grid-wrap {
   flex: 0 0 auto;
   overflow-x: auto;
@@ -2197,7 +2210,7 @@ function printSchedule() {
 }
 .sched-grid th.current-day-header {
   position: sticky;
-  background: #424c55;
+  background: linear-gradient(145deg, #3d5f80, #304c68);
   box-shadow: none;
 }
 .sched-grid th.current-day-header::before {
@@ -2205,11 +2218,23 @@ function printSchedule() {
   position: absolute;
   z-index: 2;
   pointer-events: none;
-  inset: -2px -1px -1px;
-  border: 2px solid #8f9aa2;
-  border-bottom-color: #aeb7bd;
-  box-shadow: 0 0 10px rgba(43, 53, 61, .34), inset 0 0 7px rgba(255,255,255,.18);
-  animation: currentDayFramePulse 1.05s ease-in-out .25s 3 both;
+  inset: 0 0 auto;
+  height: 3px;
+  background: #9dc5f2;
+}
+.sched-grid th.current-day-header::after {
+  content: 'TODAY';
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  padding: 3px 5px;
+  border: 1px solid rgba(198, 222, 250, .34);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .12);
+  color: #dcecff;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: .08em;
 }
 .sched-grid thead th:first-child {
   border-radius: 12px 0 0;
@@ -2265,37 +2290,25 @@ function printSchedule() {
   transition: background 0.15s ease;
 }
 .td-cell.current-day-cell {
-  box-shadow: none;
+  background-color: #f0f5fb;
 }
 .td-cell.current-day-cell::after {
   content: '';
   position: absolute;
   z-index: 6;
   pointer-events: none;
-  top: -2px;
+  top: -1px;
   right: -1px;
-  bottom: -2px;
+  bottom: -1px;
   left: -1px;
-  border-left: 2px solid #8f9aa2;
-  border-right: 2px solid #8f9aa2;
-  box-shadow: inset 1px 0 rgba(255,255,255,.48), inset -1px 0 rgba(255,255,255,.48), 0 0 7px rgba(49, 60, 68, .18);
-  animation: currentDayFramePulse 1.05s ease-in-out .25s 3 both;
+  border-left: 1px solid rgba(77, 126, 180, .38);
+  border-right: 1px solid rgba(77, 126, 180, .38);
+  box-shadow: inset 1px 0 rgba(255,255,255,.58), inset -1px 0 rgba(255,255,255,.58);
 }
 .sched-grid tbody tr:last-child .td-cell.current-day-cell {
   box-shadow: none;
 }
-.sched-grid tbody tr:last-child .td-cell.current-day-cell::after { border-bottom: 2px solid #8f9aa2; }
-.td-cell.current-day-cell .sched-entry {
-  animation: currentDayEntryPulse 1.05s ease-in-out .25s 3 both;
-}
-@keyframes currentDayFramePulse {
-  0%, 100% { border-color: #8f9aa2; opacity: 1; box-shadow: inset 1px 0 rgba(255,255,255,.48), inset -1px 0 rgba(255,255,255,.48), 0 0 7px rgba(49, 60, 68, .18); }
-  50% { border-color: #d2d9dd; opacity: 1; box-shadow: inset 1px 0 rgba(255,255,255,.8), inset -1px 0 rgba(255,255,255,.8), 0 0 18px rgba(54, 66, 74, .48); }
-}
-@keyframes currentDayEntryPulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 3px 8px rgba(30,39,44,.14); }
-  50% { transform: scale(1.012); box-shadow: 0 0 0 2px rgba(202, 211, 216, .85), 0 8px 18px rgba(45, 55, 63, .25); }
-}
+.sched-grid tbody tr:last-child .td-cell.current-day-cell::after { border-bottom: 1px solid rgba(77, 126, 180, .38); }
 .td-cell.has-entry { padding: 0; }
 .time-row:hover .td-time {
   background: #f7f8f9;

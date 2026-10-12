@@ -56,10 +56,13 @@
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <span v-if="unreadNotifs.length" class="notif-dot"></span>
+            <Transition name="notif-badge-pop">
+              <span v-if="unreadNotifs.length" :key="unreadNotifs.length" class="notif-dot" :aria-label="`${unreadNotifs.length} unread notifications`">{{ unreadNotifs.length > 99 ? '99+' : unreadNotifs.length }}</span>
+            </Transition>
           </button>
 
           <!-- Notification Dropdown -->
+          <Transition name="notif-panel">
           <div v-if="showNotif" class="notif-panel">
             <div class="notif-panel-header">
               <div>
@@ -77,7 +80,12 @@
             </div>
 
             <div class="notif-list-wrap">
-              <div v-if="notificationsLoading" class="notif-empty">Loading notifications...</div>
+              <div v-if="notificationsLoading" class="notif-skeleton-list" aria-hidden="true">
+                <div v-for="index in 5" :key="`notification-skeleton-${index}`" class="notif-skeleton-item" aria-hidden="true">
+                  <i class="notif-skeleton-avatar"></i>
+                  <span class="notif-skeleton-copy"><i></i><i></i><i></i></span>
+                </div>
+              </div>
 
               <template v-else>
                 <!-- New section -->
@@ -119,6 +127,7 @@
               </template>
             </div>
           </div>
+          </Transition>
 
           <section v-if="showNotif && selectedNotification" class="notification-preview" :style="notificationPreviewStyle" role="dialog" aria-label="Notification details">
             <button type="button" class="notification-preview-close" aria-label="Close notification details" @click="selectedNotification = null">×</button>
@@ -164,6 +173,50 @@
 
       <!-- ── Dashboard Content ── -->
 
+      <!-- Keep the page title visible while dashboard data loads. -->
+      <div v-if="dashboardLoading" class="dashboard-skeleton" role="status" aria-label="Loading dashboard">
+        <span class="sr-only">Loading dashboard content…</span>
+        <section class="stat-cards" aria-hidden="true">
+          <div v-for="index in 4" :key="`stat-skeleton-${index}`" class="stat-card skeleton-stat-card">
+            <div class="skeleton-line skeleton-stat-label"></div>
+            <div class="skeleton-line skeleton-stat-icon"></div>
+            <div class="skeleton-line skeleton-stat-value"></div>
+            <div class="skeleton-line skeleton-stat-sub"></div>
+          </div>
+        </section>
+        <section class="today-teachers-section skeleton-panel" aria-hidden="true">
+          <div class="skeleton-live-header">
+            <div class="skeleton-line skeleton-section-eyebrow"></div>
+            <div class="skeleton-line skeleton-section-title"></div>
+            <div class="skeleton-line skeleton-section-meta"></div>
+          </div>
+          <div class="skeleton-live-schedule">
+            <div class="skeleton-schedule-row">
+              <div v-for="index in 4" :key="`schedule-skeleton-${index}`" class="skeleton-schedule-card">
+                <div class="skeleton-teacher-heading">
+                  <div class="skeleton-line skeleton-teacher-avatar"></div>
+                  <div class="skeleton-line skeleton-teacher-name"></div>
+                </div>
+                <div class="skeleton-class-row">
+                  <div class="skeleton-line"></div><div class="skeleton-line short"></div>
+                </div>
+                <div class="skeleton-class-row">
+                  <div class="skeleton-line"></div><div class="skeleton-line short"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="charts-row" aria-hidden="true">
+          <div v-for="index in 2" :key="`chart-skeleton-${index}`" class="chart-card skeleton-chart-card">
+            <div class="skeleton-line skeleton-chart-title"></div>
+            <div class="skeleton-line skeleton-chart-caption"></div>
+            <div class="skeleton-chart-area"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </section>
+      </div>
+
+      <template v-else>
       <!-- Stat Cards -->
       <section class="stat-cards">
         <div class="stat-card" v-for="stat in stats" :key="stat.label">
@@ -184,7 +237,11 @@
             <p>{{ todayDateLabel }} <span>Updated {{ currentTimeLabel }}</span></p>
           </div>
           <div class="today-carousel-controls" v-if="todayTeachers.length > teachersPerSlide">
-            <span><i :class="{ 'is-paused': carouselAutoStopped }"></i> {{ carouselAutoStopped ? 'Paused · drag to browse' : 'Auto-sliding · swipe to pause' }}</span>
+            <span class="today-carousel-status" :class="{ 'is-paused': carouselAutoStopped }">
+              <i></i>
+              <strong>{{ carouselAutoStopped ? 'Paused' : 'Auto-sliding' }}</strong>
+              <span class="today-carousel-hint">{{ carouselAutoStopped ? 'Drag to browse' : 'Swipe to pause' }}</span>
+            </span>
             <template v-if="carouselAutoStopped">
               <button type="button" aria-label="Previous teachers" @pointerdown.stop @click.stop="previousTodayTeachers">‹</button>
               <button type="button" aria-label="Next teachers" @pointerdown.stop @click.stop="nextTodayTeachers">›</button>
@@ -192,10 +249,16 @@
           </div>
         </div>
 
-        <div
-          v-if="todayScheduleLoading"
-          class="today-teachers-loading"
-        >Loading today’s teaching schedule…</div>
+        <div v-if="todayScheduleLoading" class="today-schedule-loading-skeleton" aria-hidden="true">
+          <div v-for="index in 4" :key="`today-loading-${index}`" class="today-schedule-loading-card">
+            <div class="today-schedule-loading-heading">
+              <span class="today-schedule-loading-avatar"></span>
+              <span class="today-schedule-loading-name"></span>
+            </div>
+            <div class="today-schedule-loading-class"><i></i><i></i></div>
+            <div class="today-schedule-loading-class"><i></i><i></i></div>
+          </div>
+        </div>
         <div
           v-else-if="todayTeachers.length"
           ref="todayScheduleWrap"
@@ -291,10 +354,13 @@
             </div>
           </div>
           <div class="chart-wrap" :class="{ 'is-loading': isConsultationLoading }">
-            <div v-if="isConsultationLoading" class="chart-loading-overlay" role="status">
-              <span class="chart-loading-spinner" aria-hidden="true"></span>
-              <strong>Loading consultation trends</strong>
-              <span>Fetching the latest consultation activity…</span>
+            <div v-if="isConsultationLoading" class="chart-skeleton" role="status" aria-label="Loading consultation trends">
+              <span class="sr-only">Loading consultation trends…</span>
+              <div class="chart-skeleton-grid"></div>
+              <div class="chart-skeleton-line">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+              <div class="chart-skeleton-axis"><i v-for="index in 7" :key="`line-axis-${index}`"></i></div>
             </div>
             <div v-else-if="consultationLoadError" class="chart-empty-overlay" role="status">
               <span class="chart-empty-icon" aria-hidden="true">!</span>
@@ -359,10 +425,13 @@
             <span class="workload-result-count">{{ workloadChartItems.length }} teachers shown</span>
           </div>
           <div class="chart-wrap workload-chart-wrap" :class="{ 'is-loading': isWorkloadLoading }" @wheel="scrollWorkloadHorizontally">
-            <div v-if="isWorkloadLoading" class="chart-loading-overlay" role="status">
-              <span class="chart-loading-spinner" aria-hidden="true"></span>
-              <strong>Loading teacher workload</strong>
-              <span>Calculating scheduled hours for this term…</span>
+            <div v-if="isWorkloadLoading" class="chart-skeleton chart-skeleton-bars" role="status" aria-label="Loading teacher workload">
+              <span class="sr-only">Loading teacher workload…</span>
+              <div class="chart-skeleton-grid"></div>
+              <div class="chart-skeleton-bar-row">
+                <i v-for="(height, index) in [38, 62, 47, 78, 54, 69, 43, 73]" :key="`bar-skeleton-${index}`" :style="{ '--bar-height': `${height}%` }"></i>
+              </div>
+              <div class="chart-skeleton-axis"><i v-for="index in 8" :key="`bar-axis-${index}`"></i></div>
             </div>
             <div v-else-if="workloadLoadError" class="chart-empty-overlay" role="status">
               <span class="chart-empty-icon" aria-hidden="true">!</span>
@@ -378,6 +447,7 @@
           </div>
         </div>
       </section>
+      </template>
 
     </main>
 
@@ -547,6 +617,7 @@ const router = useRouter()
 const route = useRoute()
 const currentRoute = computed(() => route.path)
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const dashboardLoading = ref(true)
 
 async function apiRequest(path, options = {}) {
   const token = getToken()
@@ -573,6 +644,7 @@ const user = getUser() || {}
 
 const todayScheduleEntries = ref([])
 const teacherDirectory = ref([])
+const teacherScheduleStatusById = ref({})
 const todayScheduleLoading = ref(true)
 const currentDateTime = ref(new Date())
 const teachersPerSlide = computed(() => Math.min(5, Math.max(1, todayTeachers.value.length)))
@@ -616,6 +688,10 @@ function teacherProfile(name) {
   }) || null
 }
 
+function teacherScheduleStatus(profile) {
+  return profile?.id ? teacherScheduleStatusById.value[String(profile.id)] || '' : ''
+}
+
 function teacherAvatar(name) {
   const profile = teacherProfile(name)
   return profile?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=DDECE5&color=1B4332`
@@ -639,6 +715,10 @@ function getTodayEntryLabel(entry) {
 
 function getTodayEntryColor(entry) {
   return /laboratory|lab/i.test(String(entry?.roomType || '')) ? 'is-laboratory' : 'is-lecture'
+}
+
+function isMainCampusClass(entry) {
+  return entry?.campus === 'Main Campus' || entry?.color === 'color-orange'
 }
 
 function getFeaturedTodaySchedule(schedule) {
@@ -678,6 +758,7 @@ const todayTeachers = computed(() => {
         grouped.set(key, {
           name: profile?.name || entry.teacher,
           avatar: profile?.avatar || teacherAvatar(entry.teacher),
+          profile,
           schedule: [],
         })
       }
@@ -692,16 +773,29 @@ const todayTeachers = computed(() => {
     teacher.hasMoreSchedules = teacher.schedule.length > teacher.featuredSchedule.length
     const current = teacher.schedule.find((entry) => now >= timeToMinutes(entry.timeIn) && now < timeToMinutes(entry.timeOut))
     const next = teacher.schedule.find((entry) => timeToMinutes(entry.timeIn) > now)
+    const workStatus = teacherScheduleStatus(teacher.profile)
+    const liveStatusLabel = workStatus && workStatus !== 'On School'
+      ? workStatus
+      : (current && isMainCampusClass(current) ? 'Off Campus' : 'On School - In Class')
     teacher.currentStatus = current
-      ? { label: 'Teaching now', className: 'is-live' }
+      ? {
+          label: liveStatusLabel,
+          className: {
+            'On School - In Class': 'is-live',
+            'Off Campus': 'is-off-campus',
+            'On Meeting': 'is-meeting',
+            'On Event': 'is-event',
+          }[liveStatusLabel] || 'is-done',
+          isActive: true,
+        }
       : next
-        ? { label: `Next ${next.timeIn}`, className: 'is-next' }
-        : { label: 'Classes complete', className: 'is-done' }
+        ? { label: `Next ${next.timeIn}`, className: 'is-next', isActive: false }
+        : { label: 'Classes complete', className: 'is-done', isActive: false }
     return teacher
   }).sort((a, b) => {
-    // Prioritize "Teaching now" status first
-    if (a.currentStatus.className === 'is-live' && b.currentStatus.className !== 'is-live') return -1
-    if (a.currentStatus.className !== 'is-live' && b.currentStatus.className === 'is-live') return 1
+    // Prioritize any class currently in progress.
+    if (a.currentStatus.isActive && !b.currentStatus.isActive) return -1
+    if (!a.currentStatus.isActive && b.currentStatus.isActive) return 1
     // Then sort by time
     return timeToMinutes(a.schedule[0]?.timeIn) - timeToMinutes(b.schedule[0]?.timeIn) || a.name.localeCompare(b.name)
   })
@@ -791,6 +885,18 @@ async function loadTodayTeacherSchedules({ quiet = false } = {}) {
     ])
     todayScheduleEntries.value = Array.isArray(schedulePayload.entries) ? schedulePayload.entries : []
     teacherDirectory.value = Array.isArray(usersPayload.users) ? usersPayload.users : []
+    const scheduledTeacherIds = [...new Set(todayScheduleEntries.value
+      .map((entry) => teacherProfile(entry.teacher)?.id)
+      .filter(Boolean)
+      .map(String))]
+    const statusPayload = scheduledTeacherIds.length
+      ? await apiRequest(`/consultations/teachers?teacherIds=${encodeURIComponent(scheduledTeacherIds.join(','))}`).catch(() => ({ teachers: [] }))
+      : { teachers: [] }
+    teacherScheduleStatusById.value = Object.fromEntries(
+      (Array.isArray(statusPayload.teachers) ? statusPayload.teachers : [])
+        .filter((teacher) => teacher?.id && teacher?.statusDisplay)
+        .map((teacher) => [String(teacher.id), teacher.statusDisplay]),
+    )
   } catch (error) {
     console.error('Failed to load today’s teacher schedules:', error)
   } finally {
@@ -867,6 +973,8 @@ async function loadDashboardSummary() {
     stats.value[3].value = payload.consultations
   } catch (error) {
     console.error('Failed to load dashboard summary:', error)
+  } finally {
+    dashboardLoading.value = false
   }
 }
 
@@ -1995,6 +2103,59 @@ function confirmLogout() {
   margin-top: 4px;
 }
 
+/* Initial dashboard skeletons */
+.dashboard-skeleton { display: contents; }
+.dashboard-skeleton .skeleton-line {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(119, 130, 137, .14);
+}
+.dashboard-skeleton .skeleton-line::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent);
+  animation: dashboard-skeleton-shimmer 1.35s ease-in-out infinite;
+}
+.skeleton-stat-card { position: relative; min-height: 168px; }
+.skeleton-stat-label { width: 58%; height: 16px; margin: 4px 0 25px; }
+.skeleton-stat-icon { position: absolute; top: 31px; right: 28px; width: 25px; height: 25px; border-radius: 50% !important; }
+.skeleton-stat-value { width: 34%; height: 40px; margin-bottom: 15px; }
+.skeleton-stat-sub { width: 68%; height: 14px; }
+.skeleton-panel { min-height: 390px; padding: 26px 24px 18px; }
+.skeleton-live-header { margin-bottom: 22px; }
+.skeleton-section-eyebrow { width: 110px; height: 11px; margin-bottom: 10px; }
+.skeleton-section-title { width: 290px; max-width: 62%; height: 29px; margin: 5px 0 12px; }
+.skeleton-section-meta { width: 220px; max-width: 48%; height: 14px; }
+.skeleton-live-schedule { min-height: 250px; overflow: hidden; border-radius: 16px; background: rgba(255,255,255,.48); box-shadow: inset 0 1px 0 rgba(255,255,255,.7); }
+.skeleton-schedule-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; height: 100%; }
+.skeleton-schedule-card { min-height: 250px; padding: 17px; border-right: 1px solid rgba(119, 130, 137, .13); background: rgba(255,255,255,.24); }
+.skeleton-teacher-heading { display: flex; align-items: center; gap: 10px; padding-bottom: 15px; border-bottom: 1px solid rgba(119, 130, 137, .13); }
+.skeleton-teacher-avatar { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 50% !important; }
+.skeleton-teacher-name { width: 68%; height: 15px; }
+.skeleton-class-row { margin: 16px 0; padding: 12px; border: 1px solid rgba(119, 130, 137, .12); border-radius: 10px; background: rgba(255,255,255,.3); }
+.skeleton-class-row .skeleton-line { width: 83%; height: 11px; margin-bottom: 9px; }
+.skeleton-class-row .skeleton-line.short { width: 56%; margin-bottom: 0; }
+.skeleton-chart-card { min-height: 320px; padding: 24px; }
+.skeleton-chart-title { width: 48%; height: 22px; margin-bottom: 11px; }
+.skeleton-chart-caption { width: 62%; height: 13px; }
+.skeleton-chart-area { display: flex; height: 175px; align-items: end; justify-content: space-around; gap: 18px; margin-top: 37px; padding: 0 18px 12px; border-bottom: 1px solid rgba(119, 130, 137, .2); background: repeating-linear-gradient(to bottom, transparent 0, transparent 43px, rgba(119, 130, 137, .11) 44px, transparent 45px); }
+.skeleton-chart-area i { width: 8%; height: 38%; border-radius: 6px 6px 0 0; background: rgba(119, 130, 137, .17); }
+.skeleton-chart-area i:nth-child(2) { height: 67%; }
+.skeleton-chart-area i:nth-child(3) { height: 48%; }
+.skeleton-chart-area i:nth-child(4) { height: 82%; }
+.skeleton-chart-area i:nth-child(5) { height: 58%; }
+@keyframes dashboard-skeleton-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-skeleton .skeleton-line::after { animation: none; }
+}
+@media (max-width: 760px) {
+  .skeleton-schedule-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .skeleton-schedule-card:nth-child(n + 3) { display: none; }
+}
+
 /* Notification */
 .notif-wrap {
   position: relative;
@@ -2014,13 +2175,38 @@ function confirmLogout() {
 .notif-btn:hover { color: #30353a; }
 .notif-dot {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 13px;
-  height: 13px;
+  top: -2px;
+  right: 0;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #e8a020;
   border-radius: 50%;
   border: 1.5px solid #fff;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  box-sizing: border-box;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .22);
+}
+.notif-badge-pop-enter-active,
+.notif-badge-pop-leave-active { transition: transform .2s ease, opacity .2s ease; }
+.notif-badge-pop-enter-from,
+.notif-badge-pop-leave-to { opacity: 0; transform: scale(.45); }
+.notif-badge-pop-enter-to { animation: notif-badge-pop .32s cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes notif-badge-pop {
+  0% { transform: scale(.45); }
+  65% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notif-badge-pop-enter-active,
+  .notif-badge-pop-leave-active { transition: none; }
+  .notif-badge-pop-enter-to { animation: none; }
 }
 
 /* Notification Panel */
@@ -2035,6 +2221,52 @@ function confirmLogout() {
   box-shadow: 0 18px 42px rgba(35,43,49,.24), inset 0 1px rgba(255,255,255,.95);
   z-index: 999;
   overflow: hidden;
+}
+.notif-panel-enter-active,
+.notif-panel-leave-active {
+  transform-origin: top right;
+  transition: opacity .2s ease, transform .24s cubic-bezier(.2,.75,.25,1);
+}
+.notif-panel-enter-from,
+.notif-panel-leave-to { opacity: 0; transform: translateY(-8px) scale(.97); }
+.notif-panel-enter-to,
+.notif-panel-leave-from { opacity: 1; transform: translateY(0) scale(1); }
+.notif-skeleton-list { min-height: 240px; }
+.notif-skeleton-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 76px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(119,130,138,.13);
+}
+.notif-skeleton-avatar,
+.notif-skeleton-copy i {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: rgba(119,130,138,.16);
+}
+.notif-skeleton-avatar { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 50%; }
+.notif-skeleton-copy { display: grid; flex: 1; gap: 7px; }
+.notif-skeleton-copy i { height: 10px; border-radius: 6px; }
+.notif-skeleton-copy i:first-child { width: 47%; height: 12px; }
+.notif-skeleton-copy i:nth-child(2) { width: 88%; }
+.notif-skeleton-copy i:last-child { width: 24%; height: 8px; }
+.notif-skeleton-avatar::after,
+.notif-skeleton-copy i::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.62), transparent);
+  animation: dashboard-skeleton-shimmer 1.35s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .notif-panel-enter-active,
+  .notif-panel-leave-active { transition: none; }
+  .notif-skeleton-avatar::after,
+  .notif-skeleton-copy i::after { animation: none; }
 }
 .notification-preview {
   position: fixed;
@@ -2323,39 +2555,85 @@ function confirmLogout() {
 .today-carousel-controls {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 11px;
-  border: 1px solid #c5cdd1;
-  border-radius: 9px;
-  background: rgba(255,255,255,.58);
-  color: #66727a;
-  font-size: .68rem;
-  font-weight: 700;
-  letter-spacing: .02em;
+  gap: 8px;
   white-space: nowrap;
 }
-.today-carousel-controls i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #59656d;
-  box-shadow: 0 0 0 3px rgba(89,101,109,.12);
+.today-carousel-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #cbded2;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f5faf6, #e8f2eb);
+  color: #355f48;
+  box-shadow: 0 3px 10px rgba(38, 80, 55, .08), inset 0 1px rgba(255,255,255,.9);
+  font-size: .68rem;
+  letter-spacing: .01em;
 }
-.today-carousel-controls i.is-paused { background: #b88638; box-shadow: 0 0 0 3px rgba(184,134,56,.14); }
+.today-carousel-status > i {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #40916c;
+  box-shadow: 0 0 0 3px rgba(64,145,108,.14);
+  flex: 0 0 auto;
+}
+.today-carousel-status:not(.is-paused) > i::after {
+  position: absolute;
+  inset: -3px;
+  border: 1px solid rgba(64,145,108,.35);
+  border-radius: 50%;
+  content: '';
+  animation: carouselStatusPing 2.2s ease-out infinite;
+}
+.today-carousel-status strong {
+  color: #2f503d;
+  font-size: .7rem;
+  font-weight: 800;
+}
+.today-carousel-hint {
+  padding-left: 8px;
+  border-left: 1px solid #c8d8cd;
+  color: #728179;
+  font-size: .66rem;
+  font-weight: 600;
+}
+.today-carousel-status.is-paused {
+  border-color: #e3d5b7;
+  background: linear-gradient(135deg, #fffaf0, #f5eddd);
+  color: #806329;
+}
+.today-carousel-status.is-paused > i {
+  background: #b88638;
+  box-shadow: 0 0 0 3px rgba(184,134,56,.14);
+}
+.today-carousel-status.is-paused strong { color: #745721; }
+.today-carousel-status.is-paused .today-carousel-hint { border-left-color: #e2d4b7; color: #8a7958; }
+@keyframes carouselStatusPing {
+  0% { transform: scale(.75); opacity: .7; }
+  100% { transform: scale(1.65); opacity: 0; }
+}
 .today-carousel-controls button {
   display: grid;
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   place-items: center;
-  border: 1px solid #d0d6d9;
-  border-radius: 7px;
-  background: rgba(255,255,255,.8);
-  color: #45534d;
+  border: 1px solid #cbd5d0;
+  border-radius: 50%;
+  background: rgba(255,255,255,.88);
+  color: #40534a;
+  box-shadow: 0 2px 6px rgba(40,54,47,.08);
   cursor: pointer;
   font: 700 1.15rem/1 'Segoe UI', sans-serif;
 }
-.today-carousel-controls button:hover { background: #fff; border-color: #9aaba2; }
+.today-carousel-controls button:hover { background: #fff; border-color: #8cae98; }
 .today-carousel-controls button:focus-visible { outline: 2px solid #658977; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .today-carousel-status:not(.is-paused) > i::after { animation: none; }
+}
 /* Table format styles */
 .today-schedule-table-wrap { 
   overflow: hidden;
@@ -2524,6 +2802,15 @@ function confirmLogout() {
   background: #e8f5e9;
   box-shadow: 0 2px 6px rgba(76,175,80,0.15);
 }
+.teacher-header-status.is-off-campus {
+  color: #8b551a;
+  border: 1.5px solid #e2a04c;
+  background: #fff4e3;
+  box-shadow: 0 2px 6px rgba(226,160,76,.16);
+  animation: none;
+}
+.teacher-header-status.is-meeting { color: #765f2e; border: 1.5px solid #e1d5b8; background: #f8f3e7; animation: none; }
+.teacher-header-status.is-event { color: #285d94; border: 1.5px solid #bfd3e8; background: #eaf3fb; animation: none; }
 @keyframes statusPulse {
   0%, 100% { box-shadow: 0 2px 6px rgba(76,175,80,0.15); }
   50% { box-shadow: 0 2px 12px rgba(76,175,80,0.3); }
@@ -2826,6 +3113,48 @@ function confirmLogout() {
   font-size: 0.76rem; 
   text-align: center;
 }
+.today-schedule-loading-skeleton {
+  display: grid;
+  min-height: 150px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .55);
+}
+.today-schedule-loading-card {
+  min-height: 150px;
+  padding: 14px;
+  border-right: 1px solid rgba(119, 130, 137, .13);
+  background: rgba(255,255,255,.24);
+}
+.today-schedule-loading-heading { display: flex; align-items: center; gap: 9px; padding-bottom: 12px; border-bottom: 1px solid rgba(119,130,137,.13); }
+.today-schedule-loading-avatar,
+.today-schedule-loading-name,
+.today-schedule-loading-class,
+.today-schedule-loading-class i {
+  position: relative;
+  overflow: hidden;
+  background: rgba(119,130,137,.15);
+}
+.today-schedule-loading-avatar { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 50%; }
+.today-schedule-loading-name { width: 68%; height: 13px; border-radius: 6px; }
+.today-schedule-loading-class { display: grid; gap: 7px; margin-top: 12px; padding: 10px; border: 1px solid rgba(119,130,137,.12); border-radius: 9px; background: rgba(255,255,255,.3); }
+.today-schedule-loading-class i { width: 83%; height: 9px; border-radius: 5px; }
+.today-schedule-loading-class i + i { width: 56%; }
+.today-schedule-loading-avatar::after,
+.today-schedule-loading-name::after,
+.today-schedule-loading-class i::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
+  animation: dashboard-skeleton-shimmer 1.35s ease-in-out infinite;
+}
+@media (max-width: 760px) {
+  .today-schedule-loading-skeleton { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .today-schedule-loading-card:nth-child(n + 3) { display: none; }
+}
 .today-teachers-empty span { 
   color: #2c3e50; 
   font-size: 0.92rem; 
@@ -2997,6 +3326,86 @@ function confirmLogout() {
   position: relative;
 }
 .chart-wrap.is-loading canvas { visibility: hidden; }
+.chart-skeleton {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #f7f9f9;
+}
+.chart-skeleton-grid {
+  position: absolute;
+  inset: 14px 12px 34px 12px;
+  background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(25% - 1px), rgba(119,130,137,.14) calc(25% - 1px), rgba(119,130,137,.14) 25%);
+}
+.chart-skeleton-line {
+  position: absolute;
+  inset: 12px 24px 35px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+.chart-skeleton-line::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: linear-gradient(154deg, transparent 0 12%, rgba(91,139,112,.18) 12.2% 12.8%, transparent 13% 29%, rgba(91,139,112,.18) 29.2% 29.8%, transparent 30% 45%, rgba(91,139,112,.18) 45.2% 45.8%, transparent 46% 61%, rgba(91,139,112,.18) 61.2% 61.8%, transparent 62% 78%, rgba(91,139,112,.18) 78.2% 78.8%, transparent 79%);
+}
+.chart-skeleton-line i {
+  z-index: 1;
+  width: 13px;
+  height: 13px;
+  border: 3px solid #f7f9f9;
+  border-radius: 50%;
+  background: #9db9a7;
+  box-shadow: 0 0 0 2px rgba(91,139,112,.25);
+}
+.chart-skeleton-bar-row {
+  position: absolute;
+  inset: 14px 18px 35px;
+  display: flex;
+  align-items: end;
+  justify-content: space-around;
+  gap: 12px;
+}
+.chart-skeleton-bar-row i {
+  position: relative;
+  width: 7%;
+  height: var(--bar-height);
+  border-radius: 7px 7px 0 0;
+  background: linear-gradient(90deg, #dce3df 0%, #cfdad3 50%, #dce3df 100%);
+}
+.chart-skeleton-bar-row i::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  transform: translateX(-100%);
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+  animation: dashboard-skeleton-shimmer 1.35s ease-in-out infinite;
+}
+.chart-skeleton-axis {
+  position: absolute;
+  right: 16px;
+  bottom: 10px;
+  left: 16px;
+  display: flex;
+  justify-content: space-around;
+}
+.chart-skeleton-axis i { width: 32px; max-width: 8%; height: 8px; border-radius: 5px; background: rgba(119,130,137,.15); }
+.chart-skeleton-line i,
+.chart-skeleton-axis i {
+  animation: chart-skeleton-pulse 1.25s ease-in-out infinite alternate;
+}
+.chart-skeleton-line i:nth-child(even),
+.chart-skeleton-axis i:nth-child(even) { animation-delay: .25s; }
+@keyframes chart-skeleton-pulse { to { opacity: .48; } }
+@media (prefers-reduced-motion: reduce) {
+  .chart-skeleton-line i,
+  .chart-skeleton-axis i,
+  .chart-skeleton-bar-row i::after { animation: none; }
+}
 .chart-loading-overlay {
   position: absolute;
   z-index: 2;

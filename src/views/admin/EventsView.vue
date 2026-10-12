@@ -420,7 +420,7 @@
             <div class="form-group">
               <label class="form-label">Teachers Involved <span class="form-optional">(required for teacher status)</span></label>
               <div class="teacher-picker" v-click-outside="() => showTeacherPicker = false">
-                <button type="button" class="teacher-picker-trigger" @click="showTeacherPicker = !showTeacherPicker">
+                <button type="button" class="teacher-picker-trigger" :class="{ 'is-open': showTeacherPicker }" @click="showTeacherPicker = !showTeacherPicker">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   <span :class="eventForm.teacherIds.length ? 'teacher-picker-value' : 'teacher-picker-placeholder'">{{ selectedTeacherLabel }}</span>
                   <svg class="td-chevron" :class="{ 'td-chevron--open': showTeacherPicker }" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -729,7 +729,6 @@ async function loadEventTeachers() {
     eventTeachers.value = (Array.isArray(payload.users) ? payload.users : [])
       .filter((teacher) => teacher && typeof teacher === 'object')
       .filter((teacher) => String(teacher.account_status || 'Active') === 'Active')
-      .filter((teacher) => String(teacher.teacher_status || '').trim() === 'On School')
       .map((teacher) => {
       const name = `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim() || teacher.name || teacher.email || 'Teacher'
       const id = teacher.id || teacher._id
@@ -1648,14 +1647,23 @@ onMounted(() => {
 .teacher-picker-placeholder { color: #a7adba; font-size: 0.88rem; }
 .teacher-picker-trigger .td-chevron { margin-left: auto; color: #687178; }
 .teacher-picker-panel {
-  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; right: 0;
+  position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: 0;
+  max-height: min(390px, 52vh); display: flex; flex-direction: column;
   padding: 10px; border: 1px solid #d9e2dd; border-radius: 10px; background: #fff;
   box-shadow: 0 12px 28px rgba(18, 53, 38, 0.16);
 }
 .teacher-picker-search { display: flex; align-items: center; gap: 8px; padding: 0 9px; border: 1px solid #e4e7e9; border-radius: 7px; color: #668174; }
 .teacher-picker-search input { width: 100%; height: 32px; border: 0; outline: 0; font: inherit; font-size: 0.82rem; background: transparent; }
 .teacher-picker-all { display: flex; align-items: center; gap: 8px; margin: 9px 3px 6px; font-size: 0.78rem; color: #567064; cursor: pointer; }
-.teacher-picker-list { max-height: 164px; overflow-y: auto; border-top: 1px solid #edf0ee; }
+.teacher-picker-list {
+  flex: 1 1 auto; min-height: 0; max-height: min(280px, 42vh);
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  touch-action: pan-y; scrollbar-width: thin; scrollbar-color: #aab4b0 transparent;
+  border-top: 1px solid #edf0ee;
+}
+.teacher-picker-list::-webkit-scrollbar { width: 7px; }
+.teacher-picker-list::-webkit-scrollbar-thumb { background: #aab4b0; border-radius: 8px; }
+.teacher-picker-list::-webkit-scrollbar-track { background: transparent; }
 .teacher-picker-option { display: flex; align-items: center; gap: 9px; padding: 8px 4px; color: #333; font-size: 0.84rem; cursor: pointer; }
 .teacher-picker-option:hover { background: #f3f4f6; }
 .teacher-picker-option input, .teacher-picker-all input { accent-color: #1b4332; }
@@ -2965,5 +2973,106 @@ onMounted(() => {
     padding: 12px 14px;
     font-size: .78rem;
   }
+}
+
+/* Event teacher multi-select */
+.teacher-picker-trigger {
+  border-color: #d6dde1;
+  border-radius: 12px;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.teacher-picker-trigger:hover,
+.teacher-picker-trigger.is-open {
+  border-color: #91aa9b;
+  background: #fff;
+}
+.teacher-picker-trigger.is-open {
+  box-shadow: 0 0 0 3px rgba(73, 117, 91, .11);
+}
+.teacher-picker-trigger > svg:first-child { color: #64748b; flex: 0 0 auto; }
+.teacher-picker-panel {
+  max-height: min(440px, 58vh);
+  padding: 12px;
+  border-color: #dce4e0;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(25, 40, 34, .2), 0 3px 10px rgba(25, 40, 34, .06);
+  animation: teacherPickerReveal .16s ease-out;
+}
+.teacher-picker-search {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 0 11px;
+  border-color: #e1e7e4;
+  border-radius: 9px;
+  background: #f8faf9;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.teacher-picker-search:focus-within {
+  border-color: #91aa9b;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(73, 117, 91, .1);
+}
+.teacher-picker-search input { height: 38px; color: #34423b; }
+.teacher-picker-all {
+  flex: 0 0 auto;
+  min-height: 39px;
+  margin: 8px 0 4px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: #52675b;
+  font-size: .76rem;
+  font-weight: 650;
+}
+.teacher-picker-all:hover { background: #f3f7f4; }
+.teacher-picker-list {
+  max-height: min(300px, 40vh);
+  padding: 5px 4px 2px 0;
+  border-top-color: #edf1ef;
+}
+.teacher-picker-option {
+  min-height: 44px;
+  margin: 3px 2px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #34423b;
+  font-size: .82rem;
+  font-weight: 550;
+  transition: background .15s ease, border-color .15s ease;
+}
+.teacher-picker-option:hover { background: #f5f8f6; }
+.teacher-picker-option:has(input:checked) {
+  border-color: #d5e5da;
+  background: #eef6f0;
+  color: #28583e;
+}
+.teacher-picker-option input,
+.teacher-picker-all input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  accent-color: #3f7656;
+  cursor: pointer;
+}
+.teacher-picker-avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  background: #eaf0ed;
+  color: #52675b;
+  font-size: .66rem;
+}
+.teacher-picker-option:has(input:checked) .teacher-picker-avatar {
+  background: #d8eadf;
+  color: #28583e;
+}
+.teacher-picker-empty { padding: 14px 8px; }
+@keyframes teacherPickerReveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .teacher-picker-panel { animation: none; }
+  .teacher-picker-trigger, .teacher-picker-search, .teacher-picker-option { transition: none; }
 }
 </style>

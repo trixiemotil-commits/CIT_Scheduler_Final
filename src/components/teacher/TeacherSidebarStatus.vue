@@ -43,7 +43,7 @@
         <span :class="['sidebar-status-dot', availabilityDotClass]"></span>
       </div>
       <div :class="['sidebar-status-select-wrap', availabilityDotClass]">
-        <select v-model="availabilityChoice" class="sidebar-status-select" aria-label="Office hours availability" @pointerdown="handleOfficeHoursPointerDown">
+        <select v-model="availabilityChoice" class="sidebar-status-select" aria-label="Office hours availability" :disabled="!canChangeAvailability || saving" @pointerdown="handleOfficeHoursPointerDown">
           <option value="Available" :disabled="!canChangeAvailability">Open for consultations</option>
           <option value="Unavailable" :disabled="!canChangeAvailability">Closed for consultations</option>
         </select>
@@ -57,7 +57,7 @@
             <span>Office Hours</span>
             <span :class="['sidebar-status-dot', availabilityDotClass]"></span>
           </div>
-          <select v-model="availabilityChoice" class="collapsed-office-modal-select" aria-label="Office hours availability">
+          <select v-model="availabilityChoice" class="collapsed-office-modal-select" aria-label="Office hours availability" :disabled="!canChangeAvailability || saving">
             <option value="Available" :disabled="!canChangeAvailability">Open for consultations</option>
             <option value="Unavailable" :disabled="!canChangeAvailability">Closed for consultations</option>
           </select>
@@ -79,6 +79,7 @@ const user = ref(getUser() || {})
 const teacherStatus = ref(user.value.teacher_status || 'On School')
 const teacherAvailability = ref(user.value.teacher_availability || 'Available')
 const teacherTimeIn = ref(user.value.teacher_time_in || null)
+const scheduleStatusDisplay = ref('')
 const saving = ref(false)
 const message = ref('')
 const error = ref(false)
@@ -131,7 +132,7 @@ const normalizedStatus = computed(() => {
 const isOffline = computed(() => normalizedStatus.value === 'On Leave')
 
 const statusDisplay = computed(() => {
-  if (normalizedStatus.value === 'On School') return 'On School'
+  if (normalizedStatus.value === 'On School') return scheduleStatusDisplay.value || 'On School'
   if (normalizedStatus.value === 'On Meeting') return 'On Meeting'
   if (normalizedStatus.value === 'Off Campus') return 'Off Campus'
   return 'Offline'
@@ -144,15 +145,25 @@ const formattedTimeIn = computed(() => {
   return date.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
 })
 
-const canChangeAvailability = computed(() => normalizedStatus.value === 'On School')
+const canChangeAvailability = computed(() => (
+  normalizedStatus.value === 'On School'
+  && !['On School - In Class', 'Off Campus'].includes(scheduleStatusDisplay.value)
+))
 const workStatusDisabled = computed(() => isOffline.value)
-const statusDotClass = computed(() => isOffline.value ? 'is-offline' : (normalizedStatus.value === 'On School' ? 'is-in-school' : 'is-on-leave'))
+const statusDotClass = computed(() => {
+  if (isOffline.value) return 'is-offline'
+  if (normalizedStatus.value === 'On School' && scheduleStatusDisplay.value === 'Off Campus') return 'is-off-campus'
+  return normalizedStatus.value === 'On School' ? 'is-in-school' : 'is-on-leave'
+})
 const availabilityDotClass = computed(() => {
   if (!canChangeAvailability.value) return 'is-offline'
   return teacherAvailability.value === 'Available' ? 'is-in-school' : 'is-on-leave'
 })
 
 const availabilitySubtext = computed(() => {
+  if (['On School - In Class', 'Off Campus'].includes(scheduleStatusDisplay.value)) {
+    return 'Availability is locked while in class or off campus.'
+  }
   if (!canChangeAvailability.value) return 'Availability is locked while not on school.'
   return 'Updates your consultation availability.'
 })
@@ -162,7 +173,7 @@ const availabilityChoice = computed({
     return teacherAvailability.value === 'Available' ? 'Available' : 'Unavailable'
   },
   set(value) {
-    if (value === 'Available' || value === 'Unavailable') {
+    if (canChangeAvailability.value && !saving.value && (value === 'Available' || value === 'Unavailable')) {
       teacherAvailability.value = value
       saveStatus()
     }
@@ -208,10 +219,22 @@ async function loadStatus() {
     teacherStatus.value = currentUser.teacher_status || 'On School'
     teacherAvailability.value = currentUser.teacher_availability || 'Available'
     teacherTimeIn.value = currentUser.teacher_time_in || null
+    await loadScheduleStatusDisplay()
   } catch (_err) {
     // Session values are enough for the sidebar if the network is briefly unavailable.
   } finally {
     statusLoadInFlight = false
+  }
+}
+
+async function loadScheduleStatusDisplay() {
+  try {
+    const payload = await apiRequest(`/consultations/teachers?teacherId=${encodeURIComponent(user.value?.id || '')}`)
+    const currentTeacher = (Array.isArray(payload.teachers) ? payload.teachers : [])
+      .find((teacher) => String(teacher.id) === String(user.value?.id))
+    scheduleStatusDisplay.value = currentTeacher?.statusDisplay || ''
+  } catch (_err) {
+    // Keep the base work status if the schedule status is temporarily unavailable.
   }
 }
 
@@ -220,6 +243,7 @@ function refreshStatusWhenVisible() {
 }
 
 async function saveStatus() {
+  if (!canChangeAvailability.value) return
   if (saving.value) return
   saving.value = true
 
@@ -386,6 +410,7 @@ onBeforeUnmount(() => {
 }
 
 .sidebar-status-dot.is-in-school { background: #40916c; }
+.sidebar-status-dot.is-off-campus { background: #d98428; box-shadow: 0 0 0 3px rgba(217,132,40,.13); }
 .sidebar-status-dot.is-on-leave { background: #e63946; }
 .sidebar-status-dot.is-offline { background: #98a2b3; }
 
@@ -414,15 +439,17 @@ onBeforeUnmount(() => {
   min-width: 0;
   align-items: center;
   justify-content: center;
-  padding: 0 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding: 6px 8px;
+  line-height: 1.18;
+  white-space: normal;
+  overflow-wrap: anywhere;
   text-align: center;
   cursor: default;
   pointer-events: none;
 }
+.sidebar-status-value { padding-inline: 6px; font-size: .68rem; letter-spacing: -.02em; white-space: nowrap; }
 .sidebar-status-value.is-in-school { color: #28613f; border-color: #9bc6aa; background: #e8f3ec; }
+.sidebar-status-value.is-off-campus { color: #8b551a; border-color: #e2b979; background: #fff4e3; }
 .sidebar-status-value.is-on-leave { color: #9f3e46; border-color: #d8a3a8; background: #faebec; }
 .sidebar-status-value.is-offline { color: #59636a; border-color: #b7c0c5; background: #e5e8ea; }
 
@@ -526,6 +553,7 @@ onBeforeUnmount(() => {
   background: #e5e8ea;
   color: #59636a;
 }
+.collapsed-status-modal-value.is-off-campus { color: #8b551a; border-color: #e2b979; background: #fff4e3; }
 
 .collapsed-status-modal-action {
   width: 100%;

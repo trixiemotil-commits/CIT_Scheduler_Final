@@ -12,15 +12,14 @@
     <p v-if="error" class="device-message device-message--error" role="alert">{{ error }}</p>
     <p v-else-if="loading && !sessions.length" class="device-message">Loading devices...</p>
     <p v-else-if="!sessions.length" class="device-message">No active devices.</p>
-    <ul v-else class="device-list">
+    <ul v-else class="device-list" tabindex="0" aria-label="Active devices">
       <li v-for="session in sessions" :key="session.id" class="device-row">
         <span class="device-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg>
         </span>
         <div class="device-info">
           <div class="device-name">{{ session.device }} <span v-if="session.current" class="device-current">This device</span></div>
-          <div class="device-meta">{{ session.location }}<span v-if="session.ipAddress"> · {{ session.ipAddress }}</span></div>
-          <time class="device-time" :datetime="session.lastActiveAt">Last sign-in {{ formatDate(session.lastActiveAt) }}</time>
+          <time class="device-last-login" :datetime="session.lastActiveAt">Last login · {{ formatDate(session.lastActiveAt) }}</time>
         </div>
         <button class="device-logout" type="button" :disabled="busyId === session.id" @click="pendingLogoutSession = session">
           Log out
@@ -72,7 +71,9 @@ function closeLogoutConfirmation() {
 
 function formatDate(value) {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? 'Unknown time' : date.toLocaleString()
+  return Number.isNaN(date.getTime())
+    ? 'Unknown date'
+    : date.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 async function loadDevices() {
@@ -98,11 +99,13 @@ async function logoutDevice(session) {
   try {
     const response = await fetch(`${API_BASE}/auth/sessions/${encodeURIComponent(session.id)}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${getToken()}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify({ sessionIds: session.sessionIds || [session.id] }),
     })
     const body = await response.json()
     if (!response.ok) throw new Error(body.message || 'Unable to sign out that device.')
-    sessions.value = sessions.value.filter((item) => item.id !== session.id)
+    const revokedIds = new Set((body.sessionIds || [session.id]).map(String))
+    sessions.value = sessions.value.filter((item) => !revokedIds.has(String(item.id)))
     if (session.current) {
       logout()
       await router.replace('/')
@@ -139,8 +142,18 @@ onMounted(async () => {
 .device-refresh:hover:not(:disabled) { border-color: #9eabb3; background: #e4e9ec; transform: translateY(-1px); }
 .device-refresh svg { width: 17px; height: 17px; }
 .device-refresh:disabled, .device-logout:disabled { opacity: .55; cursor: wait; }
-.device-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.device-row { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 15px 0; border-top: 1px solid rgba(129, 140, 148, .2); }
+.device-list {
+  display: grid; gap: 0; max-height: min(540px, 52vh); overflow-y: auto; overflow-x: hidden;
+  margin: 0; padding: 2px 9px 2px 0; list-style: none;
+  overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #aeb9bf transparent;
+}
+.device-list:focus-visible { outline: 2px solid #9eabb3; outline-offset: 3px; border-radius: 8px; }
+.device-list::-webkit-scrollbar { width: 8px; }
+.device-list::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 10px; background: #aeb9bf; background-clip: padding-box; }
+.device-list::-webkit-scrollbar-thumb:hover { background-color: #87969f; }
+.device-list::-webkit-scrollbar-track { background: transparent; }
+.device-row { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 15px 8px 15px 0; border-top: 1px solid rgba(129, 140, 148, .2); transition: background .16s ease; }
+.device-row:hover { background: rgba(236, 241, 243, .56); }
 .device-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border: 1px solid #d2d9dd; border-radius: 10px; background: linear-gradient(145deg, #f8fafb, #e6ebee); color: #647681; box-shadow: inset 0 1px #fff; }
 .device-icon svg { width: 20px; height: 20px; }
 .device-info { flex: 1; min-width: 0; }
@@ -148,6 +161,7 @@ onMounted(async () => {
 .device-current { padding: 3px 8px; border: 1px solid #c8e1d6; border-radius: 999px; background: #e9f3ee; color: #176b55; font-size: .66rem; font-weight: 700; letter-spacing: .01em; }
 .device-meta, .device-time { display: block; margin-top: 4px; color: #6b777f; font-size: .74rem; font-weight: 550; line-height: 1.45; overflow-wrap: anywhere; }
 .device-time { color: #7b858c; font-size: .71rem; }
+.device-last-login { display: block; margin-top: 4px; color: #7b858c; font-size: .71rem; font-weight: 550; line-height: 1.4; }
 .device-logout { min-height: 36px; flex: 0 0 auto; padding: 7px 12px; border: 1px solid #c88787; border-radius: 8px; background: rgba(255,255,255,.82); color: #963f3f; font: inherit; font-size: .74rem; font-weight: 700; cursor: pointer; transition: background .18s, border-color .18s, transform .18s; }
 .device-logout:hover:not(:disabled) { border-color: #b96868; background: #fff3f3; transform: translateY(-1px); }
 .device-message { margin: 0; color: #6b777d; font-size: .8rem; font-weight: 600; }
@@ -187,5 +201,5 @@ onMounted(async () => {
   .device-confirm-actions { gap: 7px; }
   .device-confirm-actions button { min-height: 34px; padding-inline: 10px; font-size: .7rem; }
 }
-@media (max-width: 560px) { .device-panel { padding: 12px; border-radius: 14px; } .device-row { align-items: flex-start; gap: 8px; padding: 11px 0; } .device-icon { width: 30px; height: 30px; border-radius: 8px; } .device-icon svg { width: 15px; height: 15px; } .device-logout { align-self: center; min-height: 30px; padding: 5px 8px; font-size: .66rem; } }
+@media (max-width: 560px) { .device-panel { padding: 12px; border-radius: 14px; } .device-list { max-height: min(440px, 48vh); padding-right: 6px; } .device-row { align-items: flex-start; gap: 8px; padding: 11px 4px 11px 0; } .device-icon { width: 30px; height: 30px; border-radius: 8px; } .device-icon svg { width: 15px; height: 15px; } .device-logout { align-self: center; min-height: 30px; padding: 5px 8px; font-size: .66rem; } }
 </style>

@@ -535,7 +535,14 @@
         </div>
 
         <div v-else-if="addMode === 'teacher' || addMode === 'student'" class="sched-grid-wrap">
-          <table class="sched-grid">
+          <div v-if="scheduleDataLoading" class="timetable-skeleton" aria-hidden="true">
+            <div class="timetable-skeleton-header"><i v-for="day in 7" :key="`teacher-head-${day}`"></i></div>
+            <div v-for="slot in timeSlots30" :key="`teacher-row-${slot}`" class="timetable-skeleton-row">
+              <i class="timetable-skeleton-time"></i>
+              <i v-for="day in 6" :key="`teacher-cell-${slot}-${day}`" :class="{ 'skeleton-block': (timeSlots30.indexOf(slot) + day) % 5 === 0 }"></i>
+            </div>
+          </div>
+          <table v-else class="sched-grid">
             <thead>
               <tr>
                 <th class="th-time">Time</th>
@@ -543,7 +550,11 @@
               </tr>
               <tr v-if="addMode === 'teacher' && selectedTeacher" class="work-hours-summary-row">
                 <th class="th-time">Work hours</th>
-                <th v-for="day in days" :key="day">{{ teacherWorkHoursLabel(day) }}</th>
+                <th v-for="day in days" :key="day">
+                  <button type="button" class="work-hours-day-trigger" :aria-label="`Set ${day} work hours: ${teacherWorkHoursLabel(day)}`" @click="openWorkHoursPicker(day)">
+                    {{ teacherWorkHoursLabel(day) }}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -560,8 +571,10 @@
                       'free-time-cell': !getEntriesForCell30(slot, day).length && !getConsultationForCell30(slot, day),
                       'faculty-work-hours-cell': addMode === 'teacher' && !!selectedTeacher && isWithinTeacherWorkHours(slot, day),
                       'faculty-outside-work-hours-cell': addMode === 'teacher' && !!selectedTeacher && isOutsideTeacherWorkHours(slot, day),
+                      'faculty-work-hours-not-set-cell': addMode === 'teacher' && !!selectedTeacher && !isConfiguredTeacherWorkDay(day),
                       'readonly-entry-cell': getEntriesForCell30(slot, day).length && addMode === 'teacher' && !selectedTeacher,
                     }"
+                    :style="teacherWorkHoursEntryCellStyle30(slot, day)"
                     @click="canInteractCell30(slot, day) ? handleCellClick30(slot, day) : null"
                   >
                     <!-- Filled cell -->
@@ -622,7 +635,14 @@
 
         <!-- ── Room mode grid ── -->
         <div v-else-if="addMode === 'room'" class="sched-grid-wrap">
-          <table class="sched-grid">
+          <div v-if="scheduleDataLoading" class="timetable-skeleton" aria-hidden="true">
+            <div class="timetable-skeleton-header"><i v-for="day in 7" :key="`room-head-${day}`"></i></div>
+            <div v-for="slot in timeSlots30" :key="`room-row-${slot}`" class="timetable-skeleton-row">
+              <i class="timetable-skeleton-time"></i>
+              <i v-for="day in 6" :key="`room-cell-${slot}-${day}`" :class="{ 'skeleton-block': (timeSlots30.indexOf(slot) * day) % 7 === 0 }"></i>
+            </div>
+          </div>
+          <table v-else class="sched-grid">
             <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day">{{ day }}</th></tr></thead>
             <tbody>
               <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
@@ -909,17 +929,20 @@
           <div class="work-hours-total" :class="{ 'over-limit': assignedWorkHours.total > 44 }" aria-live="polite">
             <div class="work-hours-total-heading">
               <span>Total work hours per week</span>
-              <strong>{{ formatWorkHours(assignedWorkHours.total) }} / 44 hours</strong>
+              <strong><span>{{ formatWorkHours(assignedWorkHours.total) }}</span><small> / 44 hours</small></strong>
+            </div>
+            <div class="work-hours-total-track" role="progressbar" aria-label="Weekly work hours" aria-valuemin="0" aria-valuemax="44" :aria-valuenow="Math.min(assignedWorkHours.total, 44)">
+              <span :style="{ width: `${Math.min((assignedWorkHours.total / 44) * 100, 100)}%` }"></span>
             </div>
             <p>Work windows: {{ formatWorkHours(assignedWorkHours.workWindows) }} h · Classes &amp; office hours: {{ formatWorkHours(assignedWorkHours.classesAndOfficeHours) }} h · Consultations: {{ formatWorkHours(assignedWorkHours.consultations) }} h · Lunch breaks excluded</p>
           </div>
 
           <div class="work-hours-day-grid" role="group" aria-label="Faculty work hours by day">
-            <section v-for="day in days" :key="day" class="work-hours-day-column">
+            <section v-for="day in days" :key="day" class="work-hours-day-column" :class="{ 'is-target-day': workHoursTargetDay === day }">
               <h3>{{ day }}</h3>
               <label class="work-hours-day-field">
                 <span>Work Start</span>
-                <select v-model="workHoursForm.byDay[day].startTime" :class="{ 'is-placeholder': !workHoursForm.byDay[day].startTime }">
+                <select v-model="workHoursForm.byDay[day].startTime" :class="{ 'is-placeholder': !workHoursForm.byDay[day].startTime }" @change="handleWorkHoursStartChange(day)">
                   <option value="">Not set</option>
                   <option v-for="time in timeOptions" :key="time" :value="time">{{ time }}</option>
                 </select>
@@ -928,7 +951,7 @@
                 <span>Work End</span>
                 <select v-model="workHoursForm.byDay[day].endTime" :class="{ 'is-placeholder': !workHoursForm.byDay[day].endTime }">
                   <option value="">Not set</option>
-                  <option v-for="time in timeOptions" :key="time" :value="time">{{ time }}</option>
+                  <option v-for="time in endTimeOptionsAfter(workHoursForm.byDay[day].startTime)" :key="time" :value="time">{{ time }}</option>
                 </select>
               </label>
             </section>
@@ -936,8 +959,8 @@
 
           <p v-if="workHoursError || workHoursFormError" class="lunch-break-picker-error">{{ workHoursError || workHoursFormError }}</p>
           <div class="lunch-break-picker-actions">
-            <button type="button" class="cancel-btn-text" @click="showWorkHoursPicker = false">Cancel</button>
             <button type="button" class="save-btn" :disabled="savingWorkHours || !!workHoursFormError" :aria-busy="savingWorkHours" @click="saveWorkHours">
+              <svg v-if="savingWorkHours" class="work-hours-save-spinner" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42 16" /></svg>
               {{ savingWorkHours ? 'Saving...' : 'Save Work Hours' }}
             </button>
           </div>
@@ -1725,6 +1748,8 @@ const addTeacherList     = ref([])
 const addTeacherSearchQuery = ref('')
 const roomSearchQuery = ref('')
 const loadingAddTeachers = ref(false)
+const scheduleDataLoading = ref(true)
+const hasLoadedScheduleData = ref(false)
 
 const filteredAddTeacherList = computed(() => {
   const query = addTeacherSearchQuery.value.trim().toLowerCase()
@@ -2211,7 +2236,35 @@ function isConfiguredTeacherWorkDay(day) {
 function isWithinTeacherWorkHours(slot, day) {
   const { startTime, endTime } = teacherWorkHoursForDay(day)
   const slotMinutes = parseTime(slot)
-  return Boolean(startTime && endTime && slotMinutes >= parseTime(startTime) && slotMinutes < parseTime(endTime))
+  const workStartMinutes = parseTime(startTime)
+  const workEndMinutes = parseTime(endTime)
+  // Include one extra half-hour row after the configured end time.
+  return Boolean(startTime && endTime && slotMinutes >= workStartMinutes && slotMinutes < workEndMinutes + 30)
+}
+
+function teacherWorkHoursEntryCellStyle30(slot, day) {
+  if (addMode.value !== 'teacher' || !selectedTeacher.value) return {}
+  const entries = getEntriesForCell30(slot, day)
+  if (!entries.length) return {}
+
+  const { startTime, endTime } = teacherWorkHoursForDay(day)
+  if (!startTime || !endTime) return {}
+
+  const cellStart = parseTime(slot)
+  const cellEnd = cellStart + getScheduleRowspan30(entries[0]) * 30
+  const workStart = parseTime(startTime)
+  const workEnd = parseTime(endTime) + 30
+  const overlapStart = Math.max(cellStart, workStart)
+  const overlapEnd = Math.min(cellEnd, workEnd)
+  if (overlapStart >= overlapEnd) return { backgroundColor: '#fff' }
+  if (overlapStart <= cellStart && overlapEnd >= cellEnd) return { backgroundColor: '#e8f2ec' }
+
+  const duration = cellEnd - cellStart
+  const greenStart = ((overlapStart - cellStart) / duration) * 100
+  const greenEnd = ((overlapEnd - cellStart) / duration) * 100
+  return {
+    background: `linear-gradient(to bottom, #fff 0%, #fff ${greenStart}%, #e8f2ec ${greenStart}%, #e8f2ec ${greenEnd}%, #fff ${greenEnd}%, #fff 100%)`,
+  }
 }
 
 function isOutsideTeacherWorkHours(slot, day) {
@@ -2434,6 +2487,7 @@ function syncEntriesFromApi(apiEntries) {
 }
 
 async function refreshScheduleData(preferredLabel = '') {
+  if (!hasLoadedScheduleData.value) scheduleDataLoading.value = true
   const termId = getSelectedTermId()
   const scheduleQuery = termId ? `?academicTermId=${encodeURIComponent(termId)}` : ''
   const [tablesPayload, schedulesPayload] = await Promise.all([
@@ -2481,6 +2535,8 @@ async function refreshScheduleData(preferredLabel = '') {
 
   syncPagesFromApi(tablesPayload.tables, preferredLabel)
   syncEntriesFromApi(schedulesPayload.entries)
+  hasLoadedScheduleData.value = true
+  scheduleDataLoading.value = false
 }
 
 /* ── Conflict checking ── */
@@ -2710,6 +2766,7 @@ const showLunchBreakPicker = ref(false)
 const savingLunchBreak = ref(false)
 const showWorkHoursPicker = ref(false)
 const savingWorkHours = ref(false)
+const workHoursTargetDay = ref('')
 const workHoursError = ref('')
 const workHoursForm = reactive({ byDay: emptyWorkHoursByDay() })
 const workHoursFormError = computed(() => {
@@ -2893,11 +2950,19 @@ function openLunchBreakPicker(initialDay = form.day) {
   showLunchBreakPicker.value = true
 }
 
-function openWorkHoursPicker() {
+function openWorkHoursPicker(targetDay = '') {
   const table = scheduleTables.value.find(item => item.label === selectedTeacher.value)
+  workHoursTargetDay.value = days.includes(targetDay) ? targetDay : ''
   workHoursForm.byDay = workHoursByDayFromTable(table)
   workHoursError.value = ''
   showWorkHoursPicker.value = true
+}
+
+function handleWorkHoursStartChange(day) {
+  const dayHours = workHoursForm.byDay[day]
+  if (dayHours.startTime && dayHours.endTime && parseTime(dayHours.endTime) <= parseTime(dayHours.startTime)) {
+    dayHours.endTime = ''
+  }
 }
 
 async function saveWorkHours() {
@@ -3898,6 +3963,7 @@ onMounted(async () => {
     }
     await refreshScheduleData()
   } catch (error) {
+    scheduleDataLoading.value = false
     await showScheduleError(error, 'Unable to load schedules')
   }
 })
@@ -4364,6 +4430,19 @@ onMounted(async () => {
 .sched-grid-wrap {
   width: 100%; overflow-x: auto; margin-top: 8px; position: relative;
 }
+.timetable-skeleton { min-width: 800px; overflow: hidden; border: 1px solid #ccd4d9; border-radius: 12px; background: #fff; }
+.timetable-skeleton-header,
+.timetable-skeleton-row { display: grid; grid-template-columns: 90px repeat(6, minmax(0, 1fr)); }
+.timetable-skeleton-header { height: 48px; background: #424c55; }
+.timetable-skeleton-header i { width: 54%; height: 13px; margin: 16px auto; border-radius: 6px; background: rgba(255,255,255,.2); }
+.timetable-skeleton-row { height: 44px; }
+.timetable-skeleton-row > i { position: relative; overflow: hidden; margin: 1px; background: #f1f3f4; }
+.timetable-skeleton-row > i:not(.timetable-skeleton-time) { background: #f7f8f9; }
+.timetable-skeleton-row .timetable-skeleton-time { background: #edf0f2; }
+.timetable-skeleton-row > i.skeleton-block { margin: 3px; border-radius: 8px; background: #ead18a; }
+.timetable-skeleton-row > i::after { position: absolute; inset: 0; content: ''; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.64), transparent); animation: timetable-skeleton-shimmer 1.35s ease-in-out infinite; }
+@keyframes timetable-skeleton-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .timetable-skeleton-row > i::after { animation: none; } }
 .sched-grid {
   width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 800px;
 }
@@ -4798,44 +4877,56 @@ onMounted(async () => {
 .lunch-break-picker-field select { min-height: 46px; padding: 10px 36px 10px 12px; color: #303b43; border-color: #c5ced3; border-radius: 9px; background: #fff; font-size: .82rem; font-weight: 500; outline: none; }
 .lunch-break-picker-field select.is-placeholder { color: #8b959b; font-weight: 400; }
 .lunch-break-picker-field select:focus { border-color: #7d8a93; box-shadow: 0 0 0 3px rgba(70,84,94,.1); }
-.work-hours-picker { width: min(1120px, calc(100vw - 40px)); max-width: none; max-height: calc(100vh - 32px); overflow-y: auto; }
-.work-hours-day-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; padding: 18px 22px 4px; }
-.work-hours-day-column { min-width: 0; padding: 0 10px; border-right: 1px solid #dce2e5; }
-.work-hours-day-column:last-child { border-right: 0; }
-.work-hours-day-column h3 { margin: 0 0 14px; color: #34414a; font-size: .78rem; font-weight: 720; text-align: center; }
-.work-hours-day-field { display: grid; gap: 6px; margin-bottom: 12px; color: #59666f; font-size: .68rem; font-weight: 680; }
-.work-hours-day-field select { width: 100%; min-height: 40px; padding: 8px 25px 8px 8px; color: #303b43; border: 1px solid #c5ced3; border-radius: 8px; background: #fff; font-size: .7rem; font-weight: 500; }
+.work-hours-picker { width: min(1160px, calc(100vw - 40px)); max-width: none; max-height: calc(100vh - 32px); overflow-y: auto; border: 1px solid rgba(255,255,255,.9); border-radius: 22px; background: #f6f8f9; box-shadow: 0 28px 90px rgba(22,32,39,.28); }
+.work-hours-picker .lunch-break-picker-header { padding: 22px 26px; background: linear-gradient(135deg,#fff 0%,#f2f6f7 100%); }
+.work-hours-picker .lunch-break-picker-icon { color: #37674f; border-color: #c8ddd1; background: #e6f1ea; }
+.work-hours-picker .lunch-break-picker-help { margin-top: 18px; padding: 13px 15px; color: #53636b; border-left-color: #84939a; border-radius: 10px; background: #edf1f3; font-size: .77rem; }
+.work-hours-day-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; padding: 20px 22px 8px; }
+.work-hours-day-column { min-width: 0; padding: 14px 11px 6px; border: 1px solid #e0e7e8; border-radius: 13px; background: linear-gradient(180deg,#fff 0%,#fbfcfc 100%); box-shadow: 0 3px 10px rgba(34,48,54,.035); transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.work-hours-day-column.is-target-day { margin-block: -5px; padding: 19px 11px 11px; border-color: #9bc4aa; background: linear-gradient(180deg,#f0f8f3 0%,#e7f2eb 100%); box-shadow: 0 5px 16px rgba(54,112,76,.11), inset 0 0 0 1px rgba(84,157,111,.16); }
+.work-hours-day-column:last-child { border-right: 1px solid #e0e7e8; }
+.work-hours-day-column h3 { margin: 0 0 14px; padding-bottom: 10px; color: #34414a; border-bottom: 1px solid #e8edee; font-size: .78rem; font-weight: 760; text-align: center; }
+.work-hours-day-column.is-target-day h3 { color: #35664b; border-bottom-color: #d3e6d9; }
+.work-hours-day-field { display: grid; gap: 7px; margin-bottom: 13px; color: #59666f; font-size: .69rem; font-weight: 700; }
+.work-hours-day-field select { width: 100%; min-height: 43px; padding: 8px 25px 8px 10px; color: #303b43; border: 1px solid #cbd5d9; border-radius: 9px; background: #fff; font-size: .72rem; font-weight: 550; transition: border-color .16s ease, box-shadow .16s ease; }
 .work-hours-day-field select.is-placeholder { color: #8b959b; font-weight: 400; }
-.work-hours-day-field select:focus { border-color: #7d8a93; outline: none; box-shadow: 0 0 0 3px rgba(70,84,94,.1); }
-.work-hours-total { margin: 12px 22px 0; padding: 10px 12px; color: #40534e; border-left: 3px solid #5f8174; border-radius: 0 8px 8px 0; background: #e9f0ed; }
-.work-hours-total-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: .76rem; font-weight: 650; }
-.work-hours-total-heading strong { color: #314b40; font-size: .9rem; white-space: nowrap; }
-.work-hours-total p { margin: 4px 0 0; color: #66766f; font-size: .67rem; line-height: 1.45; }
+.work-hours-day-field select:focus { border-color: #6e9a7c; outline: none; box-shadow: 0 0 0 3px rgba(70,132,88,.14); }
+.work-hours-total { margin: 14px 22px 0; padding: 16px 18px 13px; color: #40534e; border: 1px solid #cfe0d5; border-left: 5px solid #4d8b64; border-radius: 14px; background: linear-gradient(110deg,#eaf4ed 0%,#f3f8f4 68%,#e5f0e9 100%); box-shadow: 0 7px 20px rgba(40,91,58,.08); }
+.work-hours-total-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: .78rem; font-weight: 720; }
+.work-hours-total-heading > span { color: #476254; }
+.work-hours-total-heading strong { display: inline-flex; align-items: baseline; gap: 3px; color: #245b3a; font-size: 1.45rem; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.work-hours-total-heading strong small { color: #5e7868; font-size: .74rem; font-weight: 650; }
+.work-hours-total-track { height: 8px; margin-top: 12px; overflow: hidden; border-radius: 99px; background: #d3e3d8; }
+.work-hours-total-track span { display: block; height: 100%; min-width: 0; border-radius: inherit; background: linear-gradient(90deg,#73ad82,#377b4f); transition: width .25s ease; }
+.work-hours-total p { margin: 9px 0 0; color: #62766a; font-size: .69rem; line-height: 1.5; }
 .work-hours-total.over-limit { color: #804747; border-left-color: #b85c5c; background: #f8eaea; }
 .work-hours-total.over-limit .work-hours-total-heading strong { color: #9b3535; }
+.work-hours-total.over-limit .work-hours-total-track { background: #ecd3d3; }
+.work-hours-total.over-limit .work-hours-total-track span { background: linear-gradient(90deg,#d77b70,#aa3939); }
 .work-hours-total.over-limit p { color: #8a5e5e; }
 .lunch-break-picker-error { margin: 14px 22px 0; padding: 10px 11px; color: #884848; border: 1px solid #e2caca; background: #f8eaea; font-size: .74rem; line-height: 1.45; }
 .lunch-break-picker-actions { margin: 18px 0 0; padding: 14px 22px 19px; border-top: 1px solid #dbe1e4; background: #edf1f2; }
 .lunch-break-picker-actions .cancel-btn-text { min-height: 40px; padding: 8px 14px; color: #5a6770; border: 1px solid transparent; border-radius: 8px; font-size: .76rem; font-weight: 650; }
 .lunch-break-picker-actions .cancel-btn-text:hover { border-color: #ced6da; background: #fff; opacity: 1; }
 .lunch-break-picker-actions .save-btn { min-height: 42px; padding: 9px 18px; border: 1px solid #414d56; border-radius: 9px; background: linear-gradient(145deg,#64717b,#37434c); box-shadow: 0 4px 10px rgba(38,46,52,.16); font-size: .76rem; }
+.work-hours-picker .lunch-break-picker-actions .save-btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-width: 168px; }
+.work-hours-save-spinner { width: 16px; height: 16px; flex: 0 0 auto; animation: work-hours-save-spin .75s linear infinite; }
+@keyframes work-hours-save-spin { to { transform: rotate(360deg); } }
 .lunch-break-picker-actions .save-btn:disabled { color: #929aa0; border-color: #d1d7db; background: #dfe3e5; box-shadow: none; opacity: 1; }
 .lunch-break-clear-btn { min-height: 40px; margin-right: auto; padding: 8px 13px; color: #a33c3c; border: 1px solid #e2baba; border-radius: 8px; background: #fff6f6; font-size: .74rem; font-weight: 650; cursor: pointer; }
 .lunch-break-clear-btn:hover { border-color: #c98787; background: #fbeaea; }
 @media (max-width: 1000px) {
   .work-hours-day-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 18px; }
-  .work-hours-day-column:nth-child(3) { border-right: 0; }
 }
 @media (max-width: 620px) {
   .work-hours-picker { width: calc(100vw - 24px); max-height: calc(100vh - 24px); }
-  .work-hours-day-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 4px; padding: 16px 12px 4px; }
-  .work-hours-day-column { padding: 0 8px; }
-  .work-hours-day-column:nth-child(3) { border-right: 1px solid #dce2e5; }
-  .work-hours-day-column:nth-child(even) { border-right: 0; }
+  .work-hours-day-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 16px 14px 6px; }
+  .work-hours-day-column { padding: 12px 9px 4px; }
+  .work-hours-day-column.is-target-day { padding: 17px 9px 9px; }
   .work-hours-picker .lunch-break-picker-header { padding-right: 14px; padding-left: 14px; }
   .work-hours-picker .lunch-break-picker-help { margin-right: 14px; margin-left: 14px; }
-  .work-hours-total { margin-right: 14px; margin-left: 14px; }
-  .work-hours-total-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .work-hours-total { margin-right: 14px; margin-left: 14px; padding: 14px; }
+  .work-hours-total-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
 }
 /* Edit schedule hierarchy */
 .schedule-entry-modal .schedule-teacher-field,
@@ -5135,8 +5226,8 @@ onMounted(async () => {
 .icon-btn.consult-btn { width: 38px; height: 38px; border-radius: 8px; color: #fff; border-color: #3e4b55; background: linear-gradient(145deg,#62717b,#35434c); box-shadow: 0 3px 8px rgba(38,48,55,.17); }
 .icon-btn.lunch-break-toolbar-btn { width: 38px; height: 38px; justify-content: center; padding: 0; border-radius: 8px; color: #45545e; border-color: #c7d0d5; background: linear-gradient(145deg,#f8fafb,#e3e8ea); box-shadow: 0 3px 8px rgba(38,48,55,.1); }
 .icon-btn.lunch-break-toolbar-btn:hover { color: #263640; border-color: #99a7af; background: #fff; }
-.icon-btn.work-hours-toolbar-btn { width: 38px; height: 38px; justify-content: center; padding: 0; border-radius: 8px; color: #45545e; border-color: #c7d0d5; background: linear-gradient(145deg,#f8fafb,#e3e8ea); box-shadow: 0 3px 8px rgba(38,48,55,.1); }
-.icon-btn.work-hours-toolbar-btn:hover { color: #263640; border-color: #99a7af; background: #fff; }
+.icon-btn.work-hours-toolbar-btn { width: 38px; height: 38px; justify-content: center; padding: 0; border-radius: 8px; color: #426c52; border-color: rgba(84,157,111,.3); background: rgba(84,157,111,.16); box-shadow: 0 3px 8px rgba(38,48,55,.1); }
+.icon-btn.work-hours-toolbar-btn:hover { color: #315a40; border-color: rgba(84,157,111,.48); background: rgba(84,157,111,.24); }
 .main .sched-grid-wrap {
   width: 100%;
   margin: 0;
@@ -6050,12 +6141,17 @@ onMounted(async () => {
 .sched-grid td.td-cell { background-color: #f8f9fa; }
 .sched-grid td.td-cell:hover { background-color: #edf1f3; }
 .sched-grid td.td-cell.readonly-entry-cell:hover { background-color: #f8f9fa; }
-.sched-grid .work-hours-summary-row th { height: 34px; padding: 7px 5px; color: #40534e; border-bottom: 1px solid #d6e0dc; background: #e8efec; font-size: .66rem; font-weight: 680; white-space: nowrap; }
+.sched-grid .work-hours-summary-row th { height: 34px; padding: 7px 5px; color: #40534e; border-bottom: 1px solid #d6e0dc; border-radius: 0 !important; background: rgba(84, 157, 111, .16); font-size: .66rem; font-weight: 680; white-space: nowrap; }
 .sched-grid .work-hours-summary-row th.th-time { color: #5d6c67; font-size: .61rem; }
-.sched-grid td.td-cell.faculty-work-hours-cell:not(.has-entry):not(.consult-cell) { background-color: #edf5f1; }
-.sched-grid td.td-cell.faculty-work-hours-cell:not(.has-entry):not(.consult-cell):hover { background-color: #e2eee8; }
-.sched-grid td.td-cell.faculty-outside-work-hours-cell:not(.has-entry):not(.consult-cell) { background-color: #f1f3f4; }
-.sched-grid td.td-cell.faculty-outside-work-hours-cell:not(.has-entry):not(.consult-cell):hover { background-color: #e9edef; }
+.work-hours-day-trigger { width: 100%; min-height: 32px; padding: 4px; color: inherit; border: 0; border-radius: 0; background: transparent; font: inherit; cursor: pointer; }
+.work-hours-day-trigger:hover { color: #315a40; background: rgba(84,157,111,.12); }
+.work-hours-day-trigger:focus-visible { position: relative; z-index: 1; outline: 2px solid #4f9668; outline-offset: -2px; }
+.sched-grid td.td-cell.faculty-work-hours-cell:not(.consult-cell),
+.sched-grid td.td-cell.faculty-work-hours-cell:not(.consult-cell):hover { background: #e8f2ec; }
+.sched-grid td.td-cell.faculty-work-hours-not-set-cell:not(.has-entry):not(.consult-cell),
+.sched-grid td.td-cell.faculty-work-hours-not-set-cell:not(.has-entry):not(.consult-cell):hover { background-color: #fff; }
+.sched-grid td.td-cell.faculty-outside-work-hours-cell:not(.consult-cell) { background-color: #fff; }
+.sched-grid td.td-cell.faculty-outside-work-hours-cell:not(.consult-cell):hover { background-color: #fff; }
 .consult-modal-content > .consult-right-pane { background: transparent !important; }
 .consult-empty .consult-empty-icon { display: grid !important; place-items: center; align-self: center; line-height: 0; }
 .consult-empty .consult-empty-icon svg { display: block; width: 28px; height: 28px; flex: 0 0 auto; margin: 0; }

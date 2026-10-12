@@ -674,13 +674,57 @@ function toSafeSession(session, currentSessionId) {
 
 async function listSessions(req, res) {
   try {
-    const user = await User.findById(req.user.id).select("activeSessions").lean();
+    const user = await User.findById(req.user.id).select("activeSessions trustedDevices").lean();
     if (!user) return res.status(404).json({ message: "User not found." });
     const now = Date.now();
-    const sessions = (user.activeSessions || [])
+    const trustedDeviceHashes = new Set((user.trustedDevices || []).map((device) => device.keyHash).filter(Boolean));
+    const activeSessions = (user.activeSessions || [])
       .filter((session) => new Date(session.expiresAt).getTime() > now)
-      .sort((first, second) => new Date(second.lastActiveAt || second.createdAt) - new Date(first.lastActiveAt || first.createdAt))
-      .map((session) => toSafeSession(session, req.user.sid));
+      .sort((first, second) => new Date(second.lastActiveAt || second.createdAt) - new Date(first.lastActiveAt || first.createdAt));
+
+    // A trusted browser/device is one item in Recent Devices, even if it has
+    // accumulated multiple active login sessions. Older sessions can lack a
+    // stable key (or have a different key after browser storage was reset), so
+    // fold matching reported device names into the trusted device entry too.
+    const trustedSessionsByLabel = new Map();
+    const sessions = [];
+    for (const session of activeSessions) {
+      const isTrusted = Boolean(session.deviceKeyHash && trustedDeviceHashes.has(session.deviceKeyHash));
+      if (!isTrusted) continue;
+
+      const deviceLabel = String(session.device || "Unknown device").trim();
+      const groupKey = deviceLabel.toLowerCase() === "unknown device"
+        ? `unknown:${session.deviceKeyHash}`
+        : deviceLabel;
+      let grouped = trustedSessionsByLabel.get(groupKey);
+      if (!grouped) {
+        grouped = { ...toSafeSession(session, req.user.sid), sessionIds: [], current: false, trusted: true };
+        trustedSessionsByLabel.set(groupKey, grouped);
+        sessions.push(grouped);
+      }
+      grouped.sessionIds.push(session.id);
+      if (String(session.id) === String(req.user.sid || "")) grouped.current = true;
+    }
+
+    for (const session of activeSessions) {
+      const isTrusted = Boolean(session.deviceKeyHash && trustedDeviceHashes.has(session.deviceKeyHash));
+      if (isTrusted) continue;
+
+      const deviceLabel = String(session.device || "Unknown device").trim();
+      const groupKey = deviceLabel.toLowerCase() === "unknown device" ? "" : deviceLabel;
+      const trustedDevice = groupKey ? trustedSessionsByLabel.get(groupKey) : null;
+      if (trustedDevice) {
+        trustedDevice.sessionIds.push(session.id);
+        const sessionLastActiveAt = session.lastActiveAt || session.createdAt;
+        const groupedLastActiveAt = trustedDevice.lastActiveAt || trustedDevice.createdAt;
+        if (new Date(sessionLastActiveAt).getTime() > new Date(groupedLastActiveAt).getTime()) {
+          trustedDevice.lastActiveAt = sessionLastActiveAt;
+        }
+        if (String(session.id) === String(req.user.sid || "")) trustedDevice.current = true;
+      } else {
+        sessions.push({ ...toSafeSession(session, req.user.sid), sessionIds: [session.id], trusted: false });
+      }
+    }
     return res.status(200).json({ sessions });
   } catch (error) {
     return res.status(500).json({ message: "Unable to load recent devices.", error: error.message });
@@ -692,11 +736,22 @@ async function revokeSession(req, res) {
     const sessionId = String(req.params.sessionId || "");
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found." });
-    const sessionExists = (user.activeSessions || []).some((session) => String(session.id) === sessionId);
-    if (!sessionExists) return res.status(404).json({ message: "That device session is no longer active." });
-    user.activeSessions = user.activeSessions.filter((session) => String(session.id) !== sessionId);
+    const targetSession = (user.activeSessions || []).find((session) => String(session.id) === sessionId);
+    if (!targetSession) return res.status(404).json({ message: "That device session is no longer active." });
+    const trusted = Boolean(targetSession.deviceKeyHash && (user.trustedDevices || []).some((device) => device.keyHash === targetSession.deviceKeyHash));
+    const requestedSessionIds = Array.isArray(req.body?.sessionIds)
+      ? req.body.sessionIds.map((id) => String(id))
+      : [sessionId];
+    const requestedSessionIdSet = new Set(requestedSessionIds);
+    const revokedSessionIds = trusted
+      ? user.activeSessions
+          .filter((session) => session.deviceKeyHash === targetSession.deviceKeyHash || requestedSessionIdSet.has(String(session.id)))
+          .map((session) => String(session.id))
+      : [sessionId];
+    const revokedSessionIdSet = new Set(revokedSessionIds);
+    user.activeSessions = user.activeSessions.filter((session) => !revokedSessionIdSet.has(String(session.id)));
     await user.save();
-    return res.status(200).json({ message: "Device signed out." });
+    return res.status(200).json({ message: "Device signed out.", sessionIds: revokedSessionIds });
   } catch (error) {
     return res.status(500).json({ message: "Unable to sign out that device.", error: error.message });
   }

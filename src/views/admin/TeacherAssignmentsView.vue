@@ -566,15 +566,19 @@ function canAutoRefresh() {
   return !Object.keys(unsavedChanges.value || {}).length
 }
 
-const statusTabs = ['All', 'On School', 'On Event', 'On Meeting', 'On Leave', 'Offline']
+const statusTabs = ['All', 'On School', 'On Event', 'On Meeting', 'Off Campus', 'On Leave', 'Offline']
+const scheduleStatusDisplayByTeacherId = ref({})
 
 function normalizeTeacherStatus(status) {
   if (!status) return 'On School'
-  return String(status).trim() === 'In School' ? 'On School' : String(status).trim()
+  const normalized = String(status).trim()
+  if (normalized === 'In School' || normalized === 'On School - In Class') return 'On School'
+  return normalized
 }
 
 function statusCssClass(status) {
   const normalized = normalizeTeacherStatus(status)
+  if (normalized === 'Off Campus') return 'off-campus'
   return normalized === 'On School' ? 'in-school' : normalized.toLowerCase().replace(/\s+/g, '-')
 }
 
@@ -590,6 +594,7 @@ function selectStatusTab(tab) {
 const emptyStatusDescription = computed(() => {
   const descriptions = {
     'On School': 'currently on school',
+    'Off Campus': 'currently off campus',
     'On Meeting': 'currently in a meeting',
     'On Leave': 'currently on leave',
     Offline: 'currently offline',
@@ -828,7 +833,9 @@ function displayTeacherStatus(teacher) {
   if (adminStatus === 'Offline' || teacher.teacher_clocked_out) return 'Offline'
   const eventStatus = eventStatusByTeacherId.value[String(teacher.id)]
   if (eventStatus) return eventStatus
-  if (adminStatus === 'On School') return adminStatus
+  if (adminStatus === 'On School') {
+    return scheduleStatusDisplayByTeacherId.value[String(teacher.id)] || adminStatus
+  }
   const actualStatus = getActualTeacherStatus(teacher)
   return actualStatus
 }
@@ -954,7 +961,15 @@ async function loadTeachers() {
   const showLoadingState = teachers.value.length === 0
   if (showLoadingState) loadingTeachers.value = true
   try {
-    const payload = await apiRequest('/users?role=teacher')
+    const [payload, scheduleStatusPayload] = await Promise.all([
+      apiRequest('/users?role=teacher'),
+      apiRequest('/consultations/teachers').catch(() => ({ teachers: [] })),
+    ])
+    scheduleStatusDisplayByTeacherId.value = Object.fromEntries(
+      (Array.isArray(scheduleStatusPayload.teachers) ? scheduleStatusPayload.teachers : [])
+        .filter((teacher) => teacher?.id && teacher?.statusDisplay)
+        .map((teacher) => [String(teacher.id), teacher.statusDisplay]),
+    )
     teachers.value = Array.isArray(payload.users)
       ? payload.users
         .filter(user => user && user.id && String(user.account_status || 'Active') === 'Active')
@@ -974,19 +989,23 @@ async function loadTeachers() {
 }
 
 const statusPriority = {
-  'On School': 0,
-  'On Event': 0,
-  'On Meeting': 1,
-  'On Leave': 2,
-  Offline: 3,
+  'On School': 2,
+  'On Event': 3,
+  'On Meeting': 4,
+  'On Leave': 5,
+  Offline: 6,
 }
 
 const filteredTeachers = computed(() => {
   const sortTeachers = (items) => [...items].sort((a, b) => {
-    const aStatus = normalizeTeacherStatus(displayTeacherStatus(a))
-    const bStatus = normalizeTeacherStatus(displayTeacherStatus(b))
-    const aPriority = statusPriority[aStatus] ?? 99
-    const bPriority = statusPriority[bStatus] ?? 99
+    const priorityFor = (teacher) => {
+      const displayStatus = String(displayTeacherStatus(teacher) || '').trim()
+      if (displayStatus === 'On School - In Class') return 0
+      if (displayStatus === 'Off Campus') return 1
+      return statusPriority[normalizeTeacherStatus(displayStatus)] ?? 99
+    }
+    const aPriority = priorityFor(a)
+    const bPriority = priorityFor(b)
     if (aPriority !== bPriority) return aPriority - bPriority
     return (a.name || '').localeCompare(b.name || '')
   })
@@ -1681,6 +1700,11 @@ onUnmounted(() => {
   background-color: #f0fdf4;
 }
 
+.card-off-campus {
+  border: 2px solid #e7a34e;
+  background-color: #fff8eb;
+}
+
 .card-on-leave {
   border: 2px solid #ef4444;
   background-color: #fef2f2;
@@ -1704,6 +1728,11 @@ onUnmounted(() => {
 
 .badge-in-school {
   background-color: #16a34a;
+  color: white;
+}
+
+.badge-off-campus {
+  background-color: #d98428;
   color: white;
 }
 
@@ -2608,8 +2637,9 @@ onUnmounted(() => {
 .teacher-card.card-on-leave::before { background: #9b7272; }
 .teacher-card.card-on-meeting::before { background: #a78c53; }
 .teacher-card.card-on-event::before { background: #3977b8; }
-.status-badge { top: 14px; right: 14px; display: flex; align-items: center; gap: 5px; padding: 5px 8px; color: #53616a !important; border: 1px solid #d8dee2; border-radius: 999px; background: #f1f3f4 !important; font-size: .58rem; letter-spacing: .04em; }
+.status-badge { position: relative; inset: auto; align-self: flex-end; display: flex; align-items: center; justify-content: center; max-width: 100%; margin: 0 0 8px; padding: 5px 10px; color: #53616a !important; border: 1px solid #d8dee2; border-radius: 999px; background: #f1f3f4 !important; font-size: .62rem; letter-spacing: .04em; line-height: 1.25; text-align: center; white-space: normal; overflow-wrap: anywhere; }
 .badge-in-school { color: #276842 !important; border-color: #bddbc8; background: #e8f5ed !important; }
+.badge-off-campus { color: #8b551a !important; border-color: #e2c99e; background: #fff4e3 !important; }
 .badge-on-leave { color: #7d4545 !important; border-color: #dec5c5; background: #f7eded !important; }
 .badge-on-meeting { color: #765f2e !important; border-color: #e1d5b8; background: #f8f3e7 !important; }
 .badge-on-event { color: #285d94 !important; border-color: #bfd3e8; background: #eaf3fb !important; }
@@ -2980,7 +3010,7 @@ onUnmounted(() => {
   .layout > .main .designated-label,
   .layout > .main .substitute-label { font-size: .55rem; }
   .layout > .main .status-dropdown { min-height: 35px; padding: 6px 9px; font-size: .64rem; }
-  .layout > .main .status-badge { top: 10px; right: 10px; padding: 4px 6px; font-size: .52rem; }
+  .layout > .main .status-badge { position: relative; inset: auto; max-width: 100%; margin-bottom: 7px; padding: 4px 6px; font-size: .52rem; }
   .layout > .main .area-tag { padding: 5px 7px; font-size: .59rem; }
   .layout > .main .leave-coverage-notice strong { font-size: .68rem; }
   .layout > .main .leave-coverage-notice small { font-size: .6rem; }

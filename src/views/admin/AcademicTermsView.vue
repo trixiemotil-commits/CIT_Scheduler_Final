@@ -80,7 +80,6 @@
             <span class="mode-copy"><strong>Faculty</strong><small>{{ workspaceAction === 'add' ? 'Choose a faculty member to manage their schedule' : 'See each faculty member’s complete schedule' }}</small></span>
             <span class="mode-arrow" aria-hidden="true">{{ workspacePendingMode === 'teacher' ? 'Loading…' : '→' }}</span>
           </button>
-          <p v-if="workspaceLoading" class="mode-loading-note" role="status">Loading {{ workspacePendingMode === 'teacher' ? 'faculty' : workspacePendingMode }} schedules…</p>
         </div>
 
         <template v-else>
@@ -173,7 +172,20 @@
             <button :class="{ active: termFilter === 'archived' }" @click="termFilter = 'archived'">Unpublished</button>
           </div>
         </div>
-        <div v-if="loading" class="empty-state">Loading academic terms...</div>
+        <div v-if="loading" class="term-list term-skeleton-list" aria-hidden="true">
+          <article v-for="index in 3" :key="`term-skeleton-${index}`" class="term-row term-skeleton-row">
+            <div class="term-skeleton-summary">
+              <i class="term-skeleton-line title"></i>
+              <i class="term-skeleton-line guidance"></i>
+              <div class="term-skeleton-metrics">
+                <i v-for="metric in 4" :key="`metric-${index}-${metric}`"></i>
+              </div>
+            </div>
+            <div class="term-skeleton-actions">
+              <i></i><i></i><i></i><i></i>
+            </div>
+          </article>
+        </div>
         <div v-else-if="!filteredTerms.length" class="empty-state">No academic terms found.</div>
         <div v-else class="term-list">
           <article v-for="term in filteredTerms" :key="termId(term)" class="term-row" :class="{ 'is-published': term.isPublished }">
@@ -1199,6 +1211,41 @@ loadPage()
 .term-filter button { min-height: 36px; padding: 7px 14px; color: #59646e; font-size: .74rem; font-weight: 600; }
 .term-filter button.active { color: #1f2933; box-shadow: 0 3px 10px rgba(39, 49, 57, .12); }
 .term-list { gap: 14px; }
+.term-skeleton-list { position: relative; }
+.term-skeleton-row { pointer-events: none; }
+.term-skeleton-summary { display: flex; min-width: 0; flex: 1; flex-direction: column; justify-content: center; }
+.term-skeleton-line,
+.term-skeleton-metrics i,
+.term-skeleton-actions i {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #e5e9eb;
+}
+.term-skeleton-line::after,
+.term-skeleton-metrics i::after,
+.term-skeleton-actions i::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.78), transparent);
+  animation: term-skeleton-shimmer 1.35s ease-in-out infinite;
+}
+.term-skeleton-line.title { width: min(260px, 60%); height: 19px; margin-bottom: 12px; }
+.term-skeleton-line.guidance { width: min(370px, 78%); height: 12px; margin-bottom: 19px; }
+.term-skeleton-metrics { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+.term-skeleton-metrics i { width: 118px; height: 35px; border-radius: 999px; }
+.term-skeleton-metrics i:last-child { width: 76px; }
+.term-skeleton-actions { display: grid; width: min(330px, 36%); grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: center; gap: 8px; }
+.term-skeleton-actions i { height: 42px; border-radius: 10px; }
+@keyframes term-skeleton-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .term-skeleton-line::after,
+  .term-skeleton-metrics i::after,
+  .term-skeleton-actions i::after { animation: none; }
+}
 .term-row { position: relative; align-items: stretch; min-height: 170px; padding: 22px; overflow: hidden; border: 1px solid #dce2e6; border-radius: 16px; background: linear-gradient(135deg, #fcfcfc 0%, #f1f4f5 100%); transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
 .term-row:hover { border-color: #b9c4cc; box-shadow: 0 10px 25px rgba(41, 52, 60, .09); transform: translateY(-1px); }
 .term-row.is-published { border-color: #a7cab0; background: linear-gradient(110deg, #fbfefc 0%, #edf7f2 100%); }

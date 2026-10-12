@@ -142,7 +142,14 @@
 
         <!-- Grid -->
         <div class="sched-grid-wrap">
-          <table class="sched-grid">
+          <div v-if="scheduleDataLoading" class="timetable-skeleton" aria-hidden="true">
+            <div class="timetable-skeleton-header"><i v-for="day in 7" :key="`view-head-${day}`"></i></div>
+            <div v-for="slot in timeSlots30" :key="`view-row-${slot}`" class="timetable-skeleton-row">
+              <i class="timetable-skeleton-time"></i>
+              <i v-for="day in 6" :key="`view-cell-${slot}-${day}`" :class="{ 'skeleton-block': (timeSlots30.indexOf(slot) + day * 2) % 6 === 0 }"></i>
+            </div>
+          </div>
+          <table v-else class="sched-grid">
             <thead>
               <tr>
                 <th class="th-time">Time</th>
@@ -877,6 +884,8 @@ const addingSchedule = ref(false)
 const savingConsultation = ref(false)
 const deletingConsultSlotId = ref(null)
 const loadingConsultModal = ref(false)
+const scheduleDataLoading = ref(true)
+const hasLoadedScheduleData = ref(false)
 const exportingSchedule = ref(false)
 let statusToastTimer = null
 let statusToastId = 0
@@ -1337,6 +1346,7 @@ function isEntryBeingEdited(entry) {
 }
 
 async function refreshScheduleData(preferredLabel = '') {
+  if (!hasLoadedScheduleData.value) scheduleDataLoading.value = true
   const [tablesPayload, schedulesPayload] = await Promise.all([
     apiRequest('/schedules/tables'),
     apiRequest('/schedules'),
@@ -1395,6 +1405,8 @@ async function refreshScheduleData(preferredLabel = '') {
 
   syncPagesFromApi(tablesPayload.tables, preferredLabel)
   syncEntriesFromApi(schedulesPayload.entries)
+  hasLoadedScheduleData.value = true
+  scheduleDataLoading.value = false
 }
 
 async function showScheduleError(error, fallbackTitle = 'Unable to save schedule') {
@@ -1970,6 +1982,7 @@ onMounted(async () => {
     
     await refreshScheduleData(filterYear.value)
   } catch (error) {
+    scheduleDataLoading.value = false
     await showScheduleError(error, 'Unable to load schedules')
   }
 })
@@ -2439,6 +2452,19 @@ function confirmLogout() {
   margin-top: 8px;
   position: relative;
 }
+.timetable-skeleton { min-width: 800px; overflow: hidden; border: 1px solid #ccd4d9; border-radius: 12px; background: #fff; }
+.timetable-skeleton-header,
+.timetable-skeleton-row { display: grid; grid-template-columns: 90px repeat(6, minmax(0, 1fr)); }
+.timetable-skeleton-header { height: 48px; background: #424c55; }
+.timetable-skeleton-header i { margin: 16px auto; width: 54%; height: 13px; border-radius: 6px; background: rgba(255,255,255,.2); }
+.timetable-skeleton-row { height: 44px; }
+.timetable-skeleton-row > i { position: relative; overflow: hidden; margin: 1px; background: #f1f3f4; }
+.timetable-skeleton-row > i:not(.timetable-skeleton-time) { background: #f7f8f9; }
+.timetable-skeleton-row .timetable-skeleton-time { background: #edf0f2; }
+.timetable-skeleton-row > i.skeleton-block { margin: 3px; border-radius: 8px; background: #ead18a; }
+.timetable-skeleton-row > i::after { position: absolute; inset: 0; content: ''; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.64), transparent); animation: timetable-skeleton-shimmer 1.35s ease-in-out infinite; }
+@keyframes timetable-skeleton-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .timetable-skeleton-row > i::after { animation: none; } }
 .sched-grid {
   width: 100%;
   border-collapse: collapse;

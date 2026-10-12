@@ -463,6 +463,25 @@ async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTea
   return clockedInToday ? "On School" : "Offline";
 }
 
+function resolveTeacherScheduleDisplayStatus(status, entries = [], now = new Date()) {
+  if (status !== "On School") return status;
+
+  const parts = philippineDateTimeParts(now);
+  const currentMinutes = Number(parts.hour) * 60 + Number(parts.minute);
+  const currentEntries = entries.filter((entry) => {
+    if (entry.day !== parts.weekday || !entry.timeIn || !entry.timeOut) return false;
+    if (String(entry.entryType || "").toLowerCase() === "lunch" || /\blunch(?:\s+break)?\b/i.test(String(entry.subject || ""))) return false;
+    if (String(entry.entryType || "").toLowerCase() === "consultation") return false;
+    const start = parseTimeToMinutes(entry.timeIn);
+    const end = parseTimeToMinutes(entry.timeOut);
+    return start !== null && end !== null && currentMinutes >= start && currentMinutes < end;
+  });
+
+  if (!currentEntries.length) return status;
+  if (currentEntries.some((entry) => entry.campus === "Main Campus" || entry.color === "color-orange")) return "Off Campus";
+  return "On School - In Class";
+}
+
 function normalizeAcademicYear(value) {
   const text = String(value || '').trim().toLowerCase();
   const match = text.match(/([1-4])/);
@@ -741,7 +760,17 @@ async function listTeachersForStudents(req, res) {
       ? await getStudentAcademicContext(req.user.id)
       : { year: "", section: "" };
 
-    const teacherUsers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
+    const requestedTeacherId = mongoose.Types.ObjectId.isValid(req.query.teacherId)
+      ? new mongoose.Types.ObjectId(req.query.teacherId)
+      : null;
+    const requestedTeacherIds = String(req.query.teacherIds || '')
+      .split(',')
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+    const teacherQuery = { $or: [{ role: "teacher" }, { roles: "teacher" }] };
+    if (requestedTeacherIds.length) teacherQuery._id = { $in: requestedTeacherIds };
+    else if (requestedTeacherId) teacherQuery._id = requestedTeacherId;
+    const teacherUsers = await User.find(teacherQuery)
       .select("role roles firstName lastName employeeId department account_status teacher_status teacher_admin_status teacher_time_in teacher_clocked_out teacher_status_expires_at teacher_availability avatar")
       .lean();
     const activeAcademicTermId = await getActiveAcademicTermReference();
@@ -771,7 +800,7 @@ async function listTeachersForStudents(req, res) {
           })
             .lean(),
           ScheduleEntry.find({ teacher: fullName })
-            .select("subject year section")
+            .select("subject year section academicTermId day timeIn timeOut campus color entryType")
             .lean(),
           resolveTeacherStatus(teacherUser, activeEventTeacherIds, allTeachersOnEvent),
         ]);
@@ -804,8 +833,15 @@ async function listTeachersForStudents(req, res) {
           .map((entry) => String(entry?.subject || "").trim())
           .filter(Boolean);
         const uniqueStudentSubjects = [...new Set(studentSubjects)];
+        const currentTermScheduleEntries = scheduleEntries.filter((entry) => (
+          activeAcademicTermId
+            ? String(entry.academicTermId || "") === String(activeAcademicTermId)
+            : !entry.academicTermId
+        ));
+        const statusDisplay = resolveTeacherScheduleDisplayStatus(status, currentTermScheduleEntries);
         const isSubjectTeacher = uniqueStudentSubjects.length > 0;
         const canAcceptRequests = String(status || '').toLowerCase() === "on school"
+          && statusDisplay === status
           && String(teacherUser.teacher_availability || '').toLowerCase() !== "unavailable";
 
         return {
@@ -815,6 +851,7 @@ async function listTeachersForStudents(req, res) {
           avatar: teacherUser.avatar || null,
           department: teacherUser.department || "",
           status,
+          statusDisplay,
           teacher_status: teacherUser.teacher_status || "",
           teacher_time_in: teacherUser.teacher_time_in || null,
           teacher_clocked_out: Boolean(teacherUser.teacher_clocked_out),
@@ -887,11 +924,23 @@ async function createConsultationRequest(req, res) {
     const teacherName = normalizeTeacherFullName(teacherUser);
     const { activeEventTeacherIds, allTeachersOnEvent } = await getActiveEventTeacherContext();
     const teacherStatus = await resolveTeacherStatus(teacherUser, activeEventTeacherIds, allTeachersOnEvent);
+    const activeAcademicTermId = await getActiveAcademicTermReference();
+    const currentScheduleEntries = await ScheduleEntry.find({ teacher: teacherName })
+      .select("academicTermId day timeIn timeOut campus color entryType subject")
+      .lean();
+    const currentTermScheduleEntries = currentScheduleEntries.filter((entry) => (
+      activeAcademicTermId
+        ? String(entry.academicTermId || "") === String(activeAcademicTermId)
+        : !entry.academicTermId
+    ));
+    const teacherScheduleStatus = resolveTeacherScheduleDisplayStatus(teacherStatus, currentTermScheduleEntries);
     const isSubjectTeacher = consultationType === "subject"
       || (!consultationType && Boolean(availabilityId));
 
     if (
       ["On Leave", "Offline", "On Event"].includes(teacherStatus)
+      || teacherScheduleStatus === "On School - In Class"
+      || teacherScheduleStatus === "Off Campus"
       || String(teacherUser.teacher_availability || "").trim().toLowerCase() === "unavailable"
     ) {
       return res.status(409).json({
