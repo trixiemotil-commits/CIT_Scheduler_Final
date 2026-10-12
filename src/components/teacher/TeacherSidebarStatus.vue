@@ -96,6 +96,10 @@ function normalizeTeacherStatus(statusOrObj) {
     const account = String(t.account_status || '').trim()
     if (account && account !== 'Active') return 'On Leave'
 
+    const adminStatus = String(t.teacher_admin_status || '').trim().toLowerCase()
+    if (adminStatus === 'on leave' || adminStatus === 'leave') return 'On Leave'
+    if (adminStatus === 'offline') return 'Offline'
+
     if (t.teacher_status_expires_at) {
       try {
         const expires = new Date(t.teacher_status_expires_at)
@@ -109,6 +113,7 @@ function normalizeTeacherStatus(statusOrObj) {
 
     const statusRaw = String(t.teacher_status || t.status || '').trim().toLowerCase()
     if (statusRaw === 'on leave' || statusRaw === 'leave') return 'On Leave'
+    if (statusRaw === 'offline') return 'Offline'
     if (statusRaw === 'on meeting' || statusRaw === 'on-meeting') return 'On Meeting'
     if (statusRaw === 'off campus' || statusRaw === 'off-campus') return 'Off Campus'
     return 'On School'
@@ -117,6 +122,7 @@ function normalizeTeacherStatus(statusOrObj) {
   const normalized = String(statusOrObj || '').trim()
   const lower = normalized.toLowerCase()
   if (lower === 'on leave' || lower === 'leave') return 'On Leave'
+  if (lower === 'offline') return 'Offline'
   if (lower === 'on meeting' || lower === 'on-meeting') return 'On Meeting'
   if (lower === 'off campus' || lower === 'off-campus') return 'Off Campus'
   return 'On School'
@@ -129,12 +135,13 @@ const normalizedStatus = computed(() => {
   }
   return normalizeTeacherStatus(teacherStatus.value)
 })
-const isOffline = computed(() => normalizedStatus.value === 'On Leave')
+const isOffline = computed(() => ['On Leave', 'Offline'].includes(normalizedStatus.value))
 
 const statusDisplay = computed(() => {
   if (normalizedStatus.value === 'On School') return scheduleStatusDisplay.value || 'On School'
   if (normalizedStatus.value === 'On Meeting') return 'On Meeting'
   if (normalizedStatus.value === 'Off Campus') return 'Off Campus'
+  if (normalizedStatus.value === 'On Leave') return 'On Leave'
   return 'Offline'
 })
 
@@ -151,9 +158,13 @@ const canChangeAvailability = computed(() => (
 ))
 const workStatusDisabled = computed(() => isOffline.value)
 const statusDotClass = computed(() => {
-  if (isOffline.value) return 'is-offline'
-  if (normalizedStatus.value === 'On School' && scheduleStatusDisplay.value === 'Off Campus') return 'is-off-campus'
-  return normalizedStatus.value === 'On School' ? 'is-in-school' : 'is-on-leave'
+  if (normalizedStatus.value === 'On Leave') return 'is-on-leave'
+  if (normalizedStatus.value === 'Offline') return 'is-offline'
+  const visibleStatus = normalizedStatus.value === 'On School' ? scheduleStatusDisplay.value : normalizedStatus.value
+  if (visibleStatus === 'On Meeting') return 'is-on-meeting'
+  if (visibleStatus === 'On Event') return 'is-on-event'
+  if (visibleStatus === 'Off Campus') return 'is-off-campus'
+  return 'is-in-school'
 })
 const availabilityDotClass = computed(() => {
   if (!canChangeAvailability.value) return 'is-offline'
@@ -412,6 +423,8 @@ onBeforeUnmount(() => {
 .sidebar-status-dot.is-in-school { background: #40916c; }
 .sidebar-status-dot.is-off-campus { background: #d98428; box-shadow: 0 0 0 3px rgba(217,132,40,.13); }
 .sidebar-status-dot.is-on-leave { background: #e63946; }
+.sidebar-status-dot.is-on-meeting { background: #e58a24; box-shadow: 0 0 0 3px rgba(229,138,36,.14); }
+.sidebar-status-dot.is-on-event { background: #3478c8; box-shadow: 0 0 0 3px rgba(52,120,200,.14); }
 .sidebar-status-dot.is-offline { background: #98a2b3; }
 
 .sidebar-status-action-row {
@@ -451,6 +464,8 @@ onBeforeUnmount(() => {
 .sidebar-status-value.is-in-school { color: #28613f; border-color: #9bc6aa; background: #e8f3ec; }
 .sidebar-status-value.is-off-campus { color: #8b551a; border-color: #e2b979; background: #fff4e3; }
 .sidebar-status-value.is-on-leave { color: #9f3e46; border-color: #d8a3a8; background: #faebec; }
+.sidebar-status-value.is-on-meeting { color: #9a5b16; border-color: #e6bd86; background: #fff2df; }
+.sidebar-status-value.is-on-event { color: #285f9d; border-color: #a8c5e7; background: #eaf3ff; }
 .sidebar-status-value.is-offline { color: #59636a; border-color: #b7c0c5; background: #e5e8ea; }
 
 .sidebar-status-select {
@@ -547,13 +562,15 @@ onBeforeUnmount(() => {
   font-weight: 800;
 }
 
-.collapsed-status-modal-value.is-on-leave,
 .collapsed-status-modal-value.is-offline {
   border-color: #b7c0c5;
   background: #e5e8ea;
   color: #59636a;
 }
 .collapsed-status-modal-value.is-off-campus { color: #8b551a; border-color: #e2b979; background: #fff4e3; }
+.collapsed-status-modal-value.is-on-leave { color: #9f3e46; border-color: #d8a3a8; background: #faebec; }
+.collapsed-status-modal-value.is-on-meeting { color: #9a5b16; border-color: #e6bd86; background: #fff2df; }
+.collapsed-status-modal-value.is-on-event { color: #285f9d; border-color: #a8c5e7; background: #eaf3ff; }
 
 .collapsed-status-modal-action {
   width: 100%;

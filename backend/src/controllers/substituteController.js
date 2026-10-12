@@ -5,6 +5,7 @@ const ConsultationRequest = require('../models/ConsultationRequest')
 const AcademicTerm = require('../models/AcademicTerm')
 const Notification = require('../models/Notification')
 const { notifyActiveAdmins } = require('../utils/adminNotification')
+const { logActivity } = require('../utils/activityLogWriter')
 
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : ''
@@ -415,44 +416,52 @@ async function syncAssignments(req, res) {
       },
     })
 
-    let notifiedStudents = 0
-    try {
-      notifiedStudents = await notifyStudentsOfSubstitutes({
-        originalTeacher,
-        date,
-        newAssignments: grouped,
-        previousSignatures,
-        actorId: req.user?.id,
-      })
-    } catch (notificationError) {
-      console.warn('Substitutes updated, but student notifications failed:', notificationError.message)
-    }
+    const actor = req.user
+    const requestPath = req.originalUrl || '/api/substitutions/sync'
+    const requestMethod = req.method
+    void (async () => {
+      try {
+        await notifyStudentsOfSubstitutes({
+          originalTeacher,
+          date,
+          newAssignments: grouped,
+          previousSignatures,
+          actorId: actor?.id,
+        })
+      } catch (notificationError) {
+        console.warn('Substitutes updated, but student notifications failed:', notificationError.message)
+      }
 
-    try {
-      await notifyActiveAdmins({
-        actorId: req.user?.id,
-        type: 'substitute_assignments_admin',
-        title: grouped.size ? 'Substitute assignments updated' : 'Substitute assignments removed',
-        message: `Substitute assignments for ${date} were ${grouped.size ? 'updated' : 'removed'}.`,
-        related: { originalTeacher, date, assignmentCount: grouped.size },
-        route: '/admin/teachers',
-      })
-    } catch (notificationError) {
-      console.warn('Substitutes updated, but admin notification failed:', notificationError.message)
-    }
+      try {
+        await notifyActiveAdmins({
+          actorId: actor?.id,
+          type: 'substitute_assignments_admin',
+          title: grouped.size ? 'Substitute assignments updated' : 'Substitute assignments removed',
+          message: `Substitute assignments for ${date} were ${grouped.size ? 'updated' : 'removed'}.`,
+          related: { originalTeacher, date, assignmentCount: grouped.size },
+          route: '/admin/teachers',
+        })
+      } catch (notificationError) {
+        console.warn('Substitutes updated, but admin notification failed:', notificationError.message)
+      }
 
-    await logActivity({
-      actor: req.user,
-      action: `Updated substitute assignments for ${originalTeacher} on ${date}`,
-      path: req.originalUrl || "/api/substitutions/sync",
-      method: req.method,
-      req,
-    })
+      try {
+        await logActivity({
+          actor,
+          action: `Updated substitute assignments for ${originalTeacher} on ${date}`,
+          path: requestPath,
+          method: requestMethod,
+          req,
+        })
+      } catch (activityError) {
+        console.warn('Substitutes updated, but activity logging failed:', activityError.message)
+      }
+    })()
 
     return res.json({
       message: grouped.size ? 'Substitute assignments updated.' : 'Substitute assignments removed.',
       assignmentCount: grouped.size,
-      notifiedStudents,
+      notificationsQueued: true,
     })
   } catch (error) {
     console.error('Failed to synchronize substitute assignments:', error)

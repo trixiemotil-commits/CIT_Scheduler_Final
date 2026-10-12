@@ -99,7 +99,7 @@
       </Teleport>
 
       <div v-if="showTermPrompt" class="term-prompt-overlay">
-        <form class="term-prompt" @submit.prevent="saveTermAssignment">
+        <form v-if="!showTermAssignmentConfirmation" class="term-prompt" @submit.prevent="requestTermAssignmentConfirmation">
           <div class="term-prompt-icon">
             <IonIcon :icon="calendarOutline" />
           </div>
@@ -120,8 +120,19 @@
             </select>
           </label>
           <p v-if="termPromptError" class="term-prompt-error">{{ termPromptError }}</p>
-          <button type="submit" :disabled="savingAssignment">{{ savingAssignment ? 'Saving…' : 'Continue' }}</button>
+          <button type="submit">Continue</button>
         </form>
+        <section v-else class="term-prompt term-prompt-confirm" role="alertdialog" aria-modal="true" aria-labelledby="term-confirm-title" aria-describedby="term-confirm-description">
+          <div class="term-prompt-icon"><IonIcon :icon="calendarOutline" /></div>
+          <h2 id="term-confirm-title">Confirm semester details</h2>
+          <p id="term-confirm-description">Use this year level and section for {{ publishedTermLabel }}?</p>
+          <div class="term-prompt-summary"><span>Year level</span><strong>{{ termForm.yearLevel }}</strong><span>Section</span><strong>{{ termForm.section }}</strong></div>
+          <p v-if="termPromptError" class="term-prompt-error" role="alert">{{ termPromptError }}</p>
+          <div class="term-prompt-actions">
+            <button type="button" class="term-prompt-review" :disabled="savingAssignment" @click="showTermAssignmentConfirmation = false">Review selection</button>
+            <button type="button" :disabled="savingAssignment" @click="saveTermAssignment">{{ savingAssignment ? 'Saving…' : 'Confirm' }}</button>
+          </div>
+        </section>
       </div>
     </div>
   </IonPage>
@@ -165,6 +176,7 @@ const isConsultationSessionsPage = computed(() =>
 const showTermPrompt = ref(false)
 const publishedTerm = ref(null)
 const savingAssignment = ref(false)
+const showTermAssignmentConfirmation = ref(false)
 const termPromptError = ref('')
 const termForm = reactive({ yearLevel: '', section: '' })
 const availableYears = computed(() =>
@@ -238,8 +250,14 @@ async function checkPublishedTerm() {
   }
 }
 
-async function saveTermAssignment() {
+function requestTermAssignmentConfirmation() {
   if (!termForm.yearLevel || !termForm.section) return
+  termPromptError.value = ''
+  showTermAssignmentConfirmation.value = true
+}
+
+async function saveTermAssignment() {
+  if (!termForm.yearLevel || !termForm.section || savingAssignment.value) return
   savingAssignment.value = true
   termPromptError.value = ''
   try {
@@ -252,6 +270,7 @@ async function saveTermAssignment() {
       }),
     })
     const user = saveMergedUser(payload.user || {})
+    showTermAssignmentConfirmation.value = false
     showTermPrompt.value = false
   } catch (error) {
     termPromptError.value = error.message
@@ -682,7 +701,7 @@ ion-label {
   letter-spacing: 0.01em;
 }
 
-.term-prompt-overlay{position:absolute;inset:0;z-index:10000;background:rgba(31,35,39,.62);backdrop-filter:blur(5px);display:grid;place-items:center;padding:20px}.term-prompt{width:100%;max-width:360px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.3)}.term-prompt-icon{width:50px;height:50px;border-radius:14px;background:#e8ebed;color:#30383f;display:grid;place-items:center;font-size:1.5rem}.term-prompt h2{margin:15px 0 6px;color:#252b30;font-size:1.25rem}.term-prompt>p{margin:0 0 18px;color:#687078;font-size:.82rem;line-height:1.5}.term-prompt label{display:block;margin-top:12px}.term-prompt label span{display:block;margin-bottom:5px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#454c53}.term-prompt select{width:100%;height:44px;border:1px solid #cdd2d6;border-radius:10px;padding:0 12px;background:#f7f8f9;font:inherit;font-size:.84rem}.term-prompt button{width:100%;height:44px;margin-top:20px;border:0;border-radius:10px;background:#4b5563;color:#fff;font:700 .85rem Poppins;cursor:pointer}.term-prompt button:disabled{opacity:.55}.term-prompt .term-prompt-error{color:#c1121f;margin:10px 0 0}
+.term-prompt-overlay{position:absolute;inset:0;z-index:10000;background:rgba(31,35,39,.62);backdrop-filter:blur(5px);display:grid;place-items:center;padding:20px}.term-prompt{width:100%;max-width:360px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.3)}.term-prompt-icon{width:50px;height:50px;border-radius:14px;background:#e8ebed;color:#30383f;display:grid;place-items:center;font-size:1.5rem}.term-prompt h2{margin:15px 0 6px;color:#252b30;font-size:1.25rem}.term-prompt>p{margin:0 0 18px;color:#687078;font-size:.82rem;line-height:1.5}.term-prompt label{display:block;margin-top:12px}.term-prompt label span{display:block;margin-bottom:5px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#454c53}.term-prompt select{width:100%;height:44px;border:1px solid #cdd2d6;border-radius:10px;padding:0 12px;background:#f7f8f9;font:inherit;font-size:.84rem}.term-prompt button{width:100%;height:44px;margin-top:20px;border:0;border-radius:10px;background:#4b5563;color:#fff;font:700 .85rem Poppins;cursor:pointer}.term-prompt button:disabled{opacity:.55}.term-prompt .term-prompt-error{color:#c1121f;margin:10px 0 0}.term-prompt-summary{display:grid;grid-template-columns:1fr 1.3fr;gap:8px 12px;margin:18px 0 4px;padding:14px;border:1px solid #e0e5e8;border-radius:12px;background:#f7f9fa}.term-prompt-summary span{color:#748089;font-size:.72rem;font-weight:650}.term-prompt-summary strong{color:#344957;font-size:.82rem}.term-prompt-actions{display:flex;gap:10px}.term-prompt-actions button{flex:1;min-width:0}.term-prompt-actions .term-prompt-review{border:1px solid #d2dade;background:#fff;color:#4c5961}.term-prompt-actions .term-prompt-review:hover:not(:disabled){background:#f3f6f7}
 
 @media (min-width: 391px) and (max-width: 767px) {
   .student-tab-bar {
