@@ -437,14 +437,15 @@ async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTea
 
   if (adminStatus === "On Meeting") return "On Meeting";
 
-  const configuredStatus = String(userDoc.teacher_status || "").trim();
-  if (configuredStatus === "On Leave") {
-    return userDoc.teacher_time_in ? "On Leave" : "Offline";
-  }
   if (allTeachersOnEvent || eventTeacherIds.has(String(userDoc._id))) {
     return "On Event";
   }
   if (adminStatus === "On School") return "On School";
+
+  const configuredStatus = String(userDoc.teacher_status || "").trim();
+  if (configuredStatus === "On Leave") {
+    return userDoc.teacher_time_in ? "On Leave" : "Offline";
+  }
   if (["On School", "On Meeting", "On Leave"].includes(configuredStatus)) {
     return configuredStatus;
   }

@@ -2,7 +2,6 @@ const express = require("express");
 const ActivityLog = require("../models/ActivityLog");
 const User = require("../models/User");
 const { authRequired, authorizeRoles } = require("../middleware/authMiddleware");
-const { getRequestIp, getDeviceDescription } = require("../utils/requestMetadata");
 
 const router = express.Router();
 
@@ -27,6 +26,13 @@ router.get("/", authRequired, authorizeRoles("admin"), async (req, res) => {
     const from = req.query.from ? new Date(req.query.from) : null;
     const to = req.query.to ? new Date(req.query.to) : null;
     const conditions = [];
+
+    // Keep older automatically generated page-open and generic request logs
+    // out of the activity feed as well as stopping new ones from being saved.
+    conditions.push({
+      actionType: { $ne: "navigation.open" },
+      action: { $not: /^(?:Opened\s|(?:GET|POST|PUT|PATCH|DELETE) action on system resource$)/i },
+    });
 
     if (role) conditions.push({ actorRole: role });
     if ((from && !Number.isNaN(from.getTime())) || (to && !Number.isNaN(to.getTime()))) {
@@ -87,28 +93,8 @@ router.get("/", authRequired, authorizeRoles("admin"), async (req, res) => {
   }
 });
 
-router.post("/navigation", authRequired, authorizeRoles("admin", "teacher", "student"), async (req, res) => {
-  try {
-    const routeLabel = String(req.body?.routeLabel || "a page").trim().slice(0, 120);
-    const routePath = String(req.body?.routePath || "").trim().slice(0, 200);
-    await ActivityLog.create({
-      actorId: req.user.id,
-      actorEmail: req.user.email || "",
-      actorRole: req.user.role,
-      action: `Opened ${routeLabel}`,
-      actionType: "navigation.open",
-      targetType: "page",
-      targetName: routeLabel,
-      details: { routePath },
-      path: routePath || "/",
-      method: "NAVIGATE",
-      ipAddress: getRequestIp(req),
-      device: getDeviceDescription(req),
-    });
-    res.status(201).json({ message: "Navigation logged." });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to save navigation activity.", error: error.message });
-  }
+router.post("/navigation", authRequired, authorizeRoles("admin", "teacher", "student"), (_req, res) => {
+  res.status(204).end();
 });
 
 module.exports = router;

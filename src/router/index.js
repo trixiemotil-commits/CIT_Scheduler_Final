@@ -1,4 +1,4 @@
-import { getToken, getUser, isLoggedIn, setActiveRole } from '@/auth.js'
+import { getUser, isLoggedIn, setActiveRole } from '@/auth.js'
 import { createRouter, createWebHistory } from '@ionic/vue-router'
 const ForgotPasswordView = () => import('@/views/ForgotPasswordView.vue')
 const SecurityLoginReviewView = () => import('@/views/SecurityLoginReviewView.vue')
@@ -33,7 +33,6 @@ const TeacherProfileView = () => import('@/views/teacher/TeacherProfileView.vue'
 const TeacherScheduleView = () => import('@/views/teacher/TeacherScheduleView.vue')
 const TeacherSettingsView = () => import('@/views/teacher/TeacherSettingsView.vue')
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -102,37 +101,6 @@ router.beforeEach((to, _from, next) => {
   } else {
     next()
   }
-})
-
-const activityRouteLabels = {
-  '/teacher/dashboard': 'Teacher Dashboard',
-  '/teacher/schedule': 'Teacher Schedule',
-  '/teacher/events': 'Teacher Events',
-  '/teacher/consultation': 'Teacher Consultation',
-  '/teacher/settings': 'Teacher Settings',
-  '/teacher/profile': 'Teacher Profile',
-  '/student/dashboard': 'Student Dashboard',
-  '/student/teachers': 'Student Teachers',
-  '/student/events': 'Student Events',
-  '/student/consultations': 'Student Consultations',
-  '/student/profile': 'Student Profile',
-  '/student/recent-devices': 'Student Recent Devices',
-  '/student/settings': 'Student Settings',
-  '/student/notifications': 'Student Notifications',
-}
-
-router.afterEach((to) => {
-  const currentUser = getUser()
-  const role = String(currentUser?.role || '').toLowerCase()
-  const token = getToken()
-  const routeLabel = activityRouteLabels[to.path]
-  if (!token || !routeLabel || !['teacher', 'student'].includes(role)) return
-
-  fetch(`${API_BASE}/activity-logs/navigation`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ routeLabel, routePath: to.path }),
-  }).catch(() => {})
 })
 
 export default router

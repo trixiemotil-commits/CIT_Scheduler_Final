@@ -1636,7 +1636,9 @@ function toggleExpand(which) {
 
 function createLineChart() {
   if (lineChartInstance) { lineChartInstance.destroy(); lineChartInstance = null }
-  lineChartInstance = new Chart(lineChartRef.value, {
+  const canvas = lineChartRef.value
+  if (!canvas) return
+  lineChartInstance = new Chart(canvas, {
     type: 'line',
     data: {
       labels: chartPeriods.value.map(period => period.label),
@@ -1914,14 +1916,19 @@ onMounted(() => {
   loadTodayTeacherSchedules()
   loadNotifications()
   useNotifications.addNotificationListener(handleNotification)
-  createLineChart()
-  createBarChart()
   dashboardRealtimeTimer = window.setInterval(() => {
     currentDateTime.value = new Date()
     loadTodayTeacherSchedules({ quiet: true })
   }, 10000)
   window.addEventListener('focus', refreshTodayTeacherSchedules)
   document.addEventListener('visibilitychange', refreshTodayTeacherSchedules)
+})
+
+watch(dashboardLoading, async (isLoading) => {
+  if (isLoading) return
+  await nextTick()
+  createLineChart()
+  createBarChart()
 })
 
 onUnmounted(() => {

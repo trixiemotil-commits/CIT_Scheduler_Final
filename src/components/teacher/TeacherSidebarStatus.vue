@@ -85,9 +85,27 @@ const message = ref('')
 const error = ref(false)
 const showCollapsedStatusModal = ref(false)
 const showCollapsedOfficeModal = ref(false)
+const currentTime = ref(new Date())
 let messageTimer
 let statusRefreshTimer
+let currentTimeTimer
 let statusLoadInFlight = false
+
+function getManilaMinutes(date = currentTime.value) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
+  return Number(values.hour) * 60 + Number(values.minute)
+}
+
+const isOutsideWorkWindow = computed(() => {
+  const minutes = getManilaMinutes()
+  return minutes < 6 * 60 || minutes >= 20 * 60
+})
 
 function normalizeTeacherStatus(statusOrObj) {
   // Accept either a status string or a user object similar to server-side logic.
@@ -129,6 +147,7 @@ function normalizeTeacherStatus(statusOrObj) {
 }
 
 const normalizedStatus = computed(() => {
+  if (isOutsideWorkWindow.value) return 'Offline'
   // Prefer authoritative profile on user.value to keep teacher view consistent with server-side resolution
   if (user.value && typeof user.value === 'object') {
     return normalizeTeacherStatus(user.value)
@@ -146,6 +165,7 @@ const statusDisplay = computed(() => {
 })
 
 const formattedTimeIn = computed(() => {
+  if (isOutsideWorkWindow.value) return 'Not recorded'
   if (!teacherTimeIn.value) return 'Not recorded'
   const date = new Date(teacherTimeIn.value)
   if (Number.isNaN(date.getTime())) return 'Not recorded'
@@ -156,7 +176,7 @@ const canChangeAvailability = computed(() => (
   normalizedStatus.value === 'On School'
   && !['On School - In Class', 'Off Campus'].includes(scheduleStatusDisplay.value)
 ))
-const workStatusDisabled = computed(() => isOffline.value)
+const workStatusDisabled = computed(() => isOffline.value || isOutsideWorkWindow.value)
 const statusDotClass = computed(() => {
   if (normalizedStatus.value === 'On Leave') return 'is-on-leave'
   if (normalizedStatus.value === 'Offline') return 'is-offline'
@@ -364,6 +384,7 @@ function closeCollapsedStatusModal(event) {
 onMounted(() => {
   loadStatus()
   statusRefreshTimer = window.setInterval(refreshStatusWhenVisible, 15000)
+  currentTimeTimer = window.setInterval(() => { currentTime.value = new Date() }, 15000)
   window.addEventListener('focus', refreshStatusWhenVisible)
   document.addEventListener('visibilitychange', refreshStatusWhenVisible)
   document.addEventListener('click', closeCollapsedStatusModal)
@@ -371,6 +392,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.clearInterval(statusRefreshTimer)
+  window.clearInterval(currentTimeTimer)
   window.removeEventListener('focus', refreshStatusWhenVisible)
   document.removeEventListener('visibilitychange', refreshStatusWhenVisible)
   document.removeEventListener('click', closeCollapsedStatusModal)

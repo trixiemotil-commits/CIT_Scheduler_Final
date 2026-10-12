@@ -13,11 +13,10 @@ const consultationRoutes = require("../routes/consultationRoutes");
 const notificationRoutes = require("../routes/notificationRoutes");
 const eventRoutes = require("../routes/eventRoutes");
 const activityLogRoutes = require("../routes/activityLogRoutes");
-const activityLogger = require("../middleware/activityLogger");
 const ConsultationAvailability = require("../models/ConsultationAvailability");
 const Event = require("../models/Event");
-const User = require("../models/User");
 const { processExpiredConsultationQueues } = require("../controllers/consultationController");
+const autoClockOutTeachers = require("../utils/autoClockOutTeachers");
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -40,7 +39,6 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: "10mb" }));
-app.use(activityLogger);
 
 app.get("/api/health", (_req, res) => {
   res.status(200).json({ status: "ok", message: "Backend is running" });
@@ -99,54 +97,6 @@ async function archiveExpiredEvents() {
     }
   } catch (error) {
     console.error("Failed to archive expired events:", error.message);
-  }
-}
-
-async function autoClockOutTeachers() {
-  try {
-    const timeZone = "Asia/Manila";
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    }).formatToParts(new Date());
-    const day = parts.find(part => part.type === "weekday")?.value;
-    const hour = Number(parts.find(part => part.type === "hour")?.value);
-    const isWeekday = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].includes(day);
-    const isPastClockOut = hour >= 20;
-    if (!isWeekday || !isPastClockOut) return;
-
-    const result = await User.updateMany(
-      {
-        $or: [{ role: "teacher" }, { roles: "teacher" }],
-        teacher_clocked_out: { $ne: true },
-      },
-      [
-        {
-          $set: {
-            teacher_clocked_out: true,
-            teacher_time_in: null,
-            teacher_status: "On Leave",
-            teacher_availability: "Unavailable",
-            teacher_admin_status: {
-              $cond: [
-                { $in: ["$teacher_admin_status", ["On School", "On Meeting"]] },
-                null,
-                "$teacher_admin_status",
-              ],
-            },
-          },
-        },
-      ]
-    );
-
-    if (result.modifiedCount > 0) {
-      console.log(`Automatically clocked out ${result.modifiedCount} teacher${result.modifiedCount === 1 ? "" : "s"} at or after 8:00 PM Philippine time.`);
-    }
-  } catch (error) {
-    console.error("Failed to automatically clock out teachers:", error.message);
   }
 }
 

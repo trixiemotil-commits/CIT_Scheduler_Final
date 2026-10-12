@@ -352,7 +352,13 @@
           </div>
           <div v-else class="sched-grid-wrap">
             <table class="sched-grid">
-              <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day" :class="{ 'current-day-header': day === highlightedTeacherDay }">{{ day }}</th></tr></thead>
+              <thead>
+                <tr><th class="th-time">Time</th><th v-for="day in days" :key="day" :class="{ 'current-day-header': day === highlightedTeacherDay }">{{ day }}</th></tr>
+                <tr class="teacher-work-hours-row">
+                  <th class="th-time teacher-work-hours-label">Work hours</th>
+                  <th v-for="day in days" :key="`teacher-work-${day}`" class="teacher-work-hours-cell">{{ teacherWorkHoursLabel(day) }}</th>
+                </tr>
+              </thead>
               <tbody>
                 <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
                   <td class="td-time">{{ slot }}</td>
@@ -364,7 +370,7 @@
                     :class="{
                       'has-entry': getEntriesForTeacherCell(slot, day).length,
                       'consult-cell': !getEntriesForTeacherCell(slot, day).length && !!getConsultationForTeacherCell(slot, day),
-                      'free-time-cell': !getEntriesForTeacherCell(slot, day).length && !getConsultationForTeacherCell(slot, day),
+                      'free-time-cell': !getEntriesForTeacherCell(slot, day).length && !getConsultationForTeacherCell(slot, day) && isWithinTeacherWorkHours(slot, day),
                       'current-day-cell': day === highlightedTeacherDay
                     }"
                   >
@@ -411,7 +417,7 @@
                           <div class="entry-subject">{{ getConsultationForTeacherCell(slot, day).startTime }} – {{ getConsultationForTeacherCell(slot, day).endTime }}</div>
                         </div>
                       </template>
-                      <template v-else>
+                      <template v-else-if="isWithinTeacherWorkHours(slot, day)">
                         <span class="free-time-label">Free time</span>
                       </template>
                     </td>
@@ -615,6 +621,38 @@ const showLogoutModal = ref(false)
 const selectedScheduleEntries = ref([])
 const loading = ref(true)
 const consultationSlots = ref([])
+const teacherWorkHoursByDay = ref({})
+
+function setTeacherWorkHours(scheduleTables = []) {
+  const teacherTable = (Array.isArray(scheduleTables) ? scheduleTables : []).find(table =>
+    String(table.teacher || table.label || '').trim() === selectedTeacher.value
+  )
+  const savedByDay = teacherTable?.workHoursByDay
+  const hasDaySettings = savedByDay && typeof savedByDay === 'object'
+    && days.some(day => savedByDay[day]?.startTime || savedByDay[day]?.endTime)
+  teacherWorkHoursByDay.value = Object.fromEntries(days.map(day => {
+    const settings = hasDaySettings
+      ? savedByDay[day]
+      : { startTime: teacherTable?.workStartTime, endTime: teacherTable?.workEndTime }
+    const startTime = String(settings?.startTime || '').trim()
+    const endTime = String(settings?.endTime || '').trim()
+    return [day, startTime && endTime ? { startTime, endTime } : null]
+  }))
+}
+
+function teacherWorkHoursLabel(day) {
+  const hours = teacherWorkHoursByDay.value[day]
+  return hours ? `${hours.startTime} – ${hours.endTime}` : 'Not set'
+}
+
+function isWithinTeacherWorkHours(rowSlot, day) {
+  const hours = teacherWorkHoursByDay.value[day]
+  if (!hours?.startTime || !hours?.endTime) return false
+  const slotStart = parseTime(rowSlot)
+  const start = parseTime(hours.startTime)
+  const end = parseTime(hours.endTime)
+  return slotStart >= start && slotStart <= end
+}
 
 const selectedScheduleEntry = computed(() => selectedScheduleEntries.value[0] || null)
 const selectedScheduleSections = computed(() => {
@@ -998,7 +1036,7 @@ function isSpannedStudentCell(slot, day) {
 }
 
 function getStudentRowspan(entry) {
-  return Math.min(timeSlots30.length, getRoomRowspan(entry) + 1)
+  return Math.min(timeSlots30.length, getRoomRowspan(entry))
 }
 
 function isSpannedTeacherCell(slot, day) {
@@ -1012,7 +1050,7 @@ function isSpannedTeacherCell(slot, day) {
 }
 
 function getTeacherRowspan(entry) {
-  return Math.min(timeSlots30.length, getRoomRowspan(entry) + 1)
+  return Math.min(timeSlots30.length, getRoomRowspan(entry))
 }
 
 function getConsultationForTeacherCell(rowSlot, day) {
@@ -1168,7 +1206,7 @@ function isSpannedRoomCell(slot, day) {
 }
 
 function getRoomScheduleRowspan(entry) {
-  return Math.min(timeSlots30.length, getRoomRowspan(entry) + 1)
+  return Math.min(timeSlots30.length, getRoomRowspan(entry))
 }
 
 function getRoomRowspan(entry) {
@@ -1237,7 +1275,10 @@ async function loadScheduleData() {
   try {
     const termId = getSelectedTermId()
     const scheduleQuery = termId ? `?academicTermId=${encodeURIComponent(termId)}` : ''
-    const payload = await apiRequest(`/schedules${scheduleQuery}`)
+    const [payload, tablesPayload] = await Promise.all([
+      apiRequest(`/schedules${scheduleQuery}`),
+      apiRequest(`/schedules/tables${scheduleQuery}`).catch(() => ({ tables: [] })),
+    ])
 
     // If admin is viewing a specific teacher, also fetch substitute assignments for today
     if (viewMode.value === 'teacher' && selectedTeacher.value && selectedTeacherId.value) {
@@ -1292,6 +1333,7 @@ async function loadScheduleData() {
       }
     }
 
+    setTeacherWorkHours(tablesPayload.tables || payload.tables || payload.scheduleTables || [])
     syncEntriesFromApi(payload.entries)
   } catch (_) {
     // silent
@@ -2431,6 +2473,24 @@ function printSchedule() {
   vertical-align: middle !important;
   /* Keep empty slots filled even when a neighboring event spans several rows. */
   background: linear-gradient(135deg, #eee8ff, #f5f1ff) !important;
+}
+.teacher-work-hours-row th {
+  background: #e4efe8;
+  color: #43564f;
+  border-color: #d2dfd8;
+  font-weight: 750;
+}
+.teacher-work-hours-row .teacher-work-hours-label {
+  position: sticky;
+  left: 0;
+  z-index: 17;
+  text-align: left;
+  white-space: nowrap;
+}
+.teacher-work-hours-row .teacher-work-hours-cell {
+  text-align: center;
+  white-space: nowrap;
+  font-size: .85rem;
 }
 .free-time-cell:hover {
   background: linear-gradient(135deg, #e6dcff, #f0ebff) !important;

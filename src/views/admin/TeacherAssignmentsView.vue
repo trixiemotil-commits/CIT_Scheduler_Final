@@ -173,10 +173,11 @@
               <div class="teacher-status-wrap">
                 <label>Availability status</label>
                 <select
-                  v-model="teacher.adminStatus"
-                  :class="['status-dropdown', `status-${statusCssClass(teacher.adminStatus)}`]"
-                  :disabled="statusSavingByTeacherId[teacher.id]"
-                  @change="updateTeacherStatus(teacher)"
+                  :value="canEditTeacherStatus ? teacher.adminStatus : 'Offline'"
+                  :class="['status-dropdown', `status-${statusCssClass(canEditTeacherStatus ? teacher.adminStatus : 'Offline')}`]"
+                  :disabled="!canEditTeacherStatus || statusSavingByTeacherId[teacher.id]"
+                  :title="canEditTeacherStatus ? '' : 'Teacher status can only be changed from 6:00 AM to 7:59 PM Philippine time.'"
+                  @change="onTeacherStatusChange(teacher, $event)"
                 >
                   <option value="On School">On School</option>
                   <option value="On Leave">On Leave</option>
@@ -608,6 +609,18 @@ const statusSavingByTeacherId = ref({})
 const scheduleCache = ref({})
 const scheduleLoading = ref({})
 const currentTime = ref(new Date())
+const canEditTeacherStatus = computed(() => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(currentTime.value)
+  const hour = Number(parts.find(part => part.type === 'hour')?.value)
+  const minute = Number(parts.find(part => part.type === 'minute')?.value)
+  const minutesSinceMidnight = hour * 60 + minute
+  return minutesSinceMidnight >= 6 * 60 && minutesSinceMidnight < 20 * 60
+})
 const eventStatusByTeacherId = ref({})
 let eventStatusClockInterval = null
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -828,9 +841,11 @@ function getActualTeacherStatus(teacher) {
 
 function displayTeacherStatus(teacher) {
   const adminStatus = normalizeTeacherStatus(teacher.adminStatus)
+  if (!canEditTeacherStatus.value) return 'Offline'
+  if (adminStatus === 'Offline' || normalizeTeacherStatus(teacher.teacher_status) === 'Offline') return 'Offline'
   if (adminStatus === 'On Leave') return 'On Leave'
   if (adminStatus === 'On Meeting') return 'On Meeting'
-  if (adminStatus === 'Offline' || teacher.teacher_clocked_out) return 'Offline'
+  if (teacher.teacher_clocked_out) return 'Offline'
   const eventStatus = eventStatusByTeacherId.value[String(teacher.id)]
   if (eventStatus) return eventStatus
   if (adminStatus === 'On School') {
@@ -958,6 +973,8 @@ function getAvailableSubstitutesForEntry(currentTeacher, entry) {
 }
 
 async function loadTeachers() {
+  const requestId = ++teacherLoadRequestId
+  const statusRevisionsAtStart = new Map(teacherStatusRevisions)
   const showLoadingState = teachers.value.length === 0
   if (showLoadingState) loadingTeachers.value = true
   try {
@@ -965,26 +982,52 @@ async function loadTeachers() {
       apiRequest('/users?role=teacher'),
       apiRequest('/consultations/teachers').catch(() => ({ teachers: [] })),
     ])
+    if (requestId !== teacherLoadRequestId) return
+
     scheduleStatusDisplayByTeacherId.value = Object.fromEntries(
       (Array.isArray(scheduleStatusPayload.teachers) ? scheduleStatusPayload.teachers : [])
         .filter((teacher) => teacher?.id && teacher?.statusDisplay)
         .map((teacher) => [String(teacher.id), teacher.statusDisplay]),
     )
-    teachers.value = Array.isArray(payload.users)
+    const loadedTeachers = Array.isArray(payload.users)
       ? payload.users
         .filter(user => user && user.id && String(user.account_status || 'Active') === 'Active')
         .map(mapTeacherFromApi)
         .filter(Boolean)
       : []
 
+    const currentTeachersById = new Map(teachers.value.map((teacher) => [String(teacher.id), teacher]))
+    teachers.value = loadedTeachers.map((loadedTeacher) => {
+      const teacherId = String(loadedTeacher.id)
+      const currentTeacher = currentTeachersById.get(teacherId)
+      const statusChangedDuringRequest =
+        (teacherStatusRevisions.get(teacherId) || 0) > (statusRevisionsAtStart.get(teacherId) || 0)
+
+      if (currentTeacher && (statusChangedDuringRequest || statusSavingByTeacherId.value[teacherId])) {
+        loadedTeacher.adminStatus = currentTeacher.adminStatus
+        loadedTeacher._lastStatus = currentTeacher._lastStatus
+        loadedTeacher.teacher_status = currentTeacher.teacher_status
+        loadedTeacher.teacher_availability = currentTeacher.teacher_availability
+        loadedTeacher.teacher_time_in = currentTeacher.teacher_time_in
+        loadedTeacher.teacher_clocked_out = currentTeacher.teacher_clocked_out
+        loadedTeacher.clockStatus = currentTeacher.clockStatus
+        loadedTeacher.status = currentTeacher.status
+      }
+
+      return loadedTeacher
+    })
+
     await Promise.all(teachers.value.map((teacher) => loadTeacherSchedule(teacher.name)))
+    if (requestId !== teacherLoadRequestId) return
     refreshActualStatuses()
     await refreshEventTeacherStatuses()
   } catch (error) {
-    teachers.value = []
-    console.error('Failed to load teachers:', error)
+    if (requestId === teacherLoadRequestId) {
+      teachers.value = []
+      console.error('Failed to load teachers:', error)
+    }
   } finally {
-    if (showLoadingState) loadingTeachers.value = false
+    if (showLoadingState && requestId === teacherLoadRequestId) loadingTeachers.value = false
   }
 }
 
@@ -1085,9 +1128,15 @@ const updateTeacherStatus = async (teacher) => {
   const previousStatus = teacher._lastStatus || teacher.adminStatus
   const teacherId = String(teacher.id)
   if (statusSavingByTeacherId.value[teacherId]) return
+  const requestedStatus = teacher.adminStatus
 
+  if (!canEditTeacherStatus.value) {
+    teacher.adminStatus = previousStatus
+    showTeacherToast('error', 'Teacher status can only be changed from 6:00 AM to 7:59 PM Philippine time.')
+    return
+  }
 
-  if (teacher.adminStatus === 'Offline' && previousStatus !== 'On Leave') {
+  if (requestedStatus === 'Offline' && previousStatus !== 'On Leave') {
     teacher.adminStatus = previousStatus
     showTeacherToast('error', 'Set the teacher to On Leave before setting them Offline.')
     return
@@ -1098,28 +1147,41 @@ const updateTeacherStatus = async (teacher) => {
   try {
     const response = await apiRequest(`/users/${teacher.id}/teacher-status`, {
       method: 'PATCH',
-      body: JSON.stringify({ teacher_admin_status: mapTeacherStatusToApi(teacher.adminStatus) }),
+      body: JSON.stringify({ teacher_admin_status: mapTeacherStatusToApi(requestedStatus) }),
     })
 
     if (response?.user) {
       const mapped = mapTeacherFromApi(response.user)
       if (!mapped) throw new Error('The updated teacher record is missing an ID.')
-      Object.assign(teacher, mapped)
-      teacher.currentStatus = getActualTeacherStatus(teacher)
+      const currentTeacher = teachers.value.find((item) => String(item.id) === teacherId) || teacher
+      Object.assign(currentTeacher, mapped)
+      currentTeacher.currentStatus = getActualTeacherStatus(currentTeacher)
+      const nextScheduleStatuses = { ...scheduleStatusDisplayByTeacherId.value }
+      delete nextScheduleStatuses[teacherId]
+      scheduleStatusDisplayByTeacherId.value = nextScheduleStatuses
       currentIndex.value = 0
       return
     }
 
-    teacher._lastStatus = teacher.adminStatus
-    teacher.currentStatus = getActualTeacherStatus(teacher)
+    const currentTeacher = teachers.value.find((item) => String(item.id) === teacherId) || teacher
+    currentTeacher._lastStatus = currentTeacher.adminStatus
+    currentTeacher.currentStatus = getActualTeacherStatus(currentTeacher)
     currentIndex.value = 0
   } catch (error) {
-    teacher.adminStatus = previousStatus
+    const currentTeacher = teachers.value.find((item) => String(item.id) === teacherId) || teacher
+    currentTeacher.adminStatus = previousStatus
+    currentTeacher._lastStatus = previousStatus
     console.error('Failed to update teacher status:', error)
     showTeacherToast('error', error.message || 'Failed to update teacher status.')
   } finally {
+    teacherStatusRevisions.set(teacherId, (teacherStatusRevisions.get(teacherId) || 0) + 1)
     statusSavingByTeacherId.value[teacherId] = false
   }
+}
+
+function onTeacherStatusChange(teacher, event) {
+  teacher.adminStatus = event?.target?.value || teacher.adminStatus
+  updateTeacherStatus(teacher)
 }
 
 const getAvailableSubstitutes = (currentTeacher) => {
@@ -1345,6 +1407,8 @@ function showTeacherToast(type, message) {
 
 let teacherRefreshInterval
 let statusClockInterval
+let teacherLoadRequestId = 0
+const teacherStatusRevisions = new Map()
 
 function onTeacherStatusNotification(notification) {
   if (notification?.type === 'teacher_status' || notification?.type === 'teacher_status_admin') {
@@ -1373,7 +1437,7 @@ onMounted(() => {
   statusClockInterval = window.setInterval(() => {
     currentTime.value = new Date()
     refreshActualStatuses()
-  }, 30000)
+  }, 1000)
   window.addEventListener('focus', loadTeachersIfAllowed)
   document.addEventListener('visibilitychange', refreshTeachersWhenVisible)
 })

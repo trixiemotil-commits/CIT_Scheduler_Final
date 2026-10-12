@@ -262,9 +262,9 @@
                   <!-- Empty cell -->
                   <td
                     v-else-if="cell.type === 'empty'"
-                    :class="['td-empty', { 'col-expanded': expandedDay === DAYS[ci], 'col-collapsed': expandedDay && expandedDay !== DAYS[ci] }]"
+                    :class="['td-empty', { 'free-time-cell': cell.withinWorkHours, 'col-expanded': expandedDay === DAYS[ci], 'col-collapsed': expandedDay && expandedDay !== DAYS[ci] }]"
                   >
-                    <span class="free-time-label">Free time</span>
+                    <span v-if="cell.withinWorkHours" class="free-time-label">Free time</span>
                   </td>
                   <!-- occupied: skip -->
                 </template>
@@ -444,6 +444,16 @@ function setWorkHoursFromTable(table) {
 
 function workHoursLabel(day) {
   return workHoursByDay.value[day] || 'Not set'
+}
+
+function isWithinWorkHours(day, rowIndex) {
+  const raw = workHoursByDay.value[day]
+  if (!raw || raw === 'Not set') return false
+  const [startTime, endTime] = raw.split(' – ').map(value => value.trim())
+  const start = timeToMinutes(startTime)
+  const end = timeToMinutes(endTime)
+  const slotStart = timeToMinutes(TIME_SLOTS[rowIndex]?.start)
+  return Number.isFinite(start) && Number.isFinite(end) && slotStart >= start && slotStart <= end
 }
 
 function to24Hour(value) {
@@ -1015,7 +1025,7 @@ const tableMatrix = computed(() => {
         return { type: 'consult', consult, rowspan: span }
       }
 
-      return { type: 'empty' }
+      return { type: 'empty', withinWorkHours: isWithinWorkHours(day, ri) }
     })
   )
 })
@@ -1509,6 +1519,12 @@ function confirmLogout() {
   box-sizing: border-box;
   overflow: hidden;
   transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.55s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.55s cubic-bezier(0.22, 1, 0.36, 1), padding 0.45s ease, transform 0.45s ease;
+}
+.td-empty:not(.free-time-cell) {
+  background: #fff;
+}
+.td-empty.free-time-cell {
+  background: linear-gradient(135deg, rgba(238, 232, 255, 0.9), rgba(245, 241, 255, 0.75));
 }
 
 .td-empty.col-expanded {

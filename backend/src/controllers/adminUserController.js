@@ -3,6 +3,7 @@ const User = require("../models/User");
 const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins, notifyActiveStudents } = require("../utils/adminNotification");
 const { sendAccountApprovedEmail } = require("../config/mail");
+const autoClockOutTeachers = require("../utils/autoClockOutTeachers");
 
 const ROLE_LABELS = {
   admin: "Admin",
@@ -133,6 +134,7 @@ async function listUsers(req, res) {
     const normalizedRole = role.toLowerCase();
     if (normalizedRole === 'teacher' || normalizedRole === 'admin' || normalizedRole === 'student') {
       query.$or = [{ role: normalizedRole }, { roles: normalizedRole }];
+      if (normalizedRole === 'teacher') await autoClockOutTeachers();
     }
   }
   
@@ -525,13 +527,31 @@ async function unlockUser(req, res) {
 
 async function updateTeacherStatus(req, res) {
   try {
+    const timeParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Manila",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date());
+    const hour = Number(timeParts.find((part) => part.type === "hour")?.value);
+    const minute = Number(timeParts.find((part) => part.type === "minute")?.value);
+    const minutesSinceMidnight = hour * 60 + minute;
+    if (minutesSinceMidnight < 6 * 60 || minutesSinceMidnight >= 20 * 60) {
+      return res.status(400).json({
+        message: "Teacher status can only be changed from 6:00 AM to 7:59 PM Philippine time.",
+      });
+    }
+
     const { id } = req.params;
     const requestedStatus = req.body?.teacher_admin_status || req.body?.teacher_status || req.body?.status;
     const isOfflineRequest = requestedStatus === "Offline";
     const nextStatus = isOfflineRequest ? "Offline" : sanitizeTeacherStatus(requestedStatus);
-    const user = await User.findById(id);
+    const user = await User.findOne({
+      _id: id,
+      $or: [{ role: "teacher" }, { roles: "teacher" }],
+    });
 
-    if (!user || !(getUserRoles(user).includes("teacher"))) {
+    if (!user) {
       return res.status(404).json({ message: "Teacher not found." });
     }
 
@@ -540,49 +560,62 @@ async function updateTeacherStatus(req, res) {
       return res.status(400).json({ message: "Teachers can only be manually set to Offline while On Leave." });
     }
 
-    user.teacher_admin_status = nextStatus;
+    const statusUpdate = { teacher_admin_status: nextStatus };
     if (nextStatus === "On School") {
-      user.teacher_status = "On School";
-      user.teacher_time_in = new Date();
-      user.teacher_clocked_out = false;
-      user.teacher_status_expires_at = null;
+      Object.assign(statusUpdate, {
+        teacher_status: "On School",
+        teacher_time_in: new Date(),
+        teacher_clocked_out: false,
+        teacher_status_expires_at: null,
+      });
     } else if (nextStatus === "On Meeting") {
-      user.teacher_status = "On Meeting";
-      user.teacher_time_in = new Date();
-      user.teacher_clocked_out = false;
-      user.teacher_status_expires_at = null;
+      Object.assign(statusUpdate, {
+        teacher_status: "On Meeting",
+        teacher_time_in: new Date(),
+        teacher_clocked_out: false,
+        teacher_status_expires_at: null,
+      });
     } else if (nextStatus === "On Leave") {
-      user.teacher_status = "On Leave";
-      user.teacher_availability = "Unavailable";
-      user.teacher_time_in = null;
-      user.teacher_clocked_out = true;
-      user.teacher_status_expires_at = null;
+      Object.assign(statusUpdate, {
+        teacher_status: "On Leave",
+        teacher_availability: "Unavailable",
+        teacher_time_in: null,
+        teacher_clocked_out: true,
+        teacher_status_expires_at: null,
+      });
     }
-    await user.save();
+    const updatedUser = await User.findByIdAndUpdate(
+      user._id,
+      { $set: statusUpdate },
+      { new: true, runValidators: true },
+    );
+    if (!updatedUser) {
+      return res.status(404).json({ message: "Teacher not found." });
+    }
 
     await logActivity({
       actor: req.user,
-      action: `Teacher ${user.firstName} ${user.lastName} is ${nextStatus}`,
+      action: `Teacher ${updatedUser.firstName} ${updatedUser.lastName} is ${nextStatus}`,
       path: req.originalUrl || `/api/users/${id}/teacher-status`,
       method: req.method,
       req,
     });
 
     try {
-      const teacherName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+      const teacherName = `${updatedUser.firstName || ""} ${updatedUser.lastName || ""}`.trim();
       await notifyActiveStudents({
         actorId: req.user?.id,
         type: "teacher_status",
         title: `Teacher ${nextStatus}`,
         message: `${teacherName} is now ${nextStatus}.`,
-        related: { teacherId: user._id.toString(), status: nextStatus },
+        related: { teacherId: updatedUser._id.toString(), status: nextStatus },
         route: "/student/teachers",
       });
     } catch (notificationError) {
       console.warn("Teacher status updated, but student notification failed:", notificationError.message);
     }
 
-    return res.json({ message: "Teacher status updated.", user: toClientUser(user) });
+    return res.json({ message: "Teacher status updated.", user: toClientUser(updatedUser) });
   } catch (error) {
     console.error("Failed to update teacher status:", error);
     return res.status(500).json({ message: "Failed to update teacher status.", error: error.message });
