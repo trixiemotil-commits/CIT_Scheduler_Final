@@ -16,7 +16,7 @@ const activityLogRoutes = require("../routes/activityLogRoutes");
 const ConsultationAvailability = require("../models/ConsultationAvailability");
 const Event = require("../models/Event");
 const { processExpiredConsultationQueues } = require("../controllers/consultationController");
-const autoClockOutTeachers = require("../utils/autoClockOutTeachers");
+const resetTeacherStatusesDaily = require("../utils/resetTeacherStatusesDaily");
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -104,7 +104,7 @@ async function startServer() {
   try {
     await connectDB();
     await archiveExpiredEvents();
-    await autoClockOutTeachers();
+    await resetTeacherStatusesDaily();
     await processExpiredConsultationQueues();
     // Replace the legacy cross-term uniqueness rule with a term-scoped rule.
     const consultationIndexes = await ConsultationAvailability.collection.indexes();
@@ -124,7 +124,7 @@ async function startServer() {
     }, 24 * 60 * 60 * 1000);
 
     setInterval(() => {
-      autoClockOutTeachers();
+      resetTeacherStatusesDaily();
     }, 60 * 1000);
 
     setInterval(() => {

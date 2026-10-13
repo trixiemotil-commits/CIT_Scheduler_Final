@@ -182,7 +182,7 @@
                   <option value="On School">On School</option>
                   <option value="On Leave">On Leave</option>
                   <option value="On Meeting">On Meeting</option>
-                  <option value="Offline" :disabled="teacher._lastStatus !== 'On Leave'">Offline</option>
+                  <option value="Offline">Offline</option>
                 </select>
               </div>
 
@@ -573,7 +573,7 @@ const scheduleStatusDisplayByTeacherId = ref({})
 function normalizeTeacherStatus(status) {
   if (!status) return 'On School'
   const normalized = String(status).trim()
-  if (normalized === 'In School' || normalized === 'On School - In Class') return 'On School'
+  if (normalized === 'In School' || normalized === 'On School - In Class' || normalized === 'On Class-Substitute') return 'On School'
   return normalized
 }
 
@@ -1044,6 +1044,7 @@ const filteredTeachers = computed(() => {
     const priorityFor = (teacher) => {
       const displayStatus = String(displayTeacherStatus(teacher) || '').trim()
       if (displayStatus === 'On School - In Class') return 0
+      if (displayStatus === 'On Class-Substitute') return 0
       if (displayStatus === 'Off Campus') return 1
       return statusPriority[normalizeTeacherStatus(displayStatus)] ?? 99
     }
@@ -1133,12 +1134,6 @@ const updateTeacherStatus = async (teacher) => {
   if (!canEditTeacherStatus.value) {
     teacher.adminStatus = previousStatus
     showTeacherToast('error', 'Teacher status can only be changed from 6:00 AM to 7:59 PM Philippine time.')
-    return
-  }
-
-  if (requestedStatus === 'Offline' && previousStatus !== 'On Leave') {
-    teacher.adminStatus = previousStatus
-    showTeacherToast('error', 'Set the teacher to On Leave before setting them Offline.')
     return
   }
 

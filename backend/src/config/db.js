@@ -158,7 +158,7 @@ async function migrateUserStatusFields() {
       },
       {
         $set: {
-          teacher_status: "On School",
+          teacher_status: "Offline",
         },
       }
     );

@@ -7,6 +7,7 @@ const User = require("../models/User");
 const Notification = require("../models/Notification");
 const AcademicTerm = require("../models/AcademicTerm");
 const Event = require("../models/Event");
+const SubstituteAssignment = require("../models/SubstituteAssignment");
 const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins } = require("../utils/adminNotification");
 const { sendConsultationApprovedEmail } = require("../config/mail");
@@ -479,6 +480,7 @@ function resolveTeacherScheduleDisplayStatus(status, entries = [], now = new Dat
   });
 
   if (!currentEntries.length) return status;
+  if (currentEntries.some((entry) => entry.isSubstitute)) return "On Class-Substitute";
   if (currentEntries.some((entry) => entry.campus === "Main Campus" || entry.color === "color-orange")) return "Off Campus";
   return "On School - In Class";
 }
@@ -776,6 +778,10 @@ async function listTeachersForStudents(req, res) {
       .lean();
     const activeAcademicTermId = await getActiveAcademicTermReference();
     const { activeEventTeacherIds, allTeachersOnEvent } = await getActiveEventTeacherContext();
+    const now = new Date();
+    const manilaParts = philippineDateTimeParts(now);
+    const utcDayStart = new Date(Date.UTC(Number(manilaParts.year), Number(manilaParts.month) - 1, Number(manilaParts.day)));
+    const utcNextDayStart = new Date(utcDayStart.getTime() + 24 * 60 * 60 * 1000);
 
     const teachers = await Promise.all(
       teacherUsers.map(async (teacherUser) => {
@@ -785,7 +791,7 @@ async function listTeachersForStudents(req, res) {
           fullName,
         ].filter(Boolean);
 
-        const [availabilitySlots, scheduleEntries, status] = await Promise.all([
+        const [availabilitySlots, scheduleEntries, status, substituteAssignments] = await Promise.all([
           ConsultationAvailability.find({
             $and: [
               {
@@ -804,6 +810,10 @@ async function listTeachersForStudents(req, res) {
             .select("subject year section academicTermId day timeIn timeOut campus color entryType")
             .lean(),
           resolveTeacherStatus(teacherUser, activeEventTeacherIds, allTeachersOnEvent),
+          SubstituteAssignment.find({
+            substituteTeacher: teacherUser._id,
+            date: { $gte: utcDayStart, $lt: utcNextDayStart },
+          }).select("entries").lean(),
         ]);
 
         const subjectSet = new Set();
@@ -839,7 +849,18 @@ async function listTeachersForStudents(req, res) {
             ? String(entry.academicTermId || "") === String(activeAcademicTermId)
             : !entry.academicTermId
         ));
-        const statusDisplay = resolveTeacherScheduleDisplayStatus(status, currentTermScheduleEntries);
+        const substituteScheduleEntries = substituteAssignments.flatMap((assignment) => (
+          (Array.isArray(assignment.entries) ? assignment.entries : []).map((entry) => ({
+            ...entry,
+            day: manilaParts.weekday,
+            isSubstitute: true,
+          }))
+        ));
+        const statusDisplay = resolveTeacherScheduleDisplayStatus(
+          status,
+          [...currentTermScheduleEntries, ...substituteScheduleEntries],
+          now,
+        );
         const isSubjectTeacher = uniqueStudentSubjects.length > 0;
         const canAcceptRequests = String(status || '').toLowerCase() === "on school"
           && statusDisplay === status

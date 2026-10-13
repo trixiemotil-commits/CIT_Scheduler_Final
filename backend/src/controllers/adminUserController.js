@@ -3,7 +3,7 @@ const User = require("../models/User");
 const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins, notifyActiveStudents } = require("../utils/adminNotification");
 const { sendAccountApprovedEmail } = require("../config/mail");
-const autoClockOutTeachers = require("../utils/autoClockOutTeachers");
+const resetTeacherStatusesDaily = require("../utils/resetTeacherStatusesDaily");
 
 const ROLE_LABELS = {
   admin: "Admin",
@@ -12,7 +12,7 @@ const ROLE_LABELS = {
 };
 
 const ACCOUNT_STATUS_VALUES = ["Pending", "Active", "Inactive", "Denied", "Archived"];
-const TEACHER_STATUS_VALUES = ["On School", "On Meeting", "On Leave"];
+const TEACHER_STATUS_VALUES = ["On School", "On Meeting", "On Leave", "Offline"];
 const DEFAULT_DEPARTMENT = "College of Information Technology";
 const PHINMA_EMAIL_REGEX = /^[a-z0-9._%+-]+\.au@phinmaed\.com$/i;
 const VALID_LAST_NAME_REGEX = /^[\p{L}\p{M}]+(?:[ '\u2019.-][\p{L}\p{M}]+)*$/u;
@@ -40,7 +40,7 @@ function sanitizeTeacherStatus(status) {
   if (TEACHER_STATUS_VALUES.includes(status)) {
     return status;
   }
-  return "On School";
+  return "Offline";
 }
 
 function toClientUser(user) {
@@ -55,11 +55,12 @@ function toClientUser(user) {
     department: user.department || "",
     phone: user.phone || "",
     account_status: user.account_status || fallbackAccountStatus(user.role),
-    teacher_status: user.teacher_status || (getUserRoles(user).includes("teacher") ? "On School" : ""),
+    teacher_status: user.teacher_status || (getUserRoles(user).includes("teacher") ? "Offline" : ""),
     teacher_admin_status: user.teacher_admin_status || "",
     teacher_availability: user.teacher_availability || (getUserRoles(user).includes("teacher") ? "Available" : ""),
     teacher_time_in: user.teacher_time_in || null,
     teacher_clocked_out: Boolean(user.teacher_clocked_out),
+    teacher_status_updated_date: user.teacher_status_updated_date || "",
     substituteTeacher: user.substituteTeacher || "",
     substituteAssignments: user.substituteAssignments ? Object.fromEntries(user.substituteAssignments) : {},
     status: user.account_status || fallbackAccountStatus(user.role),
@@ -134,7 +135,7 @@ async function listUsers(req, res) {
     const normalizedRole = role.toLowerCase();
     if (normalizedRole === 'teacher' || normalizedRole === 'admin' || normalizedRole === 'student') {
       query.$or = [{ role: normalizedRole }, { roles: normalizedRole }];
-      if (normalizedRole === 'teacher') await autoClockOutTeachers();
+      if (normalizedRole === 'teacher') await resetTeacherStatusesDaily();
     }
   }
   
@@ -154,7 +155,7 @@ async function createUser(req, res) {
       currentPassword,
       phone = "",
       account_status = "Active",
-      teacher_status = "On School",
+      teacher_status = "Offline",
       status,
       employeeId = "",
       studentId = "",
@@ -243,6 +244,8 @@ async function createUser(req, res) {
       phone: normalizeString(phone),
       account_status: "Active",
       teacher_status: normalizedRoles.includes("teacher") ? sanitizeTeacherStatus(teacher_status) : undefined,
+      teacher_status_reset_date: normalizedRoles.includes("teacher") ? resetTeacherStatusesDaily.getManilaDateKey() : undefined,
+      teacher_status_updated_date: "",
       employeeId: normalizedEmployeeId || undefined,
       studentId: normalizedStudentId || undefined,
       yearLevel: normalizedRoles.includes("student") ? normalizeString(yearLevel) : undefined,
@@ -290,7 +293,7 @@ async function updateUser(req, res) {
       currentPassword,
       phone = "",
       account_status,
-      teacher_status = "On School",
+      teacher_status,
       substituteTeacher = "",
       status,
       employeeId = "",
@@ -384,7 +387,15 @@ async function updateUser(req, res) {
     if (requestedStatus) {
       user.account_status = sanitizeAccountStatus(requestedStatus);
     }
-    user.teacher_status = normalizedRoles.includes("teacher") ? sanitizeTeacherStatus(teacher_status) : undefined;
+    if (normalizedRoles.includes("teacher") && teacher_status) {
+      user.teacher_status = sanitizeTeacherStatus(teacher_status);
+      user.teacher_status_reset_date = resetTeacherStatusesDaily.getManilaDateKey();
+      user.teacher_status_updated_date = resetTeacherStatusesDaily.getManilaDateKey();
+    } else if (!normalizedRoles.includes("teacher")) {
+      user.teacher_status = undefined;
+      user.teacher_status_reset_date = "";
+      user.teacher_status_updated_date = "";
+    }
     user.substituteTeacher = normalizeString(substituteTeacher) || "";
     if (typeof req.body.substituteAssignments === 'object' && req.body.substituteAssignments !== null) {
       user.substituteAssignments = req.body.substituteAssignments;
@@ -555,12 +566,11 @@ async function updateTeacherStatus(req, res) {
       return res.status(404).json({ message: "Teacher not found." });
     }
 
-    const wasOnLeave = user.teacher_admin_status === "On Leave" || user.teacher_status === "On Leave";
-    if (isOfflineRequest && !wasOnLeave) {
-      return res.status(400).json({ message: "Teachers can only be manually set to Offline while On Leave." });
-    }
-
-    const statusUpdate = { teacher_admin_status: nextStatus };
+    const statusUpdate = {
+      teacher_admin_status: nextStatus,
+      teacher_status_reset_date: resetTeacherStatusesDaily.getManilaDateKey(),
+      teacher_status_updated_date: resetTeacherStatusesDaily.getManilaDateKey(),
+    };
     if (nextStatus === "On School") {
       Object.assign(statusUpdate, {
         teacher_status: "On School",
@@ -578,6 +588,14 @@ async function updateTeacherStatus(req, res) {
     } else if (nextStatus === "On Leave") {
       Object.assign(statusUpdate, {
         teacher_status: "On Leave",
+        teacher_availability: "Unavailable",
+        teacher_time_in: null,
+        teacher_clocked_out: true,
+        teacher_status_expires_at: null,
+      });
+    } else if (nextStatus === "Offline") {
+      Object.assign(statusUpdate, {
+        teacher_status: "Offline",
         teacher_availability: "Unavailable",
         teacher_time_in: null,
         teacher_clocked_out: true,

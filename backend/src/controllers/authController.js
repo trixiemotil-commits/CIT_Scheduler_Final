@@ -9,6 +9,7 @@ const ConsultationRequest = require('../models/ConsultationRequest')
 const Notification = require('../models/Notification')
 const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins } = require('../utils/adminNotification')
+const resetTeacherStatusesDaily = require('../utils/resetTeacherStatusesDaily')
 
 function isRecaptchaEnabled() {
   return Boolean(process.env.RECAPTCHA_SECRET);
@@ -175,10 +176,13 @@ function toSafeUser(user) {
     phone: user.phone,
     gender: user.gender,
     account_status: user.account_status,
-    teacher_status: statusExpired ? "On School" : user.teacher_status,
+    // Clocking out at 8 PM is a persistent state. Do not let an older
+    // temporary status expiry make the teacher appear back On School.
+    teacher_status: user.teacher_clocked_out ? "Offline" : (statusExpired ? "On School" : user.teacher_status),
     teacher_availability: user.teacher_availability,
     teacher_time_in: user.teacher_time_in,
     teacher_clocked_out: Boolean(user.teacher_clocked_out),
+    teacher_status_updated_date: user.teacher_status_updated_date || "",
     teacher_status_expires_at: statusExpired ? null : user.teacher_status_expires_at,
     status: user.account_status,
     avatar: user.avatar,
@@ -990,18 +994,10 @@ async function updateMe(req, res) {
       return res.status(403).json({ message: "Only teachers can update teacher status." });
     }
 
-    if (isTeacher && (recordTimeIn || teacherStatus === "On School")) {
-      const parts = new Intl.DateTimeFormat("en-US", {
-        timeZone: "Asia/Manila",
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-      }).formatToParts(new Date());
-      const hour = Number(parts.find((part) => part.type === "hour")?.value);
-      const minute = Number(parts.find((part) => part.type === "minute")?.value);
-      const minutesSinceMidnight = hour * 60 + minute;
+    if (isTeacher && (teacherStatus || teacherAvailability || recordTimeIn)) {
+      const minutesSinceMidnight = resetTeacherStatusesDaily.getManilaMinutes();
       if (minutesSinceMidnight < 6 * 60 || minutesSinceMidnight >= 20 * 60) {
-        return res.status(400).json({ message: "Clock-in is available from 6:00 AM to 8:00 PM Philippine time." });
+        return res.status(400).json({ message: "Teacher status can be changed from 6:00 AM to 7:59 PM Philippine time." });
       }
     }
 
@@ -1037,10 +1033,15 @@ async function updateMe(req, res) {
         if (["On School", "On Meeting"].includes(user.teacher_admin_status)) {
           user.teacher_admin_status = null;
         }
-      } else if (teacherStatus === "On School") {
+      } else if (teacherStatus) {
+        // A teacher's explicit morning status change starts the new work day.
         user.teacher_clocked_out = false;
+        // Keep the admin-facing status in sync with the teacher's explicit choice.
+        user.teacher_admin_status = teacherStatus;
       }
       if (teacherStatus) {
+        user.teacher_status_reset_date = resetTeacherStatusesDaily.getManilaDateKey();
+        user.teacher_status_updated_date = resetTeacherStatusesDaily.getManilaDateKey();
         user.teacher_status_expires_at = teacherStatus === "On Leave" && statusDurationMinutes
           ? new Date(Date.now() + (statusDurationMinutes * 60 * 1000))
           : null;

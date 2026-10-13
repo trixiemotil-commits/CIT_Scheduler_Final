@@ -371,7 +371,7 @@
     </Teleport>
 
       <Teleport to="body">
-        <div v-if="showMorningPrompt" class="modal-overlay" @click.self="showMorningPrompt = false">
+        <div v-if="showMorningPrompt" class="modal-overlay" @click.self="dismissMorningPrompt">
           <div class="logout-modal-box">
             <div class="logout-modal-icon">
               <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#1b4332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -685,7 +685,7 @@ function goToSchedule(cls) {
 }
 
 /* ── Teacher status ── */
-const teacherStatus = ref(user.teacher_status || 'On School')
+const teacherStatus = ref(user.teacher_status || 'Offline')
 const teacherAvailability = ref(user.teacher_availability || 'Available')
 const teacherTimeIn = ref(user.teacher_time_in || null)
 const teacherIsClockedOut = ref(false)
@@ -695,8 +695,7 @@ const teacherStatusError = ref(false)
 const showPresenceMenu = ref(false)
 const showMorningPrompt = ref(false)
 const morningPromptDate = ref(localStorage.getItem(getTeacherMorningPromptDateKey()) || '')
-const morningPromptSessionShown = ref(sessionStorage.getItem(getTeacherMorningPromptSessionKey()) === 'true')
-const forcedOfflineDate = ref(localStorage.getItem(getTeacherForcedOfflineDateKey()) || '')
+const teacherStatusUpdatedDate = ref(user.teacher_status_updated_date || '')
 let statusMessageTimer
 const formattedTimeIn = computed(() => {
   if (!teacherTimeIn.value) return 'Not recorded'
@@ -727,6 +726,7 @@ async function saveTeacherStatus({ record = false, durationMinutes = 0, clockOut
     teacherAvailability.value = updatedUser.teacher_availability || teacherAvailability.value
     teacherTimeIn.value = updatedUser.teacher_time_in || null
     teacherIsClockedOut.value = Boolean(updatedUser.teacher_clocked_out)
+    teacherStatusUpdatedDate.value = updatedUser.teacher_status_updated_date || teacherStatusUpdatedDate.value
     teacherStatusMessage.value = record ? 'Time in recorded and status saved.' : 'Status saved. Students can request consultations only when you are available and on school.'
     clearTimeout(statusMessageTimer)
     statusMessageTimer = setTimeout(() => {
@@ -791,11 +791,11 @@ const showClockOutConfirm = ref(false)
 
 const workStatusDisabled = computed(() => {
   const status = normalizeTeacherStatus(teacherStatus.value)
-  return teacherIsClockedOut.value || status === 'On Leave' || forcedOfflineDate.value === getTodayKey()
+  return teacherIsClockedOut.value || status === 'On Leave'
 })
 
 const teacherStatusClass = computed(() => {
-  if (teacherIsClockedOut.value || forcedOfflineDate.value === getTodayKey()) return 'is-offline'
+  if (teacherIsClockedOut.value) return 'is-offline'
   return teacherStatus.value === 'On School' ? 'is-in-school' : 'is-on-leave'
 })
 
@@ -827,29 +827,10 @@ function getTeacherMorningPromptDateKey() {
   return `cit_teacher_morning_prompt_date_${getTeacherStorageId()}`
 }
 
-function getTeacherMorningPromptSessionKey() {
-  return `cit_teacher_morning_prompt_shown_${getTeacherStorageId()}`
-}
-
-function getTeacherForcedOfflineDateKey() {
-  return `cit_teacher_forced_offline_date_${getTeacherStorageId()}`
-}
-
-function isWeekday(date = new Date()) {
-  return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].includes(getPhilippineTimeParts(date).weekday)
-}
-
 function markMorningPromptShown() {
   morningPromptDate.value = getTodayKey()
-  morningPromptSessionShown.value = true
+  teacherStatusUpdatedDate.value = getTodayKey()
   localStorage.setItem(getTeacherMorningPromptDateKey(), morningPromptDate.value)
-  sessionStorage.setItem(getTeacherMorningPromptSessionKey(), 'true')
-}
-
-function markForcedOfflineToday() {
-  forcedOfflineDate.value = getTodayKey()
-  localStorage.setItem(getTeacherForcedOfflineDateKey(), forcedOfflineDate.value)
-  teacherIsClockedOut.value = true
 }
 
 function confirmClockOut() {
@@ -867,35 +848,26 @@ function clearExpiredDailyState() {
     morningPromptDate.value = ''
     localStorage.removeItem(getTeacherMorningPromptDateKey())
   }
-  if (forcedOfflineDate.value !== today) {
-    if (teacherIsClockedOut.value && forcedOfflineDate.value) {
-      teacherIsClockedOut.value = false
-    }
-    forcedOfflineDate.value = ''
-    localStorage.removeItem(getTeacherForcedOfflineDateKey())
-  }
 }
 
 function shouldShowMorningPrompt() {
-  if (!isWeekday()) return false
-  if (morningPromptDate.value === getTodayKey()) return false
-  if (morningPromptSessionShown.value) return false
+  const today = getTodayKey()
+  if (teacherStatusUpdatedDate.value === today || morningPromptDate.value === today) return false
   const parts = getPhilippineTimeParts()
   const minuteOfDay = Number(parts.hour) * 60 + Number(parts.minute)
-  return minuteOfDay >= 6 * 60 && minuteOfDay < 20 * 60
-}
-
-function shouldEnforceAutoOffline() {
-  if (!isWeekday()) return false
-  if (forcedOfflineDate.value === getTodayKey()) return false
-  const parts = getPhilippineTimeParts()
-  return Number(parts.hour) >= 20
+  const isOffline = teacherIsClockedOut.value || normalizeTeacherStatus(teacherStatus.value) === 'Offline'
+  return isOffline && minuteOfDay >= 6 * 60 && minuteOfDay < 20 * 60
 }
 
 function openMorningPrompt() {
   if (shouldShowMorningPrompt()) {
     showMorningPrompt.value = true
   }
+}
+
+function dismissMorningPrompt() {
+  markMorningPromptShown()
+  showMorningPrompt.value = false
 }
 
 function setMorningStartStatus(status) {
@@ -906,22 +878,9 @@ function setMorningStartStatus(status) {
   saveTeacherStatus()
 }
 
-function enforceAutoOffline() {
-  if (!shouldEnforceAutoOffline()) return
-  markForcedOfflineToday()
-  teacherStatus.value = 'On Leave'
-  showMorningPrompt.value = false
-  saveTeacherStatus({ clockOut: true })
-  teacherStatusMessage.value = 'You were automatically clocked out at 8:00 PM Philippine time.'
-  teacherStatusError.value = false
-  clearTimeout(statusMessageTimer)
-  statusMessageTimer = setTimeout(() => { teacherStatusMessage.value = '' }, 4000)
-}
-
 function dailyStatusCheck() {
   clearExpiredDailyState()
   openMorningPrompt()
-  enforceAutoOffline()
 }
 
 function initDailyStatusTimers() {
@@ -955,10 +914,12 @@ async function loadTeacherStatus() {
   try {
     const payload = await apiRequest('/auth/me')
     const currentUser = saveMergedUser(payload.user || {})
-    teacherStatus.value = currentUser.teacher_status || 'On School'
+    teacherStatus.value = currentUser.teacher_status || 'Offline'
     teacherAvailability.value = currentUser.teacher_availability || 'Available'
     teacherTimeIn.value = currentUser.teacher_time_in || null
     teacherIsClockedOut.value = Boolean(currentUser.teacher_clocked_out)
+    teacherStatusUpdatedDate.value = currentUser.teacher_status_updated_date || ''
+    openMorningPrompt()
   } catch (_) {
     // Keep the session values as a safe offline fallback.
   }

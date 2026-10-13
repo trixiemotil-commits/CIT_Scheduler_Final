@@ -165,6 +165,14 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    teacher_status_reset_date: {
+      type: String,
+      default: "",
+    },
+    teacher_status_updated_date: {
+      type: String,
+      default: "",
+    },
     substituteTeacher: {
       type: String,
       trim: true,
@@ -239,7 +247,7 @@ userSchema.pre("validate", function onValidate() {
   const roles = this.roles?.length ? this.roles : [this.role];
   if (roles.includes("teacher")) {
     if (!this.teacher_status) {
-      this.teacher_status = "On School";
+      this.teacher_status = "Offline";
     }
     if (!this.teacher_availability) {
       this.teacher_availability = "Available";

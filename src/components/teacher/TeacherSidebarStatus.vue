@@ -19,7 +19,7 @@
             @click="handleClockButton"
           >
             <svg class="sidebar-status-clock-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3 2" /></svg>
-            <span>Clock Out</span>
+            <span>{{ isOffline ? 'Clock In' : 'Clock Out' }}</span>
           </button>
           <div v-if="showCollapsedStatusModal" class="collapsed-status-modal" role="dialog" aria-label="Work status" @click.stop>
             <div class="collapsed-status-modal-head">
@@ -27,8 +27,8 @@
               <span :class="['sidebar-status-dot', statusDotClass]"></span>
             </div>
             <div :class="['collapsed-status-modal-value', statusDotClass]">{{ statusDisplay }}</div>
-            <button class="collapsed-status-modal-action" type="button" :disabled="workStatusDisabled || saving" @click="clockOutAndClose">
-              Clock Out
+            <button class="collapsed-status-modal-action" type="button" :disabled="workStatusDisabled || saving" @click="clockActionAndClose">
+              {{ isOffline ? 'Clock In' : 'Clock Out' }}
             </button>
             <div class="collapsed-status-modal-time">Time in: {{ formattedTimeIn }}</div>
           </div>
@@ -76,7 +76,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const user = ref(getUser() || {})
-const teacherStatus = ref(user.value.teacher_status || 'On School')
+const teacherStatus = ref(user.value.teacher_status || 'Offline')
 const teacherAvailability = ref(user.value.teacher_availability || 'Available')
 const teacherTimeIn = ref(user.value.teacher_time_in || null)
 const scheduleStatusDisplay = ref('')
@@ -113,6 +113,8 @@ function normalizeTeacherStatus(statusOrObj) {
     const t = statusOrObj
     const account = String(t.account_status || '').trim()
     if (account && account !== 'Active') return 'On Leave'
+
+    if (t.teacher_clocked_out) return 'Offline'
 
     const adminStatus = String(t.teacher_admin_status || '').trim().toLowerCase()
     if (adminStatus === 'on leave' || adminStatus === 'leave') return 'On Leave'
@@ -174,9 +176,9 @@ const formattedTimeIn = computed(() => {
 
 const canChangeAvailability = computed(() => (
   normalizedStatus.value === 'On School'
-  && !['On School - In Class', 'Off Campus'].includes(scheduleStatusDisplay.value)
+  && !['On School - In Class', 'On Class-Substitute', 'Off Campus'].includes(scheduleStatusDisplay.value)
 ))
-const workStatusDisabled = computed(() => isOffline.value || isOutsideWorkWindow.value)
+const workStatusDisabled = computed(() => isOutsideWorkWindow.value)
 const statusDotClass = computed(() => {
   if (normalizedStatus.value === 'On Leave') return 'is-on-leave'
   if (normalizedStatus.value === 'Offline') return 'is-offline'
@@ -192,7 +194,7 @@ const availabilityDotClass = computed(() => {
 })
 
 const availabilitySubtext = computed(() => {
-  if (['On School - In Class', 'Off Campus'].includes(scheduleStatusDisplay.value)) {
+  if (['On School - In Class', 'On Class-Substitute', 'Off Campus'].includes(scheduleStatusDisplay.value)) {
     return 'Availability is locked while in class or off campus.'
   }
   if (!canChangeAvailability.value) return 'Availability is locked while not on school.'
@@ -247,7 +249,7 @@ async function loadStatus() {
     const payload = await apiRequest('/auth/me')
     const currentUser = saveMergedUser(payload.user || {})
     user.value = currentUser
-    teacherStatus.value = currentUser.teacher_status || 'On School'
+    teacherStatus.value = currentUser.teacher_status || 'Offline'
     teacherAvailability.value = currentUser.teacher_availability || 'Available'
     teacherTimeIn.value = currentUser.teacher_time_in || null
     await loadScheduleStatusDisplay()
@@ -360,7 +362,8 @@ function handleClockButton() {
     showCollapsedStatusModal.value = !showCollapsedStatusModal.value
     return
   }
-  clockOut()
+  if (isOffline.value) clockIn()
+  else clockOut()
 }
 
 function handleOfficeHoursPointerDown(event) {
@@ -371,9 +374,32 @@ function handleOfficeHoursPointerDown(event) {
   showCollapsedOfficeModal.value = !showCollapsedOfficeModal.value
 }
 
-async function clockOutAndClose() {
+async function clockActionAndClose() {
   showCollapsedStatusModal.value = false
-  await clockOut()
+  if (isOffline.value) await clockIn()
+  else await clockOut()
+}
+
+async function clockIn() {
+  if (workStatusDisabled.value || saving.value) return
+  saving.value = true
+  try {
+    const payload = await apiRequest('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify({ teacher_status: 'On School', recordTimeIn: true }),
+    })
+    const updatedUser = saveMergedUser(payload.user || {})
+    user.value = updatedUser
+    teacherStatus.value = updatedUser.teacher_status || 'On School'
+    teacherAvailability.value = updatedUser.teacher_availability || teacherAvailability.value
+    teacherTimeIn.value = updatedUser.teacher_time_in || new Date().toISOString()
+    showMessage('Clocked in. Your work status is On School.')
+  } catch (err) {
+    showMessage(err.message || 'Unable to clock in.', true)
+    await loadStatus()
+  } finally {
+    saving.value = false
+  }
 }
 
 function closeCollapsedStatusModal(event) {
