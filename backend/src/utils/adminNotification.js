@@ -5,7 +5,6 @@ async function notifyActiveAdmins({ actorId, type, title, message, related = {},
   const admins = await User.find({
     account_status: 'Active',
     $or: [{ role: 'admin' }, { roles: 'admin' }],
-    ...(actorId ? { _id: { $ne: actorId } } : {}),
   }).select('_id').lean()
 
   if (!admins.length) return 0

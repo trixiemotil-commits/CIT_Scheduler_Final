@@ -1,4 +1,5 @@
-import { getUser, isLoggedIn, setActiveRole } from '@/auth.js'
+import { getToken, getUser, isLoggedIn, setActiveRole } from '@/auth.js'
+import notifications from '@/composables/useNotifications.js'
 import { createRouter, createWebHistory } from '@ionic/vue-router'
 const ForgotPasswordView = () => import('@/views/ForgotPasswordView.vue')
 const SecurityLoginReviewView = () => import('@/views/SecurityLoginReviewView.vue')
@@ -22,7 +23,6 @@ const StudentEventsView = () => import('@/views/student/StudentEventsView.vue')
 const StudentFaqsView = () => import('@/views/student/StudentFaqsView.vue')
 const StudentNotificationsView = () => import('@/views/student/StudentNotificationsView.vue')
 const StudentProfileView = () => import('@/views/student/StudentProfileView.vue')
-const StudentRecentDevicesView = () => import('@/views/student/StudentRecentDevicesView.vue')
 const StudentSettingsView = () => import('@/views/student/StudentSettingsView.vue')
 const StudentTeachersView = () => import('@/views/student/StudentTeachersView.vue')
 const StudentTabsView = () => import('@/views/student/StudentTabsView.vue')
@@ -33,6 +33,7 @@ const TeacherProfileView = () => import('@/views/teacher/TeacherProfileView.vue'
 const TeacherScheduleView = () => import('@/views/teacher/TeacherScheduleView.vue')
 const TeacherSettingsView = () => import('@/views/teacher/TeacherSettingsView.vue')
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -70,7 +71,6 @@ const router = createRouter({
         { path: 'events',        name: 'student-events',        component: StudentEventsView },
         { path: 'consultations', name: 'student-consultations', component: StudentConsultationsView },
         { path: 'profile',       name: 'student-profile',       component: StudentProfileView },
-        { path: 'recent-devices', name: 'student-recent-devices', component: StudentRecentDevicesView },
         { path: 'change-password', name: 'student-change-password', component: StudentChangePasswordView },
         { path: 'faqs',          name: 'student-faqs',          component: StudentFaqsView },
         { path: 'settings',      name: 'student-settings',      component: StudentSettingsView },
@@ -101,6 +101,42 @@ router.beforeEach((to, _from, next) => {
   } else {
     next()
   }
+})
+
+const activityRouteLabels = {
+  '/teacher/dashboard': 'Teacher Dashboard',
+  '/teacher/schedule': 'Teacher Schedule',
+  '/teacher/events': 'Teacher Events',
+  '/teacher/consultation': 'Teacher Consultation',
+  '/teacher/settings': 'Teacher Settings',
+  '/teacher/profile': 'Teacher Profile',
+  '/student/dashboard': 'Student Dashboard',
+  '/student/teachers': 'Student Teachers',
+  '/student/events': 'Student Events',
+  '/student/consultations': 'Student Consultations',
+  '/student/profile': 'Student Profile',
+  '/student/settings': 'Student Settings',
+  '/student/notifications': 'Student Notifications',
+}
+
+// Keep one notification stream open on every logged-in page so the bell
+// and the sound work everywhere, not only on pages that listen directly.
+router.afterEach(() => {
+  if (getToken()) notifications.startNotifications()
+})
+
+router.afterEach((to) => {
+  const currentUser = getUser()
+  const role = String(currentUser?.role || '').toLowerCase()
+  const token = getToken()
+  const routeLabel = activityRouteLabels[to.path]
+  if (!token || !routeLabel || !['teacher', 'student'].includes(role)) return
+
+  fetch(`${API_BASE}/activity-logs/navigation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ routeLabel, routePath: to.path }),
+  }).catch(() => {})
 })
 
 export default router
