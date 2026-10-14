@@ -1167,6 +1167,7 @@ async function createConsultationRequest(req, res) {
     try {
       await notifyActiveAdmins({
         actorId: req.user.id,
+        excludeIds: [String(teacherUser._id)],
         type: 'consultation_request_admin',
         title: 'New consultation request',
         message: `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}.`,
@@ -1605,6 +1606,29 @@ async function updateConsultationRequestStatus(req, res) {
       method: req.method,
       req,
     });
+
+    // When a request is cancelled, remove the teacher's old "new request" alerts and send a cancellation notice
+    if (nextStatus === 'CANCELLED') {
+      try {
+        await Notification.deleteMany({
+          'related.consultationRequestId': requestDoc._id.toString(),
+          type: 'consultation_request',
+        })
+        const cancelledTeacher = await findTeacherUserByIdentifier(requestDoc.employeeId)
+        if (cancelledTeacher && String(cancelledTeacher._id) !== String(req.user?.id)) {
+          await Notification.create({
+            recipientId: cancelledTeacher._id,
+            actorId: req.user?.id || null,
+            type: 'consultation_cancelled',
+            title: 'Consultation cancelled',
+            message: `A consultation request for ${requestDoc.subject} was cancelled.`,
+            related: { consultationRequestId: requestDoc._id.toString(), status: 'CANCELLED' },
+          })
+        }
+      } catch (err) {
+        console.warn('Failed to handle cancelled consultation notifications:', err.message)
+      }
+    }
 
     // Create notification for student when request status changes to APPROVED or RESCHED
     try {

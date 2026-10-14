@@ -1,10 +1,12 @@
 const Notification = require('../models/Notification')
 const User = require('../models/User')
 
-async function notifyActiveAdmins({ actorId, type, title, message, related = {}, route = null }) {
+async function notifyActiveAdmins({ actorId, excludeIds = [], type, title, message, related = {}, route = null }) {
+  const skipIds = [actorId, ...excludeIds].filter(Boolean)
   const admins = await User.find({
     account_status: 'Active',
     $or: [{ role: 'admin' }, { roles: 'admin' }],
+    ...(skipIds.length ? { _id: { $nin: skipIds } } : {}),
   }).select('_id').lean()
 
   if (!admins.length) return 0

@@ -30,6 +30,7 @@ try {
         data: doc.data || {},
         read: Boolean(doc.read),
         createdAt: doc.createdAt,
+        actorId: doc.actorId ? String(doc.actorId) : null,
       }
       stream.sendNotificationToRecipient(doc.recipientId, payload)
     } catch (err) {

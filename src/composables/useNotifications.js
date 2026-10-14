@@ -1,4 +1,4 @@
-import { getToken } from '@/auth.js'
+import { getToken, getUser } from '@/auth.js'
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 
@@ -11,9 +11,8 @@ async function setupNativeNotifications() {
     await LocalNotifications.createChannel({
       id: NOTIF_CHANNEL_ID,
       name: 'CIT Scheduler alerts',
-           importance: 4,
-      channelId: NOTIF_CHANNEL_ID,
-        sound: 'notification.mp3',
+      importance: 4,
+      sound: 'notification.mp3',
       vibration: true,
     })
   } catch (err) {
@@ -27,6 +26,7 @@ let esToken = null
 const listeners = new Set()
 
 let pendingSound = false
+let pendingPayload = {}
 
 function playNotificationSound(payload = {}) {
   if (Capacitor.isNativePlatform()) {
@@ -40,12 +40,13 @@ function playNotificationSound(payload = {}) {
       }],
    }).catch((err) => console.warn('Local notification failed:', err))
   }
+  if (Capacitor.isNativePlatform()) return
   try {
     const audio = new Audio('/sounds/notification.mp3')
     audio.volume = 0.6
     audio.play().catch((err) => {
       console.warn('Notification sound blocked:', err.name)
-      if (err.name === 'NotAllowedError') pendingSound = true
+      if (err.name === 'NotAllowedError') { pendingSound = true; pendingPayload = payload }
     })
   } catch (_) {}
 }
@@ -54,7 +55,7 @@ if (typeof window !== 'undefined') {
   const retryAfterClick = () => {
     if (pendingSound) {
       pendingSound = false
-      playNotificationSound()
+      if (!Capacitor.isNativePlatform()) playNotificationSound(pendingPayload)
     }
   }
   window.addEventListener('click', retryAfterClick)
@@ -85,7 +86,9 @@ function ensureEventSource() {
   es.addEventListener('notification', (ev) => {
     try {
       const payload = JSON.parse(ev.data || '{}')
-     playNotificationSound(payload)
+      const me = String(getUser()?.id || getUser()?._id || '')
+      const isOwnAction = payload.actorId && me && String(payload.actorId) === me
+      if (!isOwnAction) playNotificationSound(payload)
       for (const cb of listeners) {
         try { cb(payload) } catch (_) {}
       }
