@@ -724,48 +724,34 @@ async function listSessions(req, res) {
       .filter((session) => new Date(session.expiresAt).getTime() > now)
       .sort((first, second) => new Date(second.lastActiveAt || second.createdAt) - new Date(first.lastActiveAt || first.createdAt));
 
-    // A trusted browser/device is one item in Recent Devices, even if it has
-    // accumulated multiple active login sessions. Older sessions can lack a
-    // stable key (or have a different key after browser storage was reset), so
-    // fold matching reported device names into the trusted device entry too.
-    const trustedSessionsByLabel = new Map();
+    // Device names are not unique (two computers may both report
+    // "Desktop / Windows / Chrome"), so only group sessions by their stable
+    // device key. Sessions without a key remain separate.
+    const groupedSessions = new Map();
     const sessions = [];
     for (const session of activeSessions) {
       const isTrusted = Boolean(session.deviceKeyHash && trustedDeviceHashes.has(session.deviceKeyHash));
-      if (!isTrusted) continue;
-
-      const deviceLabel = String(session.device || "Unknown device").trim();
-      const groupKey = deviceLabel.toLowerCase() === "unknown device"
-        ? `unknown:${session.deviceKeyHash}`
-        : deviceLabel;
-      let grouped = trustedSessionsByLabel.get(groupKey);
+      const groupKey = session.deviceKeyHash
+        ? `${isTrusted ? "trusted" : "untrusted"}:${session.deviceKeyHash}`
+        : `session:${session.id}`;
+      let grouped = groupedSessions.get(groupKey);
       if (!grouped) {
-        grouped = { ...toSafeSession(session, req.user.sid), sessionIds: [], current: false, trusted: true };
-        trustedSessionsByLabel.set(groupKey, grouped);
+        grouped = {
+          ...toSafeSession(session, req.user.sid),
+          sessionIds: [],
+          current: false,
+          trusted: isTrusted,
+        };
+        groupedSessions.set(groupKey, grouped);
         sessions.push(grouped);
       }
       grouped.sessionIds.push(session.id);
-      if (String(session.id) === String(req.user.sid || "")) grouped.current = true;
-    }
-
-    for (const session of activeSessions) {
-      const isTrusted = Boolean(session.deviceKeyHash && trustedDeviceHashes.has(session.deviceKeyHash));
-      if (isTrusted) continue;
-
-      const deviceLabel = String(session.device || "Unknown device").trim();
-      const groupKey = deviceLabel.toLowerCase() === "unknown device" ? "" : deviceLabel;
-      const trustedDevice = groupKey ? trustedSessionsByLabel.get(groupKey) : null;
-      if (trustedDevice) {
-        trustedDevice.sessionIds.push(session.id);
-        const sessionLastActiveAt = session.lastActiveAt || session.createdAt;
-        const groupedLastActiveAt = trustedDevice.lastActiveAt || trustedDevice.createdAt;
-        if (new Date(sessionLastActiveAt).getTime() > new Date(groupedLastActiveAt).getTime()) {
-          trustedDevice.lastActiveAt = sessionLastActiveAt;
-        }
-        if (String(session.id) === String(req.user.sid || "")) trustedDevice.current = true;
-      } else {
-        sessions.push({ ...toSafeSession(session, req.user.sid), sessionIds: [session.id], trusted: false });
+      const sessionLastActiveAt = session.lastActiveAt || session.createdAt;
+      const groupedLastActiveAt = grouped.lastActiveAt || grouped.createdAt;
+      if (new Date(sessionLastActiveAt).getTime() > new Date(groupedLastActiveAt).getTime()) {
+        grouped.lastActiveAt = sessionLastActiveAt;
       }
+      if (String(session.id) === String(req.user.sid || "")) grouped.current = true;
     }
     return res.status(200).json({ sessions });
   } catch (error) {
