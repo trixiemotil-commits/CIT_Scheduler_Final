@@ -4,7 +4,7 @@
       <img class="review-seal" src="/branding/cit-college-seal.png" alt="" />
       <p class="review-kicker">CIT Scheduler account security</p>
       <template v-if="result">
-        <h1 id="review-title">{{ result.passwordResetRequired ? 'Sign-in reported' : 'Device confirmed' }}</h1>
+        <h1 id="review-title">{{ result.passwordResetRequired ? 'Sign-in reported' : 'Sign-in confirmed' }}</h1>
         <p class="review-copy">{{ result.message }}</p>
         <RouterLink v-if="result.passwordResetRequired" class="review-link" to="/forgot-password">Reset password</RouterLink>
         <RouterLink v-else class="review-link review-link--quiet" to="/">Return to sign in</RouterLink>

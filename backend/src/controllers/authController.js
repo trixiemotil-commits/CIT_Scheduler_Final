@@ -142,6 +142,12 @@ async function completeLogin(user, req, suppliedDeviceId) {
   user.activeSessions = activeSessions.filter((session) => new Date(session.expiresAt).getTime() > now.getTime());
   const loginWarning = user.activeSessions.length > 0;
   let trustedDevices = Array.isArray(user.trustedDevices) ? user.trustedDevices : [];
+  if (trustedDevices.length > 1) {
+    trustedDevices = [trustedDevices.reduce((first, current) =>
+      new Date(current.trustedAt).getTime() < new Date(first.trustedAt).getTime() ? current : first
+    )];
+    user.trustedDevices = trustedDevices;
+  }
   let trustedDevice = deviceKeyHash && trustedDevices.find((item) => item.keyHash === deviceKeyHash);
   if (!trustedDevice && !trustedDevices.length && !user.lastLoginAt) {
     trustedDevice = await trustInitialDevice(user, deviceKeyHash, device, now);
@@ -798,20 +804,14 @@ async function trustCurrentDevice(req, res) {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found." });
     const session = getPendingReviewSession(user, req.user.sid, String(req.body?.sessionId || ""));
-    if (!session || !session.deviceKeyHash) {
+    if (!session) {
       return res.status(404).json({ message: "That pending device sign-in is no longer active." });
     }
-    const now = new Date();
-    user.trustedDevices = (user.trustedDevices || []).filter((item) => item.keyHash !== session.deviceKeyHash);
-    user.trustedDevices.push({ keyHash: session.deviceKeyHash, label: session.device, trustedAt: now, lastUsedAt: now });
-    user.trustedDevices = user.trustedDevices
-      .sort((first, second) => new Date(second.lastUsedAt) - new Date(first.lastUsedAt))
-      .slice(0, 20);
     session.securityAlertPending = false;
     session.securityActionTokenHash = null;
     session.securityActionTokenExpiresAt = null;
     await user.save();
-    return res.status(200).json({ message: "This device is now trusted." });
+    return res.status(200).json({ message: "This sign-in is approved. This device will need confirmation next time." });
   } catch (error) {
     return res.status(500).json({ message: "Unable to trust this device.", error: error.message });
   }
@@ -864,19 +864,11 @@ async function confirmSecurityReview(req, res) {
     }
 
     if (choice === "trust") {
-      if (!session.deviceKeyHash) {
-        return res.status(400).json({ message: "This device cannot be remembered. Use the in-app security notice instead." });
-      }
-      user.trustedDevices = (user.trustedDevices || []).filter((item) => item.keyHash !== session.deviceKeyHash);
-      user.trustedDevices.push({ keyHash: session.deviceKeyHash, label: session.device, trustedAt: now, lastUsedAt: now });
-      user.trustedDevices = user.trustedDevices
-        .sort((first, second) => new Date(second.lastUsedAt) - new Date(first.lastUsedAt))
-        .slice(0, 20);
       session.securityAlertPending = false;
       session.securityActionTokenHash = null;
       session.securityActionTokenExpiresAt = null;
       await user.save();
-      return res.status(200).json({ message: "Confirmed. This device is trusted and its session remains active." });
+      return res.status(200).json({ message: "This sign-in is approved. This device will need confirmation next time." });
     }
 
     const invalidateOtherSessions = req.body?.invalidateOtherSessions !== false;
