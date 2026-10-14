@@ -103,6 +103,7 @@ async function logoutDevice(session) {
   try {
     const response = await fetch(`${API_BASE}/auth/sessions/${encodeURIComponent(session.id)}`, {
       method: 'DELETE',
+      signal: AbortSignal.timeout(15000),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
       body: JSON.stringify({ sessionIds: session.sessionIds || [session.id] }),
     })
