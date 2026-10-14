@@ -101,6 +101,34 @@ function getSecurityReviewUrl(token, choice) {
   return url.toString();
 }
 
+async function trustInitialDevice(user, deviceKeyHash, device, now) {
+  if (!deviceKeyHash || user.lastLoginAt || (user.trustedDevices || []).length) return null;
+
+  const enrolledUser = await User.findOneAndUpdate(
+    {
+      _id: user._id,
+      lastLoginAt: null,
+      $or: [
+        { trustedDevices: { $exists: false } },
+        { trustedDevices: { $size: 0 } },
+      ],
+    },
+    {
+      $push: { trustedDevices: { keyHash: deviceKeyHash, label: device, trustedAt: now, lastUsedAt: now } },
+      $set: { lastLoginAt: now },
+    },
+    { new: true }
+  ).select("trustedDevices").lean();
+
+  const latestTrustedDevices = enrolledUser
+    ? enrolledUser.trustedDevices
+    : (await User.findById(user._id).select("trustedDevices").lean())?.trustedDevices || [];
+  user.trustedDevices = latestTrustedDevices;
+  if (enrolledUser) user.lastLoginAt = now;
+
+  return latestTrustedDevices.find((trustedDevice) => trustedDevice.keyHash === deviceKeyHash) || null;
+}
+
 async function completeLogin(user, req, suppliedDeviceId) {
   const now = new Date();
   const deviceId = /^[a-zA-Z0-9-]{32,100}$/.test(String(suppliedDeviceId || ""))
@@ -113,8 +141,12 @@ async function completeLogin(user, req, suppliedDeviceId) {
   const activeSessions = Array.isArray(user.activeSessions) ? user.activeSessions : [];
   user.activeSessions = activeSessions.filter((session) => new Date(session.expiresAt).getTime() > now.getTime());
   const loginWarning = user.activeSessions.length > 0;
-  const trustedDevices = Array.isArray(user.trustedDevices) ? user.trustedDevices : [];
-  const trustedDevice = deviceKeyHash && trustedDevices.find((item) => item.keyHash === deviceKeyHash);
+  let trustedDevices = Array.isArray(user.trustedDevices) ? user.trustedDevices : [];
+  let trustedDevice = deviceKeyHash && trustedDevices.find((item) => item.keyHash === deviceKeyHash);
+  if (!trustedDevice && !trustedDevices.length && !user.lastLoginAt) {
+    trustedDevice = await trustInitialDevice(user, deviceKeyHash, device, now);
+    trustedDevices = Array.isArray(user.trustedDevices) ? user.trustedDevices : [];
+  }
   if (trustedDevice) {
     trustedDevice.lastUsedAt = now;
     trustedDevice.label = device;
