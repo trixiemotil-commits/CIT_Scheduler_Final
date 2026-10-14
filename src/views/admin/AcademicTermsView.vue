@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="layout">
     <aside class="sidebar admin-sidebar">
       <AdminSidebarToggle />
@@ -514,7 +514,9 @@ watch(
 async function apiRequest(path, options = {}) {
   const token = getToken()
   if (!token) throw new Error('Session expired.')
-  const response = await fetch(`${API_BASE}${path}`, { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, ...options })
+  const fetchOptions = { ...options };
+fetchOptions.headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options && options.headers ? options.headers : {}) };
+const response = await fetch(`${API_BASE}${path}`, fetchOptions)
   const body = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(body.message || 'Request failed.')
   return body
@@ -2330,3 +2332,4 @@ loadPage()
   max-width: none;
 }
 </style>
+
