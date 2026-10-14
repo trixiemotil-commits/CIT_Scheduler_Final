@@ -225,7 +225,12 @@ async function checkForNewLogin() {
       showSecurityWarning.value = true
       return
     }
+    const wasPending = approvalPending.value
     approvalPending.value = Boolean(payload.security?.approvalPending)
+    if (wasPending && !approvalPending.value) {
+      window.location.reload()
+      return
+    }
     if (approvalPending.value) return
     if (!payload.security?.newLoginDetected) return
     securityMode.value = 'review'
@@ -311,7 +316,7 @@ onMounted(() => {
       showNativeSplash.value = false
     }, 5000)
   }
-  securityPoll = window.setInterval(checkForNewLogin, 15000)
+  securityPoll = window.setInterval(checkForNewLogin, 5000)
   checkForNewLogin()
   document.addEventListener('visibilitychange', checkForNewLogin)
   document.addEventListener('scroll', handleDocumentScroll, true)
