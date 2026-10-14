@@ -1132,6 +1132,7 @@ async function nextModalStep() {
   modalStep.value = Math.min(3, modalStep.value + 1)
 }
 async function saveTerm() {
+  if (saving.value) return
   if (!form.schoolYear || !form.semester) return Swal.fire({ icon: 'warning', title: 'Missing details', text: 'School year and semester are required.' })
   if (!schoolYearOptions.value.includes(form.schoolYear)) return Swal.fire({ icon: 'warning', title: 'Invalid school year', text: 'Choose the current school year or a future school year.' })
   roomSelectionAttempted.value = true
@@ -1141,19 +1142,60 @@ async function saveTerm() {
     showStatusToast('info', 'No changes made.')
     return
   }
-  saving.value = true
   const payload = {
     schoolYear: form.schoolYear, semester: form.semester, sectionCounts: form.sectionCounts, sectionNames: form.sectionNames,
     rooms: selectedRooms.value.map(name => ({ name, type: 'Lecture' })), createdBy: user.name || user.email || 'Admin',
   }
+  const isEditing = Boolean(editingTermId.value)
+  const actionLabel = isEditing ? 'Save changes' : 'Create term'
+  saving.value = true
+  let result
   try {
-    await apiRequest(editingTermId.value ? `/academic-terms/${editingTermId.value}` : '/academic-terms', { method: editingTermId.value ? 'PATCH' : 'POST', body: JSON.stringify(payload) })
-    const successMessage = editingTermId.value ? 'Academic term updated.' : 'Academic term created.'
-    closeTermModal()
-    const refreshed = await loadPage()
-    if (!refreshed) showStatusToast('error', `${successMessage} The term list could not be refreshed.`)
-    else showStatusToast('success', successMessage)
-  } catch (error) { showStatusToast('error', error.message || 'Unable to save this academic term.') } finally { saving.value = false }
+    result = await Swal.fire({
+      icon: 'question',
+      title: `${isEditing ? 'Save changes to' : 'Create'} ${termLabel(form)}?`,
+      text: isEditing ? 'Your academic term details, sections, and available rooms will be updated.' : 'This academic term will be created with the selected sections and available rooms.',
+      showCancelButton: true,
+      reverseButtons: true,
+      confirmButtonText: actionLabel,
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#293d4b',
+      cancelButtonColor: '#6c757d',
+      background: '#fff',
+      showLoaderOnConfirm: false,
+      allowOutsideClick: () => !Swal.isLoading(),
+      customClass: {
+        popup: 'publish-confirm-popup',
+        title: 'publish-confirm-title',
+        icon: 'publish-confirm-icon',
+        confirmButton: 'publish-confirm-button',
+        cancelButton: 'publish-cancel-button',
+      },
+      preConfirm: async () => {
+        const confirmButton = Swal.getConfirmButton()
+        if (confirmButton) confirmButton.textContent = 'Saving...'
+        try {
+          await apiRequest(isEditing ? `/academic-terms/${editingTermId.value}` : '/academic-terms', {
+            method: isEditing ? 'PATCH' : 'POST',
+            body: JSON.stringify(payload),
+          })
+          return true
+        } catch (error) {
+          Swal.showValidationMessage(error.message || 'Unable to save this academic term.')
+          return false
+        }
+      },
+    })
+  } finally {
+    saving.value = false
+  }
+  if (!result.isConfirmed) return
+
+  const successMessage = isEditing ? 'Academic term updated.' : 'Academic term created.'
+  closeTermModal()
+  const refreshed = await loadPage()
+  if (!refreshed) showStatusToast('error', `${successMessage} The term list could not be refreshed.`)
+  else showStatusToast('success', successMessage)
 }
 async function publishTerm(term) {
   if (activeTermAction.value) return

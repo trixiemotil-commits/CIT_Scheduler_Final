@@ -273,7 +273,7 @@
                         <div class="sched-entry sched-entry-clickable" :class="getEntriesForStudentCell(slot, day)[0].color" :style="studentEntryStyle(slot, getEntriesForStudentCell(slot, day)[0])" role="button" tabindex="0" @click="openScheduleDetails(getEntriesForStudentCell(slot, day))" @keydown.enter.space.prevent="openScheduleDetails(getEntriesForStudentCell(slot, day))">
                           <div class="entry-teacher">{{ getEntriesForStudentCell(slot, day)[0].subject }}</div>
                           <div class="entry-subject">{{ getEntriesForStudentCell(slot, day)[0].teacher }}</div>
-                          <div class="entry-section-row"><span class="entry-section-badge">{{ [getEntriesForStudentCell(slot, day)[0].year, getEntriesForStudentCell(slot, day)[0].section].filter(Boolean).join(' · ') }}</span><span class="entry-room">{{ getEntriesForStudentCell(slot, day)[0].room || 'Room not assigned' }}</span></div>
+                          <div class="entry-section-row"><span class="entry-section-badge">{{ [getEntriesForStudentCell(slot, day)[0].year, getEntriesForStudentCell(slot, day)[0].section].filter(Boolean).join(' · ') }}</span><span class="entry-room">Room: {{ getEntriesForStudentCell(slot, day)[0].room || 'not assigned' }}</span></div>
                         </div>
                       </template>
                       <span v-else class="free-time-label">Free time</span>
@@ -403,7 +403,7 @@
                             <template v-for="e in getEntriesForTeacherCell(slot, day)" :key="e._key">
                               <div v-if="e.year || e.section || e.room" class="entry-section-row">
                                 <span v-if="e.year || e.section" class="entry-section-badge">{{ [e.year, e.section].filter(Boolean).join(' · ') }}</span>
-                                <span v-if="e.room" class="entry-room">{{ e.room }}</span>
+                                <span v-if="e.room" class="entry-room">Room: {{ e.room }}</span>
                               </div>
                             </template>
                           </div>
@@ -513,7 +513,7 @@
 
     <!-- ═══ Logout Confirm Modal ═══ -->
     <Teleport to="body">
-      <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
+      <div v-if="showLogoutModal" class="modal-overlay" @click.self="!isLoggingOut && (showLogoutModal = false)">
         <div class="logout-modal-box">
           <div class="logout-modal-icon">
             <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -525,8 +525,8 @@
           <h2 class="logout-modal-title">Log Out</h2>
           <p class="logout-modal-sub">Are you sure you want to log out?</p>
           <div class="logout-modal-actions">
-            <button class="logout-cancel-btn" @click="showLogoutModal = false">Cancel</button>
-            <button class="logout-confirm-btn" @click="confirmLogout">Log Out</button>
+            <button class="logout-cancel-btn" :disabled="isLoggingOut" @click="showLogoutModal = false">Cancel</button>
+            <button class="logout-confirm-btn" :disabled="isLoggingOut" :aria-busy="isLoggingOut" @click="confirmLogout">{{ isLoggingOut ? 'Logging out...' : 'Log Out' }}</button>
           </div>
         </div>
       </div>
@@ -623,6 +623,7 @@ watch(selectedTerm, async () => {
 const timeSlots30 = timeOptions
 
 const showLogoutModal = ref(false)
+const isLoggingOut = ref(false)
 const selectedScheduleEntries = ref([])
 const loading = ref(true)
 const consultationSlots = ref([])
@@ -700,7 +701,10 @@ function closeScheduleDetails() {
   selectedScheduleEntries.value = []
 }
 
-function confirmLogout() {
+async function confirmLogout() {
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+  await new Promise(resolve => setTimeout(resolve, 650))
   showLogoutModal.value = false
   logout()
   router.push('/')
@@ -1078,7 +1082,7 @@ function getConsultationForTeacherCell(rowSlot, day) {
 
 function getConsultRowspan(consult) {
   if (!consult?.startTime || !consult?.endTime) return 1
-  return Math.min(timeSlots30.length, Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime)) / 30)))
+  return Math.min(timeSlots30.length, Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime) + 30) / 30)))
 }
 
 function isSpannedConsultTeacherCell(slot, day) {
@@ -1097,9 +1101,11 @@ function consultEntryStyle(rowSlot, consult) {
   const consultStart = parseTime(consult.startTime)
   const offsetMins   = Math.max(0, consultStart - rowStart)
   const spannedMins  = getConsultRowspan(consult) * 30
+  const durationMins = Math.max(1, parseTime(consult.endTime) - consultStart + 30)
+  const trailingMins = Math.max(0, spannedMins - offsetMins - durationMins)
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
-    bottom: '4px',
+    bottom: `calc(${(trailingMins / spannedMins) * 100}% + 4px)`,
     height: 'auto',
     zIndex: 3,
   }
@@ -1233,7 +1239,7 @@ function getRoomRowspan(entry) {
   if (!entry?.timeIn || !entry?.timeOut) return 1
   const start = parseTime(entry.timeIn)
   const end   = parseTime(entry.timeOut)
-  const duration = Math.max(1, end - start)
+  const duration = Math.max(1, end - start + 30)
   const startOffset = start % 30
   return Math.max(1, Math.ceil((startOffset + duration) / 30))
 }
@@ -1245,9 +1251,11 @@ function roomEntryStyle(rowHour, entry) {
   const entryStart = parseTime(entry.timeIn)
   const offsetMins = Math.max(0, entryStart - rowStart)
   const spannedMins = getRoomScheduleRowspan(entry) * 30
+  const durationMins = Math.max(1, parseTime(entry.timeOut) - entryStart + 30)
+  const trailingMins = Math.max(0, spannedMins - offsetMins - durationMins)
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
-    bottom: '4px',
+    bottom: `calc(${(trailingMins / spannedMins) * 100}% + 4px)`,
     height: 'auto',
     zIndex: 3,
   }
@@ -1259,10 +1267,12 @@ function studentEntryStyle(rowSlot, entry) {
   const entryStart = parseTime(entry.timeIn)
   const offset = Math.max(0, entryStart - rowStart)
   const spannedMinutes = getStudentRowspan(entry) * 30
+  const durationMinutes = Math.max(1, parseTime(entry.timeOut) - entryStart + 30)
+  const trailingMinutes = Math.max(0, spannedMinutes - offset - durationMinutes)
 
   return {
     top: `calc(${(offset / spannedMinutes) * 100}% + 4px)`,
-    bottom: '4px',
+    bottom: `calc(${(trailingMinutes / spannedMinutes) * 100}% + 4px)`,
     height: 'auto',
     zIndex: 3,
   }
@@ -1274,10 +1284,12 @@ function teacherEntryStyle(rowSlot, entry) {
   const entryStart = parseTime(entry.timeIn)
   const offset = Math.max(0, entryStart - rowStart)
   const spannedMinutes = getTeacherRowspan(entry) * 30
+  const durationMinutes = Math.max(1, parseTime(entry.timeOut) - entryStart + 30)
+  const trailingMinutes = Math.max(0, spannedMinutes - offset - durationMinutes)
 
   return {
     top: `calc(${(offset / spannedMinutes) * 100}% + 4px)`,
-    bottom: '4px',
+    bottom: `calc(${(trailingMinutes / spannedMinutes) * 100}% + 4px)`,
     height: 'auto',
     zIndex: 3,
   }
@@ -2480,15 +2492,15 @@ function printSchedule() {
   padding-top: 4px;
 }
 .entry-section-row {
-  display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%;
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; min-width: 0;
 }
 .entry-section-badge {
-  font-size: 0.68rem; font-weight: 750; text-align: center;
-  text-transform: uppercase; letter-spacing: 0.025em; line-height: 1.25; opacity: 1;
-  background: rgba(255,255,255,0.3); padding: 2px 6px; border-radius: 5px;
+  display: block; width: 100%; min-width: 0; font-size: 0.58rem; font-weight: 750; text-align: center;
+  text-transform: uppercase; letter-spacing: 0.015em; line-height: 1.2; overflow-wrap: anywhere; opacity: 1;
+  background: rgba(255,255,255,0.3); padding: 2px 4px; border-radius: 5px;
 }
 .entry-room {
-  font-size: 0.72rem; opacity: 0.75; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56px;
+  display: block; width: 100%; max-width: none; font-size: 0.62rem; opacity: 0.75; text-align: left; white-space: normal; overflow-wrap: anywhere;
 }
 
 /* Entry colors */

@@ -590,8 +590,8 @@ async function findConflict(doc, excludedIds = []) {
   // Overlap: same day, time windows intersect
   const overlapFilter = {
     day: doc.day,
-    timeInMinutes: { $lt: doc.timeOutMinutes },
-    timeOutMinutes: { $gt: doc.timeInMinutes },
+    timeInMinutes: { $lt: doc.timeOutMinutes + 30 },
+    timeOutMinutes: { $gt: doc.timeInMinutes - 30 },
   };
 
   if (excludedIds.length) {
@@ -652,7 +652,7 @@ async function findConflict(doc, excludedIds = []) {
     for (const slot of consultSlots) {
       const slotStart = parseTimeToMinutes(slot.startTime);
       const slotEnd   = parseTimeToMinutes(slot.endTime);
-      if (doc.timeInMinutes < slotEnd && doc.timeOutMinutes > slotStart) {
+      if (doc.timeInMinutes < slotEnd + 30 && doc.timeOutMinutes + 30 > slotStart) {
         console.debug('findConflict -> consultConflict', { slot });
         console.debug('findConflict -> consultConflict', { slot });
         return {

@@ -549,8 +549,8 @@ function formatDate(dateStr) {
 
 .app-header {
   position: relative;
-  min-height: 118px;
-  padding: 25px 20px 24px !important;
+  min-height: 100px;
+  padding: 16px 20px 20px !important;
   align-items: flex-start;
 }
 
@@ -722,8 +722,8 @@ function formatDate(dateStr) {
   }
 
   .app-header {
-    min-height: 122px;
-    padding: 22px 20px 22px !important;
+    min-height: 108px;
+    padding: 18px 20px 20px !important;
   }
 
   .header-title { font-size: 1.18rem; }
@@ -761,7 +761,7 @@ function formatDate(dateStr) {
 
 @media (max-width: 360px) {
   .mobile-app { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
-  .app-header { min-height: 104px; padding: 19px 14px 22px !important; }
+  .app-header { min-height: 92px; padding: 14px 14px 19px !important; }
   .app-header::after { left: 14px; font-size: .54rem; }
   .header-left { gap: 10px; }
   .avatar-sm { width: 44px; height: 44px; }
@@ -790,7 +790,7 @@ function formatDate(dateStr) {
 }
 
 @media (max-width: 430px) and (max-height: 680px) {
-  .app-header { min-height: 102px; padding-top: 17px !important; }
+  .app-header { min-height: 90px; padding-top: 14px !important; }
   .stats-grid { padding-top: 8px; padding-bottom: 12px; }
   .stat-card { min-height: 98px; }
   .section-card { padding-top: 16px; padding-bottom: 10px; }

@@ -574,7 +574,7 @@
 
     <!-- ═══ Logout Confirm Modal ═══ -->
     <Teleport to="body">
-      <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
+      <div v-if="showLogoutModal" class="modal-overlay" @click.self="!isLoggingOut && (showLogoutModal = false)">
         <div class="logout-modal-box">
           <!-- Icon -->
           <div class="logout-modal-icon">
@@ -587,8 +587,8 @@
           <h2 class="logout-modal-title">Log Out</h2>
           <p class="logout-modal-sub">Are you sure you want to log out?</p>
           <div class="logout-modal-actions">
-            <button class="logout-cancel-btn" @click="showLogoutModal = false">Cancel</button>
-            <button class="logout-confirm-btn" @click="confirmLogout">Log Out</button>
+            <button class="logout-cancel-btn" :disabled="isLoggingOut" @click="showLogoutModal = false">Cancel</button>
+            <button class="logout-confirm-btn" :disabled="isLoggingOut" :aria-busy="isLoggingOut" @click="confirmLogout">{{ isLoggingOut ? 'Logging out...' : 'Log Out' }}</button>
           </div>
         </div>
       </div>
@@ -1958,7 +1958,11 @@ function handleLogout() {
 }
 
 const showLogoutModal = ref(false)
-function confirmLogout() {
+const isLoggingOut = ref(false)
+async function confirmLogout() {
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+  await new Promise(resolve => setTimeout(resolve, 650))
   showLogoutModal.value = false
   logout()
   router.push('/')

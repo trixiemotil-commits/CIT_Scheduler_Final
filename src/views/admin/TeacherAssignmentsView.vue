@@ -436,7 +436,7 @@
     </Teleport>
 
     <Teleport to="body">
-      <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
+      <div v-if="showLogoutModal" class="modal-overlay" @click.self="!isLoggingOut && (showLogoutModal = false)">
         <div class="logout-modal-box" role="dialog" aria-modal="true" aria-labelledby="logout-modal-title">
           <div class="logout-modal-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -448,8 +448,8 @@
           <h2 id="logout-modal-title" class="logout-modal-title">Log out?</h2>
           <p class="logout-modal-sub">You will be returned to the login page.</p>
           <div class="logout-modal-actions">
-            <button class="logout-cancel-btn" @click="showLogoutModal = false">Cancel</button>
-            <button class="logout-confirm-btn" @click="confirmLogout">Log out</button>
+            <button class="logout-cancel-btn" :disabled="isLoggingOut" @click="showLogoutModal = false">Cancel</button>
+            <button class="logout-confirm-btn" :disabled="isLoggingOut" :aria-busy="isLoggingOut" @click="confirmLogout">{{ isLoggingOut ? 'Logging out...' : 'Log out' }}</button>
           </div>
         </div>
       </div>
@@ -474,6 +474,7 @@ const currentUserRoles = (Array.isArray(user.roles) && user.roles.length ? user.
 const canAddUsers = currentUserRoles.includes('admin') && currentUserRoles.includes('teacher')
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const showLogoutModal = ref(false)
+const isLoggingOut = ref(false)
 const showAddModal = ref(false)
 const coverageTeacher = ref(null)
 const coverageSnapshot = ref({})
@@ -509,7 +510,10 @@ function goToPage(pageIndex) {
   triggerCarouselAnimation()
 }
 
-function confirmLogout() {
+async function confirmLogout() {
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+  await new Promise(resolve => setTimeout(resolve, 650))
   showLogoutModal.value = false
   logout()
   router.push('/')

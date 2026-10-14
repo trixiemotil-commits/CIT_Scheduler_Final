@@ -407,7 +407,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">{{ isTeacherRole ? 'Employee ID' : 'School ID Number' }} <span class="form-required">*</span></label>
-              <input v-model="userForm.schoolId" class="form-input" type="text" :inputmode="isTeacherRole ? 'text' : 'numeric'" :maxlength="isTeacherRole ? 12 : 14" :placeholder="isTeacherRole ? 'AU2025-00000' : '01-1234-123456'" required @input="formatSchoolId" />
+              <input v-model="userForm.schoolId" class="form-input" type="text" :inputmode="isTeacherRole ? 'text' : 'numeric'" :maxlength="isTeacherRole ? 12 : 14" :placeholder="isTeacherRole ? 'AU2025-00000' : '01-1234-123456'" required @focus="requireRoleBeforeId" @input="formatSchoolId" />
             </div>
           </div>
 
@@ -421,7 +421,7 @@
           <div class="form-row form-row--single">
             <div class="form-group">
               <label class="form-label">Role <span class="form-required">*</span></label>
-              <select v-model="userForm.role" class="form-input" required @change="handleRoleChange">
+              <select ref="roleSelectElement" v-model="userForm.role" class="form-input" required @change="handleRoleChange">
                 <option value="" disabled>Select role…</option>
                 <option value="Admin">Admin</option>
                 <option value="Teacher">Teacher</option>
@@ -672,8 +672,10 @@
         <p id="register-confirm-title" class="swal-text">Are you sure you want to continue?</p>
         <p id="register-confirm-description" class="swal-description">Please review the account details before continuing.</p>
         <div class="swal-actions">
-          <button class="swal-cancel" @click="showRegisterConfirm = false">Cancel</button>
-          <button class="swal-continue" @click="confirmSaveUser">Continue</button>
+          <button class="swal-cancel" :disabled="isSavingUser" @click="showRegisterConfirm = false">Cancel</button>
+          <button class="swal-continue" :disabled="isSavingUser" @click="confirmSaveUser">
+            {{ isSavingUser ? 'Saving...' : 'Continue' }}
+          </button>
         </div>
       </div>
     </div>
@@ -721,7 +723,7 @@
 
   <!-- ═══ Logout Confirm Modal ═══ -->
   <Teleport to="body">
-    <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
+    <div v-if="showLogoutModal" class="modal-overlay" @click.self="!isLoggingOut && (showLogoutModal = false)">
       <div class="logout-modal-box">
         <div class="logout-modal-icon">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -733,8 +735,8 @@
         <h2 class="logout-modal-title">Log out?</h2>
         <p class="logout-modal-sub">You will be returned to the login page.</p>
         <div class="logout-modal-actions">
-          <button class="logout-cancel-btn" @click="showLogoutModal = false">Cancel</button>
-          <button class="logout-confirm-btn" @click="confirmLogout">Log out</button>
+          <button class="logout-cancel-btn" :disabled="isLoggingOut" @click="showLogoutModal = false">Cancel</button>
+          <button class="logout-confirm-btn" :disabled="isLoggingOut" :aria-busy="isLoggingOut" @click="confirmLogout">{{ isLoggingOut ? 'Logging out...' : 'Log out' }}</button>
         </div>
       </div>
     </div>
@@ -744,7 +746,7 @@
 <script setup>
 import { getToken, getUser, logout } from '@/auth.js'
 import { initialsAvatar } from '@/utils/avatar.js'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -800,7 +802,11 @@ const navItems = [
 
 /* ── Logout ── */
 const showLogoutModal = ref(false)
-function confirmLogout() {
+const isLoggingOut = ref(false)
+async function confirmLogout() {
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+  await new Promise(resolve => setTimeout(resolve, 650))
   showLogoutModal.value = false
   logout()
   router.push('/')
@@ -1253,6 +1259,14 @@ const isSavingUser    = ref(false)
 const studentYearOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', yearLevel: '', section: '', password: '', confirmPassword: '', currentPassword: '' })
 const userForm  = ref(emptyForm())
+const roleSelectElement = ref(null)
+
+function requireRoleBeforeId(event) {
+  if (userForm.value.role) return
+  event.target.blur()
+  showUserFormError('Please select a role before entering an ID number.')
+  nextTick(() => roleSelectElement.value?.focus())
+}
 
 function openAddUser() {
   editingUser.value     = null
@@ -1540,8 +1554,8 @@ function printUsersTable() {
 }
 
 async function confirmSaveUser() {
+  if (isSavingUser.value) return
   formError.value = ''
-  showRegisterConfirm.value = false
   isSavingUser.value = true
   const wasEditing = Boolean(editingUser.value)
 
@@ -1560,6 +1574,7 @@ async function confirmSaveUser() {
     }
 
     await fetchUsers()
+    showRegisterConfirm.value = false
     showUserModal.value = false
     showToast(wasEditing ? 'User updated successfully.' : 'User added successfully.')
   } catch (error) {

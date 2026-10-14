@@ -23,6 +23,7 @@ const StudentEventsView = () => import('@/views/student/StudentEventsView.vue')
 const StudentFaqsView = () => import('@/views/student/StudentFaqsView.vue')
 const StudentNotificationsView = () => import('@/views/student/StudentNotificationsView.vue')
 const StudentProfileView = () => import('@/views/student/StudentProfileView.vue')
+const StudentRecentDevicesView = () => import('@/views/student/StudentRecentDevicesView.vue')
 const StudentSettingsView = () => import('@/views/student/StudentSettingsView.vue')
 const StudentTeachersView = () => import('@/views/student/StudentTeachersView.vue')
 const StudentTabsView = () => import('@/views/student/StudentTabsView.vue')
@@ -71,6 +72,7 @@ const router = createRouter({
         { path: 'events',        name: 'student-events',        component: StudentEventsView },
         { path: 'consultations', name: 'student-consultations', component: StudentConsultationsView },
         { path: 'profile',       name: 'student-profile',       component: StudentProfileView },
+        { path: 'recent-devices', name: 'student-recent-devices', component: StudentRecentDevicesView },
         { path: 'change-password', name: 'student-change-password', component: StudentChangePasswordView },
         { path: 'faqs',          name: 'student-faqs',          component: StudentFaqsView },
         { path: 'settings',      name: 'student-settings',      component: StudentSettingsView },
@@ -122,6 +124,7 @@ const activityRouteLabels = {
   '/student/events': 'Student Events',
   '/student/consultations': 'Student Consultations',
   '/student/profile': 'Student Profile',
+  '/student/recent-devices': 'Recent Devices',
   '/student/settings': 'Student Settings',
   '/student/notifications': 'Student Notifications',
 }

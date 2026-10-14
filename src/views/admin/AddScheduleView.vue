@@ -486,7 +486,7 @@
                 <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>
               </svg>
             </button>
-            <button v-if="addMode === 'teacher'" class="icon-btn lunch-break-toolbar-btn" title="Set Lunch Break" aria-label="Set Lunch Break" @click="openLunchBreakPicker('')">
+            <button v-if="addMode === 'teacher' && !editMode" class="icon-btn lunch-break-toolbar-btn" title="Set Lunch Break" aria-label="Set Lunch Break" @click="openLunchBreakPicker('')">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
             </button>
             <button v-if="addMode === 'teacher'" class="icon-btn work-hours-toolbar-btn" title="Set Faculty Work Hours" aria-label="Set Faculty Work Hours" @click="openWorkHoursPicker">
@@ -611,7 +611,7 @@
                         <div v-if="(getEntriesForCell30(slot, day)[0].year || getEntriesForCell30(slot, day)[0].section) && getEntriesForCell30(slot, day)[0].entryType !== 'lunch'" class="entry-section-rows">
                           <div v-for="e in getEntriesForCell30(slot, day)" :key="e._key" class="entry-section-row">
                             <span v-if="e.year || e.section" class="entry-section-badge">{{ [e.year, e.section].filter(Boolean).join(' · ') }}</span>
-                            <span v-if="e.room" class="entry-room">{{ e.room }}</span>
+                            <span v-if="e.room" class="entry-room">Room: {{ e.room }}</span>
                           </div>
                         </div>
                         <div v-if="getEntriesForCell30(slot, day)[0].addedAt" class="entry-timestamp">Added: {{ getEntriesForCell30(slot, day)[0].addedAt }}</div>
@@ -795,12 +795,22 @@
                 <input v-model.trim="form.subject" type="text" class="form-input" placeholder="Enter Subject" />
               </div>
               <div v-else class="form-select-wrap">
-                <TypeaheadSelect v-model="form.subject" :options="modalSubjectOptions" placeholder="Select Subject" />
+                <select v-model="form.subject" class="form-select">
+                  <option value="" disabled>Select Subject</option>
+                  <option v-for="subject in modalSubjectOptions" :key="subject" :value="subject">{{ subject }}</option>
+                </select>
+                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
             </div>
             <div v-if="!isPracticumForm" class="form-row-inline schedule-start-field">
               <label class="form-label">Start of Class</label>
-              <div class="form-value-locked">{{ form.timeIn || 'Select a timetable slot' }}</div>
+              <div class="form-select-wrap">
+                <select v-model="form.timeIn" class="form-select">
+                  <option value="" disabled>Select Start of Class</option>
+                  <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
+                </select>
+                <svg class="sel-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
             </div>
             <div v-if="!isPracticumForm" class="form-row-inline schedule-end-field">
               <label class="form-label">End of Class</label>
@@ -936,10 +946,6 @@
             <button v-if="editMode" class="clear-slot-btn" @click="clearSlot">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
               Clear Slot
-            </button>
-            <button v-if="addMode === 'teacher' && (selectedTeacher || form.teacher) && form.day" type="button" class="lunch-break-modal-btn" @click="openLunchBreakPicker(form.day)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v8M5 3v5a3 3 0 0 0 6 0V3M8 11v10M16 3v18M16 3c2.2 0 3 1.8 3 4v2h-3"/></svg>
-              Set Lunch Break
             </button>
             <button class="save-btn" @click="saveEntry" :aria-busy="savingSchedule" :disabled="!form.teacher || !form.subject || !form.year || (!isPracticumForm && (!form.day || !form.timeIn || !form.timeOut || !!modalTimeError)) || (isPracticumForm && !form.section) || submittingSchedule">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1333,7 +1339,7 @@
 
     <!-- ═══ Consultation Management Modal ═══ -->
     <Teleport to="body">
-      <div v-if="showConsultModal" class="modal-overlay" @click.self="showConsultModal = false">
+      <div v-if="showConsultModal && !consultSlotEditorOpen" class="modal-overlay" @click.self="showConsultModal = false">
         <div class="sched-modal-box consult-modal-box">
           <div class="sched-modal-header">
             <div class="consult-header-icon" aria-hidden="true">
@@ -1400,8 +1406,9 @@
     </Teleport>
 
     <Teleport to="body">
-      <div v-if="consultSlotEditorOpen" class="modal-overlay consult-slot-editor-overlay" @click.self="closeConsultSlotEditor">
-        <section class="sched-modal-box consult-modal-box consult-slot-editor-box" role="dialog" aria-modal="true" aria-labelledby="consult-slot-editor-title">
+      <Transition name="consult-slot-pop" appear>
+        <div v-if="consultSlotEditorOpen" class="modal-overlay consult-slot-editor-overlay" @click.self="closeConsultSlotEditor">
+          <section class="sched-modal-box consult-modal-box consult-slot-editor-box" role="dialog" aria-modal="true" aria-labelledby="consult-slot-editor-title">
           <header class="consult-slot-editor-header">
             <div class="consult-form-icon" aria-hidden="true">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
@@ -1457,18 +1464,29 @@
             </div>
           </div>
           <footer class="consult-slot-editor-actions">
-            <button type="button" class="cancel-btn-text" @click="closeConsultSlotEditor">Cancel</button>
-            <button type="button" class="save-btn" @click="saveConsultSlot" :disabled="!consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || !!consultTimeError">
-              {{ consultEditId ? 'Update slot' : 'Save slot' }}
+            <button
+              v-if="consultEditId"
+              type="button"
+              class="consult-slot-clear-btn"
+              :disabled="savingConsultSlot"
+              @click="deleteConsultSlot(consultEditId)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/></svg>
+              Clear Slot
+            </button>
+            <button type="button" class="save-btn" @click="saveConsultSlot" :disabled="savingConsultSlot || !consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || !!consultTimeError">
+              <svg v-if="savingConsultSlot" class="consult-button-spinner" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /></svg>
+              {{ savingConsultSlot ? 'Saving...' : consultEditId ? 'Update slot' : 'Save slot' }}
             </button>
           </footer>
-        </section>
-      </div>
+          </section>
+        </div>
+      </Transition>
     </Teleport>
 
     <!-- ═══ Logout Confirm Modal ═══ -->
     <Teleport to="body">
-      <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
+      <div v-if="showLogoutModal" class="modal-overlay" @click.self="!isLoggingOut && (showLogoutModal = false)">
         <div class="logout-modal-box">
           <div class="logout-modal-icon">
             <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1480,8 +1498,8 @@
           <h2 class="logout-modal-title">Log Out</h2>
           <p class="logout-modal-sub">Are you sure you want to log out?</p>
           <div class="logout-modal-actions">
-            <button class="logout-cancel-btn" @click="showLogoutModal = false">Cancel</button>
-            <button class="logout-confirm-btn" @click="confirmLogout">Log Out</button>
+            <button class="logout-cancel-btn" :disabled="isLoggingOut" @click="showLogoutModal = false">Cancel</button>
+            <button class="logout-confirm-btn" :disabled="isLoggingOut" :aria-busy="isLoggingOut" @click="confirmLogout">{{ isLoggingOut ? 'Logging out...' : 'Log Out' }}</button>
           </div>
         </div>
       </div>
@@ -2281,7 +2299,7 @@ function getRowspan30(entry) {
   if (!entry?.timeIn || !entry?.timeOut) return 1
   const start = parseTime(entry.timeIn)
   const end   = parseTime(entry.timeOut)
-  const duration = Math.max(1, end - start)
+  const duration = Math.max(1, end - start + 30)
   const startOffset = start % 30
   return Math.max(1, Math.ceil((startOffset + duration) / 30))
 }
@@ -2369,10 +2387,12 @@ function scheduleEntryStyle30(rowSlot, entry) {
   const entryStart = parseTime(entry.timeIn)
   const offsetMins = Math.max(0, entryStart - rowStart)
   const spannedMins = getScheduleRowspan30(entry) * 30
+  const durationMins = Math.max(1, parseTime(entry.timeOut) - entryStart + 30)
+  const trailingMins = Math.max(0, spannedMins - offsetMins - durationMins)
 
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
-    bottom: '4px',
+    bottom: `calc(${(trailingMins / spannedMins) * 100}% + 4px)`,
     height: 'auto',
     zIndex: 3,
   }
@@ -2382,7 +2402,7 @@ function entryStyle30(rowSlot, entry) {
   if (!entry?.timeIn || !entry?.timeOut) return {}
   const rowStart   = parseTime(rowSlot)
   const entryStart = parseTime(entry.timeIn)
-  const mins       = Math.max(1, parseTime(entry.timeOut) - entryStart)
+  const mins       = Math.max(1, parseTime(entry.timeOut) - entryStart + 30)
   const offsetMins = Math.max(0, entryStart - rowStart)
   const spannedMins = getRowspan30(entry) * 30
   const trailingMins = Math.max(0, spannedMins - offsetMins - mins)
@@ -2407,7 +2427,7 @@ function getConsultationForCell30(rowSlot, day) {
 
 function getConsultRowspan30(consult) {
   if (!consult?.startTime || !consult?.endTime) return 1
-  return Math.min(timeSlots30.length, Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime)) / 30)))
+  return Math.min(timeSlots30.length, Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime) + 30) / 30)))
 }
 
 function isConsultSpannedCell30(slot, day) {
@@ -2426,9 +2446,11 @@ function consultEntryStyle30(rowSlot, consult) {
   const consultStart = parseTime(consult.startTime)
   const offsetMins   = Math.max(0, consultStart - rowStart)
   const spannedMins  = getConsultRowspan30(consult) * 30
+  const durationMins = Math.max(1, parseTime(consult.endTime) - consultStart + 30)
+  const trailingMins = Math.max(0, spannedMins - offsetMins - durationMins)
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
-    bottom: '4px',
+    bottom: `calc(${(trailingMins / spannedMins) * 100}% + 4px)`,
     height: 'auto',
   }
 }
@@ -2687,7 +2709,7 @@ function checkScheduleConflict(payload, skipFilter = null) {
       if (!entryTermId || entryTermId !== String(selectedId)) return
     }
     const isSameDay     = entry.day === payload.day
-    const isTimeOverlap = newTimeIn < parseTime(entry.timeOut) && newTimeOut > parseTime(entry.timeIn)
+    const isTimeOverlap = newTimeIn < parseTime(entry.timeOut) + 30 && newTimeOut + 30 > parseTime(entry.timeIn)
     if (!isSameDay || !isTimeOverlap) return
     const teacherIsGeneric = String(payload.teacher || '').trim().toLowerCase() === 'cit faculty'
     const payloadTeacherNorm = String(payload.teacher || '').trim().toLowerCase()
@@ -2786,8 +2808,8 @@ function buildTeacherScheduleIntervals(payload) {
     .filter(entry => entry.entryType !== 'lunch' && entry.subject !== 'Lunch Break')
 
   const intervals = scheduleEntries
-    .map(entry => ({ start: parseTime(entry.timeIn), end: parseTime(entry.timeOut) }))
-    .concat([{ start: parseTime(payload.timeIn), end: parseTime(payload.timeOut) }])
+    .map(entry => ({ start: parseTime(entry.timeIn), end: parseTime(entry.timeOut) + 30 }))
+    .concat([{ start: parseTime(payload.timeIn), end: parseTime(payload.timeOut) + 30 }])
     .filter(interval => interval.start < interval.end)
     .sort((a, b) => a.start - b.start)
 
@@ -3880,6 +3902,7 @@ const showConsultModal  = ref(false)
 const consultSlotEditorOpen = ref(false)
 const consultEditId     = ref(null)
 const consultWeeklyMins = ref(0)
+const savingConsultSlot = ref(false)
 const consultForm = reactive({ dayOfWeek: '', startTime: '', endTime: '' })
 const consultTimeError  = ref('')
 
@@ -3933,13 +3956,13 @@ function editConsultSlot(slot) {
 
 async function openConsultSlotModal(slot) {
   if (!slot) return
-  await openConsultModal()
   const refreshedSlot = consultationSlots.value.find(item => item.id === slot.id) || slot
   editConsultSlot(refreshedSlot)
 }
 
 async function saveConsultSlot() {
-  if (!consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || consultTimeError.value) return
+  if (savingConsultSlot.value || !consultForm.dayOfWeek || !consultForm.startTime || !consultForm.endTime || consultTimeError.value) return
+  savingConsultSlot.value = true
   try {
     const teacherUser = teacherUserMap.value[selectedTeacher.value]
     const employeeId  = teacherUser?.employeeId || selectedTeacher.value
@@ -3964,6 +3987,8 @@ async function saveConsultSlot() {
       confirmButtonText: 'OK', confirmButtonColor: '#4b5563', background: '#fff',
       customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
     })
+  } finally {
+    savingConsultSlot.value = false
   }
 }
 
@@ -3972,6 +3997,18 @@ async function deleteConsultSlot(id) {
     icon: 'warning', title: 'Remove Consultation Slot?', text: 'This slot will be permanently deleted.',
     showCancelButton: true, reverseButtons: true, confirmButtonText: 'Delete', confirmButtonColor: '#b52222',
     cancelButtonText: 'Cancel', cancelButtonColor: '#6c757d', background: '#fff',
+    showLoaderOnConfirm: false,
+    allowOutsideClick: () => !Swal.isLoading(),
+    preConfirm: async () => {
+      const confirmButton = Swal.getConfirmButton()
+      if (confirmButton) confirmButton.textContent = 'Deleting...'
+      try {
+        await apiRequest(`/consultations/${id}`, { method: 'DELETE' })
+      } catch (error) {
+        Swal.showValidationMessage(error?.message || 'Failed to delete consultation slot.')
+        return false
+      }
+    },
     customClass: {
       popup: 'swal-clear-slot-popup',
       title: 'swal-cit-title',
@@ -3981,11 +4018,7 @@ async function deleteConsultSlot(id) {
   })
   if (!ok.isConfirmed) return
   try {
-    await apiRequest(`/consultations/${id}`, { method: 'DELETE' })
-    if (consultEditId.value === id) {
-      consultEditId.value = null
-      Object.assign(consultForm, { dayOfWeek: '', startTime: '', endTime: '' })
-    }
+    if (consultEditId.value === id) closeConsultSlotEditor()
     await fetchConsultationsForTeacher()
     const termId = getSelectedTermId()
     const res = await apiRequest(`/consultations/summary?teacher=${encodeURIComponent(selectedTeacher.value)}&academicTermId=${encodeURIComponent(termId)}`)
@@ -4092,7 +4125,8 @@ function printSchedule() {
 
 /* ── Logout ── */
 const showLogoutModal = ref(false)
-function confirmLogout() { showLogoutModal.value = false; logout(); router.push('/') }
+const isLoggingOut = ref(false)
+async function confirmLogout() { if (isLoggingOut.value) return; isLoggingOut.value = true; await new Promise(resolve => setTimeout(resolve, 650)); showLogoutModal.value = false; logout(); router.push('/') }
 
 /* ── onMounted ── */
 onMounted(async () => {
@@ -4744,9 +4778,9 @@ onMounted(async () => {
 .entry-subject { font-size: 0.78rem; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 52px; }
 .entry-time-range { font-size: 0.7rem; opacity: 0.75; font-style: italic; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .entry-section-rows { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; border-top: 1px solid rgba(255,255,255,0.25); padding-top: 3px; }
-.entry-section-row { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
-.entry-section-badge { font-size: 0.68rem; font-weight: 750; text-transform: uppercase; letter-spacing: 0.025em; line-height: 1.25; opacity: 1; background: rgba(255,255,255,0.3); padding: 2px 5px; border-radius: 4px; }
-.entry-room { font-size: 0.72rem; opacity: 0.75; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56px; }
+.entry-section-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; min-width: 0; }
+.entry-section-badge { display: block; width: 100%; min-width: 0; font-size: 0.58rem; font-weight: 750; text-transform: uppercase; letter-spacing: 0.015em; line-height: 1.2; overflow-wrap: anywhere; opacity: 1; background: rgba(255,255,255,0.3); padding: 2px 4px; border-radius: 4px; }
+.entry-room { display: block; width: 100%; max-width: none; font-size: 0.62rem; opacity: 0.75; text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .entry-edit-hint { position: absolute; top: 50%; left: 50%; z-index: 2; padding: 4px 8px; color: #fff; border-radius: 999px; background: rgba(0,0,0,.42); font-size: .6rem; font-style: italic; white-space: nowrap; opacity: 0; pointer-events: none; transform: translate(-50%,-50%); transition: opacity .15s ease; }
 .sched-entry:hover .entry-edit-hint { opacity: 0.9; }
 .entry-timestamp { font-size: 0.55rem; opacity: 0.6; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: absolute; bottom: 2px; left: 6px; background: rgba(0,0,0,0.2); padding: 1px 4px; border-radius: 3px; color: rgba(255,255,255,0.9); z-index: 2; }
@@ -5111,7 +5145,8 @@ onMounted(async () => {
   font-size: .82rem;
   font-weight: 650;
 }
-.schedule-entry-modal .schedule-subject-field .form-select { font-weight: 560; }
+.schedule-entry-modal .schedule-subject-field .form-select { font-weight: 450; }
+.schedule-entry-modal .schedule-subject-field .form-select option { font-weight: 400; }
 .schedule-entry-modal .schedule-campus-field .campus-toggle { max-width: 100%; }
 .schedule-entry-modal .clear-slot-btn {
   min-height: 40px;
@@ -6373,6 +6408,20 @@ onMounted(async () => {
 .consult-open-editor-btn:hover { background: #303b45; }
 .consult-open-editor-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .consult-slot-editor-overlay { z-index: 1100; padding: 16px; background: rgba(19,26,31,.56); }
+.consult-slot-pop-enter-active,
+.consult-slot-pop-leave-active { transition: opacity .18s ease, background-color .18s ease; }
+.consult-slot-pop-enter-active .consult-slot-editor-box,
+.consult-slot-pop-leave-active .consult-slot-editor-box { transition: opacity .2s ease, transform .2s cubic-bezier(.2,.8,.2,1); }
+.consult-slot-pop-enter-from,
+.consult-slot-pop-leave-to { opacity: 0; background-color: rgba(19,26,31,0); }
+.consult-slot-pop-enter-from .consult-slot-editor-box,
+.consult-slot-pop-leave-to .consult-slot-editor-box { opacity: 0; transform: translateY(12px) scale(.96); }
+@media (prefers-reduced-motion: reduce) {
+  .consult-slot-pop-enter-active,
+  .consult-slot-pop-leave-active,
+  .consult-slot-pop-enter-active .consult-slot-editor-box,
+  .consult-slot-pop-leave-active .consult-slot-editor-box { transition-duration: .01ms; }
+}
 .consult-modal-box.consult-slot-editor-box {
   display: flex;
   width: min(520px, calc(100vw - 32px));
@@ -6402,7 +6451,11 @@ onMounted(async () => {
 .consult-editor-field .form-label { color: #4e5b64; font-size: .72rem; font-weight: 650; }
 .consult-slot-editor-box .form-select { min-height: 44px; padding: 9px 34px 9px 11px; border-radius: 9px; font-size: .76rem; }
 .consult-editor-error { grid-column: 1 / -1; margin: 0 !important; }
-.consult-slot-editor-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 22px 18px; border-top: 1px solid #e1e7eb; background: #fff; }
+.consult-slot-editor-actions { display: flex; justify-content: space-between; gap: 8px; padding: 12px 22px 18px; border-top: 1px solid #e1e7eb; background: #fff; }
+.consult-slot-editor-actions:not(:has(.consult-slot-clear-btn)) { justify-content: flex-end; }
+.consult-slot-clear-btn { display: inline-flex; min-height: 38px; align-items: center; gap: 7px; padding: 8px 12px; color: #b34040; border: 1px solid #efcaca; border-radius: 8px; background: #fff; font-size: .72rem; font-weight: 650; cursor: pointer; }
+.consult-slot-clear-btn:hover:not(:disabled) { background: #fff5f5; }
+.consult-slot-clear-btn:disabled { cursor: wait; opacity: .55; }
 .consult-slot-editor-actions .save-btn { min-height: 38px; padding: 8px 16px; font-size: .74rem; }
 .consult-slot-editor-actions .cancel-btn-text { min-height: 38px; padding: 8px 12px; font-size: .72rem; }
 .schedule-status-toast {
@@ -6492,6 +6545,95 @@ onMounted(async () => {
   .sched-grid .entry-section-badge,
   .sched-grid .entry-room { font-size: .44rem; }
 }
+
+/* Clean white consultation dialog */
+.consult-button-spinner {
+  width: 14px;
+  height: 14px;
+  margin-right: 7px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 42 18;
+  animation: consult-button-spin .7s linear infinite;
+}
+@keyframes consult-button-spin { to { transform: rotate(360deg); } }
+.consult-modal-box {
+  border: 1px solid #e8ebef;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 54px rgba(20, 30, 44, .14);
+}
+.consult-modal-box .sched-modal-header,
+.consult-modal-content,
+.consult-left-pane,
+.consult-right-pane,
+.consult-modal-content > .consult-right-pane {
+  background: #fff !important;
+  box-shadow: none !important;
+}
+.consult-modal-box .sched-modal-header {
+  border-bottom: 1px solid #edf0f3;
+}
+.consult-left-pane { border-color: #edf0f3; }
+.consult-header-icon,
+.consult-modal-box .sched-modal-mode-badge,
+.consult-close,
+.consult-slot-calendar,
+.consult-empty-icon,
+.consult-form-icon {
+  color: #27364a;
+  border: 1px solid #e8ebef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: none;
+}
+.consult-modal-box .sched-modal-mode-badge { color: #526174; }
+.consult-modal-box .sched-modal-title,
+.consult-section-heading span,
+.consult-usage-copy strong,
+.consult-slot-day { color: #172437; }
+.consult-modal-subtitle,
+.consult-section-heading p,
+.consult-usage-copy span,
+.consult-slot-time { color: #66758a; }
+.consult-usage,
+.consult-slot-item,
+.consult-empty,
+.consult-modal-box .consult-right-pane .consult-form-shell {
+  border: 1px solid #e8ebef;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: none;
+}
+.consult-slot-item:hover {
+  border-color: #cbd5e1;
+  background: #fcfdff;
+  box-shadow: none;
+}
+.consult-progress { background: #edf1f5; }
+.consult-progress span { background: #26364a; }
+.consult-section-heading strong,
+.consult-slot-dur { color: #526174; background: #f5f7fa; }
+.consult-modal-box .form-select {
+  border-color: #dce2e9;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: none;
+}
+.consult-modal-box .form-select:focus {
+  border-color: #8292a5;
+  box-shadow: 0 0 0 3px rgba(71, 94, 122, .1);
+}
+.consult-modal-box .save-btn {
+  border: 1px solid #1d2a3b;
+  border-radius: 8px;
+  background: #1d2a3b;
+  box-shadow: none;
+}
+.consult-modal-box .save-btn:not(:disabled):hover { background: #2b3b50; }
+.consult-modal-box .sched-modal-actions { background: #fff !important; box-shadow: none !important; }
 </style>
 
 <style>

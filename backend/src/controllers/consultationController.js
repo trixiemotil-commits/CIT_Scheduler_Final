@@ -604,8 +604,8 @@ async function checkClassConflict(teacher, dayOfWeek, startTime, endTime, academ
     const entryStart = entry.timeInMinutes  ?? parseTimeToMinutes(entry.timeIn);
     const entryEnd   = entry.timeOutMinutes ?? parseTimeToMinutes(entry.timeOut);
     if (entryStart === null || entryEnd === null) continue;
-    // Block overlap and a class that starts exactly when consultation ends.
-    if ((newStart < entryEnd && newEnd > entryStart) || (includeAdjacent && entryStart === newEnd)) {
+    // Scheduled blocks render 30 minutes longer than their entered times.
+    if ((newStart < entryEnd + 30 && newEnd + 30 > entryStart) || (includeAdjacent && entryStart === newEnd + 30)) {
       return `${teacher} has a class on ${dayOfWeek} from ${entry.timeIn} to ${entry.timeOut}${entry.subject ? ` (${entry.subject})` : ''}. Please select another consultation time.`;
     }
   }

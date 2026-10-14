@@ -508,7 +508,7 @@
 
     <!-- ═══ Logout Confirm Modal ═══ -->
     <Teleport to="body">
-      <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
+      <div v-if="showLogoutModal" class="modal-overlay" @click.self="!isLoggingOut && (showLogoutModal = false)">
         <div class="logout-modal-box">
           <div class="logout-modal-icon">
             <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#e63946" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -520,8 +520,8 @@
           <h2 class="logout-modal-title">Log Out</h2>
           <p class="logout-modal-sub">Are you sure you want to log out?</p>
           <div class="logout-modal-actions">
-            <button class="logout-cancel-btn" @click="showLogoutModal = false">Cancel</button>
-            <button class="logout-confirm-btn" @click="confirmLogout">Log Out</button>
+            <button class="logout-cancel-btn" :disabled="isLoggingOut" @click="showLogoutModal = false">Cancel</button>
+            <button class="logout-confirm-btn" :disabled="isLoggingOut" :aria-busy="isLoggingOut" @click="confirmLogout">{{ isLoggingOut ? 'Logging out...' : 'Log Out' }}</button>
           </div>
         </div>
       </div>
@@ -610,7 +610,11 @@ const navItems = [
 
 /* ── Logout ── */
 const showLogoutModal = ref(false)
-function confirmLogout() {
+const isLoggingOut = ref(false)
+async function confirmLogout() {
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+  await new Promise(resolve => setTimeout(resolve, 650))
   showLogoutModal.value = false
   logout()
   router.push('/')
@@ -2389,6 +2393,18 @@ onMounted(() => {
 .form-row {
   gap: 14px;
 }
+.event-form .form-row > .form-group { min-width: 0; }
+.event-form .form-row > .form-group:first-child :deep(.date-trigger) {
+  display: flex;
+  width: 100%;
+  height: 40px;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.event-form .form-row > .form-group:first-child :deep(.date-trigger:hover) {
+  border-color: #d4d8dc;
+}
 
 .event-form .form-label { font-size: .7rem; color: #3f5f50; letter-spacing: .55px; }
 .event-form .form-input,
@@ -3077,6 +3093,12 @@ onMounted(() => {
   background: #d8eadf;
   color: #28583e;
 }
+.event-meeting-toggle:has(input:checked) {
+  border-color: #d5e5da;
+  background: #eef6f0;
+}
+.event-meeting-option:has(input:checked) { color: #28583e; }
+.event-meeting-option input { accent-color: #3f7656; }
 .teacher-picker-empty { padding: 14px 8px; }
 @keyframes teacherPickerReveal {
   from { opacity: 0; transform: translateY(-4px); }

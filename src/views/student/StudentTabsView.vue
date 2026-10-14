@@ -152,6 +152,30 @@
           <button type="submit">Continue</button>
         </form>
       </div>
+
+      <Teleport to="body">
+        <div v-if="showTermReview" class="term-review-overlay">
+          <section class="term-review-modal" role="dialog" aria-modal="true" aria-labelledby="term-review-title">
+            <div class="term-prompt-icon"><IonIcon :icon="calendarOutline" /></div>
+            <h2 id="term-review-title">Confirm your enrollment</h2>
+            <p>Review the details you entered for {{ publishedTermLabel }}.</p>
+            <dl class="term-review-details">
+              <div><dt>Enrollment type</dt><dd>{{ termForm.enrollmentType }}</dd></div>
+              <div v-for="assignment in termReviewAssignments" :key="assignment.yearLevel"><dt>{{ assignment.yearLevel }}</dt><dd>{{ assignment.section }}</dd></div>
+            </dl>
+            <p v-if="termPromptError" class="term-prompt-error" role="alert">{{ termPromptError }}</p>
+            <div class="term-review-actions">
+              <button class="term-review-back" type="button" :disabled="savingAssignment" @click="showTermReview = false">Back</button>
+              <button type="button" :disabled="savingAssignment" :aria-busy="savingAssignment" @click="confirmTermAssignment">{{ savingAssignment ? 'Confirming...' : 'Confirm' }}</button>
+            </div>
+          </section>
+        </div>
+      </Teleport>
+      <Teleport to="body">
+        <div v-if="termPromptSuccess" class="term-prompt-success" role="status" aria-live="polite">
+          <span aria-hidden="true">✓</span>{{ termPromptSuccess }}
+        </div>
+      </Teleport>
     </div>
   </IonPage>
 </template>
@@ -178,7 +202,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
-const CONSULTATION_ICON_CIRCLE_RADIUS = 28
+const CONSULTATION_ICON_CIRCLE_RADIUS = 20
 const CONSULTATION_BUTTON_GAP = 8
 const CONSULTATION_MODAL_LIFT = 26
 const route = useRoute()
@@ -192,10 +216,12 @@ const isConsultationSessionsPage = computed(() =>
   || (route.path === '/student/teachers' && route.query.mode === 'consultation-booking')
 )
 const showTermPrompt = ref(false)
+const showTermReview = ref(false)
 const publishedTerm = ref(null)
 const promptedTermId = ref('')
 const savingAssignment = ref(false)
 const termPromptError = ref('')
+const termPromptSuccess = ref('')
 const yearLevelOrder = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 const termForm = reactive({ enrollmentType: 'Regular', yearLevel: '', section: '', yearLevels: [], sectionsByYear: {} })
 const availableYears = computed(() => yearLevelOrder.filter((year) =>
@@ -203,6 +229,10 @@ const availableYears = computed(() => yearLevelOrder.filter((year) =>
 ))
 const publishedTermLabel = computed(() =>
   publishedTerm.value ? `${publishedTerm.value.schoolYear} · ${publishedTerm.value.semester}` : 'A new semester'
+)
+const termReviewAssignments = computed(() => termForm.enrollmentType === 'Regular'
+  ? (termForm.yearLevel && termForm.section ? [{ yearLevel: termForm.yearLevel, section: termForm.section }] : [])
+  : termForm.yearLevels.map((yearLevel) => ({ yearLevel, section: termForm.sectionsByYear[yearLevel] || '' }))
 )
 
 function sectionsForYear(year) {
@@ -288,15 +318,20 @@ async function checkPublishedTerm() {
 
 async function saveTermAssignment() {
   if (savingAssignment.value) return
-  const studentYearSections = termForm.enrollmentType === 'Regular'
-    ? [{ yearLevel: termForm.yearLevel, section: termForm.section }]
-    : termForm.yearLevels.map((year) => ({ yearLevel: year, section: termForm.sectionsByYear[year] || '' }))
+  const studentYearSections = termReviewAssignments.value
   if (!studentYearSections.length || studentYearSections.some((pair) => !pair.yearLevel || !pair.section)) {
     termPromptError.value = termForm.enrollmentType === 'Irregular'
       ? 'Select at least one enrolled year and choose its section.'
       : 'Choose your year level and section.'
     return
   }
+  termPromptError.value = ''
+  showTermReview.value = true
+}
+
+async function confirmTermAssignment() {
+  if (savingAssignment.value) return
+  const studentYearSections = termReviewAssignments.value
   savingAssignment.value = true
   termPromptError.value = ''
   try {
@@ -311,8 +346,11 @@ async function saveTermAssignment() {
       }),
     })
     studentUser.value = saveMergedUser(payload.user || {})
+    showTermReview.value = false
     showTermPrompt.value = false
     promptedTermId.value = ''
+    termPromptSuccess.value = 'Your enrollment details were saved successfully.'
+    setTimeout(() => { termPromptSuccess.value = '' }, 3500)
   } catch (error) {
     termPromptError.value = error.message
   } finally {
@@ -432,8 +470,8 @@ const indicatorStyle = computed(() => {
   position: fixed;
   z-index: 10006;
   display: grid;
-  width: var(--consultation-icon-circle-size, 56px);
-  height: var(--consultation-icon-circle-size, 56px);
+  width: var(--consultation-icon-circle-size, 40px);
+  height: var(--consultation-icon-circle-size, 40px);
   place-items: center;
   border: 0;
   border-radius: 50%;
@@ -451,9 +489,9 @@ const indicatorStyle = computed(() => {
 }
 
 .consultation-choice-anchor-icon {
-  width: 40px;
-  height: 40px;
-  padding: 6px;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
   color: var(--metal-500);
 }
 
@@ -629,7 +667,7 @@ const indicatorStyle = computed(() => {
   position: relative;
   width: 100%;
   max-width: 420px;
-  height: 64px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -650,7 +688,7 @@ const indicatorStyle = computed(() => {
   transform: translateX(-50%);
   width: min(420px, calc(100vw - 18px));
   max-width: 420px;
-  height: 64px;
+  height: 52px;
   padding: 0 12px;
   margin: 0 auto;
   box-sizing: border-box;
@@ -743,11 +781,25 @@ ion-label {
 }
 
 .term-prompt-overlay{position:absolute;inset:0;z-index:10000;background:rgba(31,35,39,.62);backdrop-filter:blur(5px);display:grid;place-items:center;padding:20px}.term-prompt{width:100%;max-width:360px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.3)}.term-prompt-icon{width:50px;height:50px;border-radius:14px;background:#e8ebed;color:#30383f;display:grid;place-items:center;font-size:1.5rem}.term-prompt h2{margin:15px 0 6px;color:#252b30;font-size:1.25rem}.term-prompt>p{margin:0 0 18px;color:#687078;font-size:.82rem;line-height:1.5}.term-prompt label{display:block;margin-top:12px}.term-prompt label span{display:block;margin-bottom:5px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#454c53}.term-prompt select{width:100%;height:44px;border:1px solid #cdd2d6;border-radius:10px;padding:0 12px;background:#f7f8f9;font:inherit;font-size:.84rem}.term-prompt button{width:100%;height:44px;margin-top:20px;border:0;border-radius:10px;background:#4b5563;color:#fff;font:700 .85rem Poppins;cursor:pointer}.term-prompt button:disabled{opacity:.55}.term-prompt .term-prompt-error{color:#c1121f;margin:10px 0 0}.term-prompt-summary{display:grid;grid-template-columns:1fr 1.3fr;gap:8px 12px;margin:18px 0 4px;padding:14px;border:1px solid #e0e5e8;border-radius:12px;background:#f7f9fa}.term-prompt-summary span{color:#748089;font-size:.72rem;font-weight:650}.term-prompt-summary strong{color:#344957;font-size:.82rem}.term-prompt-actions{display:flex;gap:10px}.term-prompt-actions button{flex:1;min-width:0}.term-prompt-actions .term-prompt-review{border:1px solid #d2dade;background:#fff;color:#4c5961}.term-prompt-actions .term-prompt-review:hover:not(:disabled){background:#f3f6f7}
+.term-review-overlay{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;padding:20px;background:rgba(31,35,39,.62);backdrop-filter:blur(5px)}
+.term-review-modal{width:min(100%,380px);padding:24px;border:1px solid #e3e7ea;border-radius:20px;background:#fff;box-shadow:0 24px 70px rgba(0,0,0,.3)}
+.term-review-modal h2{margin:15px 0 6px;color:#252b30;font-size:1.22rem}
+.term-review-modal>p{margin:0 0 16px;color:#687078;font-size:.84rem;line-height:1.5}
+.term-review-details{display:grid;gap:8px;margin:18px 0 0;padding:14px;border:1px solid #e0e5e8;border-radius:12px;background:#f7f9fa}
+.term-review-details>div{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.term-review-details dt{color:#748089;font-size:.76rem;font-weight:650}
+.term-review-details dd{margin:0;color:#344957;font-size:.82rem;font-weight:700;text-align:right}
+.term-review-actions{display:flex;gap:10px;margin-top:18px}
+.term-review-actions button{flex:1;min-width:0;height:44px;border:0;border-radius:10px;background:#4b5563;color:#fff;font:700 .85rem Poppins;cursor:pointer}
+.term-review-actions .term-review-back{border:1px solid #d2dade;background:#fff;color:#4c5961}
+.term-review-actions button:disabled{opacity:.58;cursor:wait}
+.term-prompt-success{position:fixed;z-index:21000;top:max(18px,env(safe-area-inset-top));left:50%;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100vw - 32px);padding:12px 16px;transform:translateX(-50%);border:1px solid #c8e3d3;border-radius:12px;background:#eff8f2;color:#24583b;box-shadow:0 8px 28px rgba(20,45,31,.16);font-size:.86rem;font-weight:650}
+.term-prompt-success span{display:grid;width:22px;height:22px;place-items:center;border-radius:50%;background:#2f704b;color:white;font-weight:800}
 .term-prompt{max-height:calc(100dvh - 32px);overflow:auto}.term-prompt-years{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.term-prompt .term-prompt-label{grid-column:1/-1;margin:0;color:#454c53;font-size:.72rem;font-weight:700;text-transform:uppercase}.term-prompt .term-prompt-year-option{display:flex;align-items:center;gap:8px;margin:0;padding:10px;border:1px solid #d9dfe2;border-radius:9px;background:#f7f8f9}.term-prompt-year-option input{width:16px;height:16px;margin:0;accent-color:#4b5563}.term-prompt .term-prompt-year-option span{margin:0;text-transform:none;font-size:.78rem;font-weight:600}
 
 @media (min-width: 391px) and (max-width: 767px) {
   .student-tab-bar {
-    height: calc(72px + var(--student-safe-bottom)) !important;
+    height: calc(54px + var(--student-safe-bottom)) !important;
   }
 
   .student-tab-bar ion-tab-button::part(native) {
@@ -757,9 +809,9 @@ ion-label {
 
   .student-tab-bar ion-tab-button ion-icon,
   .student-tab-bar ion-tab-button.tab-selected ion-icon {
-    width: 34px !important;
-    height: 34px !important;
-    flex-basis: 34px !important;
+    width: 26px !important;
+    height: 26px !important;
+    flex-basis: 26px !important;
   }
 
   .student-tab-bar ion-tab-button:not(.consultation-tab) ion-label {
@@ -774,6 +826,21 @@ ion-label {
   }
 }
 
+@media (min-width: 391px) and (max-width: 767px) {
+  .student-tab-bar {
+    height: calc(70px + var(--student-safe-bottom)) !important;
+  }
+
+  .student-tab-bar ion-tab-button::part(native) {
+    gap: 9px;
+    padding: 12px 4px 14px;
+  }
+
+  .student-tab-bar ion-tab-button:not(.consultation-tab) ion-label {
+    font-size: .68rem !important;
+  }
+}
+
 @media (min-width: 768px) {
   .student-app-shell {
     max-width: 480px;
@@ -783,7 +850,7 @@ ion-label {
 
   .student-tab-bar {
     max-width: 430px !important;
-    height: calc(76px + var(--student-safe-bottom)) !important;
+    height: calc(50px + var(--student-safe-bottom)) !important;
     margin: 0 auto !important;
     padding: 0 10px calc(var(--student-safe-bottom) + 2px) !important;
     border-radius: 32px 32px 8px 8px !important;
@@ -800,9 +867,9 @@ ion-label {
 
   .student-tab-bar ion-tab-button ion-icon,
   .student-tab-bar ion-tab-button.tab-selected ion-icon {
-    width: 32px !important;
-    height: 32px !important;
-    flex-basis: 32px !important;
+    width: 26px !important;
+    height: 26px !important;
+    flex-basis: 26px !important;
   }
 
   .student-tab-bar ion-tab-button ion-label {
@@ -846,7 +913,7 @@ ion-label {
 
 @media (max-width: 360px) {
   .student-tab-bar {
-    height: calc(76px + var(--student-safe-bottom)) !important;
+    height: calc(50px + var(--student-safe-bottom)) !important;
     border-radius: 24px 24px 6px 6px !important;
   }
 
@@ -890,7 +957,7 @@ ion-label {
 
 @media (max-width: 430px) and (max-height: 680px) {
   .student-tab-bar {
-    height: calc(76px + var(--student-safe-bottom)) !important;
+    height: calc(50px + var(--student-safe-bottom)) !important;
   }
 
   .student-tab-bar ion-tab-button {
