@@ -11,8 +11,9 @@ async function setupNativeNotifications() {
     await LocalNotifications.createChannel({
       id: NOTIF_CHANNEL_ID,
       name: 'CIT Scheduler alerts',
-      importance: 4,
-      sound: 'notification.mp3',
+           importance: 4,
+      channelId: NOTIF_CHANNEL_ID,
+        sound: 'notification.mp3',
       vibration: true,
     })
   } catch (err) {
@@ -39,7 +40,6 @@ function playNotificationSound(payload = {}) {
       }],
    }).catch((err) => console.warn('Local notification failed:', err))
   }
-  if (Capacitor.isNativePlatform()) return
   try {
     const audio = new Audio('/sounds/notification.mp3')
     audio.volume = 0.6
