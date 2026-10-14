@@ -125,10 +125,8 @@ async function logoutDevice(session) {
 async function confirmLogoutDevice() {
   if (!pendingLogoutSession.value || busyId.value) return
   const session = pendingLogoutSession.value
-  await logoutDevice(session)
-  if (!busyId.value && !sessions.value.some((item) => item.id === session.id)) {
-    pendingLogoutSession.value = null
-  }
+   await logoutDevice(session)
+  pendingLogoutSession.value = null
 }
 
 onMounted(async () => {
