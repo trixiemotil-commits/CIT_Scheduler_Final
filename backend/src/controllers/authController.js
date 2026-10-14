@@ -142,12 +142,7 @@ async function completeLogin(user, req, suppliedDeviceId) {
   user.activeSessions = activeSessions.filter((session) => new Date(session.expiresAt).getTime() > now.getTime());
   const loginWarning = user.activeSessions.length > 0;
   let trustedDevices = Array.isArray(user.trustedDevices) ? user.trustedDevices : [];
-  if (trustedDevices.length > 1) {
-    trustedDevices = [trustedDevices.reduce((first, current) =>
-      new Date(current.trustedAt).getTime() < new Date(first.trustedAt).getTime() ? current : first
-    )];
-    user.trustedDevices = trustedDevices;
-  }
+ 
   let trustedDevice = deviceKeyHash && trustedDevices.find((item) => item.keyHash === deviceKeyHash);
   if (!trustedDevice && !trustedDevices.length && !user.lastLoginAt) {
     trustedDevice = await trustInitialDevice(user, deviceKeyHash, device, now);
@@ -192,6 +187,19 @@ async function completeLogin(user, req, suppliedDeviceId) {
     }
   }
   return { loginWarning, sessionId, securityAlert: !trustedDevice, securityApprovalRequired: !trustedDevice, securityEmailSent };
+}
+
+function trustSessionDevice(user, session) {
+  if (!session?.deviceKeyHash) return;
+  const alreadyTrusted = (user.trustedDevices || []).some((item) => item.keyHash === session.deviceKeyHash);
+  if (alreadyTrusted) return;
+  const now = new Date();
+  user.trustedDevices.push({
+    keyHash: session.deviceKeyHash,
+    label: session.device || "Unknown device",
+    trustedAt: now,
+    lastUsedAt: now,
+  });
 }
 
 function toSafeUser(user) {
@@ -793,6 +801,7 @@ async function trustCurrentDevice(req, res) {
     if (!session) {
       return res.status(404).json({ message: "That pending device sign-in is no longer active." });
     }
+    trustSessionDevice(user, session);
     session.securityAlertPending = false;
     session.securityActionTokenHash = null;
     session.securityActionTokenExpiresAt = null;
@@ -850,6 +859,7 @@ async function confirmSecurityReview(req, res) {
     }
 
     if (choice === "trust") {
+      trustSessionDevice(user, session);
       session.securityAlertPending = false;
       session.securityActionTokenHash = null;
       session.securityActionTokenExpiresAt = null;
