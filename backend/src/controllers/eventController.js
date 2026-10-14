@@ -23,20 +23,19 @@ function cleanStudentYearLevels(value) {
 async function validateEventTeacherIds(teacherIds) {
   if (!teacherIds.length) return null;
 
-  // Validate every assignment, including existing ones, so an off-school
-  // teacher cannot remain assigned by editing an old event.
+  // Event assignments are limited to active teacher accounts, regardless of
+  // the teacher's current availability status.
   const idsToValidate = teacherIds;
   if (!idsToValidate.length) return null;
 
   const teachers = await User.find({
     _id: { $in: idsToValidate },
     account_status: "Active",
-    teacher_status: "On School",
     $or: [{ role: "teacher" }, { roles: "teacher" }],
   }).select("_id").lean();
   const eligibleIds = new Set(teachers.map((teacher) => String(teacher._id)));
   const unavailable = idsToValidate.find((teacherId) => !eligibleIds.has(String(teacherId)));
-  return unavailable ? "Only active teachers with status On School can be assigned to an event." : null;
+  return unavailable ? "Only active teacher accounts can be assigned to an event." : null;
 }
 
 function serializeEvent(event) {
@@ -55,6 +54,7 @@ function eventPayload(body = {}) {
     location: cleanString(body.location),
     image: typeof body.image === "string" ? body.image : "",
     teacherIds: cleanTeacherIds(body.teacherIds),
+    isMeeting: body.isMeeting === true,
     studentYearLevels: cleanStudentYearLevels(body.studentYearLevels),
   };
 }
@@ -88,7 +88,12 @@ async function notifyStudentsOfEvent(event, actorId) {
     ],
   };
   if (event.studentYearLevels?.length) {
-    studentQuery.yearLevel = { $in: event.studentYearLevels };
+    studentQuery.$and = [{
+      $or: [
+        { yearLevel: { $in: event.studentYearLevels } },
+        { "studentYearSections.yearLevel": { $in: event.studentYearLevels } },
+      ],
+    }];
   }
   const students = await User.find(studentQuery).select("_id").lean();
 
@@ -156,11 +161,15 @@ async function listEvents(req, res) {
         { teacherIds: String(req.user.id) },
       ];
     } else if (req.user?.role === "student") {
-      const student = await User.findById(req.user.id).select("yearLevel").lean();
+      const student = await User.findById(req.user.id).select("yearLevel studentYearSections").lean();
+      const studentYears = [...new Set([
+        student?.yearLevel,
+        ...(student?.studentYearSections || []).map((item) => item.yearLevel),
+      ].map(cleanString).filter(Boolean))];
       query.$or = [
         { studentYearLevels: { $exists: false } },
         { studentYearLevels: { $size: 0 } },
-        { studentYearLevels: student?.yearLevel || "__unassigned__" },
+        { studentYearLevels: { $in: studentYears.length ? studentYears : ["__unassigned__"] } },
       ];
     }
 

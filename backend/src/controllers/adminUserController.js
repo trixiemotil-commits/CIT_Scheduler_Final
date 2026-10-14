@@ -25,6 +25,17 @@ function getUserRoles(user) {
   return Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role];
 }
 
+function actorCanManageUsers(req) {
+  const roles = (Array.isArray(req.user?.roles) && req.user.roles.length ? req.user.roles : [req.user?.role])
+    .map((role) => String(role || "").trim().toLowerCase());
+  return roles.includes("admin") && roles.includes("teacher");
+}
+
+function hasAdminAndTeacherRoles(user) {
+  const roles = getUserRoles(user).map((role) => String(role || "").trim().toLowerCase());
+  return roles.includes("admin") && roles.includes("teacher");
+}
+
 function formatRoles(user) {
   return getUserRoles(user).map(formatRole).join(" & ");
 }
@@ -74,6 +85,7 @@ function toClientUser(user) {
     loginLockoutLevel: Number(user.loginLockoutLevel || 0),
     loginLockedUntil: user.loginLockedUntil || null,
     dateAdded: user.createdAt,
+    lastLoginAt: user.lastLoginAt || null,
   };
 }
 
@@ -145,6 +157,10 @@ async function listUsers(req, res) {
 
 async function createUser(req, res) {
   try {
+    if (!actorCanManageUsers(req)) {
+      return res.status(403).json({ message: "Only users with both Admin and Teacher roles can add user accounts." });
+    }
+
     const {
       firstName,
       lastName,
@@ -348,6 +364,9 @@ async function updateUser(req, res) {
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
+    if (hasAdminAndTeacherRoles(user) && !actorCanManageUsers(req)) {
+      return res.status(403).json({ message: "Only users with both Admin and Teacher roles can edit Admin & Teacher accounts." });
+    }
     const previousTeacherStatus = user.teacher_status;
 
     const emailOwner = await User.findOne({ email: normalizedEmail });
@@ -459,6 +478,9 @@ async function updateUserStatus(req, res) {
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ message: "User not found." });
+    }
+    if (nextStatus === "Archived" && hasAdminAndTeacherRoles(user) && !actorCanManageUsers(req)) {
+      return res.status(403).json({ message: "Only users with both Admin and Teacher roles can archive Admin & Teacher accounts." });
     }
 
     const previousStatus = user.account_status;

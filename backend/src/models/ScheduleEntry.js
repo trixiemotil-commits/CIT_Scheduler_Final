@@ -21,7 +21,7 @@ const scheduleEntrySchema = new mongoose.Schema(
     },
     entryType: {
       type: String,
-      enum: ["class", "lunch"],
+      enum: ["class", "lunch", "practicum"],
       default: "class",
       required: true,
       trim: true,
@@ -44,28 +44,38 @@ const scheduleEntrySchema = new mongoose.Schema(
     day: {
       type: String,
       enum: DAY_VALUES,
-      required: true,
+      required: function requiresDay() {
+        return this.entryType !== "practicum";
+      },
       trim: true,
     },
     timeIn: {
       type: String,
-      required: true,
+      required: function requiresTimeIn() {
+        return this.entryType !== "practicum";
+      },
       trim: true,
     },
     timeOut: {
       type: String,
-      required: true,
+      required: function requiresTimeOut() {
+        return this.entryType !== "practicum";
+      },
       trim: true,
     },
     timeInMinutes: {
       type: Number,
-      required: true,
+      required: function requiresTimeInMinutes() {
+        return this.entryType !== "practicum";
+      },
       min: 0,
       max: 1439,
     },
     timeOutMinutes: {
       type: Number,
-      required: true,
+      required: function requiresTimeOutMinutes() {
+        return this.entryType !== "practicum";
+      },
       min: 1,
       max: 1440,
     },

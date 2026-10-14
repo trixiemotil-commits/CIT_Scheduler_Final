@@ -89,7 +89,7 @@ async function findTeacherUserByIdentifier(identifier) {
 
   // Fallback for legacy records where full teacher name may be stored.
   const teachers = await User.find({ $or: [{ role: "teacher" }, { roles: "teacher" }] })
-    .select("role firstName lastName employeeId department account_status teacher_status avatar")
+    .select("role roles firstName lastName employeeId department account_status teacher_status teacher_admin_status teacher_time_in teacher_clocked_out teacher_status_expires_at teacher_availability avatar")
     .lean();
 
   const normalizedKey = key.toLowerCase();
@@ -406,21 +406,25 @@ function isEventCurrentlyActive(event, now = new Date()) {
 
 async function getActiveEventTeacherContext() {
   const activeEventTeacherIds = new Set();
+  const activeMeetingTeacherIds = new Set();
   let allTeachersOnEvent = false;
   const activeEvents = await Event.find({ status: "active" })
-    .select("teacherIds date time endTime status")
+    .select("teacherIds date time endTime status isMeeting")
     .lean();
 
   for (const event of activeEvents) {
     if (!isEventCurrentlyActive(event)) continue;
     const teacherIds = Array.isArray(event.teacherIds) ? event.teacherIds.filter(Boolean) : [];
-    teacherIds.forEach((teacherId) => activeEventTeacherIds.add(String(teacherId)));
+    teacherIds.forEach((teacherId) => {
+      activeEventTeacherIds.add(String(teacherId));
+      if (event.isMeeting) activeMeetingTeacherIds.add(String(teacherId));
+    });
   }
 
-  return { activeEventTeacherIds, allTeachersOnEvent };
+  return { activeEventTeacherIds, activeMeetingTeacherIds, allTeachersOnEvent };
 }
 
-async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTeachersOnEvent = false) {
+async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTeachersOnEvent = false, meetingTeacherIds = new Set()) {
   if (!userDoc || !(Array.isArray(userDoc.roles) ? userDoc.roles : [userDoc.role]).includes("teacher")) {
     return "Offline";
   }
@@ -436,7 +440,7 @@ async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTea
     return "Offline";
   }
 
-  if (adminStatus === "On Meeting") return "On Meeting";
+  if (adminStatus === "On Meeting" || meetingTeacherIds.has(String(userDoc._id))) return "On Meeting";
 
   if (allTeachersOnEvent || eventTeacherIds.has(String(userDoc._id))) {
     return "On Event";
@@ -485,43 +489,84 @@ function resolveTeacherScheduleDisplayStatus(status, entries = [], now = new Dat
   return "On School - In Class";
 }
 
+function availableConsultationTimesForToday(scheduleEntries, events, _bookings, dayOfWeek, currentMinutes) {
+  const times = [];
+  for (let start = AVAILABLE_TEACHER_START_MINUTES; start < AVAILABLE_TEACHER_END_MINUTES; start += 5) {
+    if (start <= currentMinutes) continue;
+    if (availableConsultationEndMinutes(scheduleEntries, events, dayOfWeek, start) > start) times.push(minutesTo24h(start));
+  }
+  return times;
+}
+
+function availableConsultationEndMinutes(scheduleEntries, events, dayOfWeek, startMinutes) {
+  let endMinutes = AVAILABLE_TEACHER_END_MINUTES;
+  const blocks = [
+    ...scheduleEntries
+      .filter((entry) => entry.day === dayOfWeek && entry.timeIn && entry.timeOut)
+      .map((entry) => ({
+        start: entry.timeInMinutes ?? parseTimeToMinutes(entry.timeIn),
+        end: entry.timeOutMinutes ?? parseTimeToMinutes(entry.timeOut),
+      })),
+    ...events.map((event) => ({ start: parseTimeToMinutes(event.time), end: parseTimeToMinutes(event.endTime) })),
+  ];
+  for (const block of blocks) {
+    if (block.start === null || block.end === null) continue;
+    if (startMinutes >= block.start && startMinutes < block.end) return startMinutes;
+    if (block.start > startMinutes) endMinutes = Math.min(endMinutes, block.start);
+  }
+  return endMinutes;
+}
+
 function normalizeAcademicYear(value) {
   const text = String(value || '').trim().toLowerCase();
   const match = text.match(/([1-4])/);
   return match ? match[1] : text;
 }
 
-async function isStudentAssignedToTeacher(teacherUser, studentYear, studentSection, subject = '') {
+async function isStudentAssignedToTeacher(teacherUser, studentYearSections, subject = '') {
   const teacherName = normalizeTeacherFullName(teacherUser);
-  const year = String(studentYear || '').trim();
-  const section = String(studentSection || '').trim();
+  const pairs = Array.isArray(studentYearSections) ? studentYearSections : [];
   const requestedSubject = String(subject || '').trim().toLowerCase();
 
-  if (!teacherName || !year || !section) {
+  const activeAcademicTermId = await getActiveAcademicTermReference();
+  if (!teacherName || !pairs.length || !activeAcademicTermId) {
     return false;
   }
 
-  const assignments = await ScheduleEntry.find({ teacher: teacherName })
+  const assignments = await ScheduleEntry.find({ teacher: teacherName, academicTermId: activeAcademicTermId })
     .select('year section subject')
     .lean();
 
-  return assignments.some((assignment) => (
-    normalizeAcademicYear(assignment.year) === normalizeAcademicYear(year)
-    && String(assignment.section || '').trim().toLowerCase() === section.toLowerCase()
+  return assignments.some((assignment) => pairs.some((pair) => (
+    normalizeAcademicYear(assignment.year) === normalizeAcademicYear(pair.year)
+    && String(assignment.section || '').trim().toLowerCase() === pair.section.toLowerCase()
     && (!requestedSubject || String(assignment.subject || '').trim().toLowerCase() === requestedSubject)
-  ));
+  )));
 }
 
 async function getStudentAcademicContext(userId) {
-  if (!userId) return { year: "", section: "" };
+  if (!userId) return { yearSections: [] };
 
+  const activeAcademicTermId = await getActiveAcademicTermReference();
   const student = await User.findById(userId)
-    .select("yearLevel grade section")
+    .select("yearLevel grade section studentYearSections assignedAcademicTermId")
     .lean();
+  if (!activeAcademicTermId || String(student?.assignedAcademicTermId || "") !== String(activeAcademicTermId)) {
+    return { yearSections: [] };
+  }
+
+  const savedPairs = Array.isArray(student?.studentYearSections)
+    ? student.studentYearSections
+      .map((item) => ({ year: String(item?.yearLevel || "").trim(), section: String(item?.section || "").trim() }))
+      .filter((item) => item.year && item.section)
+    : [];
+  const yearSections = savedPairs.length
+    ? savedPairs
+    : [{ year: String(student?.yearLevel || student?.grade || "").trim(), section: String(student?.section || "").trim() }]
+      .filter((item) => item.year && item.section);
 
   return {
-    year: String(student?.yearLevel || student?.grade || "").trim(),
-    section: String(student?.section || "").trim(),
+    yearSections,
   };
 }
 
@@ -613,6 +658,8 @@ function toClientRequest(doc, studentMeta = null, availabilityMeta = null, consu
     studentId: doc.studentId?.toString?.() || doc.studentId,
     studentName,
     studentNumber: studentMeta?.studentId || "",
+    studentYearLevel: studentMeta?.yearLevel || studentMeta?.grade || "",
+    studentSection: studentMeta?.section || "",
     studentAvatar: studentMeta?.avatar || null,
     employeeId: doc.employeeId,
     availabilityId: doc.availabilityId?.toString?.() || doc.availabilityId,
@@ -633,27 +680,38 @@ function toClientRequest(doc, studentMeta = null, availabilityMeta = null, consu
 }
 
 async function enrichRequestsWithQueue(requests) {
-  const ACTIVE_QUEUE_STATUSES = ["APPROVED"];
+  const QUEUE_STATUSES = ["PENDING", "APPROVED"];
   const queueable = requests.filter(
-    (req) => req?.availabilityId && req?.consultationDate && ACTIVE_QUEUE_STATUSES.includes(req.status)
+    (req) => QUEUE_STATUSES.includes(String(req.status || "").toUpperCase())
+      && ((req?.consultationDate && req?.consultationStartTime) || (!req?.availabilityId && !req?.consultationStartTime))
   );
 
   if (!queueable.length) {
-    return requests.map((req) => ({ ...req, queuePosition: null, queueTotal: null, isNextInQueue: false }));
+    return requests.map((req) => ({
+      ...req,
+      pendingQueuePosition: null,
+      pendingQueueTotal: null,
+      approvedQueuePosition: null,
+      approvedQueueTotal: null,
+      queuePosition: null,
+      queueTotal: null,
+      isNextInQueue: false,
+    }));
   }
 
   const groups = new Map();
   for (const req of queueable) {
-    const date = new Date(req.consultationDate);
-    if (Number.isNaN(date.getTime())) {
-      continue;
-    }
-    const dateKey = date.toISOString().slice(0, 10);
-    const key = `${req.employeeId}|${req.availabilityId}|${dateKey}`;
+    const status = String(req.status || "").toUpperCase();
+    const date = req.consultationDate ? new Date(req.consultationDate) : null;
+    if (date && Number.isNaN(date.getTime())) continue;
+    const dateKey = date ? date.toISOString().slice(0, 10) : "available-now";
+    const key = `${status}|${req.employeeId}|${req.availabilityId || req.consultationStartTime || "available-now"}|${dateKey}`;
     if (!groups.has(key)) {
       groups.set(key, {
+        status,
         employeeId: req.employeeId,
-        availabilityId: req.availabilityId,
+        availabilityId: req.availabilityId || null,
+        startTime: req.consultationStartTime,
         consultationDate: date,
       });
     }
@@ -662,10 +720,13 @@ async function enrichRequestsWithQueue(requests) {
   const queueDocsByKey = new Map();
   for (const [key, info] of groups.entries()) {
     const docs = await ConsultationRequest.find({
+      status: info.status,
       employeeId: info.employeeId,
-      availabilityId: info.availabilityId,
-      consultationDate: info.consultationDate,
-      status: { $in: ACTIVE_QUEUE_STATUSES },
+      ...(info.availabilityId
+        ? { availabilityId: info.availabilityId, consultationDate: info.consultationDate }
+        : info.startTime
+          ? { $or: [{ availabilityId: { $exists: false } }, { availabilityId: null }], consultationDate: info.consultationDate, consultationStartTime: info.startTime }
+          : { $or: [{ availabilityId: { $exists: false } }, { availabilityId: null }], consultationStartTime: { $in: ["", null] } }),
     })
       .sort({ createdAt: 1, _id: 1 })
       .select("_id")
@@ -676,28 +737,57 @@ async function enrichRequestsWithQueue(requests) {
 
   return requests.map((req) => {
     const status = String(req.status || "").toUpperCase();
-    if (!ACTIVE_QUEUE_STATUSES.includes(status) || !req.availabilityId || !req.consultationDate) {
-      return { ...req, queuePosition: null, queueTotal: null, isNextInQueue: false };
+    const availableNow = !req.availabilityId && !req.consultationStartTime;
+    const date = req.consultationDate ? new Date(req.consultationDate) : null;
+    const validQueueRequest = QUEUE_STATUSES.includes(status)
+      && (availableNow || (date && req.consultationStartTime))
+      && !(date && Number.isNaN(date.getTime()));
+    if (!validQueueRequest) {
+      return {
+        ...req,
+        pendingQueuePosition: null,
+        pendingQueueTotal: null,
+        approvedQueuePosition: null,
+        approvedQueueTotal: null,
+        queuePosition: null,
+        queueTotal: null,
+        isNextInQueue: false,
+      };
     }
 
-    const date = new Date(req.consultationDate);
-    if (Number.isNaN(date.getTime())) {
-      return { ...req, queuePosition: null, queueTotal: null, isNextInQueue: false };
-    }
-
-    const key = `${req.employeeId}|${req.availabilityId}|${date.toISOString().slice(0, 10)}`;
+    const dateKey = date ? date.toISOString().slice(0, 10) : "available-now";
+    const key = `${status}|${req.employeeId}|${req.availabilityId || req.consultationStartTime || "available-now"}|${dateKey}`;
     const queueIds = queueDocsByKey.get(key) || [];
     const idx = queueIds.findIndex((id) => id === String(req.id));
 
     if (idx < 0) {
-      return { ...req, queuePosition: null, queueTotal: queueIds.length || null, isNextInQueue: false };
+      return {
+        ...req,
+        pendingQueuePosition: null,
+        pendingQueueTotal: null,
+        approvedQueuePosition: null,
+        approvedQueueTotal: null,
+        queuePosition: null,
+        queueTotal: queueIds.length || null,
+        isNextInQueue: false,
+      };
     }
 
     const position = idx + 1;
+    const pendingQueuePosition = status === "PENDING" ? position : null;
+    const pendingQueueTotal = status === "PENDING" ? queueIds.length : null;
+    const approvedQueuePosition = status === "APPROVED" ? position : null;
+    const approvedQueueTotal = status === "APPROVED" ? queueIds.length : null;
     return {
       ...req,
-      queuePosition: position,
-      queueTotal: queueIds.length,
+      pendingQueuePosition,
+      pendingQueueTotal,
+      approvedQueuePosition,
+      approvedQueueTotal,
+      // Keep the original fields for student views; select the queue that
+      // matches this request's current state.
+      queuePosition: status === "PENDING" ? pendingQueuePosition : approvedQueuePosition,
+      queueTotal: status === "PENDING" ? pendingQueueTotal : approvedQueueTotal,
       isNextInQueue: position === 1,
     };
   });
@@ -719,7 +809,7 @@ async function listTeachersForStudents(req, res) {
   try {
     const studentContext = req.user?.role === "student"
       ? await getStudentAcademicContext(req.user.id)
-      : { year: "", section: "" };
+      : { yearSections: [] };
 
     const requestedTeacherId = mongoose.Types.ObjectId.isValid(req.query.teacherId)
       ? new mongoose.Types.ObjectId(req.query.teacherId)
@@ -735,11 +825,26 @@ async function listTeachersForStudents(req, res) {
       .select("role roles firstName lastName employeeId department account_status teacher_status teacher_admin_status teacher_time_in teacher_clocked_out teacher_status_expires_at teacher_availability avatar")
       .lean();
     const activeAcademicTermId = await getActiveAcademicTermReference();
-    const { activeEventTeacherIds, allTeachersOnEvent } = await getActiveEventTeacherContext();
+    const { activeEventTeacherIds, activeMeetingTeacherIds, allTeachersOnEvent } = await getActiveEventTeacherContext();
     const now = new Date();
     const manilaParts = philippineDateTimeParts(now);
+    const todayKey = dateKeyFromParts(manilaParts);
+    const todayUtc = dateOnlyToUtc(todayKey);
+    const currentMinutes = Number(manilaParts.hour) * 60 + Number(manilaParts.minute);
     const utcDayStart = new Date(Date.UTC(Number(manilaParts.year), Number(manilaParts.month) - 1, Number(manilaParts.day)));
     const utcNextDayStart = new Date(utcDayStart.getTime() + 24 * 60 * 60 * 1000);
+    const teacherIds = teacherUsers.map((teacher) => String(teacher._id));
+    const teacherIdentifiers = teacherUsers.flatMap((teacher) => [teacher.employeeId, normalizeTeacherFullName(teacher)]).filter(Boolean);
+    const [todayEvents, todayBookings] = await Promise.all([
+      Event.find({ status: "active", date: todayKey, teacherIds: { $in: teacherIds } })
+        .select("teacherIds time endTime")
+        .lean(),
+      ConsultationRequest.find({
+        employeeId: { $in: teacherIdentifiers },
+        consultationDate: todayUtc,
+        status: { $in: ACTIVE_STUDENT_REQUEST_STATUSES },
+      }).select("employeeId consultationStartTime consultationEndTime").lean(),
+    ]);
 
     const teachers = await Promise.all(
       teacherUsers.map(async (teacherUser) => {
@@ -764,10 +869,12 @@ async function listTeachersForStudents(req, res) {
             ],
           })
             .lean(),
-          ScheduleEntry.find({ teacher: fullName })
-            .select("subject year section academicTermId day timeIn timeOut campus color entryType")
-            .lean(),
-          resolveTeacherStatus(teacherUser, activeEventTeacherIds, allTeachersOnEvent),
+          activeAcademicTermId
+            ? ScheduleEntry.find({ teacher: fullName, academicTermId: activeAcademicTermId })
+              .select("subject year section academicTermId day timeIn timeOut timeInMinutes timeOutMinutes campus color entryType")
+              .lean()
+            : Promise.resolve([]),
+          resolveTeacherStatus(teacherUser, activeEventTeacherIds, allTeachersOnEvent, activeMeetingTeacherIds),
           SubstituteAssignment.find({
             substituteTeacher: teacherUser._id,
             date: { $gte: utcDayStart, $lt: utcNextDayStart },
@@ -793,20 +900,30 @@ async function listTeachersForStudents(req, res) {
         }
 
         const studentSubjects = scheduleEntries
-          .filter((entry) => (
-            studentContext.year
-            && studentContext.section
-            && String(entry?.year || "").trim() === studentContext.year
-            && String(entry?.section || "").trim().toLowerCase() === studentContext.section.toLowerCase()
-          ))
+          .filter((entry) => studentContext.yearSections.some((pair) => (
+            String(entry?.year || "").trim() === pair.year
+            && String(entry?.section || "").trim().toLowerCase() === pair.section.toLowerCase()
+          )))
           .map((entry) => String(entry?.subject || "").trim())
           .filter(Boolean);
         const uniqueStudentSubjects = [...new Set(studentSubjects)];
-        const currentTermScheduleEntries = scheduleEntries.filter((entry) => (
-          activeAcademicTermId
-            ? String(entry.academicTermId || "") === String(activeAcademicTermId)
-            : !entry.academicTermId
+        const currentTermScheduleEntries = scheduleEntries;
+        const currentTermTodayEntries = currentTermScheduleEntries.filter((entry) => entry.day === manilaParts.weekday);
+        const todaySubstituteEntries = substituteAssignments.flatMap((assignment) => (
+          (Array.isArray(assignment.entries) ? assignment.entries : []).map((entry) => ({
+            ...entry,
+            day: manilaParts.weekday,
+          }))
         ));
+        const teacherTodayEvents = todayEvents.filter((event) => event.teacherIds?.some((id) => String(id) === String(teacherUser._id)));
+        const teacherTodayBookings = todayBookings.filter((booking) => lookupKeys.includes(String(booking.employeeId || "")));
+        const availableTimeSlots = availableConsultationTimesForToday(
+          [...currentTermTodayEntries, ...todaySubstituteEntries],
+          teacherTodayEvents,
+          teacherTodayBookings,
+          manilaParts.weekday,
+          currentMinutes,
+        );
         const substituteScheduleEntries = substituteAssignments.flatMap((assignment) => (
           (Array.isArray(assignment.entries) ? assignment.entries : []).map((entry) => ({
             ...entry,
@@ -821,7 +938,6 @@ async function listTeachersForStudents(req, res) {
         );
         const isSubjectTeacher = uniqueStudentSubjects.length > 0;
         const canAcceptRequests = String(status || '').toLowerCase() === "on school"
-          && statusDisplay === status
           && String(teacherUser.teacher_availability || '').toLowerCase() !== "unavailable";
 
         return {
@@ -837,6 +953,7 @@ async function listTeachersForStudents(req, res) {
           teacher_clocked_out: Boolean(teacherUser.teacher_clocked_out),
           teacherAvailability: teacherUser.teacher_availability || "Available",
           available: canAcceptRequests,
+          availableTimeSlots,
           isSubjectTeacher,
           studentSubjects: uniqueStudentSubjects,
           subjects: Array.from(subjectSet),
@@ -888,11 +1005,12 @@ async function createConsultationRequest(req, res) {
       time,
       notes = "",
     } = req.body || {};
-    if (!teacherId || !topic) {
-      return res.status(400).json({ message: "teacherId and topic are required." });
+    if (!teacherId || (consultationType === "subject" && !topic)) {
+      return res.status(400).json({ message: "teacherId and a subject are required for subject-teacher consultations." });
     }
 
-    if (!availabilityId && (!date || !time)) {
+    const isRequestedAvailableTeacher = consultationType === "available" || (!consultationType && !availabilityId);
+    if (!availabilityId && !isRequestedAvailableTeacher && (!time || !date)) {
       return res.status(400).json({ message: "Please provide a consultation date and time." });
     }
 
@@ -902,8 +1020,8 @@ async function createConsultationRequest(req, res) {
     }
 
     const teacherName = normalizeTeacherFullName(teacherUser);
-    const { activeEventTeacherIds, allTeachersOnEvent } = await getActiveEventTeacherContext();
-    const teacherStatus = await resolveTeacherStatus(teacherUser, activeEventTeacherIds, allTeachersOnEvent);
+    const { activeEventTeacherIds, activeMeetingTeacherIds, allTeachersOnEvent } = await getActiveEventTeacherContext();
+    const teacherStatus = await resolveTeacherStatus(teacherUser, activeEventTeacherIds, allTeachersOnEvent, activeMeetingTeacherIds);
     const activeAcademicTermId = await getActiveAcademicTermReference();
     const currentScheduleEntries = await ScheduleEntry.find({ teacher: teacherName })
       .select("academicTermId day timeIn timeOut campus color entryType subject")
@@ -916,11 +1034,11 @@ async function createConsultationRequest(req, res) {
     const teacherScheduleStatus = resolveTeacherScheduleDisplayStatus(teacherStatus, currentTermScheduleEntries);
     const isSubjectTeacher = consultationType === "subject"
       || (!consultationType && Boolean(availabilityId));
+    const isAvailableTeacherRequest = !isSubjectTeacher;
 
     if (
-      ["On Leave", "Offline", "On Event"].includes(teacherStatus)
-      || teacherScheduleStatus === "On School - In Class"
-      || teacherScheduleStatus === "Off Campus"
+      ["On Leave", "Offline", "On Event", "On Meeting"].includes(teacherStatus)
+      || (isSubjectTeacher && (teacherScheduleStatus === "On School - In Class" || teacherScheduleStatus === "Off Campus"))
       || String(teacherUser.teacher_availability || "").trim().toLowerCase() === "unavailable"
     ) {
       return res.status(409).json({
@@ -946,23 +1064,33 @@ async function createConsultationRequest(req, res) {
         consultationDate = nextDateForDay(matchedSlot.dayOfWeek, matchedSlot.startTime);
         requestMinutes = parseTimeToMinutes(matchedSlot.startTime);
       }
-    } else {
-      consultationDate = dateOnlyToUtc(date);
+    } else if (!isAvailableTeacherRequest) {
+      const requestDateKey = isAvailableTeacherRequest
+        ? dateKeyFromParts(philippineDateTimeParts())
+        : date;
+      consultationDate = dateOnlyToUtc(requestDateKey);
       if (!consultationDate || Number.isNaN(consultationDate.getTime())) {
         return res.status(400).json({ message: "Invalid date/time provided." });
       }
 
-      const dayOfWeek = DAYS[consultationDate.getDay()];
+      const dayOfWeek = DAYS[consultationDate.getUTCDay()];
       requestMinutes = parseTimeToMinutes(time);
       if (requestMinutes === null) {
         return res.status(400).json({ message: "Invalid time provided." });
       }
 
-      if (
-        requestMinutes < AVAILABLE_TEACHER_START_MINUTES
-        || requestMinutes + 60 > AVAILABLE_TEACHER_END_MINUTES
-      ) {
+      if (requestMinutes < AVAILABLE_TEACHER_START_MINUTES
+        || (isAvailableTeacherRequest ? requestMinutes >= AVAILABLE_TEACHER_END_MINUTES : requestMinutes + 60 > AVAILABLE_TEACHER_END_MINUTES)) {
         return res.status(400).json({ message: "Available-teacher consultations must be scheduled between 7:00 AM and 6:00 PM." });
+      }
+
+      if (isAvailableTeacherRequest) {
+        const currentParts = philippineDateTimeParts();
+        const requestedToday = requestDateKey === dateKeyFromParts(currentParts);
+        const currentMinutes = Number(currentParts.hour) * 60 + Number(currentParts.minute);
+        if (!requestedToday || requestMinutes <= currentMinutes) {
+          return res.status(409).json({ message: "Available-teacher consultations must use a future free time today." });
+        }
       }
 
       if (isSubjectTeacher) {
@@ -983,39 +1111,41 @@ async function createConsultationRequest(req, res) {
       });
     }
 
-    if (!consultationDate || Number.isNaN(consultationDate.getTime()) || requestMinutes === null) {
+    if (!isAvailableTeacherRequest && (!consultationDate || Number.isNaN(consultationDate.getTime()) || requestMinutes === null)) {
       return res.status(400).json({ message: "Selected consultation availability is invalid." });
     }
 
-    const consultationDay = DAYS[consultationDate.getUTCDay()];
-    const consultationStartTime = minutesTo24h(requestMinutes);
-    const consultationEndTime = minutesTo24h(requestMinutes + 60);
-    const teacherClassConflict = isSubjectTeacher
-      ? await checkClassConflict(
-        teacherName,
-        consultationDay,
-        consultationStartTime,
-        consultationEndTime,
-        matchedSlot?.academicTermId,
-        true
-      )
-      : null;
+    const consultationDay = consultationDate ? DAYS[consultationDate.getUTCDay()] : "";
+    const consultationStartTime = requestMinutes === null ? "" : minutesTo24h(requestMinutes);
+    const eventDate = consultationDate ? consultationDate.toISOString().slice(0, 10) : "";
+    const sameDayEvents = consultationDate ? await Event.find({
+      status: "active",
+      teacherIds: { $in: [String(teacherUser._id)] },
+      date: eventDate,
+    }).select("title time endTime").lean() : [];
+    const requestEndMinutes = isAvailableTeacherRequest ? null : requestMinutes + 60;
+    if (!isAvailableTeacherRequest && requestEndMinutes <= requestMinutes) {
+      return res.status(409).json({ message: "That time is no longer free. Please choose another time before the next class or event." });
+    }
+    const consultationEndTime = requestEndMinutes === null ? "" : minutesTo24h(requestEndMinutes);
+    const teacherClassConflict = consultationDate ? await checkClassConflict(
+      teacherName,
+      consultationDay,
+      consultationStartTime,
+      consultationEndTime,
+      matchedSlot?.academicTermId || activeAcademicTermId,
+      true
+    ) : null;
     if (teacherClassConflict) {
       return res.status(409).json({ message: teacherClassConflict });
     }
 
-    const eventDate = consultationDate.toISOString().slice(0, 10);
-    const sameDayEvents = await Event.find({
-      status: "active",
-      teacherIds: { $in: [String(teacherUser._id)] },
-      date: eventDate,
-    }).select("title time endTime").lean();
     const overlappingEvent = sameDayEvents.find((event) => {
       const eventStart = parseTimeToMinutes(event.time);
       const eventEnd = parseTimeToMinutes(event.endTime);
       return eventStart !== null && eventEnd !== null
         && requestMinutes < eventEnd
-        && requestMinutes + 60 > eventStart;
+        && requestEndMinutes > eventStart;
     });
     if (overlappingEvent) {
       return res.status(409).json({ message: `This consultation overlaps ${overlappingEvent.title}. Please choose a different time.` });
@@ -1028,7 +1158,9 @@ async function createConsultationRequest(req, res) {
       studentId: req.user.id,
       employeeId: teacherKey,
       status: "PENDING",
-      ...(matchedSlot
+      ...(isAvailableTeacherRequest
+        ? { availabilityId: { $in: [null] }, consultationStartTime: { $in: ["", null] } }
+        : matchedSlot
         ? { availabilityId: matchedSlot._id }
         : { consultationDate, consultationStartTime }),
     };
@@ -1040,12 +1172,12 @@ async function createConsultationRequest(req, res) {
       });
     }
 
-    const hasTimeConflict = await hasStudentTimeConflict(
+    const hasTimeConflict = consultationDate ? await hasStudentTimeConflict(
       req.user.id,
       consultationDate,
       requestMinutes,
-      requestMinutes + 60
-    );
+      requestEndMinutes
+    ) : false;
     if (hasTimeConflict) {
       return res.status(409).json({
         message: "You already have a consultation request during this time. Please choose a different time slot.",
@@ -1058,20 +1190,21 @@ async function createConsultationRequest(req, res) {
       availabilityId: isSubjectTeacher ? matchedSlot?._id : undefined,
       consultationStartTime,
       consultationEndTime,
-      subject: String(topic).trim(),
+      subject: String(topic || "General Consultation").trim(),
       purpose: String(notes || "").trim(),
       requestDate,
       consultationDate,
       status: isSubjectTeacher ? "APPROVED" : "PENDING",
     });
 
-    const requestEndMinutes = requestMinutes + 60;
-    await ConsultationLog.create({
-      requestId: requestDoc._id,
-      timeIn: minutesTo24h(requestMinutes),
-      timeOut: minutesTo24h(requestEndMinutes),
-      notes: "Consultation request created.",
-    });
+    if (consultationStartTime && consultationEndTime) {
+      await ConsultationLog.create({
+        requestId: requestDoc._id,
+        timeIn: consultationStartTime,
+        timeOut: consultationEndTime,
+        notes: "Consultation request created.",
+      });
+    }
 
     // Notify the teacher for every new request, including subject requests that are auto-approved.
     const requestMessage = isSubjectTeacher
@@ -1087,7 +1220,7 @@ async function createConsultationRequest(req, res) {
         data: {
           studentName: `${req.user.firstName || 'A student'} ${req.user.lastName || ''}`.trim(),
           subject: requestDoc.subject,
-          consultationTime: `${consultationStartTime} - ${consultationEndTime}`,
+          consultationTime: consultationStartTime ? `${consultationStartTime} - ${consultationEndTime}` : "Available now",
           status: requestDoc.status,
           avatar: req.user.avatar || null,
         },
@@ -1252,7 +1385,7 @@ async function listConsultationRequests(req, res) {
 
     const students = studentIds.length
       ? await User.find({ _id: { $in: studentIds } })
-        .select("firstName lastName studentId avatar")
+        .select("firstName lastName studentId avatar yearLevel grade section")
         .lean()
       : [];
 
@@ -1339,11 +1472,7 @@ async function updateConsultationRequestByStudent(req, res) {
     }
 
     const { id } = req.params;
-    const { topic, availabilityId, notes = "" } = req.body || {};
-
-    if (!topic || !availabilityId) {
-      return res.status(400).json({ message: "topic and availabilityId are required." });
-    }
+    const { topic, availabilityId, notes = "", date, time } = req.body || {};
 
     const requestDoc = await ConsultationRequest.findById(id);
     if (!requestDoc) {
@@ -1360,22 +1489,83 @@ async function updateConsultationRequestByStudent(req, res) {
     }
 
     const teacherName = normalizeTeacherFullName(teacherUser);
-    const { activeEventTeacherIds, allTeachersOnEvent } = await getActiveEventTeacherContext();
-    const teacherStatus = await resolveTeacherStatus(teacherUser, activeEventTeacherIds, allTeachersOnEvent);
+    const { activeEventTeacherIds, activeMeetingTeacherIds, allTeachersOnEvent } = await getActiveEventTeacherContext();
+    const teacherStatus = await resolveTeacherStatus(teacherUser, activeEventTeacherIds, allTeachersOnEvent, activeMeetingTeacherIds);
     const studentContext = await getStudentAcademicContext(req.user.id);
     const isSubjectTeacher = await isStudentAssignedToTeacher(
       teacherUser,
-      studentContext.year,
-      studentContext.section
+      studentContext.yearSections
     );
 
-    if (["On Leave", "Offline", "On Event"].includes(teacherStatus) || teacherUser.teacher_availability === "Unavailable") {
+    if (["On Leave", "Offline", "On Event", "On Meeting"].includes(teacherStatus) || String(teacherUser.teacher_availability || "").trim().toLowerCase() === "unavailable") {
       return res.status(409).json({
         message: `${teacherName} is not open for consultation right now. Please select another teacher.`,
       });
     }
 
     const lookupKeys = [teacherUser.employeeId, teacherName].filter(Boolean);
+    if (!requestDoc.availabilityId) {
+      if (!time) {
+        requestDoc.subject = String(topic || requestDoc.subject || "General Consultation").trim();
+        requestDoc.purpose = String(notes || "").trim();
+        requestDoc.employeeId = teacherUser.employeeId || teacherName;
+        requestDoc.consultationDate = null;
+        requestDoc.consultationStartTime = "";
+        requestDoc.consultationEndTime = "";
+        requestDoc.status = "PENDING";
+        await requestDoc.save();
+        await logActivity({ actor: req.user, action: `Edited consultation request for ${teacherName}`, path: req.originalUrl || `/api/consultations/requests/${id}`, method: req.method, req });
+        return res.json({ message: "Consultation request updated.", request: toClientRequest(requestDoc) });
+      }
+      const todayKey = dateKeyFromParts(philippineDateTimeParts());
+      const requestedDateKey = String(date || "").trim();
+      const consultationDate = dateOnlyToUtc(requestedDateKey);
+      const requestStartMinutes = parseTimeToMinutes(time);
+      if (!consultationDate || requestedDateKey !== todayKey || requestStartMinutes === null) {
+        return res.status(400).json({ message: "Available-teacher requests can only be moved to a valid time today." });
+      }
+      const currentParts = philippineDateTimeParts();
+      const currentMinutes = Number(currentParts.hour) * 60 + Number(currentParts.minute);
+      if (requestStartMinutes <= currentMinutes || requestStartMinutes < AVAILABLE_TEACHER_START_MINUTES || requestStartMinutes >= AVAILABLE_TEACHER_END_MINUTES) {
+        return res.status(409).json({ message: "Choose a future consultation time today." });
+      }
+      const dayOfWeek = DAYS[consultationDate.getUTCDay()];
+      const startTime = minutesTo24h(requestStartMinutes);
+      const eventDate = consultationDate.toISOString().slice(0, 10);
+      const sameDayEvents = await Event.find({ status: "active", teacherIds: { $in: [String(teacherUser._id)] }, date: eventDate }).select("title time endTime").lean();
+      const activeAcademicTermId = await getActiveAcademicTermReference();
+      const scheduleRows = await ScheduleEntry.find({ teacher: teacherName }).select("academicTermId day timeIn timeOut campus color entryType subject").lean();
+      const currentTermRows = scheduleRows.filter((entry) => activeAcademicTermId
+        ? String(entry.academicTermId || "") === String(activeAcademicTermId)
+        : !entry.academicTermId);
+      const requestEndMinutes = availableConsultationEndMinutes(currentTermRows, sameDayEvents, dayOfWeek, requestStartMinutes);
+      if (requestEndMinutes <= requestStartMinutes) return res.status(409).json({ message: "That time is no longer free. Please choose another time before the next class or event." });
+      const endTime = minutesTo24h(requestEndMinutes);
+      const teacherClassConflict = await checkClassConflict(teacherName, dayOfWeek, startTime, endTime, activeAcademicTermId, true);
+      if (teacherClassConflict) return res.status(409).json({ message: teacherClassConflict });
+      const overlappingEvent = sameDayEvents.find((event) => {
+        const eventStart = parseTimeToMinutes(event.time);
+        const eventEnd = parseTimeToMinutes(event.endTime);
+        return eventStart !== null && eventEnd !== null && requestStartMinutes < eventEnd && requestEndMinutes > eventStart;
+      });
+      if (overlappingEvent) return res.status(409).json({ message: `This consultation overlaps ${overlappingEvent.title}. Please choose a different time.` });
+      if (await hasStudentTimeConflict(req.user.id, consultationDate, requestStartMinutes, requestEndMinutes, requestDoc._id)) {
+        return res.status(409).json({ message: "You already have a consultation request during this time. Please choose a different time slot." });
+      }
+      requestDoc.subject = String(topic || requestDoc.subject || "General Consultation").trim();
+      requestDoc.purpose = String(notes || "").trim();
+      requestDoc.employeeId = teacherUser.employeeId || teacherName;
+      requestDoc.availabilityId = null;
+      requestDoc.consultationDate = consultationDate;
+      requestDoc.consultationStartTime = startTime;
+      requestDoc.consultationEndTime = endTime;
+      requestDoc.status = "PENDING";
+      await requestDoc.save();
+      await logActivity({ actor: req.user, action: `Edited consultation request for ${teacherName}`, path: req.originalUrl || `/api/consultations/requests/${id}`, method: req.method, req });
+      return res.json({ message: "Consultation request updated.", request: toClientRequest(requestDoc) });
+    }
+
+    if (!topic || !availabilityId) return res.status(400).json({ message: "topic and availabilityId are required." });
     const matchedSlot = await ConsultationAvailability.findOne({
       _id: availabilityId,
       $or: [
@@ -1499,6 +1689,23 @@ async function updateConsultationRequestStatus(req, res) {
     const previousStatus = String(requestDoc.status || "").toUpperCase();
     const statusChanged = previousStatus !== nextStatus;
     const actorRole = req.user?.role;
+    if (actorRole === "teacher" && nextStatus === "APPROVED" && !requestDoc.availabilityId) {
+      const earlierRequest = await ConsultationRequest.findOne({
+        _id: { $ne: requestDoc._id },
+        employeeId: requestDoc.employeeId,
+        availabilityId: { $in: [null] },
+        ...(requestDoc.consultationStartTime
+          ? { consultationDate: requestDoc.consultationDate, consultationStartTime: requestDoc.consultationStartTime }
+          : { consultationStartTime: { $in: ["", null] } }),
+        status: "PENDING",
+        createdAt: { $lte: requestDoc.createdAt },
+      }).sort({ createdAt: 1, _id: 1 }).lean();
+      if (earlierRequest && (new Date(earlierRequest.createdAt) < new Date(requestDoc.createdAt)
+        || (new Date(earlierRequest.createdAt).getTime() === new Date(requestDoc.createdAt).getTime()
+          && String(earlierRequest._id) < String(requestDoc._id)))) {
+        return res.status(409).json({ message: "Earlier consultation requests for this time must be handled first." });
+      }
+    }
     if (actorRole === "student") {
       if (String(requestDoc.studentId) !== String(req.user.id)) {
         return res.status(403).json({ message: "You can only update your own consultation requests." });
@@ -1762,7 +1969,7 @@ async function createConsultation(req, res) {
 
     // Weekly limits apply independently to each academic term.
     const existing = await ConsultationAvailability.find({
-      employeeId,
+      teacher,
       academicTermId: academicTermId || null,
     });
     const weeklyUsed = existing.reduce((sum, d) => sum + slotDurationMinutes(d.startTime, d.endTime), 0);
@@ -1826,7 +2033,7 @@ async function updateConsultation(req, res) {
 
     // Weekly totals and conflicts apply only within this slot's term.
     const others = await ConsultationAvailability.find({
-      employeeId: target.employeeId,
+      teacher: target.teacher,
       academicTermId: academicTermId || null,
       _id: { $ne: target._id },
     });

@@ -208,9 +208,9 @@
                           <div class="entry-teacher">{{ getEntriesForRoomCell(slot, day)[0].teacher }}</div>
                           <div class="entry-subject">{{ getEntriesForRoomCell(slot, day)[0].subject }}</div>
                           <div class="entry-time-range">{{ getEntriesForRoomCell(slot, day)[0].slot }}</div>
-                          <div v-if="getEntriesForRoomCell(slot, day).some((entry) => entry.section)" class="entry-section-rows">
-                            <div v-for="e in getEntriesForRoomCell(slot, day).filter((entry) => entry.section)" :key="e._key" class="entry-section-row">
-                              <span class="entry-section-badge">{{ e.section }}</span>
+                          <div v-if="getEntriesForRoomCell(slot, day).some((entry) => entry.section || entry.year)" class="entry-section-rows">
+                            <div v-for="e in getEntriesForRoomCell(slot, day).filter((entry) => entry.section || entry.year)" :key="e._key" class="entry-section-row">
+                              <span class="entry-section-badge">{{ [e.year, e.section].filter(Boolean).join(' · ') }}</span>
                             </div>
                           </div>
                         </div>
@@ -257,6 +257,11 @@
           </div>
           <div v-else-if="studentHasNoEntries" class="empty-state"><p>No schedules found for <strong>{{ selectedStudentYear }} · {{ selectedStudentSection }}</strong>.</p></div>
           <div v-else class="sched-grid-wrap">
+            <div v-if="studentPracticumAssignments.length" class="student-practicum-assignment">
+              <strong>IT Practicum · 6 units</strong>
+              <span v-for="assignment in studentPracticumAssignments" :key="assignment.id">{{ assignment.teacher }}</span>
+              <small>No fixed day, time, or room</small>
+            </div>
             <table class="sched-grid">
               <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day" :class="{ 'current-day-header': day === highlightedTeacherDay }">{{ day }}</th></tr></thead>
               <tbody>
@@ -268,7 +273,7 @@
                         <div class="sched-entry sched-entry-clickable" :class="getEntriesForStudentCell(slot, day)[0].color" :style="studentEntryStyle(slot, getEntriesForStudentCell(slot, day)[0])" role="button" tabindex="0" @click="openScheduleDetails(getEntriesForStudentCell(slot, day))" @keydown.enter.space.prevent="openScheduleDetails(getEntriesForStudentCell(slot, day))">
                           <div class="entry-teacher">{{ getEntriesForStudentCell(slot, day)[0].subject }}</div>
                           <div class="entry-subject">{{ getEntriesForStudentCell(slot, day)[0].teacher }}</div>
-                          <div class="entry-section-row"><span class="entry-room">{{ getEntriesForStudentCell(slot, day)[0].room || 'Room not assigned' }}</span></div>
+                          <div class="entry-section-row"><span class="entry-section-badge">{{ [getEntriesForStudentCell(slot, day)[0].year, getEntriesForStudentCell(slot, day)[0].section].filter(Boolean).join(' · ') }}</span><span class="entry-room">{{ getEntriesForStudentCell(slot, day)[0].room || 'Room not assigned' }}</span></div>
                         </div>
                       </template>
                       <span v-else class="free-time-label">Free time</span>
@@ -392,12 +397,12 @@
                           <div class="entry-teacher">{{ getEntriesForTeacherCell(slot, day)[0].subject }}</div>
                           <div class="entry-subject">{{ getEntriesForTeacherCell(slot, day)[0].slot }}</div>
                           <div
-                            v-if="getEntriesForTeacherCell(slot, day).some((entry) => entry.section || entry.room)"
+                            v-if="getEntriesForTeacherCell(slot, day).some((entry) => entry.year || entry.section || entry.room)"
                             class="entry-section-rows"
                           >
                             <template v-for="e in getEntriesForTeacherCell(slot, day)" :key="e._key">
-                              <div v-if="e.section || e.room" class="entry-section-row">
-                                <span v-if="e.section" class="entry-section-badge">{{ e.section }}</span>
+                              <div v-if="e.year || e.section || e.room" class="entry-section-row">
+                                <span v-if="e.year || e.section" class="entry-section-badge">{{ [e.year, e.section].filter(Boolean).join(' · ') }}</span>
                                 <span v-if="e.room" class="entry-room">{{ e.room }}</span>
                               </div>
                             </template>
@@ -621,6 +626,7 @@ const showLogoutModal = ref(false)
 const selectedScheduleEntries = ref([])
 const loading = ref(true)
 const consultationSlots = ref([])
+let consultationFetchId = 0
 const teacherWorkHoursByDay = ref({})
 
 function setTeacherWorkHours(scheduleTables = []) {
@@ -777,6 +783,7 @@ const roomSearchQuery = ref('')
 const viewMode         = ref(initialViewRouteMode)   // null | 'room' | 'teacher'
 const selectedStudentYear = ref(initialViewRouteMode === 'student' ? (String(route.query.year || '') || '') : '')
 const selectedStudentSection = ref(initialViewRouteMode === 'student' ? (String(route.query.section || '') || '') : '')
+const studentPracticumAssignments = ref([])
 const selectedTeacher  = ref(initialViewRouteMode === 'teacher' ? (String(route.query.teacher || '') || null) : null)
 const selectedTeacherId = ref(null)
 const teacherList      = ref([])
@@ -955,17 +962,22 @@ async function loadTeachers() {
 }
 
 async function fetchConsultationsForTeacher() {
+  const fetchId = ++consultationFetchId
+  const teacher = selectedTeacher.value
+  const termId = getSelectedTermId()
   if (!selectedTeacher.value) {
     consultationSlots.value = []
     return
   }
   try {
-    const termId = getSelectedTermId()
-    const query = new URLSearchParams({ teacher: selectedTeacher.value })
+    const query = new URLSearchParams({ teacher })
     if (termId) query.set('academicTermId', termId)
     const res = await apiRequest(`/consultations?${query.toString()}`)
+    // Ignore a slower response if the selected teacher or term changed while it was in flight.
+    if (fetchId !== consultationFetchId || teacher !== selectedTeacher.value || termId !== getSelectedTermId()) return
     consultationSlots.value = res.consultations || []
   } catch (_) {
+    if (fetchId !== consultationFetchId || teacher !== selectedTeacher.value || termId !== getSelectedTermId()) return
     consultationSlots.value = []
   }
 }
@@ -1066,7 +1078,7 @@ function getConsultationForTeacherCell(rowSlot, day) {
 
 function getConsultRowspan(consult) {
   if (!consult?.startTime || !consult?.endTime) return 1
-  return Math.min(timeSlots30.length, Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime)) / 30) + 1))
+  return Math.min(timeSlots30.length, Math.max(1, Math.ceil((parseTime(consult.endTime) - parseTime(consult.startTime)) / 30)))
 }
 
 function isSpannedConsultTeacherCell(slot, day) {
@@ -1100,10 +1112,11 @@ const teacherHasNoEntries = computed(() => {
 
 const studentHasNoEntries = computed(() => {
   if (viewMode.value !== 'student') return false
-  return !Object.values(entries).some((entry) => (
+  const hasScheduledClasses = Object.values(entries).some((entry) => (
     String(entry.year || '').trim() === selectedStudentYear.value
     && String(entry.section || '').trim() === selectedStudentSection.value
   ))
+  return !hasScheduledClasses && !studentPracticumAssignments.value.length
 })
 
 const currentFloorRooms = computed(
@@ -1138,8 +1151,15 @@ function resetEntriesStore() {
 
 function syncEntriesFromApi(apiEntries) {
   resetEntriesStore()
+  studentPracticumAssignments.value = []
   if (!Array.isArray(apiEntries)) return
   apiEntries.forEach(entry => {
+    if (String(entry.entryType || '').trim().toLowerCase() === 'practicum') {
+      if (String(entry.year || '').trim() === selectedStudentYear.value && String(entry.section || '').trim() === selectedStudentSection.value) {
+        studentPracticumAssignments.value.push(entry)
+      }
+      return
+    }
     const tableLabel = entry.tableLabel || entry.teacher || ''
     const entryType = String(entry.entryType || '').trim().toLowerCase()
     const isLunch = entryType === 'lunch' || entry.color === 'color-gray' || /\blunch\b/i.test(String(entry.subject || ''))
@@ -1418,7 +1438,7 @@ function exportScheduleExcel() {
   const entryContent = (entry, groupedEntries) => {
     const sectionRows = groupedEntries
       .filter(item => item.section || item.room || item.year)
-      .map(item => [item.section, !isRoom ? item.room : '', item.year].filter(Boolean).join(' · '))
+      .map(item => [item.year, item.section, !isRoom ? item.room : ''].filter(Boolean).join(' · '))
       .filter(Boolean)
       .map(value => `<span class="e-section">${esc(value)}</span>`)
       .join('')
@@ -1564,11 +1584,7 @@ function printSchedule() {
     const sectionRows = allEntries
       .filter(item => item.section || item.room || item.year)
       .map(item => {
-        const pieces = [
-          item.section,
-          !isRoom ? item.room : '',
-          item.year,
-        ].filter(Boolean)
+        const pieces = [item.year, item.section, !isRoom ? item.room : ''].filter(Boolean)
         return pieces.length ? `<span class="e-section">${esc(pieces.join(' · '))}</span>` : ''
       })
       .join('')
@@ -2079,6 +2095,14 @@ function printSchedule() {
   flex: 0 0 auto;
   overflow: visible;
 }
+.student-practicum-assignment {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  margin: 0 0 12px; padding: 12px 14px; border: 1px solid #ddd6fe;
+  border-radius: 10px; background: #f5f3ff; color: #4c1d95; font-size: .88rem;
+}
+.student-practicum-assignment strong { font-weight: 750; }
+.student-practicum-assignment span { font-weight: 650; }
+.student-practicum-assignment small { color: #6b7280; }
 .sched-topbar {
   display: flex;
   align-items: center;
@@ -2459,9 +2483,9 @@ function printSchedule() {
   display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%;
 }
 .entry-section-badge {
-  font-size: 0.72rem; font-weight: 700; text-align: center;
-  text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.9;
-  background: rgba(255,255,255,0.24); padding: 2px 6px; border-radius: 5px;
+  font-size: 0.68rem; font-weight: 750; text-align: center;
+  text-transform: uppercase; letter-spacing: 0.025em; line-height: 1.25; opacity: 1;
+  background: rgba(255,255,255,0.3); padding: 2px 6px; border-radius: 5px;
 }
 .entry-room {
   font-size: 0.72rem; opacity: 0.75; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56px;

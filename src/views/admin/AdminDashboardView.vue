@@ -1487,23 +1487,27 @@ function calculateWorkloads(users, scheduleEntries, scheduleTables = []) {
     const meetingKeys = new Set(group.entries.map(entry => group.parallel
       ? `${entry.day}|${entry.timeIn}|${entry.timeOut}`
       : `${entry.day}|${entry.timeIn}|${entry.timeOut}|${entry.roomType || 'Lecture'}`))
-    const hours = Array.from(meetingKeys).reduce((sum, key) => {
+    const hours = first.entryType === 'practicum' ? 0 : Array.from(meetingKeys).reduce((sum, key) => {
       const [, timeIn, timeOut] = key.split('|')
       return sum + Math.max(0, minutesFromTime(timeOut) - minutesFromTime(timeIn)) / 60
     }, 0)
-    const units = group.parallel
-      ? (sectionCount + 1) * (hasLab ? 2.5 : 1.5)
-      : (hasLab ? 5 : 3)
+    const units = first.entryType === 'practicum'
+      ? 6 * (group.parallel ? sectionCount : 1)
+      : group.parallel
+        ? (sectionCount + 1) * (hasLab ? 2.5 : 1.5)
+        : (hasLab ? 5 : 3)
     const current = workloads.get(first.teacher) || { name: first.teacher, totalHours: 0, units: 0, daysTeaching: 0, schedule: [] }
     current.totalHours += hours
     current.units += units
-    current.schedule.push(...group.entries.map(entry => ({
-      day: entry.day,
-      time: `${entry.timeIn}-${entry.timeOut}`,
-      duration: `${Math.max(0, minutesFromTime(entry.timeOut) - minutesFromTime(entry.timeIn)) / 60}h`,
-      subject: entry.subject,
-      section: [entry.year, entry.section].filter(Boolean).join(' - '),
-    })))
+    if (first.entryType !== 'practicum') {
+      current.schedule.push(...group.entries.map(entry => ({
+        day: entry.day,
+        time: `${entry.timeIn}-${entry.timeOut}`,
+        duration: `${Math.max(0, minutesFromTime(entry.timeOut) - minutesFromTime(entry.timeIn)) / 60}h`,
+        subject: entry.subject,
+        section: [entry.year, entry.section].filter(Boolean).join(' - '),
+      })))
+    }
     current.daysTeaching = new Set(current.schedule.map(entry => entry.day)).size
     workloads.set(first.teacher, current)
   })
@@ -1528,17 +1532,15 @@ async function loadChartData() {
   isConsultationLoading.value = true
   consultationLoadError.value = false
   try {
-    const [termPayload, requestsPayload, usersPayload, termsPayload, scheduleTablesPayload] = await Promise.all([
+    const [termPayload, requestsPayload, usersPayload, termsPayload] = await Promise.all([
       apiRequest('/academic-terms/published'),
       apiRequest('/consultations/requests'),
       apiRequest('/users?role=teacher'),
       apiRequest('/academic-terms'),
-      apiRequest('/schedules/tables'),
     ])
     const publishedTerm = termPayload.term
     const termIdOf = term => String(term?._id || term?.id || '')
     academicTerms.value = termsPayload.terms || []
-    workloadScheduleTables.value = scheduleTablesPayload.tables || []
     const selectedTerm = academicTerms.value.find(term => termIdOf(term) === termIdOf(publishedTerm))
       || publishedTerm
       || academicTerms.value[0]
@@ -1589,10 +1591,13 @@ async function loadWorkloadTerm(termId) {
   }
 
   try {
-    const schedulesPayload = await apiRequest(selectedId
-      ? `/schedules?academicTermId=${encodeURIComponent(selectedId)}`
-      : '/schedules')
+    const termQuery = selectedId ? `?academicTermId=${encodeURIComponent(selectedId)}` : ''
+    const [schedulesPayload, scheduleTablesPayload] = await Promise.all([
+      apiRequest(`/schedules${termQuery}`),
+      apiRequest(`/schedules/tables${termQuery}`),
+    ])
     if (requestId !== workloadRequestId) return
+    workloadScheduleTables.value = scheduleTablesPayload.tables || []
     const workloads = calculateWorkloads(workloadUsers.value, schedulesPayload.entries || [], workloadScheduleTables.value)
     workloadByTermCache.set(selectedId, workloads)
     liveTeacherWorkloads.value = workloads

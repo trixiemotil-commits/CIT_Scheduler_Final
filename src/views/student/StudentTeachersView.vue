@@ -35,7 +35,7 @@
         >
           <option value="" disabled>Select a teacher</option>
           <option v-for="teacher in bookingTeacherOptions" :key="teacher.id" :value="String(teacher.id)">
-            {{ teacher.name }} · {{ displayedSubjects(teacher).join(', ') || 'Consultation' }}
+            {{ teacher.name }}
           </option>
         </select>
         <span v-if="bookingTeacherType && !bookingTeacherOptions.length && !loadingTeachers" class="booking-empty-note">
@@ -55,7 +55,7 @@
         <span :class="['status-pill', statusClass(selectedTeacher.statusDisplay || selectedTeacher.status)]">{{ teacherDisplayStatus(selectedTeacher) }}</span>
       </div>
 
-      <div class="field-group">
+      <div v-if="bookingTeacherType === 'Subject Teacher'" class="field-group">
         <label class="field-label" for="booking-subject">Subject</label>
         <select id="booking-subject" v-model="reqForm.subject" class="field-input" required :disabled="!selectedTeacher">
           <option value="" disabled>Select subject</option>
@@ -71,32 +71,14 @@
         </select>
       </div>
 
-      <div class="field-group">
+      <div v-if="bookingTeacherType === 'Subject Teacher'" class="field-group">
         <label class="field-label">Consultation Schedule</label>
-        <select v-if="bookingTeacherType === 'Subject Teacher'" v-model="reqForm.availabilityId" class="field-input" required :disabled="!selectedTeacher">
+        <select v-model="reqForm.availabilityId" class="field-input" required :disabled="!selectedTeacher">
           <option value="" disabled>Select assigned availability</option>
           <option v-for="slot in selectedTeacher?.consultationSlots || []" :key="slot.id" :value="slot.id">
             {{ formatSlotLabel(slot) }}
           </option>
         </select>
-        <template v-else>
-          <div class="schedule-input-grid">
-            <label class="schedule-subfield" for="booking-date">
-              <span>Date</span>
-              <span class="schedule-input-wrap">
-                <IonIcon :icon="calendarOutline" aria-hidden="true" />
-                <input id="booking-date" v-model="reqForm.date" class="field-input" type="date" :min="today" required :disabled="!selectedTeacher" />
-              </span>
-            </label>
-            <label class="schedule-subfield" for="booking-time">
-              <span>Time</span>
-              <span class="schedule-input-wrap">
-                <IonIcon :icon="timeOutline" aria-hidden="true" />
-                <input id="booking-time" v-model="reqForm.time" class="field-input" type="time" min="07:00" max="17:00" required :disabled="!selectedTeacher" />
-              </span>
-            </label>
-          </div>
-        </template>
       </div>
 
       <div class="field-group">
@@ -105,7 +87,7 @@
       </div>
 
       <div v-if="reqError" class="msg-err">{{ reqError }}</div>
-      <button class="modal-submit booking-submit" type="submit" :disabled="!selectedTeacher || isSubmittingRequest">
+      <button class="modal-submit booking-submit" type="submit" :disabled="!selectedTeacher || isSubmittingRequest || !selectedTeacher.available">
         {{ isSubmittingRequest ? 'Sending...' : 'Send Request' }}
       </button>
     </form>
@@ -166,16 +148,12 @@
             </div>
             <div class="teacher-meta">
               <div class="teacher-name">{{ t.name }}</div>
-              <div :class="['teacher-type-pill', t.isSubjectTeacher ? 'subject' : 'available']">
-                {{ t.isSubjectTeacher ? 'Subject Teacher' : 'Available Teacher' }}
+              <div :class="['teacher-type-pill', teacherTypePillClass(t)]">
+                {{ teacherTypePillLabel(t) }}
               </div>
               <div :class="['consultation-availability', t.available ? 'is-open' : 'is-closed']">
                 <span class="consultation-availability-dot" aria-hidden="true"></span>
                 {{ consultationAvailabilityLabel(t) }}
-              </div>
-              <div class="teacher-subjects-clean">
-                <span v-for="subject in displayedSubjects(t)" :key="subject" class="subject-chip">{{ subject }}</span>
-                <span v-if="hiddenSubjectCount(t)" class="subject-chip more">+{{ hiddenSubjectCount(t) }} more</span>
               </div>
             </div>
             <span :class="['status-pill', statusClass(t.statusDisplay || t.status)]">{{ teacherDisplayStatus(t) }}</span>
@@ -209,10 +187,6 @@
               <span v-else>{{ selectedTeacher?.initials }}</span>
             </div>
             <div class="profile-hero-name">{{ selectedTeacher?.name }}</div>
-            <div class="profile-subjects-clean">
-              <span v-for="subject in displayedSubjects(selectedTeacher)" :key="subject" class="subject-chip">{{ subject }}</span>
-              <span v-if="hiddenSubjectCount(selectedTeacher)" class="subject-chip more">+{{ hiddenSubjectCount(selectedTeacher) }} more</span>
-            </div>
             <div class="stars-row" style="justify-content:center;margin-top:6px">
               <span class="stars">★★★★</span>
               <span class="rating">{{ selectedTeacher?.rating }} ({{ selectedTeacher?.reviews }} reviews)</span>
@@ -221,12 +195,6 @@
             <div :class="['consultation-availability', selectedTeacher?.available ? 'is-open' : 'is-closed']">
               <span class="consultation-availability-dot" aria-hidden="true"></span>
               {{ consultationAvailabilityLabel(selectedTeacher) }}
-            </div>
-          </div>
-          <div class="prof-row">
-            <span class="prof-label">Specializations</span>
-            <div class="tags-row" style="margin-top:6px">
-              <span v-for="tag in selectedTeacher?.tags" :key="tag" class="tag">{{ tag }}</span>
             </div>
           </div>
           <div class="prof-row">
@@ -289,24 +257,31 @@ const teachers = ref([])
 const currentUser = computed(() => getUser() || {})
 const studentYearLevel = computed(() => String(currentUser.value.yearLevel || currentUser.value.grade || '').trim())
 const studentSection = computed(() => String(currentUser.value.section || '').trim())
+const studentYearSections = computed(() => {
+  const savedPairs = Array.isArray(currentUser.value.studentYearSections)
+    ? currentUser.value.studentYearSections
+      .map((pair) => ({ year: String(pair?.yearLevel || '').trim(), section: String(pair?.section || '').trim() }))
+      .filter((pair) => pair.year && pair.section)
+    : []
+  return savedPairs.length ? savedPairs : (studentYearLevel.value && studentSection.value
+    ? [{ year: studentYearLevel.value, section: studentSection.value }]
+    : [])
+})
 
 function normalizeSection(section) {
   return String(section || '').trim().toLowerCase()
 }
 
 function hasMatchingAssignment(teacher) {
-  const year = studentYearLevel.value
-  const section = studentSection.value
-
-  if (!year || !section) {
+  if (!studentYearSections.value.length) {
     return true
   }
 
   const pairs = Array.isArray(teacher.assignedYearSections) ? teacher.assignedYearSections : []
-  return pairs.some((pair) =>
-    String(pair?.year || '').trim() === year
-    && normalizeSection(pair?.section) === normalizeSection(section)
-  )
+  return pairs.some((assignedPair) => studentYearSections.value.some((studentPair) =>
+    String(assignedPair?.year || '').trim() === studentPair.year
+    && normalizeSection(assignedPair?.section) === normalizeSection(studentPair.section)
+  ))
 }
 
 function isSubjectTeacher(teacher) {
@@ -314,11 +289,26 @@ function isSubjectTeacher(teacher) {
 }
 
 function teacherStatusLabel(status) {
-  return status === 'In School' ? 'On School' : status
+  if (status === 'In School') return 'On School'
+  return status
 }
 
 function teacherDisplayStatus(teacher) {
-  return teacher?.statusDisplay || teacherStatusLabel(teacher?.status)
+  const displayStatus = teacher?.statusDisplay
+  const actualStatus = teacher?.status
+  return teacherStatusLabel(displayStatus && displayStatus !== 'Unavailable' ? displayStatus : actualStatus)
+}
+
+function teacherTypePillLabel(teacher) {
+  const status = teacher?.status
+  if (status === 'Offline' || status === 'On Leave' || teacher?.statusDisplay === 'Unavailable') return 'Unavailable'
+  return teacher?.isSubjectTeacher ? 'Subject Teacher' : 'Available Teacher'
+}
+
+function teacherTypePillClass(teacher) {
+  const label = teacherTypePillLabel(teacher)
+  if (label === 'Unavailable') return 'unavailable'
+  return teacher?.isSubjectTeacher ? 'subject' : 'available'
 }
 
 function isAvailableTeacher(teacher) {
@@ -436,12 +426,12 @@ function mapTeacher(teacher) {
   const consultationSlots = Array.isArray(teacher.consultationSlots) ? teacher.consultationSlots : []
   const teacherAvailability = String(teacher.teacherAvailability || teacher.teacher_availability || 'Available').trim()
 
-  const matchedSubjects = (studentYearLevel.value && studentSection.value)
+  const matchedSubjects = studentYearSections.value.length
     ? subjectAssignments
-      .filter((entry) =>
-        String(entry?.year || '').trim() === studentYearLevel.value
-        && normalizeSection(entry?.section) === normalizeSection(studentSection.value)
-      )
+      .filter((entry) => studentYearSections.value.some((studentPair) =>
+        String(entry?.year || '').trim() === studentPair.year
+        && normalizeSection(entry?.section) === normalizeSection(studentPair.section)
+      ))
       .map((entry) => String(entry?.subject || '').trim())
       .filter(Boolean)
     : []
@@ -450,20 +440,16 @@ function mapTeacher(teacher) {
     ? teacher.isSubjectTeacher
     : null
   const subjectTeacherMatch = backendSubjectTeacher ?? matchedSubjects.length > 0
-  const resolvedSubjects = subjectTeacherMatch
+  const resolvedSubjects = (subjectTeacherMatch
     ? [...new Set(studentSubjects.length ? studentSubjects : matchedSubjects)]
-    : subjects
+    : subjects).filter((subject) => String(subject || '').trim().toLowerCase() !== 'lunch break')
 
   const hasSlots = consultationSlots.length > 0
   const statusAllowsConsultation = resolvedStatus === 'In School'
-  const scheduleAllowsConsultation = !['On School - In Class', 'Off Campus'].includes(
-    teacher.statusDisplay || teacher.status_display || ''
-  )
   const availabilityAllowsConsultation = typeof teacher.available === 'boolean'
     ? teacher.available
     : teacherAvailability.toLowerCase() !== 'unavailable'
   const isAvailable = statusAllowsConsultation
-    && scheduleAllowsConsultation
     && availabilityAllowsConsultation
 
   return {
@@ -482,6 +468,7 @@ function mapTeacher(teacher) {
     subjectList: resolvedSubjects,
     assignedYearSections,
     consultationSlots,
+    availableTimeSlots: Array.isArray(teacher.availableTimeSlots) ? teacher.availableTimeSlots : [],
     isSubjectTeacher: subjectTeacherMatch,
   }
 }
@@ -542,7 +529,7 @@ const subjectTeachers = computed(() => {
     .filter((t) => isSubjectTeacher(t)
       && matchesSearch(t)
       && hasMatchingAssignment(t)
-      && (!isConsultationBooking.value || (t.status === 'In School' && canBookTeacher(t))))
+      && (!isConsultationBooking.value || (t.status === 'In School' && t.available && t.consultationSlots.length)))
     .sort((a, b) => {
       const availabilityDifference = compareTeacherStatusAndConsultation(a, b)
       if (availabilityDifference) return availabilityDifference
@@ -558,15 +545,13 @@ const subjectTeachers = computed(() => {
 const availableTeachers = computed(() => {
   return teachers.value
     .filter((t) => matchesSearch(t)
-      && !isSubjectTeacher(t)
-      && (!isConsultationBooking.value || canBookTeacher(t)))
+      && (!isConsultationBooking.value || (t.status === 'In School' && t.available)))
     .sort((a, b) => compareTeacherStatusAndConsultation(a, b) || a.name.localeCompare(b.name))
 })
 
 const bookingAvailableTeachers = computed(() => {
   return teachers.value
     .filter((t) => matchesSearch(t)
-      && !isSubjectTeacher(t)
       && t.status === 'In School'
       && t.available)
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -575,7 +560,6 @@ const bookingAvailableTeachers = computed(() => {
 const allAvailableTeachers = computed(() => {
   return teachers.value
     .filter((t) => matchesSearch(t)
-      && !isSubjectTeacher(t)
       && (!isConsultationBooking.value || (t.status === 'In School' && canBookTeacher(t))))
 })
 
@@ -595,7 +579,7 @@ const visibleSubjectTeachers = computed(() => {
 const visibleAvailableTeachers = computed(() => availableTeachers.value)
 
 const allTeachers = computed(() => {
-  return [...subjectTeachers.value, ...allAvailableTeachers.value].sort((a, b) => {
+  return [...new Map([...subjectTeachers.value, ...allAvailableTeachers.value].map((teacher) => [String(teacher.id), teacher])).values()].sort((a, b) => {
     const availabilityDifference = compareTeacherStatusAndConsultation(a, b)
     if (availabilityDifference) return availabilityDifference
     return a.name.localeCompare(b.name)
@@ -618,16 +602,6 @@ const visibleTeacherCount = computed(() => {
   return teachersToDisplay.value.length
 })
 
-function displayedSubjects(teacher) {
-  const list = Array.isArray(teacher?.subjectList) ? teacher.subjectList : []
-  return list.slice(0, 4)
-}
-
-function hiddenSubjectCount(teacher) {
-  const list = Array.isArray(teacher?.subjectList) ? teacher.subjectList : []
-  return Math.max(0, list.length - 4)
-}
-
 function statusClass(s) {
   if (s === 'On School - In Class') return 'pill-green'
   if (s === 'Off Campus') return 'pill-yellow'
@@ -638,6 +612,7 @@ function statusClass(s) {
     'On Event': 'pill-blue',
     'On Leave': 'pill-red',
     Offline: 'pill-gray',
+    Unavailable: 'pill-gray',
   }[s] || 'pill-gray'
 }
 
@@ -662,6 +637,16 @@ function formatDateInput(date) {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+
+function formatBookingTime(value) {
+  const [hourText, minuteText] = String(value || '').split(':')
+  const hour = Number(hourText)
+  const minute = Number(minuteText)
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value
+  return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`
 }
 
 function todayDayName() {
@@ -765,7 +750,7 @@ async function submitRequest() {
 
   reqError.value = ''
   if (!selectedTeacher.value) { reqError.value = 'Please select a teacher.'; return }
-  if (!reqForm.value.subject) { reqError.value = 'Please select a subject.'; return }
+  if (bookingTeacherType.value === 'Subject Teacher' && !reqForm.value.subject) { reqError.value = 'Please select a subject.'; return }
   if (!reqForm.value.reason) { reqError.value = 'Please select a reason.'; return }
   if (reqForm.value.reason === 'Other Academic Concern' && !reqForm.value.description.trim()) {
     reqError.value = 'Please enter a short description for your other concern.'
@@ -781,7 +766,7 @@ async function submitRequest() {
 
   const body = {
     teacherId: selectedTeacher.value.id,
-    topic: reqForm.value.subject,
+    topic: bookingTeacherType.value === 'Subject Teacher' ? reqForm.value.subject : 'General Consultation',
     consultationType: bookingTeacherType.value === 'Subject Teacher' ? 'subject' : 'available',
     notes,
   }
@@ -797,18 +782,9 @@ async function submitRequest() {
     body.time = to24Hour(slot.startTime)
     if (!body.date || !body.time) { reqError.value = 'Selected consultation availability is invalid.'; return }
   } else {
-    if (!reqForm.value.date) { reqError.value = 'Please pick a consultation date.'; return }
-    if (!reqForm.value.time) { reqError.value = 'Please pick a consultation time.'; return }
-    if (reqForm.value.time < '07:00' || reqForm.value.time > '17:00') {
-      reqError.value = 'Available-teacher consultations must be scheduled between 7:00 AM and 6:00 PM.'
-      return
-    }
-
-    // Available teachers accept free date/time requests; never attach an admin slot.
+    if (!selectedTeacher.value.available) { reqError.value = 'This teacher is not currently open for consultation.'; return }
+    // Available-teacher requests are queued without a scheduled time.
     body.availabilityId = undefined
-    body.date = reqForm.value.date
-    body.time = to24Hour(reqForm.value.time)
-    if (!body.time) { reqError.value = 'Selected consultation time is invalid.'; return }
   }
 
   isSubmittingRequest.value = true
@@ -984,6 +960,7 @@ onUnmounted(() => {
 .teacher-type-pill { display: inline-flex; margin-top: 4px; padding: 3px 7px; border-radius: 6px; font-size: 0.66rem; font-weight: 700; line-height: 1.1; }
 .teacher-type-pill.subject { background: #e8eef8; color: #3d618d; }
 .teacher-type-pill.available { background: #fff1c2; color: #735900; }
+.teacher-type-pill.unavailable { background: #e8ecef; color: #64717b; }
 .consultation-availability {
   display: inline-flex;
   align-items: center;
@@ -1201,6 +1178,7 @@ onUnmounted(() => {
 .teacher-name { font-size: .96rem; color: #252b31; }
 .teacher-type-pill { margin-top: 6px; padding: 4px 9px; border-radius: 999px; background: #e1e7ed !important; color: #4b6784 !important; }
 .teacher-type-pill.available { background: #fff1c2 !important; color: #735900 !important; }
+.teacher-type-pill.unavailable { background: #e8ecef !important; color: #64717b !important; }
 .subject-chip { border-color: #cdd4d9; border-radius: 999px; background: rgba(245,247,247,.7); color: #56616b; }
 .status-pill { border: 1px solid rgba(255,255,255,.7); border-radius: 999px; padding: 6px 9px; }
 .pill-green { background: #e0eee5; color: #397051; }
@@ -1363,6 +1341,7 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px rgba(83, 99, 109, .12), inset 0 1px 2px rgba(50, 60, 66, .04);
 }
 .schedule-input-wrap .field-input:disabled { opacity: .58; }
+.schedule-today-value { display: flex; align-items: center; min-height: 48px; box-sizing: border-box; }
 
 .booking-form-guidance {
   margin: 0;

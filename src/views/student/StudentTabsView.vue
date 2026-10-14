@@ -99,40 +99,58 @@
       </Teleport>
 
       <div v-if="showTermPrompt" class="term-prompt-overlay">
-        <form v-if="!showTermAssignmentConfirmation" class="term-prompt" @submit.prevent="requestTermAssignmentConfirmation">
+        <form class="term-prompt" @submit.prevent="saveTermAssignment">
           <div class="term-prompt-icon">
             <IonIcon :icon="calendarOutline" />
           </div>
           <h2>New Semester Published</h2>
-          <p>{{ publishedTermLabel }} is now active. Select your year and section for this semester.</p>
+          <p>{{ publishedTermLabel }} is now active. Tell us how you are enrolled this semester.</p>
           <label>
-            <span>Year Level</span>
-            <select v-model="termForm.yearLevel" required>
-              <option value="" disabled>Select year level</option>
-              <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
+            <span>Enrollment Type</span>
+            <select v-model="termForm.enrollmentType" required>
+              <option value="Regular">Regular</option>
+              <option value="Irregular">Irregular</option>
             </select>
           </label>
-          <label>
-            <span>Section</span>
-            <select v-model="termForm.section" :disabled="!termForm.yearLevel" required>
-              <option value="" disabled>Select section</option>
-              <option v-for="section in availableSections" :key="section" :value="section">{{ section }}</option>
-            </select>
-          </label>
+          <template v-if="termForm.enrollmentType === 'Regular'">
+            <label>
+              <span>Year Level</span>
+              <select v-model="termForm.yearLevel" required @change="termForm.section = ''">
+                <option value="" disabled>Select year level</option>
+                <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
+              </select>
+            </label>
+            <label>
+              <span>Section</span>
+              <select v-model="termForm.section" :disabled="!termForm.yearLevel" required>
+                <option value="" disabled>Select section</option>
+                <option v-for="section in sectionsForYear(termForm.yearLevel)" :key="section" :value="section">{{ section }}</option>
+              </select>
+            </label>
+          </template>
+          <template v-else>
+            <div class="term-prompt-years">
+              <span class="term-prompt-label">Years you are enrolled in</span>
+              <label v-for="year in availableYears" :key="year" class="term-prompt-year-option">
+                <input
+                  type="checkbox"
+                  :checked="termForm.yearLevels.includes(year)"
+                  @change="toggleEnrollmentYear(year, $event.target.checked)"
+                />
+                <span>{{ year }}</span>
+              </label>
+            </div>
+            <label v-for="year in termForm.yearLevels" :key="`section-${year}`">
+              <span>{{ year }} Section</span>
+              <select v-model="termForm.sectionsByYear[year]" required>
+                <option value="" disabled>Select section</option>
+                <option v-for="section in sectionsForYear(year)" :key="section" :value="section">{{ section }}</option>
+              </select>
+            </label>
+          </template>
           <p v-if="termPromptError" class="term-prompt-error">{{ termPromptError }}</p>
           <button type="submit">Continue</button>
         </form>
-        <section v-else class="term-prompt term-prompt-confirm" role="alertdialog" aria-modal="true" aria-labelledby="term-confirm-title" aria-describedby="term-confirm-description">
-          <div class="term-prompt-icon"><IonIcon :icon="calendarOutline" /></div>
-          <h2 id="term-confirm-title">Confirm semester details</h2>
-          <p id="term-confirm-description">Use this year level and section for {{ publishedTermLabel }}?</p>
-          <div class="term-prompt-summary"><span>Year level</span><strong>{{ termForm.yearLevel }}</strong><span>Section</span><strong>{{ termForm.section }}</strong></div>
-          <p v-if="termPromptError" class="term-prompt-error" role="alert">{{ termPromptError }}</p>
-          <div class="term-prompt-actions">
-            <button type="button" class="term-prompt-review" :disabled="savingAssignment" @click="showTermAssignmentConfirmation = false">Review selection</button>
-            <button type="button" :disabled="savingAssignment" @click="saveTermAssignment">{{ savingAssignment ? 'Saving…' : 'Confirm' }}</button>
-          </div>
-        </section>
       </div>
     </div>
   </IonPage>
@@ -175,25 +193,32 @@ const isConsultationSessionsPage = computed(() =>
 )
 const showTermPrompt = ref(false)
 const publishedTerm = ref(null)
+const promptedTermId = ref('')
 const savingAssignment = ref(false)
-const showTermAssignmentConfirmation = ref(false)
 const termPromptError = ref('')
-const termForm = reactive({ yearLevel: '', section: '' })
-const availableYears = computed(() =>
-  Object.entries(publishedTerm.value?.sectionNames || {})
-    .filter(([, sections]) => Array.isArray(sections) && sections.length)
-    .map(([year]) => year)
-)
-const availableSections = computed(() =>
-  Array.isArray(publishedTerm.value?.sectionNames?.[termForm.yearLevel])
-    ? publishedTerm.value.sectionNames[termForm.yearLevel]
-    : []
-)
+const yearLevelOrder = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+const termForm = reactive({ enrollmentType: 'Regular', yearLevel: '', section: '', yearLevels: [], sectionsByYear: {} })
+const availableYears = computed(() => yearLevelOrder.filter((year) =>
+  Array.isArray(publishedTerm.value?.sectionNames?.[year]) && publishedTerm.value.sectionNames[year].length
+))
 const publishedTermLabel = computed(() =>
   publishedTerm.value ? `${publishedTerm.value.schoolYear} · ${publishedTerm.value.semester}` : 'A new semester'
 )
 
-watch(() => termForm.yearLevel, () => { termForm.section = '' })
+function sectionsForYear(year) {
+  const sections = publishedTerm.value?.sectionNames?.[year]
+  return Array.isArray(sections) ? sections : []
+}
+
+function toggleEnrollmentYear(year, isSelected) {
+  if (isSelected && !termForm.yearLevels.includes(year)) {
+    termForm.yearLevels.push(year)
+    termForm.sectionsByYear[year] = ''
+  } else if (!isSelected) {
+    termForm.yearLevels = termForm.yearLevels.filter((item) => item !== year)
+    delete termForm.sectionsByYear[year]
+  }
+}
 
 async function authenticatedRequest(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -212,7 +237,7 @@ async function authenticatedRequest(path, options = {}) {
 let termCheckInFlight = false
 
 async function checkPublishedTerm() {
-  if (termCheckInFlight || showTermPrompt.value) return
+  if (termCheckInFlight) return
   termCheckInFlight = true
 
   try {
@@ -226,18 +251,29 @@ async function checkPublishedTerm() {
     const profilePayload = await authenticatedRequest('/auth/me')
     const user = profilePayload.user || {}
     if (user.id || user._id) saveMergedUser(user)
-    if (String(user.assignedAcademicTermId || '') === termId) return
-
-    const existingSections = term.sectionNames?.[user.yearLevel]
-    if (!user.assignedAcademicTermId && user.yearLevel && user.section && existingSections?.includes(user.section)) {
-      const backfillPayload = await authenticatedRequest('/auth/me', {
-        method: 'PUT',
-        body: JSON.stringify({ yearLevel: user.yearLevel, section: user.section, academicTermId: termId }),
-      })
-      if (backfillPayload.user) saveMergedUser(backfillPayload.user)
+    if (String(user.assignedAcademicTermId || '') === termId) {
+      showTermPrompt.value = false
+      promptedTermId.value = ''
       return
     }
 
+    if (promptedTermId.value !== termId) {
+      const savedPairs = Array.isArray(user.studentYearSections) && user.studentYearSections.length
+        ? user.studentYearSections
+        : (user.yearLevel && user.section ? [{ yearLevel: user.yearLevel, section: user.section }] : [])
+      const validSavedPairs = savedPairs.filter((pair) =>
+        term.sectionNames?.[pair.yearLevel]?.includes(pair.section)
+      )
+      termForm.enrollmentType = user.studentEnrollmentType === 'Irregular' ? 'Irregular' : 'Regular'
+      termForm.yearLevel = validSavedPairs[0]?.yearLevel || ''
+      termForm.section = validSavedPairs[0]?.section || ''
+      termForm.yearLevels = termForm.enrollmentType === 'Irregular'
+        ? validSavedPairs.map((pair) => pair.yearLevel)
+        : []
+      termForm.sectionsByYear = Object.fromEntries(validSavedPairs.map((pair) => [pair.yearLevel, pair.section]))
+      termPromptError.value = ''
+    }
+    promptedTermId.value = termId
     showTermPrompt.value = true
   } catch (error) {
     if (error.status === 401) {
@@ -250,28 +286,33 @@ async function checkPublishedTerm() {
   }
 }
 
-function requestTermAssignmentConfirmation() {
-  if (!termForm.yearLevel || !termForm.section) return
-  termPromptError.value = ''
-  showTermAssignmentConfirmation.value = true
-}
-
 async function saveTermAssignment() {
-  if (!termForm.yearLevel || !termForm.section || savingAssignment.value) return
+  if (savingAssignment.value) return
+  const studentYearSections = termForm.enrollmentType === 'Regular'
+    ? [{ yearLevel: termForm.yearLevel, section: termForm.section }]
+    : termForm.yearLevels.map((year) => ({ yearLevel: year, section: termForm.sectionsByYear[year] || '' }))
+  if (!studentYearSections.length || studentYearSections.some((pair) => !pair.yearLevel || !pair.section)) {
+    termPromptError.value = termForm.enrollmentType === 'Irregular'
+      ? 'Select at least one enrolled year and choose its section.'
+      : 'Choose your year level and section.'
+    return
+  }
   savingAssignment.value = true
   termPromptError.value = ''
   try {
     const payload = await authenticatedRequest('/auth/me', {
       method: 'PUT',
       body: JSON.stringify({
-        yearLevel: termForm.yearLevel,
-        section: termForm.section,
+        studentEnrollmentType: termForm.enrollmentType,
+        studentYearSections,
+        yearLevel: studentYearSections[0].yearLevel,
+        section: studentYearSections[0].section,
         academicTermId: String(publishedTerm.value?.id || publishedTerm.value?._id || ''),
       }),
     })
-    const user = saveMergedUser(payload.user || {})
-    showTermAssignmentConfirmation.value = false
+    studentUser.value = saveMergedUser(payload.user || {})
     showTermPrompt.value = false
+    promptedTermId.value = ''
   } catch (error) {
     termPromptError.value = error.message
   } finally {
@@ -702,6 +743,7 @@ ion-label {
 }
 
 .term-prompt-overlay{position:absolute;inset:0;z-index:10000;background:rgba(31,35,39,.62);backdrop-filter:blur(5px);display:grid;place-items:center;padding:20px}.term-prompt{width:100%;max-width:360px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.3)}.term-prompt-icon{width:50px;height:50px;border-radius:14px;background:#e8ebed;color:#30383f;display:grid;place-items:center;font-size:1.5rem}.term-prompt h2{margin:15px 0 6px;color:#252b30;font-size:1.25rem}.term-prompt>p{margin:0 0 18px;color:#687078;font-size:.82rem;line-height:1.5}.term-prompt label{display:block;margin-top:12px}.term-prompt label span{display:block;margin-bottom:5px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#454c53}.term-prompt select{width:100%;height:44px;border:1px solid #cdd2d6;border-radius:10px;padding:0 12px;background:#f7f8f9;font:inherit;font-size:.84rem}.term-prompt button{width:100%;height:44px;margin-top:20px;border:0;border-radius:10px;background:#4b5563;color:#fff;font:700 .85rem Poppins;cursor:pointer}.term-prompt button:disabled{opacity:.55}.term-prompt .term-prompt-error{color:#c1121f;margin:10px 0 0}.term-prompt-summary{display:grid;grid-template-columns:1fr 1.3fr;gap:8px 12px;margin:18px 0 4px;padding:14px;border:1px solid #e0e5e8;border-radius:12px;background:#f7f9fa}.term-prompt-summary span{color:#748089;font-size:.72rem;font-weight:650}.term-prompt-summary strong{color:#344957;font-size:.82rem}.term-prompt-actions{display:flex;gap:10px}.term-prompt-actions button{flex:1;min-width:0}.term-prompt-actions .term-prompt-review{border:1px solid #d2dade;background:#fff;color:#4c5961}.term-prompt-actions .term-prompt-review:hover:not(:disabled){background:#f3f6f7}
+.term-prompt{max-height:calc(100dvh - 32px);overflow:auto}.term-prompt-years{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.term-prompt .term-prompt-label{grid-column:1/-1;margin:0;color:#454c53;font-size:.72rem;font-weight:700;text-transform:uppercase}.term-prompt .term-prompt-year-option{display:flex;align-items:center;gap:8px;margin:0;padding:10px;border:1px solid #d9dfe2;border-radius:9px;background:#f7f8f9}.term-prompt-year-option input{width:16px;height:16px;margin:0;accent-color:#4b5563}.term-prompt .term-prompt-year-option span{margin:0;text-transform:none;font-size:.78rem;font-weight:600}
 
 @media (min-width: 391px) and (max-width: 767px) {
   .student-tab-bar {

@@ -124,7 +124,9 @@ function mapRequestToSession(requestDoc, teacherLookup, availabilityLookup) {
         ? 'Approved'
         : mapStatusFromApi(requestDoc.status),
     rescheduleOfferPending: Boolean(requestDoc.rescheduleOfferPending),
-    date: normalizeDateOnly(requestDoc.consultationDate || requestDoc.requestDate),
+    date: requestDoc.consultationDate || requestDoc.consultationStartTime
+      ? normalizeDateOnly(requestDoc.consultationDate || requestDoc.requestDate)
+      : '',
     timeStart: requestDoc.consultationStartTime || matchedSlot?.startTime || '',
     timeEnd: requestDoc.consultationEndTime || matchedSlot?.endTime || '',
     time: requestDoc.consultationStartTime || matchedSlot?.startTime || '--:--',
@@ -136,10 +138,15 @@ function mapRequestToSession(requestDoc, teacherLookup, availabilityLookup) {
     reviewed: false,
     subjectList: subjectList.length ? subjectList : [requestDoc.subject || 'Consultation'],
     consultationSlots,
+    availableTimeSlots: Array.isArray(teacherMeta?.availableTimeSlots) ? teacherMeta.availableTimeSlots : [],
     availabilityId: requestDoc.availabilityId,
     queuePosition: Number.isFinite(Number(requestDoc.queuePosition)) ? Number(requestDoc.queuePosition) : null,
     queueTotal: Number.isFinite(Number(requestDoc.queueTotal)) ? Number(requestDoc.queueTotal) : null,
     isNextInQueue: Boolean(requestDoc.isNextInQueue),
+    pendingQueuePosition: Number.isFinite(Number(requestDoc.pendingQueuePosition)) ? Number(requestDoc.pendingQueuePosition) : null,
+    pendingQueueTotal: Number.isFinite(Number(requestDoc.pendingQueueTotal)) ? Number(requestDoc.pendingQueueTotal) : null,
+    approvedQueuePosition: Number.isFinite(Number(requestDoc.approvedQueuePosition)) ? Number(requestDoc.approvedQueuePosition) : null,
+    approvedQueueTotal: Number.isFinite(Number(requestDoc.approvedQueueTotal)) ? Number(requestDoc.approvedQueueTotal) : null,
   }
 }
 
@@ -175,6 +182,7 @@ async function loadSessions(force = false, options = { includeArchived: false })
             avatar: t.avatar || '',
             subjects: Array.isArray(t.subjects) ? t.subjects : [],
             consultationSlots: Array.isArray(t.consultationSlots) ? t.consultationSlots : [],
+            availableTimeSlots: Array.isArray(t.availableTimeSlots) ? t.availableTimeSlots : [],
           }
 
           if (t.employeeId) {
@@ -284,6 +292,8 @@ async function updateSession(id, changes, options = {}) {
           topic: changes.subject,
           availabilityId: changes.availabilityId,
           notes: changes.notes || '',
+          date: changes.date,
+          time: changes.time,
         }),
       })
     } catch (error) {

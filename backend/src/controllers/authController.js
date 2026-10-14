@@ -172,6 +172,11 @@ function toSafeUser(user) {
     department: user.department,
     yearLevel: user.yearLevel,
     section: user.section,
+    studentEnrollmentType: user.studentEnrollmentType || "Regular",
+    studentYearSections: (user.studentYearSections || []).map((item) => ({
+      yearLevel: item.yearLevel,
+      section: item.section,
+    })),
     assignedAcademicTermId: user.assignedAcademicTermId ? String(user.assignedAcademicTermId) : "",
     phone: user.phone,
     gender: user.gender,
@@ -912,6 +917,13 @@ async function updateMe(req, res) {
     const yearLevel = normalizeString(req.body.yearLevel);
     const section = normalizeString(req.body.section);
     const academicTermId = normalizeString(req.body.academicTermId);
+    const studentEnrollmentType = normalizeString(req.body.studentEnrollmentType || "Regular");
+    const requestedYearSections = Array.isArray(req.body.studentYearSections)
+      ? req.body.studentYearSections.map((item) => ({
+        yearLevel: normalizeString(item?.yearLevel),
+        section: normalizeString(item?.section),
+      }))
+      : (yearLevel && section ? [{ yearLevel, section }] : []);
     const assigningAcademicTerm = Object.prototype.hasOwnProperty.call(req.body, "academicTermId");
     const avatar = normalizeString(req.body.avatar);
     const gender = normalizeString(req.body.gender);
@@ -967,9 +979,23 @@ async function updateMe(req, res) {
       if (user.role !== "student" || !/^[a-f\d]{24}$/i.test(academicTermId)) {
         return res.status(400).json({ message: "Invalid academic term assignment." });
       }
+      if (!["Regular", "Irregular"].includes(studentEnrollmentType)) {
+        return res.status(400).json({ message: "Select whether you are a regular or irregular student." });
+      }
       assignedAcademicTerm = await AcademicTerm.findOne({ _id: academicTermId, isPublished: true });
-      const sections = assignedAcademicTerm?.sectionNames?.[yearLevel];
-      if (!assignedAcademicTerm || !yearLevel || !section || !Array.isArray(sections) || !sections.includes(section)) {
+      const validYearLevels = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
+      const expectedCount = studentEnrollmentType === "Regular" ? 1 : null;
+      const hasValidCount = requestedYearSections.length > 0
+        && (expectedCount === null || requestedYearSections.length === expectedCount);
+      const hasUniqueYears = new Set(requestedYearSections.map((item) => item.yearLevel)).size === requestedYearSections.length;
+      const allSectionsValid = requestedYearSections.every((item) => {
+        const sections = assignedAcademicTerm?.sectionNames?.[item.yearLevel];
+        return validYearLevels.includes(item.yearLevel)
+          && item.section
+          && Array.isArray(sections)
+          && sections.includes(item.section);
+      });
+      if (!assignedAcademicTerm || !hasValidCount || !hasUniqueYears || !allSectionsValid) {
         return res.status(400).json({ message: "Select a valid year and section for the published academic term." });
       }
     }
@@ -1015,9 +1041,16 @@ async function updateMe(req, res) {
       if (studentId) {
         user.studentId = studentId;
       }
-      user.yearLevel = yearLevel || user.yearLevel || "";
-      user.section = section || user.section || "";
-      if (assignedAcademicTerm) user.assignedAcademicTermId = assignedAcademicTerm._id;
+      if (assignedAcademicTerm) {
+        user.studentEnrollmentType = studentEnrollmentType;
+        user.studentYearSections = requestedYearSections;
+        user.yearLevel = requestedYearSections[0].yearLevel;
+        user.section = requestedYearSections[0].section;
+        user.assignedAcademicTermId = assignedAcademicTerm._id;
+      } else {
+        user.yearLevel = yearLevel || user.yearLevel || "";
+        user.section = section || user.section || "";
+      }
     }
     if (avatar) {
       user.avatar = avatar;

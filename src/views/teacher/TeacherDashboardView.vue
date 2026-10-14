@@ -1037,7 +1037,9 @@ const resolvedSecondSubtext = computed(() => {
 function canChangeAvailability() {
   if (teacherStatus.value === 'On Leave') return false
   if (teacherStatus.value === 'On Meeting') return false
+  if (teacherStatus.value === 'On Event') return false
   if (teacherStatus.value === 'Off Campus') return false
+  if (isCurrentlyInMeeting.value || isCurrentlyInEvent.value) return false
   if (isCurrentlyOnMainCampusClass.value) return false
   if (isCurrentlyInClass.value) return false
   if (isCurrentlyOnLunchBreak.value) return false

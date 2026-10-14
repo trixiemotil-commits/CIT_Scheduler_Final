@@ -67,8 +67,11 @@
             <div class="session-subject">{{ s.subject }}</div>
             <div class="session-teacher">{{ s.teacher }}</div>
             <div class="session-info-row">
-              <span class="info-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>{{ formatWeekday(s.date) }}, {{ formatDate(s.date) }}</span>
-              <span class="info-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{{ formatTimeRange(s.timeStart, s.timeEnd) }}</span>
+              <template v-if="s.date || s.timeStart">
+                <span class="info-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>{{ formatWeekday(s.date) }}, {{ formatDate(s.date) }}</span>
+                <span class="info-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{{ s.availabilityId ? formatTimeRange(s.timeStart, s.timeEnd) : formatTime(s.timeStart) }}</span>
+              </template>
+              <span v-else class="info-chip">{{ s.status === 'Approved' ? 'Teacher available now' : 'Waiting for teacher availability' }}</span>
               <span class="info-chip" v-if="s.status === 'Approved' && s.ticketNumber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v12H5zM8 9h8M8 12h5M8 15h7"/></svg>{{ s.ticketNumber }}</span>
             </div>
             <div v-if="s.status === 'Approved' && s.queuePosition" class="queue-row">
@@ -184,7 +187,7 @@
             </div>
             <div><div class="tp-name">{{ activeSession.subject }}</div><div class="tp-subj">{{ activeSession.teacher }}</div></div>
           </div>
-          <div class="field-group">
+          <div v-if="activeSession?.availabilityId" class="field-group">
             <label class="field-label">Subject</label>
             <select v-model="editForm.subject" class="field-input">
               <option value="" disabled>Select subject</option>
@@ -201,13 +204,22 @@
               </option>
             </select>
           </div>
-          <div class="field-group">
+          <div v-if="activeSession?.availabilityId" class="field-group">
             <label class="field-label">Consultation Schedule</label>
             <select v-model="editForm.availabilityId" class="field-input">
               <option value="" disabled>Select assigned availability</option>
               <option v-for="slot in activeSession?.consultationSlots || []" :key="slot.id" :value="slot.id">
                 {{ formatSlotLabel(slot) }}
               </option>
+            </select>
+          </div>
+          <div v-else class="field-group">
+            <label class="field-label">Consultation Schedule</label>
+            <div v-if="activeSession?.timeStart" class="field-input" aria-readonly="true">{{ formatWeekday(activeSession?.date) }}, {{ formatDate(activeSession?.date) }}</div>
+            <div v-if="activeSession?.timeStart" class="field-input" aria-readonly="true">{{ formatTime(activeSession.timeStart) }}</div>
+            <div v-else class="field-input" aria-readonly="true">No time is booked. The request depends on the teacher’s current availability.</div>
+            <select v-if="activeSession?.timeStart" v-model="editForm.time" class="field-input">
+              <option v-for="time in availableEditTimes" :key="time" :value="time">{{ formatTime(time) }}</option>
             </select>
           </div>
           <div class="field-group">
@@ -617,9 +629,14 @@ function openDetails(s) { activeSession.value = s; showDetails.value = true }
 
 /* ── Edit Session ── */
 const showEdit  = ref(false)
-const editForm  = ref({ subject: '', reason: CONSULTATION_REASONS[0], availabilityId: '', description: '' })
+const editForm  = ref({ subject: '', reason: CONSULTATION_REASONS[0], availabilityId: '', date: '', time: '', description: '' })
 const editError = ref('')
 const isSavingEdit = ref(false)
+const availableEditTimes = computed(() => {
+  const options = activeSession.value?.availableTimeSlots || []
+  const current = activeSession.value?.timeStart
+  return [...new Set([...(current ? [current] : []), ...options])]
+})
 
 function formatSlotLabel(slot) {
   return `${slot.dayOfWeek} • ${slot.startTime} - ${slot.endTime}`
@@ -631,6 +648,8 @@ function openEdit(s) {
     subject: s.subject || (s.subjectList?.[0] || ''),
     reason: s.reason || CONSULTATION_REASONS[0],
     availabilityId: s.availabilityId || (s.consultationSlots?.[0]?.id || ''),
+    date: s.date || '',
+    time: s.timeStart || '',
     description: s.description || '',
   }
   editError.value = ''
@@ -639,9 +658,9 @@ function openEdit(s) {
 async function saveEdit() {
   if (isSavingEdit.value) return
   editError.value = ''
-  if (!editForm.value.subject.trim()) { editError.value = 'Please select a subject.'; return }
+  if (activeSession.value.availabilityId && !editForm.value.subject.trim()) { editError.value = 'Please select a subject.'; return }
   if (!editForm.value.reason.trim()) { editError.value = 'Please select a reason.'; return }
-  if (!editForm.value.availabilityId) { editError.value = 'Please select consultation availability.'; return }
+  if (activeSession.value.availabilityId && !editForm.value.availabilityId) { editError.value = 'Please select consultation availability.'; return }
   if (editForm.value.reason === 'Other Academic Concern' && !editForm.value.description.trim()) {
     editError.value = 'Please enter a short description for your other concern.'
     return
@@ -658,7 +677,9 @@ async function saveEdit() {
 
     return sameTeacher
       && item.status === 'Pending'
-      && String(item.availabilityId || '') === String(editForm.value.availabilityId)
+      && (activeSession.value.availabilityId
+        ? String(item.availabilityId || '') === String(editForm.value.availabilityId)
+        : !item.availabilityId && item.date === editForm.value.date && item.timeStart === editForm.value.time)
   })
 
   if (hasDuplicatePending) {
@@ -678,8 +699,10 @@ async function saveEdit() {
     await updateSession(
       activeSession.value.id,
       {
-        subject: editForm.value.subject.trim(),
+        subject: editForm.value.subject.trim() || 'General Consultation',
         availabilityId: editForm.value.availabilityId,
+        date: editForm.value.date,
+        time: editForm.value.time,
         notes,
         reason: editForm.value.reason,
         description: editForm.value.description,

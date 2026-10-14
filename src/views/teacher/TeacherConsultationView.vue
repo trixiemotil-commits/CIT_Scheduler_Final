@@ -149,19 +149,20 @@
                     <span :class="['status-badge', `badge-${req.status}`]">{{ statusLabel(req.status) }}</span>
                   </div>
                   <div class="req-id">Student ID: {{ req.studentId }}</div>
+                  <div v-if="req.studentYearLevel || req.studentSection" class="req-id">{{ req.studentYearLevel }}<span v-if="req.studentYearLevel && req.studentSection"> · </span>{{ req.studentSection ? `Section ${req.studentSection}` : '' }}</div>
                   <div v-if="req.ticketNumber" class="req-ticket">Ticket: {{ req.ticketNumber }}</div>
                   <div
-                    v-if="req.status === 'approved' && req.queuePosition"
+                    v-if="req.queuePosition"
                     class="req-queue"
                     :class="Number(req.queuePosition) === 1 && Number(req.queueTotal) === 1 ? 'req-queue--solo' : 'req-queue--waiting'"
                   >
-                    Queue: #{{ req.queuePosition }}<span v-if="req.queueTotal">{{ ` of ${req.queueTotal}` }}</span>
+                    {{ req.status === 'approved' ? 'Approved queue' : 'Pending queue' }}: #{{ req.queuePosition }}<span v-if="req.queueTotal">{{ ` of ${req.queueTotal}` }}</span>
                   </div>
                 </div>
               </div>
               <div class="req-actions">
                 <!-- Pending actions -->
-                <template v-if="req.status === 'pending' && !req.isSubjectTeacher && !req.availabilityId">
+                <template v-if="req.status === 'pending' && !req.isSubjectTeacher && !req.availabilityId && Number(req.pendingQueuePosition) === 1">
                   <button class="btn-approve" @click.stop="approve(req.id)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     Approve
@@ -182,7 +183,7 @@
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6m0-6 6 6"/></svg>
                       Reschedule
                     </button>
-                    <button v-if="Number(req.queuePosition) === 1" class="btn-done" @click.stop="openDoneModal(req.id)">
+                    <button v-if="Number(req.approvedQueuePosition) === 1" class="btn-done" @click.stop="openDoneModal(req.id)">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                       Mark as Done
                     </button>
@@ -561,11 +562,14 @@ function formatTimeLabel(value) {
 }
 
 function formatScheduleLabel(doc) {
+  if (!doc.availabilityId && !doc.consultationStartTime) return 'Available now'
   const dateText = formatDateOnly(doc.consultationDate)
   const dayText = String(doc.consultationDayOfWeek || '').trim()
   const startText = formatTimeLabel(doc.consultationStartTime)
   const endText = formatTimeLabel(doc.consultationEndTime)
-  const timeText = startText && endText ? `${startText} - ${endText}` : startText || endText
+  const timeText = doc.availabilityId
+    ? (startText && endText ? `${startText} - ${endText}` : startText || endText)
+    : startText || endText
 
   const parts = [dateText, dayText, timeText].filter(Boolean)
   if (parts.length) return parts.join(' • ')
@@ -583,8 +587,11 @@ function mapRequest(doc) {
   const studentName = String(doc.studentName || '').trim() || 'Student'
   return {
     id: doc.id,
+    createdAt: doc.createdAt || doc.requestDate || '',
     name: studentName,
     studentId: doc.studentNumber || doc.studentId || '--',
+    studentYearLevel: doc.studentYearLevel || '',
+    studentSection: doc.studentSection || '',
     ticketNumber: doc.ticketNumber || '',
     availabilityId: doc.availabilityId || '',
     status: doc.rescheduleOfferPending ? 'resched' : doc.availabilityId && String(doc.status || '').toUpperCase() === 'APPROVED' ? 'approved' : mapStatusFromApi(doc.status),
@@ -600,6 +607,10 @@ function mapRequest(doc) {
     rejectionReason: parsedReason,
     queuePosition: Number.isFinite(Number(doc.queuePosition)) ? Number(doc.queuePosition) : null,
     queueTotal: Number.isFinite(Number(doc.queueTotal)) ? Number(doc.queueTotal) : null,
+    pendingQueuePosition: Number.isFinite(Number(doc.pendingQueuePosition)) ? Number(doc.pendingQueuePosition) : null,
+    pendingQueueTotal: Number.isFinite(Number(doc.pendingQueueTotal)) ? Number(doc.pendingQueueTotal) : null,
+    approvedQueuePosition: Number.isFinite(Number(doc.approvedQueuePosition)) ? Number(doc.approvedQueuePosition) : null,
+    approvedQueueTotal: Number.isFinite(Number(doc.approvedQueueTotal)) ? Number(doc.approvedQueueTotal) : null,
   }
 }
 
@@ -662,15 +673,23 @@ const tabs = computed(() => [
   { key: 'cancelled', label: 'Cancelled', count: requests.value.filter(r => r.status === 'cancelled').length },
 ])
 
-const filteredRequests = computed(() =>
-  activeTab.value === 'all'
+function oldestRequestFirst(a, b) {
+  const aTime = new Date(a.createdAt || 0).getTime()
+  const bTime = new Date(b.createdAt || 0).getTime()
+  return (Number.isFinite(aTime) ? aTime : 0) - (Number.isFinite(bTime) ? bTime : 0)
+}
+
+const filteredRequests = computed(() => {
+  const rows = activeTab.value === 'all'
     ? requests.value
     : requests.value.filter(r => r.status === activeTab.value)
-)
+  return activeTab.value === 'pending' ? [...rows].sort(oldestRequestFirst) : rows
+})
 
 const pendingRequestIds = computed(() =>
   requests.value
     .filter((r) => r.status === 'pending' && !r.isSubjectTeacher && !r.availabilityId && r.id)
+    .sort(oldestRequestFirst)
     .map((r) => r.id)
 )
 

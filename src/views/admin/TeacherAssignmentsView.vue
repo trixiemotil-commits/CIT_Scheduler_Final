@@ -71,7 +71,7 @@
           <h1 class="page-title">Teacher Assignments</h1>
           <p class="page-sub">Manage teacher availability, designated areas, and substitute coverage.</p>
         </div>
-        <button class="add-teacher-btn header-add-btn" @click="showAddModal = true">
+        <button v-if="canAddUsers" class="add-teacher-btn header-add-btn" @click="showAddModal = true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
           Add teacher
         </button>
@@ -181,7 +181,6 @@
                 >
                   <option value="On School">On School</option>
                   <option value="On Leave">On Leave</option>
-                  <option value="On Meeting">On Meeting</option>
                   <option value="Offline">Offline</option>
                 </select>
               </div>
@@ -470,6 +469,9 @@ const route = useRoute()
 const currentRoute = computed(() => route.path)
 
 const user = getUser() || {}
+const currentUserRoles = (Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role])
+  .map(role => String(role || '').trim().toLowerCase())
+const canAddUsers = currentUserRoles.includes('admin') && currentUserRoles.includes('teacher')
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const showLogoutModal = ref(false)
 const showAddModal = ref(false)
@@ -893,7 +895,10 @@ async function refreshEventTeacherStatuses() {
       const end = parseEventTime(event.endTime)
       if (start === null || end === null || minutes < start || minutes >= end) continue
       for (const id of Array.isArray(event.teacherIds) ? event.teacherIds : []) {
-        nextStatuses[String(id)] = 'On Event'
+        const teacherId = String(id)
+        if (event.isMeeting || nextStatuses[teacherId] !== 'On Meeting') {
+          nextStatuses[teacherId] = event.isMeeting ? 'On Meeting' : 'On Event'
+        }
       }
     }
     eventStatusByTeacherId.value = nextStatuses

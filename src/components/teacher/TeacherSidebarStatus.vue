@@ -176,7 +176,7 @@ const formattedTimeIn = computed(() => {
 
 const canChangeAvailability = computed(() => (
   normalizedStatus.value === 'On School'
-  && !['On School - In Class', 'On Class-Substitute', 'Off Campus'].includes(scheduleStatusDisplay.value)
+  && !['On School - In Class', 'On Class-Substitute', 'Off Campus', 'On Meeting', 'On Event'].includes(scheduleStatusDisplay.value)
 ))
 const workStatusDisabled = computed(() => isOutsideWorkWindow.value)
 const statusDotClass = computed(() => {
@@ -194,6 +194,9 @@ const availabilityDotClass = computed(() => {
 })
 
 const availabilitySubtext = computed(() => {
+  if (['On Meeting', 'On Event'].includes(scheduleStatusDisplay.value) || ['On Meeting', 'On Event'].includes(normalizedStatus.value)) {
+    return 'Availability is locked during a meeting or event.'
+  }
   if (['On School - In Class', 'On Class-Substitute', 'Off Campus'].includes(scheduleStatusDisplay.value)) {
     return 'Availability is locked while in class or off campus.'
   }

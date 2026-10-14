@@ -1,4 +1,4 @@
-import { getToken, getUser, isLoggedIn, setActiveRole } from '@/auth.js'
+import { getToken, getUser, isLoggedIn, selectRole } from '@/auth.js'
 import notifications from '@/composables/useNotifications.js'
 import { createRouter, createWebHistory } from '@ionic/vue-router'
 const ForgotPasswordView = () => import('@/views/ForgotPasswordView.vue')
@@ -81,7 +81,7 @@ const router = createRouter({
   ]
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const user = getUser()
   let role = (user?.role || '').toString().toLowerCase()
   const requiredRole = to.meta.role ? String(to.meta.role).toLowerCase() : ''
@@ -91,8 +91,15 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.requiresAuth && !isLoggedIn()) {
     next('/')
   } else if (requiredRole && role !== requiredRole && canUseRequiredRole) {
-    setActiveRole(requiredRole)
-    next()
+    try {
+      // Keep the server token's active role in sync with the role used by the
+      // page. Updating only local user data leaves API requests authorized as
+      // the previous role (for example, Teacher on admin routes).
+      await selectRole(requiredRole)
+      next()
+    } catch (_error) {
+      next(role === 'teacher' ? '/teacher/dashboard' : role === 'admin' ? '/admin/dashboard' : '/')
+    }
   } else if (requiredRole && role !== requiredRole) {
     if (role === 'teacher') next('/teacher/dashboard')
     else if (role === 'admin') next('/admin/dashboard')

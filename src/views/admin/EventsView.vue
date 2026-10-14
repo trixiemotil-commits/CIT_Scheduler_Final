@@ -416,6 +416,14 @@
               </div>
             </div>
 
+            <div class="form-group event-meeting-toggle">
+              <label class="event-meeting-option">
+                <input v-model="eventForm.isMeeting" type="checkbox" />
+                <span>Meeting</span>
+              </label>
+              <span class="teacher-picker-help">When selected, the involved teachers show “On Meeting” until the event end time.</span>
+            </div>
+
             <!-- Teachers involved -->
             <div class="form-group">
               <label class="form-label">Teachers Involved <span class="form-optional">(required for teacher status)</span></label>
@@ -444,7 +452,7 @@
                   </div>
                 </div>
               </div>
-              <span class="teacher-picker-help">Select the teachers who will attend. Their status shows “On Event” during the event time.</span>
+              <span class="teacher-picker-help">Select the teachers who will attend. Their status shows “{{ eventForm.isMeeting ? 'On Meeting' : 'On Event' }}” during the event time.</span>
             </div>
 
             <!-- Students involved -->
@@ -612,7 +620,7 @@ function confirmLogout() {
 const showEventModal = ref(false)
 const editingEvent   = ref(null)
 const eventsTab      = ref('active')
-const eventForm      = ref({ title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [], studentYearLevels: [] })
+const eventForm      = ref({ title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [], isMeeting: false, studentYearLevels: [] })
 const eventFormElement = ref(null)
 const savingEvent = ref(false)
 const showEventActionConfirm = ref(false)
@@ -805,7 +813,7 @@ function toggleVisibleTeachers() {
 
 function openAddEvent() {
   editingEvent.value = null
-  eventForm.value = { title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [], studentYearLevels: [] }
+  eventForm.value = { title: '', description: '', date: '', time: '', endTime: '', location: '', image: '', teacherIds: [], isMeeting: false, studentYearLevels: [] }
   imagePreview.value = ''
   showTeacherPicker.value = false
   teacherSearchQuery.value = ''
@@ -817,7 +825,7 @@ function openAddEvent() {
 
 function openEditEvent(ev) {
   editingEvent.value = ev
-  eventForm.value = { title: ev.title, description: ev.description, date: ev.date, time: ev.time, endTime: ev.endTime || '', location: ev.location, image: ev.image || '', teacherIds: [...(ev.teacherIds || [])], studentYearLevels: [...(ev.studentYearLevels || [])] }
+  eventForm.value = { title: ev.title, description: ev.description, date: ev.date, time: ev.time, endTime: ev.endTime || '', location: ev.location, image: ev.image || '', teacherIds: [...(ev.teacherIds || [])], isMeeting: ev.isMeeting === true, studentYearLevels: [...(ev.studentYearLevels || [])] }
   imagePreview.value = ev.image || ''
   showTeacherPicker.value = false
   teacherSearchQuery.value = ''
@@ -1674,6 +1682,9 @@ onMounted(() => {
 .teacher-picker-avatar { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #dcefe4; color: #1b4332; font-size: 0.66rem; font-weight: 700; }
 .teacher-picker-empty { margin: 14px 4px; color: #8b9490; text-align: center; font-size: 0.8rem; }
 .teacher-picker-help { color: #8b9490; font-size: 0.74rem; }
+.event-meeting-option { display: inline-flex; align-items: center; gap: 8px; color: #263238; font-size: .84rem; font-weight: 700; cursor: pointer; }
+.event-meeting-option input { width: 16px; height: 16px; accent-color: #42505b; }
+.event-meeting-toggle { padding: 10px 12px; border: 1px solid #d7dfe3; border-radius: 9px; background: #f7f9fa; }
 .form-label { font-size: 0.78rem; font-weight: 700; color: #666; letter-spacing: 0.4px; text-transform: uppercase; }
 .form-required { color: #e63946; }
 .form-input {

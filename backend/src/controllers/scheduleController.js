@@ -101,6 +101,12 @@ function workloadForEntries(entries) {
 
   return Array.from(groups.values()).reduce((total, group) => {
     const first = group.entries[0];
+    if (first.entryType === "practicum") {
+      const sections = first.parallel
+        ? Math.max(1, Number(first.parallelCount) || first.parallelSlots?.length || group.entries.length)
+        : 1;
+      return total + (6 * sections);
+    }
     const sectionCount = group.parallel ? Math.max(2, Number(first.parallelCount) || group.entries.length) : 1;
     const hasLab = group.entries.some(entry => entry.roomType === "Comlab/Laboratory");
     return total + (group.parallel ? (sectionCount + 1) * (hasLab ? 2.5 : 1.5) : (hasLab ? 5 : 3));
@@ -111,15 +117,15 @@ async function assertTeacherUnitLimit(docs, academicTermId, excludedIds = []) {
   const teacher = normalizeString(docs[0]?.teacher);
   if (!teacher || isGenericTeacher(teacher) || docs[0]?.entryType === "lunch") return;
 
-  const filter = { teacher, entryType: "class", academicTermId: academicTermId || null };
+  const filter = { teacher, entryType: { $in: ["class", "practicum"] }, academicTermId: academicTermId || null };
   if (excludedIds.length) filter._id = { $nin: excludedIds };
   const existing = await ScheduleEntry.find(filter)
-    .select("_id teacher entryType parallel parallelGroupId parallelCount roomType timeInMinutes timeOutMinutes timeIn timeOut")
+    .select("_id teacher entryType year section subject parallel parallelGroupId parallelCount parallelSlots roomType timeInMinutes timeOutMinutes timeIn timeOut")
     .lean();
   const combined = [...existing, ...docs];
   const units = workloadForEntries(combined);
   const totalHours = combined.reduce((sum, entry) => {
-    if (entry.entryType === "lunch") return sum;
+    if (entry.entryType === "lunch" || entry.entryType === "practicum") return sum;
     const startMinutes = Number.isFinite(entry.timeInMinutes) ? entry.timeInMinutes : parseTimeToMinutes(entry.timeIn || "8:00 AM");
     const endMinutes = Number.isFinite(entry.timeOutMinutes) ? entry.timeOutMinutes : parseTimeToMinutes(entry.timeOut || "8:00 AM");
     return sum + Math.max(0, (endMinutes - startMinutes) / 60);
@@ -133,17 +139,23 @@ async function assertTeacherUnitLimit(docs, academicTermId, excludedIds = []) {
   }
 }
 
-function toClientTable(table) {
+function toClientTable(table, academicTermId = "", allowLegacyHours = true) {
   const workHoursByDay = table.workHoursByDay instanceof Map
     ? Object.fromEntries(table.workHoursByDay)
     : table.workHoursByDay || {};
+  const workHoursByTerm = table.workHoursByTerm instanceof Map
+    ? Object.fromEntries(table.workHoursByTerm)
+    : table.workHoursByTerm || {};
+  const hasTermHours = Boolean(academicTermId)
+    && Object.prototype.hasOwnProperty.call(workHoursByTerm, academicTermId);
+  const useLegacyHours = !academicTermId || (!hasTermHours && allowLegacyHours);
   return {
     id: table._id.toString(),
     teacher: table.teacher,
     label: table.label,
-    workStartTime: table.workStartTime || "",
-    workEndTime: table.workEndTime || "",
-    workHoursByDay,
+    workStartTime: useLegacyHours ? table.workStartTime || "" : "",
+    workEndTime: useLegacyHours ? table.workEndTime || "" : "",
+    workHoursByDay: hasTermHours ? workHoursByTerm[academicTermId] : useLegacyHours ? workHoursByDay : {},
   };
 }
 
@@ -247,7 +259,53 @@ function normalizeParallelSlots(parallelSlots) {
     .filter((slot) => slot.section);
 }
 
+const PRACTICUM_SUBJECT = "ITE 311 | IT Practicum";
+
+function buildPracticumDoc(payload, academicTermId = null) {
+  const teacher = normalizeString(payload.teacher);
+  const year = normalizeString(payload.baseYear || payload.year);
+  const subject = normalizeString(payload.subject);
+  const parallel = Boolean(payload.parallel);
+  const parallelSlots = parallel
+    ? normalizeParallelSlots(payload.parallelSlots).map(slot => ({ section: slot.section, room: "", roomType: "Lecture" }))
+    : [{ section: normalizeString(payload.section), room: "", roomType: "Lecture" }];
+  const sections = parallelSlots.map(slot => slot.section);
+  if (!teacher || !year || !sections.length || sections.some(section => !section) || !subject) {
+    throw new Error("Teacher, year, section, and subject are required for an IT Practicum assignment.");
+  }
+  if (year !== "4th Year" || subject !== PRACTICUM_SUBJECT) {
+    throw new Error("IT Practicum assignments are only available for 4th Year ITE 311.");
+  }
+  if (new Set(sections).size !== sections.length) {
+    throw new Error("Parallel IT Practicum sections must be unique.");
+  }
+
+  const parallelGroupId = `practicum_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const academicTermReference = resolveAcademicTermReference(academicTermId || payload?.academicTermId) || undefined;
+  return parallelSlots.map(({ section }) => ({
+    tableLabel: teacher,
+    entryType: "practicum",
+    year,
+    section,
+    teacher,
+    subject,
+    room: "",
+    roomType: "Lecture",
+    campus: normalizeString(payload.campus) || "South Campus",
+    parallel,
+    parallelGroupId,
+    parallelCount: parallel ? sections.length : 1,
+    parallelSlots: parallel ? parallelSlots : [],
+    color: "color-purple",
+    academicTermId: academicTermReference,
+    addedAt: payload.addedAt ? new Date(payload.addedAt) : new Date(),
+  }));
+}
+
 function buildEntryDocs(payload, academicTermId = null) {
+  if (normalizeString(payload.entryType).toLowerCase() === "practicum") {
+    return buildPracticumDoc(payload, academicTermId);
+  }
   const teacher  = normalizeString(payload.teacher);
   const teacherIsGenericFlag = Boolean(payload.teacherIsGeneric) || normalizeString(payload.teacher).toLowerCase() === 'cit faculty'
   const tableLabel = teacher;  // schedules are stored per teacher
@@ -354,6 +412,15 @@ function buildEntryDocs(payload, academicTermId = null) {
       addedAt,
     },
   ];
+}
+
+async function assertPracticumSemester(payload, academicTermId) {
+  if (normalizeString(payload?.entryType).toLowerCase() !== "practicum") return;
+  const termId = resolveAcademicTermReference(academicTermId || payload?.academicTermId);
+  const term = termId ? await AcademicTerm.findById(termId).select("semester").lean() : null;
+  if (!term || term.semester !== "2nd Semester") {
+    throw new Error("ITE 311 | IT Practicum can only be assigned in the 2nd Semester.");
+  }
 }
 
 function buildLunchBreakDoc(payload, academicTermId = null) {
@@ -511,6 +578,7 @@ async function buildRecurringReplacementDocs(oldDescriptor, next, academicTermId
 }
 
 async function findConflict(doc, excludedIds = []) {
+  if (doc.entryType === "practicum") return null;
   console.debug('findConflict called', {
     teacher: doc.teacher,
     day: doc.day,
@@ -607,10 +675,19 @@ function docForConflictCheck(doc) {
   return doc
 }
 
-async function listScheduleTables(_req, res) {
+async function listScheduleTables(req, res) {
   try {
+    const requestedTermId = normalizeString(req.query?.academicTermId);
+    const requestedTerm = requestedTermId ? resolveAcademicTermReference(requestedTermId) : null;
+    if (requestedTermId && !requestedTerm) {
+      return res.status(400).json({ message: "A valid academic term is required to load schedule work hours." });
+    }
+    const activeTermId = await getActiveAcademicTermReference();
+    const selectedTermId = requestedTerm || activeTermId;
+    const selectedTermKey = selectedTermId?.toString() || "";
+    const allowLegacyHours = !selectedTermKey || String(activeTermId || "") === selectedTermKey;
     const tables = await ScheduleTable.find();
-    return res.json({ tables: sortTables(tables.map(toClientTable)) });
+    return res.json({ tables: sortTables(tables.map(table => toClientTable(table, selectedTermKey, allowLegacyHours))) });
   } catch (error) {
     console.error("Failed to list schedule tables:", error);
     return res.status(500).json({ message: "Failed to load schedule tables.", error: error.message });
@@ -623,6 +700,15 @@ async function createScheduleTable(req, res) {
     if (!teacher) {
       return res.status(400).json({ message: "Teacher name is required." });
     }
+
+    const requestedTermId = normalizeString(req.body.academicTermId);
+    const academicTerm = requestedTermId
+      ? resolveAcademicTermReference(requestedTermId)
+      : await getActiveAcademicTermReference();
+    if (requestedTermId && !academicTerm) {
+      return res.status(400).json({ message: "A valid academic term is required to save schedule work hours." });
+    }
+    const academicTermKey = academicTerm?.toString() || "";
 
     const hasPerDayHours = req.body.workHoursByDay !== undefined;
     const workStartTime = normalizeString(req.body.workStartTime || req.body.workStart || "");
@@ -664,9 +750,12 @@ async function createScheduleTable(req, res) {
 
     const label = teacher;
     const update = { teacher, label };
-    if (hasPerDayHours) update.workHoursByDay = workHoursByDay;
-    if (req.body.workStartTime !== undefined || req.body.workStart !== undefined) update.workStartTime = workStartTime;
-    if (req.body.workEndTime !== undefined || req.body.workEnd !== undefined) update.workEndTime = workEndTime;
+    if (hasPerDayHours) {
+      if (academicTermKey) update[`workHoursByTerm.${academicTermKey}`] = workHoursByDay;
+      else update.workHoursByDay = workHoursByDay;
+    }
+    if (!academicTermKey && (req.body.workStartTime !== undefined || req.body.workStart !== undefined)) update.workStartTime = workStartTime;
+    if (!academicTermKey && (req.body.workEndTime !== undefined || req.body.workEnd !== undefined)) update.workEndTime = workEndTime;
     const table = await ScheduleTable.findOneAndUpdate(
       { label },
       update,
@@ -705,7 +794,9 @@ async function createScheduleTable(req, res) {
     } catch (notificationError) {
       console.warn("Schedule table created, but admin notification failed:", notificationError.message);
     }
-    return res.status(201).json({ message: "Schedule table created.", table: toClientTable(table) });
+    const activeTermId = academicTermKey ? await getActiveAcademicTermReference() : null;
+    const allowLegacyHours = !academicTermKey || String(activeTermId || "") === academicTermKey;
+    return res.status(201).json({ message: "Schedule table created.", table: toClientTable(table, academicTermKey, allowLegacyHours) });
   } catch (error) {
     console.error("Failed to create schedule table:", error);
     return res.status(500).json({ message: "Failed to create schedule table.", error: error.message });
@@ -767,10 +858,11 @@ async function createSchedule(req, res) {
       entryType: payload.entryType || 'class',
     });
     const academicTermId = resolveAcademicTermReference(payload?.academicTermId) || await getActiveAcademicTermReference();
+    await assertPracticumSemester(payload, academicTermId);
     const isLunchBreak = normalizeString(payload.entryType).toLowerCase() === "lunch";
     const docs = isLunchBreak ? [buildLunchBreakDoc(payload, academicTermId)] : buildEntryDocs(payload, academicTermId);
     await assertTeacherUnitLimit(docs, academicTermId);
-    await ensureTableExists(docs[0].tableLabel);
+    if (docs[0].entryType !== "practicum") await ensureTableExists(docs[0].tableLabel);
 
     for (const doc of docs) {
       const conflictMessage = await findConflict(docForConflictCheck(doc));
@@ -834,6 +926,7 @@ async function createSchedule(req, res) {
       error.message.includes("Time Out") ||
       error.message.includes("parallel schedule") ||
       error.message.includes("recurring schedule") ||
+      error.message.includes("Practicum") ||
       error.message.includes("cannot exceed")
     )) {
       return res.status(400).json({ message: error.message });
@@ -1018,12 +1111,13 @@ async function replaceSchedule(req, res) {
     }
 
     const academicTermId = resolveAcademicTermReference(next?.academicTermId) || await getActiveAcademicTermReference();
+    await assertPracticumSemester(next, academicTermId);
     const excludedIds = await getExcludedIds(oldDescriptor);
     const docs = oldDescriptor.recurringAssignment
       ? await buildRecurringReplacementDocs(oldDescriptor, next, academicTermId)
       : buildEntryDocs(next, academicTermId);
     await assertTeacherUnitLimit(docs, academicTermId, excludedIds);
-    await ensureTableExists(docs[0].tableLabel);
+    if (docs[0].entryType !== "practicum") await ensureTableExists(docs[0].tableLabel);
 
     for (const doc of docs) {
       const conflictMessage = await findConflict(docForConflictCheck(doc), excludedIds);
@@ -1083,6 +1177,7 @@ async function replaceSchedule(req, res) {
       error.message.includes("Time Out") ||
       error.message.includes("parallel schedule") ||
       error.message.includes("recurring schedule") ||
+      error.message.includes("Practicum") ||
       error.message.includes("cannot exceed")
     )) {
       return res.status(400).json({ message: error.message });

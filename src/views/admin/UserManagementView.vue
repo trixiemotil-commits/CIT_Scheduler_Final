@@ -56,7 +56,7 @@
           </h1>
           <p class="page-sub">Add, edit, and manage system user accounts</p>
         </div>
-        <button v-if="activeView === 'active'" class="um-add-btn" @click="openAddUser">
+        <button v-if="activeView === 'active' && canAddUsers" class="um-add-btn" @click="openAddUser">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Add User
         </button>
@@ -204,6 +204,19 @@
         </button>
       </div>
 
+      <div class="um-login-date-filter" role="group" aria-label="Filter by last login date">
+        <span class="um-login-date-filter__title">Last login</span>
+        <label>
+          <span>From</span>
+          <input v-model="lastLoginStartDate" type="date" :max="lastLoginEndDate || undefined" aria-label="Last login from date" />
+        </label>
+        <label>
+          <span>To</span>
+          <input v-model="lastLoginEndDate" type="date" :min="lastLoginStartDate || undefined" aria-label="Last login to date" />
+        </label>
+        <button v-if="lastLoginStartDate || lastLoginEndDate" type="button" @click="clearLastLoginDateFilter">Clear</button>
+      </div>
+
       <!-- Table -->
       <div v-if="loadError" class="um-error-banner">{{ loadError }}</div>
       <div v-if="autoRefreshNotice" class="um-info-banner" role="status" aria-live="polite">{{ autoRefreshNotice }}</div>
@@ -225,13 +238,14 @@
               <th>Email</th>
               <th>Role</th>
               <th>Status</th>
-              <th>Date Added</th>
+              <th class="um-date-added">Date Added</th>
+              <th class="um-last-login">Last Login</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="isLoadingUsers">
-              <td :colspan="isMultiSelectMode ? 7 : 6">
+              <td :colspan="isMultiSelectMode ? 8 : 7">
                 <div class="um-empty">
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   <span>Loading users...</span>
@@ -246,6 +260,7 @@
                   type="checkbox"
                   class="um-select-check"
                   :value="user.id"
+                  :disabled="!canManageUser(user)"
                   :aria-label="`Select ${user.name}`"
                 />
               </td>
@@ -272,15 +287,16 @@
                   {{ loginLockLabel(user) }}
                 </span>
               </td>
-              <td class="um-date">{{ user.dateAdded }}</td>
+              <td class="um-date um-date-added">{{ user.dateAdded }}</td>
+              <td class="um-date um-last-login">{{ user.lastLoginDisplay }}</td>
               <td>
                 <div class="um-actions">
                   <template v-if="activeView === 'active'">
                     <div class="um-actions-row">
-                      <button v-if="user.status !== 'Pending'" class="um-btn um-btn--edit" @click="openEditUser(user)" title="Edit" aria-label="Edit user">
+                      <button v-if="user.status !== 'Pending' && canManageUser(user)" class="um-btn um-btn--edit" @click="openEditUser(user)" title="Edit" aria-label="Edit user">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
-                      <button v-if="user.status !== 'Pending'" class="um-btn um-btn--archive" @click="openArchiveUser(user)" title="Archive" aria-label="Archive user">
+                      <button v-if="user.status !== 'Pending' && canManageUser(user)" class="um-btn um-btn--archive" @click="openArchiveUser(user)" title="Archive" aria-label="Archive user">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                       </button>
                       <button v-if="user.isLoginLocked" class="um-btn um-btn--unlock" @click="unlockUser(user)" title="Unlock login" aria-label="Unlock user login">
@@ -305,7 +321,7 @@
               </td>
             </tr>
             <tr v-if="filteredUsers.length === 0">
-              <td :colspan="isMultiSelectMode ? 7 : 6">
+              <td :colspan="isMultiSelectMode ? 8 : 7">
                 <div class="um-empty">
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   <span>No users found</span>
@@ -409,7 +425,7 @@
                 <option value="" disabled>Select role…</option>
                 <option value="Admin">Admin</option>
                 <option value="Teacher">Teacher</option>
-                <option value="Admin & Teacher">Admin & Teacher</option>
+                <option v-if="editingUser && userForm.role === 'Admin & Teacher'" value="Admin &amp; Teacher">Admin &amp; Teacher</option>
                 <option value="Student">Student</option>
               </select>
             </div>
@@ -739,6 +755,17 @@ const currentRoute = computed(() => route.path)
 
 
 const user = getUser() || {}
+const currentUserRoles = (Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role])
+  .map(role => String(role || '').trim().toLowerCase())
+const canAddUsers = currentUserRoles.includes('admin') && currentUserRoles.includes('teacher')
+function hasAdminAndTeacherRoles(account) {
+  const roles = (Array.isArray(account?.roles) && account.roles.length ? account.roles : [account?.role])
+    .map(role => String(role || '').trim().toLowerCase())
+  return roles.includes('admin') && roles.includes('teacher')
+}
+function canManageUser(account) {
+  return canAddUsers || !hasAdminAndTeacherRoles(account)
+}
 /* ── Nav ── */
 const navItems = [
   {
@@ -787,6 +814,8 @@ const searchQuery = ref('')
 const roleFilter  = ref('')
 const userStatFilter = ref('')
 const statusFilter = ref('all')
+const lastLoginStartDate = ref('')
+const lastLoginEndDate = ref('')
 
 /* ── Users Data ── */
 const users = ref([])
@@ -863,6 +892,12 @@ const filteredUsers = computed(() => {
       u.role === roleFilter.value
 
     const statusMatch = statusFilter.value === 'all' || String(u.status || '').toLowerCase() === statusFilter.value.toLowerCase()
+    const loginDate = toLocalDateInputValue(u.lastLoginAt)
+    const loginDateMatch = (!lastLoginStartDate.value && !lastLoginEndDate.value) || (
+      Boolean(loginDate) &&
+      (!lastLoginStartDate.value || loginDate >= lastLoginStartDate.value) &&
+      (!lastLoginEndDate.value || loginDate <= lastLoginEndDate.value)
+    )
     const yearMatch = userStatFilter.value === '' ||
       (userStatFilter.value === 'admins' && (roles.includes('admin') || u.role === 'Admin')) ||
       (userStatFilter.value === 'teachers' && (roles.includes('teacher') || u.role === 'Teacher')) ||
@@ -871,9 +906,24 @@ const filteredUsers = computed(() => {
       (userStatFilter.value === 'year-3' && (String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('3rd') || String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('third'))) ||
       (userStatFilter.value === 'year-4' && (String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('4th') || String(u.yearLevel || u.studentYear || u.year || '').toLowerCase().includes('fourth')))
 
-    return matchSearch && matchRole && statusMatch && yearMatch
+    return matchSearch && matchRole && statusMatch && yearMatch && loginDateMatch
   })
 })
+
+function clearLastLoginDateFilter() {
+  lastLoginStartDate.value = ''
+  lastLoginEndDate.value = ''
+}
+
+function toLocalDateInputValue(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 function selectUserStat(stat) {
   userStatFilter.value = stat === 'all' ? '' : stat
@@ -890,10 +940,10 @@ const selectedPendingUsers = computed(() => {
 })
 const selectedNonPendingUsers = computed(() => {
   const selectedIds = new Set(selectedUserIds.value)
-  return users.value.filter((user) => user.status !== 'Pending' && user.status !== 'Archived' && selectedIds.has(user.id))
+  return users.value.filter((user) => user.status !== 'Pending' && user.status !== 'Archived' && selectedIds.has(user.id) && canManageUser(user))
 })
 const allVisibleUsersSelected = computed(() => {
-  const visible = filteredUsers.value
+  const visible = filteredUsers.value.filter(canManageUser)
   return visible.length > 0 && visible.every((user) => selectedUserIds.value.includes(user.id))
 })
 
@@ -907,7 +957,7 @@ function toggleMultiSelectMode() {
 }
 
 function toggleAllVisibleUsers() {
-  const visibleIds = filteredUsers.value.map((user) => user.id)
+  const visibleIds = filteredUsers.value.filter(canManageUser).map((user) => user.id)
   if (allVisibleUsersSelected.value) {
     selectedUserIds.value = selectedUserIds.value.filter((id) => !visibleIds.includes(id))
   } else {
@@ -931,6 +981,7 @@ function fallbackAvatar(name) {
 
 function normalizeRoleLabel(role) {
   const value = (role || '').toString().toLowerCase()
+  if (value.includes('admin') && value.includes('teacher')) return 'Admin & Teacher'
   if (value === 'admin') return 'Admin'
   if (value === 'teacher') return 'Teacher'
   if (value === 'student') return 'Student'
@@ -960,14 +1011,18 @@ function mapUserForUi(user) {
   const firstName = user.firstName || ''
   const lastName  = user.lastName || ''
   const name = (user.name || `${firstName} ${lastName}`).trim() || 'New User'
+  const roles = Array.isArray(user.roles) ? user.roles : []
+  const roleLabel = roles.includes('admin') && roles.includes('teacher')
+    ? 'Admin & Teacher'
+    : normalizeRoleLabel(user.role || user.roleKey)
   return {
     id: user.id || user._id,
     name,
     firstName,
     lastName,
     email: user.email || '',
-    role: normalizeRoleLabel(user.role || user.roleKey),
-    roles: Array.isArray(user.roles) ? user.roles : [],
+    role: roleLabel,
+    roles,
     department: user.department || '',
     status: user.status || 'Active',
     dateAdded: formatDisplayDate(user.dateAdded || user.createdAt),
@@ -981,7 +1036,25 @@ function mapUserForUi(user) {
     isLoginLocked: Boolean(user.isLoginLocked),
     loginLockoutLevel: Number(user.loginLockoutLevel || 0),
     loginLockedUntil: user.loginLockedUntil || null,
+    lastLoginAt: user.lastLoginAt || null,
+    lastLoginDisplay: formatDisplayDateTime(user.lastLoginAt),
   }
+}
+
+function formatDisplayDateTime(dateInput) {
+  if (!dateInput) return 'Never'
+  const date = new Date(dateInput)
+  if (Number.isNaN(date.getTime())) return 'Never'
+  const displayDate = date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+  const displayTime = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+  return `${displayDate}, ${displayTime}`
 }
 
 function statusClass(status) {
@@ -1194,12 +1267,15 @@ function openAddUser() {
 function openEditUser(user) {
   editingUser.value = user
   formError.value = ''
+  const userRoles = (Array.isArray(user.roles) ? user.roles : [])
+    .map(role => String(role || '').trim().toLowerCase())
+  const isAdminTeacher = userRoles.includes('admin') && userRoles.includes('teacher')
   userForm.value = {
     firstName: user.firstName || '',
     lastName: user.lastName || '',
     email: user.email,
     schoolId: user.employeeId ? formatEmployeeIdValue(user.employeeId) : formatSchoolIdValue(user.schoolId || user.studentId),
-    role: user.role,
+    role: isAdminTeacher ? 'Admin & Teacher' : user.role,
     status: user.status,
     yearLevel: user.yearLevel || '',
     section: user.section || '',
@@ -1409,6 +1485,7 @@ function printUsersTable() {
           <td>${esc(user.role)}</td>
           <td>${esc(user.status)}</td>
           <td>${esc(user.dateAdded)}</td>
+          <td>${esc(user.lastLoginDisplay)}</td>
         </tr>`
     })
     .join('')
@@ -1447,6 +1524,7 @@ function printUsersTable() {
         <th>Role</th>
         <th>Status</th>
         <th>Date Added</th>
+        <th>Last Login</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -3706,4 +3784,58 @@ function confirmRestoreUser() {
   .reg-avatar-wrap { width: 42px; height: 42px; }
   .form-input { min-height: 38px; padding-block: 7px; }
 }
+
+.um-login-date-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: -4px 0 14px;
+  color: #52606b;
+  font-size: .78rem;
+}
+.um-login-date-filter__title { font-weight: 800; }
+.um-login-date-filter label { display: inline-flex; align-items: center; gap: 7px; }
+.um-login-date-filter input {
+  min-height: 36px;
+  padding: 5px 9px;
+  border: 1px solid #d8e0e5;
+  border-radius: 9px;
+  background: #fff;
+  color: #34414b;
+  font: inherit;
+}
+.um-login-date-filter button {
+  border: 0;
+  background: transparent;
+  color: #326fba;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+.um-table { min-width: 1460px; }
+.um-table:not(.um-table--selecting) th:nth-child(1),
+.um-table:not(.um-table--selecting) td:nth-child(1) { width: 20% !important; }
+.um-table:not(.um-table--selecting) th:nth-child(2),
+.um-table:not(.um-table--selecting) td:nth-child(2) { width: 23% !important; }
+.um-table:not(.um-table--selecting) th:nth-child(3),
+.um-table:not(.um-table--selecting) td:nth-child(3) { width: 8% !important; }
+.um-table:not(.um-table--selecting) th:nth-child(4),
+.um-table:not(.um-table--selecting) td:nth-child(4) { width: 12% !important; }
+.um-table--selecting th:nth-child(1),
+.um-table--selecting td:nth-child(1) { width: 34px !important; }
+.um-table--selecting th:nth-child(2),
+.um-table--selecting td:nth-child(2) { width: 20% !important; }
+.um-table--selecting th:nth-child(3),
+.um-table--selecting td:nth-child(3) { width: 23% !important; }
+.um-table--selecting th:nth-child(4),
+.um-table--selecting td:nth-child(4) { width: 8% !important; }
+.um-table--selecting th:nth-child(5),
+.um-table--selecting td:nth-child(5) { width: 12% !important; }
+.um-table th.um-date-added,
+.um-table td.um-date-added { width: 130px !important; white-space: nowrap; }
+.um-table th.um-last-login,
+.um-table td.um-last-login { width: 190px !important; white-space: nowrap; }
+.um-table th:last-child,
+.um-table td:last-child { width: 156px !important; }
 </style>

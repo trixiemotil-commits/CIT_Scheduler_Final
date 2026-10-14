@@ -43,6 +43,9 @@ export default defineConfig(({ mode }) => ({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  optimizeDeps: {
+    include: ['@capacitor/core', '@capacitor/local-notifications']
+  },
   server: {
     port: 5173,
     strictPort: true,

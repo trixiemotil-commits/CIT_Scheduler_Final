@@ -31,9 +31,9 @@
       </button>
       <button type="button" class="stat-card red" @click="$router.push('/student/teachers')">
         <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3" /><path d="M5 20a7 7 0 0 1 14 0M16 4l4 4M20 4l-4 4" /></svg></span>
-        <span class="stat-label">Offline</span>
-        <span class="stat-num">{{ teacherStats.offline }}</span>
-        <span class="stat-desc">teachers offline</span>
+        <span class="stat-label">On Leave</span>
+        <span class="stat-num">{{ teacherStats.onLeave }}</span>
+        <span class="stat-desc">teachers on leave</span>
       </button>
       <button type="button" class="stat-card blue" @click="$router.push('/student/teachers')">
         <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="m8 12 2.5 2.5L16 9" /></svg></span>
@@ -121,7 +121,7 @@ const teacherStats = computed(() => {
   const isAvailable = (teacher) => isOnSchool(teacher) && teacher.available === true
   return {
     inSchool: list.filter(isOnSchool).length,
-    offline: list.filter((teacher) => String(teacher.status || '').trim().toLowerCase() === 'offline').length,
+    onLeave: list.filter((teacher) => String(teacher.status || '').trim().toLowerCase() === 'on leave').length,
     available: list.filter(isAvailable).length,
     notAvailable: list.filter((teacher) => !isAvailable(teacher)).length,
   }

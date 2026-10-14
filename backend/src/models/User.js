@@ -118,6 +118,18 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    studentEnrollmentType: {
+      type: String,
+      enum: ["Regular", "Irregular"],
+      default: "Regular",
+    },
+    studentYearSections: {
+      type: [{
+        yearLevel: { type: String, enum: YEAR_LEVEL_VALUES, required: true },
+        section: { type: String, trim: true, required: true },
+      }],
+      default: [],
+    },
     assignedAcademicTermId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "AcademicTerm",
