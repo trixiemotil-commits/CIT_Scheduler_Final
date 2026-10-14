@@ -83,7 +83,7 @@
                   <ul class="notif-list">
                     <li v-for="n in unreadNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><strong>{{ n.type === 'new_event' ? n.eventTitle : n.studentName }}</strong><small>{{ n.type === 'new_event' ? n.eventMessage : `Submitted a consultation request for ${n.subject}` }}</small><time v-if="n.type !== 'new_event'">{{ n.consultationTime }}</time></span>
+                      <span class="notif-text"><strong>{{ n.displayTitle }}</strong><small>{{ n.displayMessage }}</small><time>{{ n.timeAgo }}<template v-if="n.consultationTime"> · {{ n.consultationTime }}</template></time></span>
                       <span class="notif-read-status unread">Unread</span>
                       <span class="notif-unread-dot"></span>
                     </li>
@@ -98,7 +98,7 @@
                   <ul class="notif-list">
                     <li v-for="n in readNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><strong>{{ n.type === 'new_event' ? n.eventTitle : n.studentName }}</strong><small>{{ n.type === 'new_event' ? n.eventMessage : `Submitted a consultation request for ${n.subject}` }}</small><time v-if="n.type !== 'new_event'">{{ n.consultationTime }}</time></span>
+                      <span class="notif-text"><strong>{{ n.displayTitle }}</strong><small>{{ n.displayMessage }}</small><time>{{ n.timeAgo }}<template v-if="n.consultationTime"> · {{ n.consultationTime }}</template></time></span>
                       <span class="notif-read-status read">Read</span>
                     </li>
                   </ul>
@@ -113,7 +113,7 @@
                   <ul class="notif-list">
                     <li v-for="n in newNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><strong>{{ n.type === 'new_event' ? n.eventTitle : n.studentName }}</strong><small>{{ n.type === 'new_event' ? n.eventMessage : `Submitted a consultation request for ${n.subject}` }}</small><time v-if="n.type !== 'new_event'">{{ n.consultationTime }}</time></span>
+                      <span class="notif-text"><strong>{{ n.displayTitle }}</strong><small>{{ n.displayMessage }}</small><time>{{ n.timeAgo }}<template v-if="n.consultationTime"> · {{ n.consultationTime }}</template></time></span>
                       <span :class="['notif-read-status', n.read ? 'read' : 'unread']">{{ n.read ? 'Read' : 'Unread' }}</span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
                     </li>
@@ -124,7 +124,7 @@
                   <ul class="notif-list">
                     <li v-for="n in todayNotifs" :key="n.id" class="notif-item" @click="openNotification(n)">
                       <img :src="n.avatar" class="notif-avatar" alt="" />
-                      <span class="notif-text"><strong>{{ n.type === 'new_event' ? n.eventTitle : n.studentName }}</strong><small>{{ n.type === 'new_event' ? n.eventMessage : `Submitted a consultation request for ${n.subject}` }}</small><time v-if="n.type !== 'new_event'">{{ n.consultationTime }}</time></span>
+                      <span class="notif-text"><strong>{{ n.displayTitle }}</strong><small>{{ n.displayMessage }}</small><time>{{ n.timeAgo }}<template v-if="n.consultationTime"> · {{ n.consultationTime }}</template></time></span>
                       <span :class="['notif-read-status', n.read ? 'read' : 'unread']">{{ n.read ? 'Read' : 'Unread' }}</span>
                       <span v-if="!n.read" class="notif-unread-dot"></span>
                     </li>
@@ -509,6 +509,62 @@ function notificationGroup(createdAt) {
   return Date.now() - created.getTime() < 24 * 60 * 60 * 1000 ? 'new' : 'today'
 }
 
+function notificationTimeAgo(createdAt) {
+  const created = new Date(createdAt)
+  if (Number.isNaN(created.getTime())) return 'Just now'
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - created.getTime()) / 60000))
+  if (elapsedMinutes < 1) return 'Just now'
+  if (elapsedMinutes === 1) return '1 minute ago'
+  if (elapsedMinutes < 60) return `${elapsedMinutes} minutes ago`
+  const elapsedHours = Math.floor(elapsedMinutes / 60)
+  if (elapsedHours === 1) return '1 hour ago'
+  if (elapsedHours < 24) return `${elapsedHours} hours ago`
+  const elapsedDays = Math.floor(elapsedHours / 24)
+  return elapsedDays === 1 ? '1 day ago' : `${elapsedDays} days ago`
+}
+
+function formatConsultationTime(value) {
+  return String(value || '').replace(/\b(\d{1,2}):(\d{2})(?:\s*(AM|PM))?\b/gi, (match, hoursText, minutes, meridiem) => {
+    let hours = Number(hoursText)
+    const minuteValue = Number(minutes)
+    if (minuteValue > 59) return match
+    if (meridiem) {
+      if (hours < 1 || hours > 12) return match
+      if (meridiem.toUpperCase() === 'PM' && hours < 12) hours += 12
+      if (meridiem.toUpperCase() === 'AM' && hours === 12) hours = 0
+    } else if (hours > 23) {
+      return match
+    }
+    return `${hours % 12 || 12}:${minutes} ${hours >= 12 ? 'PM' : 'AM'}`
+  })
+}
+
+function mapNotification(n) {
+  const eventTitle = n.type === 'new_event' ? (n.title || 'New event assigned') : ''
+  const eventMessage = n.type === 'new_event' ? (n.message || 'View the event details.') : ''
+  const studentName = n.data?.studentName || notificationStudentName(n)
+  const subject = n.data?.subject || notificationSubject(n)
+
+  return {
+    id: n.id,
+    type: n.type,
+    avatar: n.data?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.title || 'Notif')}&background=DDECE5&color=1B4332`,
+    displayTitle: eventTitle || (n.type === 'consultation_request' && n.data?.status !== 'APPROVED'
+      ? studentName
+      : (n.title || n.type)),
+    displayMessage: eventMessage || n.message || (n.type === 'consultation_request'
+      ? `Submitted a consultation request for ${subject}`
+      : ''),
+    studentName,
+    subject,
+    consultationTime: formatConsultationTime(n.data?.consultationTime),
+    timeAgo: notificationTimeAgo(n.createdAt),
+    read: Boolean(n.read),
+    group: notificationGroup(n.createdAt),
+    request: n,
+  }
+}
+
 async function loadConsultationNotifications() {
   if (document.visibilityState === 'hidden' || notificationRefreshInFlight) return
   notificationRefreshInFlight = true
@@ -517,21 +573,7 @@ async function loadConsultationNotifications() {
       cache: 'no-store',
     })
     const notifs = Array.isArray(payload.notifications) ? payload.notifications : []
-    notifications.value = notifs.slice(0, 50).map(n => {
-      return {
-        id: n.id,
-        type: n.type,
-        avatar: n.data?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.title||'Notif')}&background=DDECE5&color=1B4332`,
-        eventTitle: n.type === 'new_event' ? (n.title || 'New event assigned') : '',
-        eventMessage: n.type === 'new_event' ? (n.message || 'View the event details.') : '',
-        studentName: n.data?.studentName || notificationStudentName(n),
-        subject: n.data?.subject || notificationSubject(n),
-        consultationTime: n.data?.consultationTime || '',
-        read: Boolean(n.read),
-        group: notificationGroup(n.createdAt),
-        request: n,
-      }
-    })
+    notifications.value = notifs.slice(0, 50).map(mapNotification)
   } catch (_) {
     notifications.value = []
   } finally {
@@ -547,19 +589,8 @@ function toggleNotifications() {
 function _onNotif(n) {
   try {
     if (!n || !n.id) return
-    const item = {
-      id: n.id,
-      type: n.type,
-      avatar: n.data?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.title||'Notif')}&background=DDECE5&color=1B4332`,
-      eventTitle: n.type === 'new_event' ? (n.title || 'New event assigned') : '',
-      eventMessage: n.type === 'new_event' ? (n.message || 'View the event details.') : '',
-      studentName: n.data?.studentName || notificationStudentName(n),
-      subject: n.data?.subject || notificationSubject(n),
-      consultationTime: n.data?.consultationTime || '',
-      read: Boolean(n.read),
-      group: notificationGroup(n.createdAt),
-      request: n,
-    }
+    if (notifications.value.some(notification => notification.id === n.id)) return
+    const item = mapNotification(n)
     notifications.value = [item, ...notifications.value].slice(0, 100)
     loadConsultationNotifications()
     loadConsultationStats()
@@ -1357,7 +1388,6 @@ onUnmounted(() => {
   window.clearInterval(consultationStatsRefreshTimer)
   document.removeEventListener('visibilitychange', refreshDashboardWhenVisible)
   useNotifications.removeNotificationListener(_onNotif)
-  useNotifications.closeNotifications()
 })
 
 /* ── Logout ── */

@@ -837,7 +837,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   useNotifications.removeNotificationListener(_onNotification)
-  useNotifications.closeNotifications()
 })
 </script>
 

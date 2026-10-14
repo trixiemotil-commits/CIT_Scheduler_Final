@@ -24,6 +24,7 @@ setupNativeNotifications()
 let es = null
 let esToken = null
 const listeners = new Set()
+const seenNotificationIds = new Set()
 
 let pendingSound = false
 let pendingPayload = {}
@@ -86,6 +87,13 @@ function ensureEventSource() {
   es.addEventListener('notification', (ev) => {
     try {
       const payload = JSON.parse(ev.data || '{}')
+      if (payload.id && seenNotificationIds.has(String(payload.id))) return
+      if (payload.id) {
+        seenNotificationIds.add(String(payload.id))
+        if (seenNotificationIds.size > 500) {
+          seenNotificationIds.delete(seenNotificationIds.values().next().value)
+        }
+      }
       const me = String(getUser()?.id || getUser()?._id || '')
       const isOwnAction = payload.actorId && me && String(payload.actorId) === me
       if (!isOwnAction) playNotificationSound(payload)
@@ -128,4 +136,3 @@ export function closeNotifications() {
   listeners.clear()
 }
 export default { addNotificationListener, removeNotificationListener, closeNotifications, startNotifications }
-

@@ -110,6 +110,7 @@ function mapRequestToSession(requestDoc, teacherLookup, availabilityLookup) {
 
   return {
     id: requestDoc.id,
+    createdAt: requestDoc.createdAt || requestDoc.requestDate || '',
     employeeId: requestDoc.employeeId || '',
     ticketNumber: requestDoc.ticketNumber || null,
     subject: requestDoc.subject || 'Consultation',

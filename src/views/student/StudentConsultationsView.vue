@@ -227,7 +227,7 @@
 
     <!-- ══ CANCEL CONFIRMATION MODAL ══ -->
     <Teleport to="body">
-      <div v-if="showCancel" class="modal-overlay alert-overlay cancel-confirm-overlay" @click.self="showCancel = false">
+      <div v-if="showCancel" class="modal-overlay alert-overlay cancel-confirm-overlay" @click.self="!isCancelling && (showCancel = false)">
         <section class="cancel-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="cancel-confirm-title" aria-describedby="cancel-confirm-description">
           <div class="cancel-confirm-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5m0 3h.01M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -237,8 +237,11 @@
             This will cancel your consultation with <strong>{{ activeSession?.teacher || 'this teacher' }}</strong>.
           </p>
           <div class="cancel-confirm-actions">
-            <button class="cancel-confirm-back" @click="showCancel = false">Keep booking</button>
-            <button class="cancel-confirm-submit" @click="confirmCancel">Cancel consultation</button>
+            <button class="cancel-confirm-back" :disabled="isCancelling" @click="showCancel = false">Keep booking</button>
+            <button class="cancel-confirm-submit" :disabled="isCancelling" :aria-busy="isCancelling" @click="confirmCancel">
+              <span v-if="isCancelling" class="cancel-loading-spinner" aria-hidden="true"></span>
+              {{ isCancelling ? 'Cancelling...' : 'Cancel consultation' }}
+            </button>
           </div>
         </section>
       </div>
@@ -323,15 +326,14 @@
 
 <script setup>
 import StudentRefresher from '@/components/student/StudentRefresher.vue'
-import { useAutoRefresh } from '@/composables/useAutoRefresh.js'
 import { useStudentData } from '@/composables/useStudentData.js'
 import { IonContent, IonPage } from '@ionic/vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 const { sessions, cancelSession, acceptRescheduleOffer, updateSession, isLoadingSessions, sessionsError, loadSessions } = useStudentData()
-const { refresh: refreshConsultations } = useAutoRefresh(
-  () => loadSessions(true, { includeArchived: true })
-)
+const refreshConsultations = () => loadSessions(true, { includeArchived: true })
+const route = useRoute()
 
 const CONSULTATION_REASONS = [
   'Lesson Clarification',
@@ -344,8 +346,14 @@ const CONSULTATION_REASONS = [
 ]
 
 const tabs       = ['All', 'Pending', 'Approved', 'Reschedule', 'Completed', 'Cancelled', 'Archived']
-const activeTab  = ref('All')
+const initialTab = String(route.query.tab || '')
+const activeTab  = ref(tabs.includes(initialTab) ? initialTab : 'All')
 const acceptingRescheduleId = ref('')
+
+watch(() => route.query.tab, (tab) => {
+  const requestedTab = String(tab || '')
+  activeTab.value = tabs.includes(requestedTab) ? requestedTab : 'All'
+})
 
 const filteredSessions = computed(() =>
   activeTab.value === 'All' ? sessions.value : sessions.value.filter(s => s.status === activeTab.value)
@@ -691,6 +699,7 @@ async function saveEdit() {
 
 /* ── Cancel Confirmation ── */
 const showCancel = ref(false)
+const isCancelling = ref(false)
 function openCancel(s) { activeSession.value = s; showCancel.value = true }
 async function acceptRescheduledBooking(session) {
   if (acceptingRescheduleId.value) return
@@ -705,6 +714,8 @@ async function acceptRescheduledBooking(session) {
   }
 }
 async function confirmCancel() {
+  if (isCancelling.value || !activeSession.value) return
+  isCancelling.value = true
   try {
     await cancelSession(activeSession.value.id)
     await loadSessions(true)
@@ -713,6 +724,8 @@ async function confirmCancel() {
   } catch (error) {
     showCancel.value = false
     showToast(error.message || 'Failed to cancel session.')
+  } finally {
+    isCancelling.value = false
   }
 }
 
@@ -1127,6 +1140,20 @@ onMounted(() => {
   transition: transform .16s ease, box-shadow .16s ease;
 }
 .cancel-confirm-actions button:active { transform: translateY(1px); }
+.cancel-confirm-actions button:disabled {
+  cursor: not-allowed;
+  opacity: .7;
+}
+.cancel-confirm-submit { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.cancel-loading-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255,255,255,.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: cancel-spinner .7s linear infinite;
+}
+@keyframes cancel-spinner { to { transform: rotate(360deg); } }
 .cancel-confirm-back {
   border: 1px solid #cbd2d6;
   background: linear-gradient(145deg,#f3f4f4,#dfe2e3);

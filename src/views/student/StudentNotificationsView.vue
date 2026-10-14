@@ -22,7 +22,7 @@
     <div class="notif-list">
       <div v-for="group in groupedNotifications" :key="group.label">
         <div class="group-label">{{ group.label }}</div>
-        <div v-for="n in group.items" :key="n.id" class="notif-item" :class="{ unread: !n.read }" @click="n.read = true">
+        <div v-for="n in group.items" :key="n.id" class="notif-item" :class="{ unread: !n.read }" @click="openNotification(n)">
           <div class="notif-dot" :class="{ on: !n.read }"></div>
           <img v-if="n.avatar" :src="n.avatar" class="notif-avatar" alt="" />
           <div class="notif-body">
@@ -61,6 +61,7 @@ import { getToken } from '@/auth.js'
 import useNotifications from '@/composables/useNotifications'
 import { IonContent, IonPage } from '@ionic/vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -77,6 +78,7 @@ async function apiRequest(path, options = {}) {
 }
 
 const notifications = ref([])
+const router = useRouter()
 const isClearing = ref(false)
 const showClearConfirm = ref(false)
 const clearError = ref('')
@@ -87,12 +89,15 @@ async function loadNotifications() {
     const notifs = Array.isArray(payload.notifications) ? payload.notifications : []
     notifications.value = notifs.map(n => ({
       id: n.id,
+      type: n.type,
       title: n.title || n.type,
       desc: n.message || '',
       avatar: n.data?.avatar || '',
       time: new Date(n.createdAt).toLocaleString(),
       group: (Date.now() - new Date(n.createdAt).getTime()) < (24*60*60*1000) ? 'TODAY' : 'EARLIER',
       read: Boolean(n.read),
+      related: n.related || {},
+      route: n.data?.route || '',
     }))
   } catch (err) {
     notifications.value = []
@@ -103,15 +108,19 @@ onMounted(() => loadNotifications())
 
 // subscribe to SSE notifications to update the list in realtime
 function _onNotif(n) {
+  if (!n?.id || notifications.value.some(notification => notification.id === n.id)) return
   // prepend new notification
   const item = {
     id: n.id,
+    type: n.type,
     title: n.title || n.type,
     desc: n.message || '',
     avatar: n.data?.avatar || '',
     time: new Date(n.createdAt).toLocaleString(),
     group: (Date.now() - new Date(n.createdAt).getTime()) < (24*60*60*1000) ? 'TODAY' : 'EARLIER',
     read: Boolean(n.read),
+    related: n.related || {},
+    route: n.data?.route || '',
   }
   notifications.value = [item, ...notifications.value]
 }
@@ -125,6 +134,36 @@ onUnmounted(() => {
 })
 
 const unreadCount = computed(() => notifications.value.filter((n) => !n.read).length)
+
+async function openNotification(notification) {
+  if (!notification.read) {
+    notification.read = true
+    apiRequest(`/notifications/${notification.id}/read`, { method: 'PATCH' })
+      .catch((error) => console.error('Failed to mark notification as read:', error))
+  }
+
+  if (String(notification.type || '').startsWith('consultation_')) {
+    const status = String(notification.related?.status || '').toUpperCase()
+    const tabByStatus = {
+      PENDING: 'Pending',
+      APPROVED: 'Approved',
+      RESCHED: 'Reschedule',
+      COMPLETED: 'Completed',
+      CANCELLED: 'Cancelled',
+      ARCHIVED: 'Archived',
+    }
+    router.push({
+      path: '/student/consultations',
+      query: tabByStatus[status] ? { tab: tabByStatus[status] } : {},
+    })
+    return
+  }
+
+  if (notification.route) {
+    router.push(notification.route)
+  }
+}
+
 const groupOrder = ['TODAY', 'YESTERDAY', 'EARLIER']
 const groupedNotifications = computed(() =>
   groupOrder

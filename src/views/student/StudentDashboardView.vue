@@ -106,7 +106,7 @@ import { getToken, getUser } from '@/auth.js'
 import StudentRefresher from '@/components/student/StudentRefresher.vue'
 import useNotifications from '@/composables/useNotifications.js'
 import { useStudentData } from '@/composables/useStudentData.js'
-import { IonContent, IonPage } from '@ionic/vue'
+import { IonContent, IonPage, onIonViewWillEnter } from '@ionic/vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 const user     = getUser() || { name: 'Anna Cooper', email: 'student@gmail.com' }
@@ -140,7 +140,15 @@ async function refreshDashboard() {
   await Promise.all([loadSessions(true), loadTeachers()])
 }
 
-const recentConsultations = computed(() => sessions.value.slice(0, 4))
+const recentConsultations = computed(() =>
+  [...sessions.value]
+    .sort((a, b) => {
+      const createdAtA = Date.parse(a.createdAt || a.date || '') || 0
+      const createdAtB = Date.parse(b.createdAt || b.date || '') || 0
+      return createdAtB - createdAtA
+    })
+    .slice(0, 4)
+)
 const consultationStatusCounts = computed(() => {
   const counts = { approved: 0, pending: 0, reschedule: 0, completed: 0 }
   sessions.value.forEach((session) => {
@@ -154,10 +162,13 @@ const consultationStatusCounts = computed(() => {
 })
 
 onMounted(() => {
-  loadNotifications()
   loadRecentEvents()
   loadTeachers()
   useNotifications.addNotificationListener(handleNotification)
+})
+
+onIonViewWillEnter(() => {
+  loadNotifications()
 })
 
 onUnmounted(() => {
@@ -169,7 +180,7 @@ const unreadCount = ref(0)
 const recentEvents = ref([])
 
 function handleNotification(notification) {
-  if (!notification?.read) unreadCount.value += 1
+  if (!notification?.read) loadNotifications()
 }
 
 async function apiRequest(path, options = {}) {
@@ -229,7 +240,8 @@ async function loadRecentEvents() {
 
 function displayStatus(status) {
   const normalized = String(status || '').trim().toLowerCase()
-  if (normalized === 'cancelled' || normalized === 'resched' || normalized === 'rescheduled') return 'Reschedule'
+  if (normalized === 'cancelled' || normalized === 'canceled') return 'Cancelled'
+  if (normalized === 'resched' || normalized === 'reschedule' || normalized === 'rescheduled') return 'Reschedule'
   if (normalized === 'approved') return 'Approved'
   if (normalized === 'pending') return 'Pending'
   if (normalized === 'completed' || normalized === 'done') return 'Completed'
@@ -241,6 +253,7 @@ function badgeClass(status) {
     Approved: 'badge-green',
     Pending: 'badge-orange',
     Reschedule: 'badge-red',
+    Cancelled: 'badge-red',
     Completed: 'badge-gray',
   }[displayStatus(status)] || 'badge-gray'
 }

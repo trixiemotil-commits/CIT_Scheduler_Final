@@ -655,7 +655,7 @@ const activeTab = ref(consultationTabs.includes(initialConsultationTab) ? initia
 
 const tabs = computed(() => [
   { key: 'all',       label: 'All',       count: requests.value.length },
-  { key: 'pending',   label: 'Requested', count: requests.value.filter(r => r.status === 'pending').length },
+  { key: 'pending',   label: 'Pending',   count: requests.value.filter(r => r.status === 'pending').length },
   { key: 'approved',  label: 'Approved',  count: requests.value.filter(r => r.status === 'approved').length },
   { key: 'resched',   label: 'Reschedule', count: requests.value.filter(r => r.status === 'resched').length },
   { key: 'completed', label: 'Completed', count: requests.value.filter(r => r.status === 'completed').length },

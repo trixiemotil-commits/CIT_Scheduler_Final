@@ -512,48 +512,6 @@ async function isStudentAssignedToTeacher(teacherUser, studentYear, studentSecti
   ));
 }
 
-async function autoApproveEligibleSubjectRequest(requestDoc) {
-  if (String(requestDoc?.status || '').toUpperCase() !== 'PENDING') {
-    return false;
-  }
-
-  const teacherUser = await findTeacherUserByIdentifier(requestDoc.employeeId);
-  if (!teacherUser) return false;
-
-  const isSubjectTeacher = Boolean(requestDoc.availabilityId);
-  if (!isSubjectTeacher) return false;
-
-  const availability = await ConsultationAvailability.findById(requestDoc.availabilityId)
-    .select('dayOfWeek startTime endTime employeeId teacher')
-    .lean();
-  if (!availability) return false;
-
-  requestDoc.status = 'APPROVED';
-  requestDoc.isSubjectTeacher = true;
-  await ConsultationRequest.updateOne(
-    { _id: requestDoc._id, status: 'PENDING' },
-    { $set: { status: 'APPROVED' } }
-  );
-
-  try {
-    const student = await User.findById(requestDoc.studentId).select("email firstName lastName").lean();
-    if (student?.email) {
-      await sendConsultationApprovedEmail({
-        to: student.email,
-        studentName: `${student.firstName || ""} ${student.lastName || ""}`.trim(),
-        subject: requestDoc.subject,
-        consultationDate: requestDoc.consultationDate?.toISOString?.().slice(0, 10),
-        startTime: requestDoc.consultationStartTime,
-        endTime: requestDoc.consultationEndTime,
-      });
-    }
-  } catch (error) {
-    console.warn("Failed to send consultation approval email:", error.message);
-  }
-
-  return true;
-}
-
 async function getStudentAcademicContext(userId) {
   if (!userId) return { year: "", section: "" };
 
@@ -1116,17 +1074,21 @@ async function createConsultationRequest(req, res) {
     });
 
     // Notify the teacher for every new request, including subject requests that are auto-approved.
+    const requestMessage = isSubjectTeacher
+      ? `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}, and it was automatically approved.`
+      : `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}.`
     try {
       await Notification.create({
         recipientId: teacherUser._id,
         actorId: req.user.id,
         type: 'consultation_request',
-        title: 'New consultation request',
-        message: `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}.`,
+        title: isSubjectTeacher ? 'Consultation automatically approved' : 'New consultation request',
+        message: requestMessage,
         data: {
           studentName: `${req.user.firstName || 'A student'} ${req.user.lastName || ''}`.trim(),
           subject: requestDoc.subject,
           consultationTime: `${consultationStartTime} - ${consultationEndTime}`,
+          status: requestDoc.status,
           avatar: req.user.avatar || null,
         },
         related: { consultationRequestId: requestDoc._id.toString() },
@@ -1137,9 +1099,10 @@ async function createConsultationRequest(req, res) {
           recipientId: req.user.id,
           actorId: req.user.id,
           type: 'consultation_status',
-          title: 'Consultation APPROVED',
-          message: `Your consultation request (${requestDoc.subject}) was approved automatically.`,
+          title: 'Consultation approved',
+          message: `Your consultation request for ${requestDoc.subject} was approved automatically.`,
           related: { consultationRequestId: requestDoc._id.toString(), status: 'APPROVED' },
+          data: { route: '/student/consultations' },
         })
       }
     } catch (err) {
@@ -1169,8 +1132,8 @@ async function createConsultationRequest(req, res) {
         actorId: req.user.id,
         excludeIds: [String(teacherUser._id)],
         type: 'consultation_request_admin',
-        title: 'New consultation request',
-        message: `${req.user.firstName || 'A student'} requested a consultation for ${requestDoc.subject}.`,
+        title: isSubjectTeacher ? 'Consultation automatically approved' : 'New consultation request',
+        message: requestMessage,
         related: { consultationRequestId: requestDoc._id.toString() },
       })
     } catch (err) {
@@ -1280,8 +1243,6 @@ async function listConsultationRequests(req, res) {
     }
 
     const docs = await ConsultationRequest.find(filter).sort({ createdAt: -1 }).lean();
-
-    await Promise.all(docs.map((doc) => autoApproveEligibleSubjectRequest(doc)));
 
     const studentIds = [...new Set(
       docs
@@ -1536,6 +1497,7 @@ async function updateConsultationRequestStatus(req, res) {
     }
 
     const previousStatus = String(requestDoc.status || "").toUpperCase();
+    const statusChanged = previousStatus !== nextStatus;
     const actorRole = req.user?.role;
     if (actorRole === "student") {
       if (String(requestDoc.studentId) !== String(req.user.id)) {
@@ -1554,12 +1516,12 @@ async function updateConsultationRequestStatus(req, res) {
       }
     }
 
-    requestDoc.status = nextStatus;
+    const statusUpdate = { status: nextStatus };
     if (nextStatus === "APPROVED" && requestDoc.rescheduleOfferPending) {
-      requestDoc.rescheduleOfferPending = false;
+      statusUpdate.rescheduleOfferPending = false;
     }
     if (nextStatus === "CANCELLED") {
-      requestDoc.rescheduleOfferPending = false;
+      statusUpdate.rescheduleOfferPending = false;
     }
     if (String(nextStatus).toUpperCase() === 'RESCHED' && statusNotes) {
       const existingPurpose = String(requestDoc.purpose || '')
@@ -1570,10 +1532,22 @@ async function updateConsultationRequestStatus(req, res) {
           .filter((line) => !/^Resched Reason:/i.test(line))
           .filter(Boolean)
         filteredLines.push(`Resched Reason: ${cleanedNotes}`)
-        requestDoc.purpose = filteredLines.join('\n')
+        statusUpdate.purpose = filteredLines.join('\n')
       }
     }
-    await requestDoc.save();
+    const updatedRequest = await ConsultationRequest.findOneAndUpdate(
+      { _id: requestDoc._id, status: previousStatus },
+      { $set: statusUpdate },
+      { new: true }
+    );
+    if (!updatedRequest) {
+      const latestRequest = await ConsultationRequest.findById(requestDoc._id);
+      if (latestRequest && String(latestRequest.status || '').toUpperCase() === nextStatus) {
+        return res.json({ message: "Consultation request updated.", request: toClientRequest(latestRequest) });
+      }
+      return res.status(409).json({ message: "This consultation request changed. Refresh and try again." });
+    }
+    requestDoc.set(updatedRequest.toObject());
 
     const reqDate = new Date(requestDoc.requestDate);
     const timeIn = minutesTo24h(reqDate.getHours() * 60 + reqDate.getMinutes());
@@ -1607,50 +1581,83 @@ async function updateConsultationRequestStatus(req, res) {
       req,
     });
 
-    // When a request is cancelled, remove the teacher's old "new request" alerts and send a cancellation notice
-    if (nextStatus === 'CANCELLED') {
+    const statusLabels = {
+      PENDING: 'pending',
+      APPROVED: 'approved',
+      RESCHED: 'rescheduled',
+      COMPLETED: 'completed',
+      CANCELLED: 'cancelled',
+      ARCHIVED: 'archived',
+    };
+    const statusActions = {
+      PENDING: 'set the consultation to pending',
+      APPROVED: 'approved the consultation',
+      RESCHED: 'proposed a new time for the consultation',
+      COMPLETED: 'marked the consultation as completed',
+      CANCELLED: 'cancelled the consultation',
+      ARCHIVED: 'archived the consultation',
+    };
+    const actorName = `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim()
+      || `The ${req.user?.role || 'user'}`;
+    const subject = requestDoc.subject || 'consultation';
+    const statusAction = statusActions[nextStatus] || `updated the consultation to ${statusLabels[nextStatus] || nextStatus}`;
+    const statusMessage = `${actorName} ${statusAction} for ${subject}.${statusNotes ? ` Reason: ${statusNotes}` : ''}`;
+
+    if (statusChanged && nextStatus === 'CANCELLED') {
       try {
         await Notification.deleteMany({
           'related.consultationRequestId': requestDoc._id.toString(),
           type: 'consultation_request',
         })
-        const cancelledTeacher = await findTeacherUserByIdentifier(requestDoc.employeeId)
-        if (cancelledTeacher && String(cancelledTeacher._id) !== String(req.user?.id)) {
-          await Notification.create({
-            recipientId: cancelledTeacher._id,
-            actorId: req.user?.id || null,
-            type: 'consultation_cancelled',
-            title: 'Consultation cancelled',
-            message: `A consultation request for ${requestDoc.subject} was cancelled.`,
-            related: { consultationRequestId: requestDoc._id.toString(), status: 'CANCELLED' },
-          })
-        }
       } catch (err) {
         console.warn('Failed to handle cancelled consultation notifications:', err.message)
       }
     }
 
-    // Create notification for student when request status changes to APPROVED or RESCHED
-    try {
-      const upper = String(nextStatus || '').toUpperCase()
-      if (['APPROVED', 'RESCHED'].includes(upper)) {
-        const message = statusNotes
-          ? `Your consultation request (${requestDoc.subject}) was updated to ${upper}. Reason: ${statusNotes}`
-          : `Your consultation request (${requestDoc.subject}) was updated to ${upper}.`
+    if (statusChanged && String(req.user?.id) !== String(requestDoc.studentId)) {
+      try {
+        const isTeacherRescheduleProposal = nextStatus === 'RESCHED' && actorRole === 'teacher';
+        const title = isTeacherRescheduleProposal
+          ? 'Teacher proposed a reschedule'
+          : `Consultation ${statusLabels[nextStatus] || nextStatus.toLowerCase()}`;
+        const studentMessage = isTeacherRescheduleProposal
+          ? `Your teacher proposed rescheduling your ${subject} consultation. No new time has been chosen yet. Please use Reschedule on your consultation to request a time that works for you.${statusNotes ? ` Reason: ${statusNotes}` : ''}`
+          : `${actorName} ${statusAction} for your ${subject}.${statusNotes ? ` Reason: ${statusNotes}` : ''}`;
         await Notification.create({
           recipientId: requestDoc.studentId,
           actorId: req.user?.id || null,
-          type: 'consultation_status',
-          title: `Consultation ${upper}`,
-          message,
-          related: { consultationRequestId: requestDoc._id.toString(), status: upper },
+          type: nextStatus === 'CANCELLED' ? 'consultation_cancelled' : 'consultation_status',
+          title,
+          message: studentMessage,
+          related: { consultationRequestId: requestDoc._id.toString(), status: nextStatus },
+          data: { route: '/student/consultations' },
         })
+      } catch (err) {
+        console.warn('Failed to create notification for student:', err.message)
       }
-    } catch (err) {
-      console.warn('Failed to create notification for student:', err.message)
     }
 
-    if (nextStatus === 'APPROVED' && previousStatus !== 'APPROVED') {
+    let requestTeacher = null;
+    if (statusChanged) {
+      try {
+        requestTeacher = await findTeacherUserByIdentifier(requestDoc.employeeId);
+        if (requestTeacher && String(requestTeacher._id) !== String(req.user?.id)) {
+          await Notification.create({
+            recipientId: requestTeacher._id,
+            actorId: req.user?.id || null,
+            type: nextStatus === 'CANCELLED' ? 'consultation_cancelled' : 'consultation_status',
+            title: `Consultation ${statusLabels[nextStatus] || nextStatus.toLowerCase()}`,
+            message: `${actorName} ${statusAction} for ${subject}.${statusNotes ? ` Reason: ${statusNotes}` : ''}`,
+            related: { consultationRequestId: requestDoc._id.toString(), status: nextStatus },
+            data: { route: '/teacher/consultation' },
+          })
+        }
+      } catch (err) {
+        console.warn('Failed to create notification for teacher:', err.message)
+      }
+    }
+
+    if (statusChanged && nextStatus === 'APPROVED' && previousStatus !== 'APPROVED') {
       try {
         const student = await User.findById(requestDoc.studentId).select("email firstName lastName").lean();
         if (student?.email) {
@@ -1668,16 +1675,19 @@ async function updateConsultationRequestStatus(req, res) {
       }
     }
 
-    try {
-      await notifyActiveAdmins({
-        actorId: req.user?.id || null,
-        type: 'consultation_status_admin',
-        title: `Consultation ${nextStatus}`,
-        message: `A consultation request for ${requestDoc.subject} was updated to ${nextStatus}.`,
-        related: { consultationRequestId: requestDoc._id.toString(), status: nextStatus },
-      })
-    } catch (err) {
-      console.warn('Failed to create admin status notification:', err.message)
+    if (statusChanged) {
+      try {
+        await notifyActiveAdmins({
+          actorId: req.user?.id || null,
+          excludeIds: requestTeacher ? [String(requestTeacher._id)] : [],
+          type: 'consultation_status_admin',
+          title: `Consultation ${statusLabels[nextStatus] || nextStatus.toLowerCase()}`,
+          message: statusMessage,
+          related: { consultationRequestId: requestDoc._id.toString(), status: nextStatus },
+        })
+      } catch (err) {
+        console.warn('Failed to create admin status notification:', err.message)
+      }
     }
 
     return res.json({ message: "Consultation request updated.", request: toClientRequest(requestDoc) });
