@@ -101,6 +101,34 @@ function getSecurityReviewUrl(token, choice) {
   return url.toString();
 }
 
+async function trustInitialDevice(user, deviceKeyHash, device, now) {
+  if (!deviceKeyHash || user.lastLoginAt || (user.trustedDevices || []).length) return null;
+
+  const enrolledUser = await User.findOneAndUpdate(
+    {
+      _id: user._id,
+      lastLoginAt: null,
+      $or: [
+        { trustedDevices: { $exists: false } },
+        { trustedDevices: { $size: 0 } },
+      ],
+    },
+    {
+      $push: { trustedDevices: { keyHash: deviceKeyHash, label: device, trustedAt: now, lastUsedAt: now } },
+      $set: { lastLoginAt: now },
+    },
+    { new: true }
+  ).select("trustedDevices").lean();
+
+  const latestTrustedDevices = enrolledUser
+    ? enrolledUser.trustedDevices
+    : (await User.findById(user._id).select("trustedDevices").lean())?.trustedDevices || [];
+  user.trustedDevices = latestTrustedDevices;
+  if (enrolledUser) user.lastLoginAt = now;
+
+  return latestTrustedDevices.find((trustedDevice) => trustedDevice.keyHash === deviceKeyHash) || null;
+}
+
 async function completeLogin(user, req, suppliedDeviceId) {
   const now = new Date();
   const deviceId = /^[a-zA-Z0-9-]{32,100}$/.test(String(suppliedDeviceId || ""))
@@ -113,8 +141,25 @@ async function completeLogin(user, req, suppliedDeviceId) {
   const activeSessions = Array.isArray(user.activeSessions) ? user.activeSessions : [];
   user.activeSessions = activeSessions.filter((session) => new Date(session.expiresAt).getTime() > now.getTime());
   const loginWarning = user.activeSessions.length > 0;
-  const trustedDevices = Array.isArray(user.trustedDevices) ? user.trustedDevices : [];
-  const trustedDevice = deviceKeyHash && trustedDevices.find((item) => item.keyHash === deviceKeyHash);
+let trustedDevices = Array.isArray(user.trustedDevices) ? user.trustedDevices : [];
+  if (trustedDevices.length > 1) {
+    trustedDevices = [trustedDevices.reduce((first, current) =>
+      new Date(current.trustedAt).getTime() < new Date(first.trustedAt).getTime() ? current : first
+    )];
+    user.trustedDevices = trustedDevices;
+  }
+  if (trustedDevices.length > 1) {
+    trustedDevices = [trustedDevices.reduce((first, current) =>
+      new Date(current.trustedAt).getTime() < new Date(first.trustedAt).getTime() ? current : first
+    )];
+    user.trustedDevices = trustedDevices;
+  }
+ 
+  let trustedDevice = deviceKeyHash && trustedDevices.find((item) => item.keyHash === deviceKeyHash);
+  if (!trustedDevice && !trustedDevices.length && !user.lastLoginAt) {
+    trustedDevice = await trustInitialDevice(user, deviceKeyHash, device, now);
+    trustedDevices = Array.isArray(user.trustedDevices) ? user.trustedDevices : [];
+  }
   if (trustedDevice) {
     trustedDevice.lastUsedAt = now;
     trustedDevice.label = device;
@@ -154,6 +199,19 @@ async function completeLogin(user, req, suppliedDeviceId) {
     }
   }
   return { loginWarning, sessionId, securityAlert: !trustedDevice, securityApprovalRequired: !trustedDevice, securityEmailSent };
+}
+
+function trustSessionDevice(user, session) {
+  if (!session?.deviceKeyHash) return;
+  const alreadyTrusted = (user.trustedDevices || []).some((item) => item.keyHash === session.deviceKeyHash);
+  if (alreadyTrusted) return;
+  const now = new Date();
+  user.trustedDevices.push({
+    keyHash: session.deviceKeyHash,
+    label: session.device || "Unknown device",
+    trustedAt: now,
+    lastUsedAt: now,
+  });
 }
 
 function toSafeUser(user) {
@@ -691,48 +749,34 @@ async function listSessions(req, res) {
       .filter((session) => new Date(session.expiresAt).getTime() > now)
       .sort((first, second) => new Date(second.lastActiveAt || second.createdAt) - new Date(first.lastActiveAt || first.createdAt));
 
-    // A trusted browser/device is one item in Recent Devices, even if it has
-    // accumulated multiple active login sessions. Older sessions can lack a
-    // stable key (or have a different key after browser storage was reset), so
-    // fold matching reported device names into the trusted device entry too.
-    const trustedSessionsByLabel = new Map();
+    // Device names are not unique (two computers may both report
+    // "Desktop / Windows / Chrome"), so only group sessions by their stable
+    // device key. Sessions without a key remain separate.
+    const groupedSessions = new Map();
     const sessions = [];
     for (const session of activeSessions) {
       const isTrusted = Boolean(session.deviceKeyHash && trustedDeviceHashes.has(session.deviceKeyHash));
-      if (!isTrusted) continue;
-
-      const deviceLabel = String(session.device || "Unknown device").trim();
-      const groupKey = deviceLabel.toLowerCase() === "unknown device"
-        ? `unknown:${session.deviceKeyHash}`
-        : deviceLabel;
-      let grouped = trustedSessionsByLabel.get(groupKey);
+      const groupKey = session.deviceKeyHash
+        ? `${isTrusted ? "trusted" : "untrusted"}:${session.deviceKeyHash}`
+        : `session:${session.id}`;
+      let grouped = groupedSessions.get(groupKey);
       if (!grouped) {
-        grouped = { ...toSafeSession(session, req.user.sid), sessionIds: [], current: false, trusted: true };
-        trustedSessionsByLabel.set(groupKey, grouped);
+        grouped = {
+          ...toSafeSession(session, req.user.sid),
+          sessionIds: [],
+          current: false,
+          trusted: isTrusted,
+        };
+        groupedSessions.set(groupKey, grouped);
         sessions.push(grouped);
       }
       grouped.sessionIds.push(session.id);
-      if (String(session.id) === String(req.user.sid || "")) grouped.current = true;
-    }
-
-    for (const session of activeSessions) {
-      const isTrusted = Boolean(session.deviceKeyHash && trustedDeviceHashes.has(session.deviceKeyHash));
-      if (isTrusted) continue;
-
-      const deviceLabel = String(session.device || "Unknown device").trim();
-      const groupKey = deviceLabel.toLowerCase() === "unknown device" ? "" : deviceLabel;
-      const trustedDevice = groupKey ? trustedSessionsByLabel.get(groupKey) : null;
-      if (trustedDevice) {
-        trustedDevice.sessionIds.push(session.id);
-        const sessionLastActiveAt = session.lastActiveAt || session.createdAt;
-        const groupedLastActiveAt = trustedDevice.lastActiveAt || trustedDevice.createdAt;
-        if (new Date(sessionLastActiveAt).getTime() > new Date(groupedLastActiveAt).getTime()) {
-          trustedDevice.lastActiveAt = sessionLastActiveAt;
-        }
-        if (String(session.id) === String(req.user.sid || "")) trustedDevice.current = true;
-      } else {
-        sessions.push({ ...toSafeSession(session, req.user.sid), sessionIds: [session.id], trusted: false });
+      const sessionLastActiveAt = session.lastActiveAt || session.createdAt;
+      const groupedLastActiveAt = grouped.lastActiveAt || grouped.createdAt;
+      if (new Date(sessionLastActiveAt).getTime() > new Date(groupedLastActiveAt).getTime()) {
+        grouped.lastActiveAt = sessionLastActiveAt;
       }
+      if (String(session.id) === String(req.user.sid || "")) grouped.current = true;
     }
     return res.status(200).json({ sessions });
   } catch (error) {
@@ -771,20 +815,14 @@ async function trustCurrentDevice(req, res) {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found." });
     const session = getPendingReviewSession(user, req.user.sid, String(req.body?.sessionId || ""));
-    if (!session || !session.deviceKeyHash) {
+    if (!session) {
       return res.status(404).json({ message: "That pending device sign-in is no longer active." });
     }
-    const now = new Date();
-    user.trustedDevices = (user.trustedDevices || []).filter((item) => item.keyHash !== session.deviceKeyHash);
-    user.trustedDevices.push({ keyHash: session.deviceKeyHash, label: session.device, trustedAt: now, lastUsedAt: now });
-    user.trustedDevices = user.trustedDevices
-      .sort((first, second) => new Date(second.lastUsedAt) - new Date(first.lastUsedAt))
-      .slice(0, 20);
-    session.securityAlertPending = false;
+   session.securityAlertPending = false;
     session.securityActionTokenHash = null;
     session.securityActionTokenExpiresAt = null;
     await user.save();
-    return res.status(200).json({ message: "This device is now trusted." });
+    return res.status(200).json({ message: "This sign-in is approved. This device will need confirmation next time." });
   } catch (error) {
     return res.status(500).json({ message: "Unable to trust this device.", error: error.message });
   }
@@ -837,19 +875,11 @@ async function confirmSecurityReview(req, res) {
     }
 
     if (choice === "trust") {
-      if (!session.deviceKeyHash) {
-        return res.status(400).json({ message: "This device cannot be remembered. Use the in-app security notice instead." });
-      }
-      user.trustedDevices = (user.trustedDevices || []).filter((item) => item.keyHash !== session.deviceKeyHash);
-      user.trustedDevices.push({ keyHash: session.deviceKeyHash, label: session.device, trustedAt: now, lastUsedAt: now });
-      user.trustedDevices = user.trustedDevices
-        .sort((first, second) => new Date(second.lastUsedAt) - new Date(first.lastUsedAt))
-        .slice(0, 20);
       session.securityAlertPending = false;
       session.securityActionTokenHash = null;
       session.securityActionTokenExpiresAt = null;
       await user.save();
-      return res.status(200).json({ message: "Confirmed. This device is trusted and its session remains active." });
+      return res.status(200).json({ message: "This sign-in is approved. This device will need confirmation next time." });
     }
 
     const invalidateOtherSessions = req.body?.invalidateOtherSessions !== false;

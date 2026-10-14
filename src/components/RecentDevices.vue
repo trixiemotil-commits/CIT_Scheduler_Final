@@ -18,7 +18,11 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg>
         </span>
         <div class="device-info">
-          <div class="device-name">{{ session.device }} <span v-if="session.current" class="device-current">This device</span></div>
+          <div class="device-name">
+            {{ session.device }}
+            <span v-if="session.trusted" class="device-trusted">Primary trusted device</span>
+            <span v-if="session.current" class="device-current">This device</span>
+          </div>
           <time class="device-last-login" :datetime="session.lastActiveAt">Last login · {{ formatDate(session.lastActiveAt) }}</time>
         </div>
         <button class="device-logout" type="button" :disabled="busyId === session.id" @click="pendingLogoutSession = session">
@@ -40,8 +44,8 @@
           <template v-else>This device will be signed out of your account.</template>
         </p>
         <div class="device-confirm-actions">
-          <button type="button" class="device-confirm-cancel" :disabled="busyId" @click="closeLogoutConfirmation">Cancel</button>
-          <button type="button" class="device-confirm-submit" :disabled="busyId" @click="confirmLogoutDevice">
+          <button type="button" class="device-confirm-cancel" :disabled="Boolean(busyId)" @click="closeLogoutConfirmation">Cancel</button>
+          <button type="button" class="device-confirm-submit" :disabled="Boolean(busyId)" @click="confirmLogoutDevice">
             {{ busyId ? 'Signing out…' : 'Log out' }}
           </button>
         </div>
@@ -99,6 +103,7 @@ async function logoutDevice(session) {
   try {
     const response = await fetch(`${API_BASE}/auth/sessions/${encodeURIComponent(session.id)}`, {
       method: 'DELETE',
+      signal: AbortSignal.timeout(15000),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
       body: JSON.stringify({ sessionIds: session.sessionIds || [session.id] }),
     })
@@ -120,10 +125,8 @@ async function logoutDevice(session) {
 async function confirmLogoutDevice() {
   if (!pendingLogoutSession.value || busyId.value) return
   const session = pendingLogoutSession.value
-  await logoutDevice(session)
-  if (!busyId.value && !sessions.value.some((item) => item.id === session.id)) {
-    pendingLogoutSession.value = null
-  }
+   await logoutDevice(session)
+  pendingLogoutSession.value = null
 }
 
 onMounted(async () => {
@@ -158,6 +161,7 @@ onMounted(async () => {
 .device-icon svg { width: 20px; height: 20px; }
 .device-info { flex: 1; min-width: 0; }
 .device-name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #2d3941; font-size: .88rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.device-trusted { padding: 3px 8px; border: 1px solid #c8e1d6; border-radius: 999px; background: #e9f3ee; color: #176b55; font-size: .66rem; font-weight: 700; letter-spacing: .01em; white-space: nowrap; }
 .device-current { padding: 3px 8px; border: 1px solid #c8e1d6; border-radius: 999px; background: #e9f3ee; color: #176b55; font-size: .66rem; font-weight: 700; letter-spacing: .01em; }
 .device-meta, .device-time { display: block; margin-top: 4px; color: #6b777f; font-size: .74rem; font-weight: 550; line-height: 1.45; overflow-wrap: anywhere; }
 .device-time { color: #7b858c; font-size: .71rem; }
@@ -189,6 +193,7 @@ onMounted(async () => {
   .device-icon { width: 36px; height: 36px; }
   .device-icon svg { width: 17px; height: 17px; }
   .device-name { gap: 5px; font-size: .76rem; }
+  .device-trusted { padding: 2px 5px; font-size: .58rem; }
   .device-current { padding: 2px 5px; font-size: .58rem; }
   .device-meta, .device-time { margin-top: 3px; font-size: .65rem; }
   .device-logout { min-height: 30px; padding: 5px 8px; font-size: .66rem; }

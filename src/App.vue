@@ -50,7 +50,7 @@
         <h2 id="security-warning-title">{{ securityMode === 'reset' ? 'Password reset required' : 'New device sign-in' }}</h2>
         <p v-if="securityMode === 'reset'">A sign-in was reported as unrecognized. Reset your password before continuing to use this account.</p>
         <template v-else>
-          <p>Your account was accessed from a device that has not been trusted.</p>
+          <p>A sign-in from a device that is not your primary trusted device needs your confirmation.</p>
           <dl v-if="securityDetails" class="security-warning-details">
             <div><dt>Device</dt><dd>{{ securityDetails.device }}</dd></div>
             <div><dt>Location</dt><dd>{{ securityDetails.location }}</dd></div>
@@ -225,7 +225,12 @@ async function checkForNewLogin() {
       showSecurityWarning.value = true
       return
     }
+    const wasPending = approvalPending.value
     approvalPending.value = Boolean(payload.security?.approvalPending)
+    if (wasPending && !approvalPending.value) {
+      window.location.reload()
+      return
+    }
     if (approvalPending.value) return
     if (!payload.security?.newLoginDetected) return
     securityMode.value = 'review'
@@ -256,7 +261,7 @@ async function trustCurrentDevice() {
     if (!response.ok) throw new Error(body.message || 'Unable to trust this device.')
     showSecurityWarning.value = false
     securityDismissed.value = false
-    securitySuccess.value = body.message || 'This device sign-in was confirmed.'
+    securitySuccess.value = body.message || 'This sign-in was approved.'
     if (securitySuccessTimer) window.clearTimeout(securitySuccessTimer)
     securitySuccessTimer = window.setTimeout(() => {
       securitySuccess.value = ''
@@ -311,7 +316,7 @@ onMounted(() => {
       showNativeSplash.value = false
     }, 5000)
   }
-  securityPoll = window.setInterval(checkForNewLogin, 15000)
+  securityPoll = window.setInterval(checkForNewLogin, 5000)
   checkForNewLogin()
   document.addEventListener('visibilitychange', checkForNewLogin)
   document.addEventListener('scroll', handleDocumentScroll, true)
