@@ -44,8 +44,8 @@
           <template v-else>This device will be signed out of your account.</template>
         </p>
         <div class="device-confirm-actions">
-          <button type="button" class="device-confirm-cancel" :disabled="busyId" @click="closeLogoutConfirmation">Cancel</button>
-          <button type="button" class="device-confirm-submit" :disabled="busyId" @click="confirmLogoutDevice">
+          <button type="button" class="device-confirm-cancel" :disabled="Boolean(busyId)" @click="closeLogoutConfirmation">Cancel</button>
+          <button type="button" class="device-confirm-submit" :disabled="Boolean(busyId)" @click="confirmLogoutDevice">
             {{ busyId ? 'Signing out…' : 'Log out' }}
           </button>
         </div>
