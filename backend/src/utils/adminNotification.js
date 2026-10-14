@@ -31,9 +31,10 @@ async function notifyActiveAdmins({ actorId, type, title, message, related = {},
 }
 
 async function notifyActiveStudents({ actorId, type, title, message, related = {}, route = '/student/teachers' }) {
-  const students = await User.find({
+ const students = await User.find({
     account_status: 'Active',
     $or: [{ role: 'student' }, { roles: 'student' }],
+    ...(actorId ? { _id: { $ne: actorId } } : {}),
   }).select('_id').lean()
 
   if (!students.length) return 0

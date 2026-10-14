@@ -22,6 +22,7 @@ try {
     try {
       const payload = {
         id: doc._id.toString(),
+        actorId: doc.actorId ? doc.actorId.toString() : null,
         type: doc.type,
         title: doc.title,
         message: doc.message,

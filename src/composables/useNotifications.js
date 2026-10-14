@@ -1,4 +1,25 @@
 import { getToken } from '@/auth.js'
+import { Capacitor } from '@capacitor/core'
+import { LocalNotifications } from '@capacitor/local-notifications'
+
+const NOTIF_CHANNEL_ID = 'cit-alerts-v1'
+
+async function setupNativeNotifications() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    await LocalNotifications.requestPermissions()
+    await LocalNotifications.createChannel({
+      id: NOTIF_CHANNEL_ID,
+      name: 'CIT Scheduler alerts',
+      importance: 4,
+      sound: 'notification.mp3',
+      vibration: true,
+    })
+  } catch (err) {
+    console.warn('Notification channel setup failed:', err)
+  }
+}
+setupNativeNotifications()
 
 let es = null
 let esToken = null
@@ -6,7 +27,19 @@ const listeners = new Set()
 
 let pendingSound = false
 
-function playNotificationSound() {
+function playNotificationSound(payload = {}) {
+  if (Capacitor.isNativePlatform()) {
+    LocalNotifications.schedule({
+      notifications: [{
+        id: Math.floor(Date.now() % 2147483647),
+        title: payload.title || 'CIT Scheduler',
+        body: payload.message || 'You have a new notification.',
+        channelId: NOTIF_CHANNEL_ID,
+        sound: 'notification.mp3',
+      }],
+   }).catch((err) => console.warn('Local notification failed:', err))
+  }
+  if (Capacitor.isNativePlatform()) return
   try {
     const audio = new Audio('/sounds/notification.mp3')
     audio.volume = 0.6
@@ -52,7 +85,7 @@ function ensureEventSource() {
   es.addEventListener('notification', (ev) => {
     try {
       const payload = JSON.parse(ev.data || '{}')
-      playNotificationSound()
+     playNotificationSound(payload)
       for (const cb of listeners) {
         try { cb(payload) } catch (_) {}
       }
