@@ -291,6 +291,11 @@ async function reportCurrentDevice() {
     showSecurityWarning.value = false
     securityDismissed.value = false
     securitySuccess.value = body.message || 'The unrecognized device was signed out.'
+    if (securitySuccessTimer) window.clearTimeout(securitySuccessTimer)
+    securitySuccessTimer = window.setTimeout(() => {
+      securitySuccess.value = ''
+      securitySuccessTimer = null
+    }, 5000)
   } catch (error) {
     securityError.value = error.message
   } finally {

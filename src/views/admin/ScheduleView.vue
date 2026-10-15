@@ -126,7 +126,7 @@
           <span><i class="legend-swatch legend-lecture" aria-hidden="true"></i>Lecture</span>
           <span><i class="legend-swatch legend-consultation" aria-hidden="true"></i>Consultation</span>
           <span><i class="legend-swatch legend-lunch" aria-hidden="true"></i>Lunch</span>
-          <span><i class="legend-swatch legend-free" aria-hidden="true"></i>Free time</span>
+          <span><i class="legend-swatch legend-free" aria-hidden="true"></i>Office hours</span>
         </div>
 
         <!-- Pagination: year filter chips -->

@@ -114,11 +114,13 @@ function normalizeTeacherStatus(statusOrObj) {
     const account = String(t.account_status || '').trim()
     if (account && account !== 'Active') return 'On Leave'
 
-    if (t.teacher_clocked_out) return 'Offline'
-
     const adminStatus = String(t.teacher_admin_status || '').trim().toLowerCase()
     if (adminStatus === 'on leave' || adminStatus === 'leave') return 'On Leave'
     if (adminStatus === 'offline') return 'Offline'
+    if (adminStatus === 'on meeting' || adminStatus === 'on-meeting') return 'On Meeting'
+    if (adminStatus === 'off campus' || adminStatus === 'off-campus') return 'Off Campus'
+    if (adminStatus === 'on school') return 'On School'
+    if (t.teacher_clocked_out) return 'Offline'
 
     if (t.teacher_status_expires_at) {
       try {
@@ -131,7 +133,7 @@ function normalizeTeacherStatus(statusOrObj) {
       }
     }
 
-    const statusRaw = String(t.teacher_status || t.status || '').trim().toLowerCase()
+    const statusRaw = String(t.teacher_admin_status || t.teacher_status || t.status || '').trim().toLowerCase()
     if (statusRaw === 'on leave' || statusRaw === 'leave') return 'On Leave'
     if (statusRaw === 'offline') return 'Offline'
     if (statusRaw === 'on meeting' || statusRaw === 'on-meeting') return 'On Meeting'
@@ -149,11 +151,16 @@ function normalizeTeacherStatus(statusOrObj) {
 }
 
 const normalizedStatus = computed(() => {
-  if (isOutsideWorkWindow.value) return 'Offline'
   // Prefer authoritative profile on user.value to keep teacher view consistent with server-side resolution
   if (user.value && typeof user.value === 'object') {
+    const adminStatus = String(user.value.teacher_admin_status || '').trim().toLowerCase()
+    if (['on school', 'on leave', 'offline', 'on meeting', 'on-meeting', 'off campus', 'off-campus'].includes(adminStatus)) {
+      return normalizeTeacherStatus(user.value)
+    }
+    if (isOutsideWorkWindow.value) return 'Offline'
     return normalizeTeacherStatus(user.value)
   }
+  if (isOutsideWorkWindow.value) return 'Offline'
   return normalizeTeacherStatus(teacherStatus.value)
 })
 const isOffline = computed(() => ['On Leave', 'Offline'].includes(normalizedStatus.value))

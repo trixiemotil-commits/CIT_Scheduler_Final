@@ -180,6 +180,7 @@
                   @change="onTeacherStatusChange(teacher, $event)"
                 >
                   <option value="On School">On School</option>
+                  <option value="On Meeting">On Meeting</option>
                   <option value="On Leave">On Leave</option>
                   <option value="Offline">Offline</option>
                 </select>
@@ -584,6 +585,7 @@ function normalizeTeacherStatus(status) {
 }
 
 function statusCssClass(status) {
+  if (/^(on|in)\s+class[\s-]*substitute$/i.test(String(status || '').trim())) return 'class-substitute'
   const normalized = normalizeTeacherStatus(status)
   if (normalized === 'Off Campus') return 'off-campus'
   return normalized === 'On School' ? 'in-school' : normalized.toLowerCase().replace(/\s+/g, '-')
@@ -2643,6 +2645,8 @@ onUnmounted(() => {
 .summary-counts .summary-count--leave b { color: #874b47; background: #f2dfde; }
 .summary-counts .summary-count--event { color: #285d94; border-color: #bfd3e8; background: #eef5fc; }
 .summary-counts .summary-count--event b { color: #285d94; background: #dceafa; }
+.summary-counts .summary-count--meeting { color: #765f2e; border-color: #e1d5b8; background: #f8f3e7; }
+.summary-counts .summary-count--meeting b { color: #765f2e; background: #ebe2ce; }
 .status-tabs { gap: 7px; margin-bottom: 20px; }
 .status-tab { display: inline-flex; min-height: 38px; padding: 7px 12px; align-items: center; gap: 7px; color: #59656e; border-color: #d8dee2; border-radius: 10px; background: #f7f8f9; font-size: .72rem; font-weight: 600; }
 .status-tab span { display: grid; min-width: 20px; height: 20px; place-items: center; padding: 0 5px; color: #6c7780; border-radius: 99px; background: #e5e9ec; font-size: .61rem; }
@@ -2702,11 +2706,13 @@ onUnmounted(() => {
 .teacher-card:hover { transform: translateY(-2px); border-color: #b9c4ca !important; box-shadow: 0 12px 27px rgba(42,52,59,.11); }
 .teacher-card::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: #8c979f; }
 .teacher-card.card-in-school::before { background: #499067; }
+.teacher-card.card-class-substitute::before { background: #d97898; }
 .teacher-card.card-on-leave::before { background: #9b7272; }
 .teacher-card.card-on-meeting::before { background: #a78c53; }
 .teacher-card.card-on-event::before { background: #3977b8; }
 .status-badge { position: relative; inset: auto; align-self: flex-end; display: flex; align-items: center; justify-content: center; max-width: 100%; margin: 0 0 8px; padding: 5px 10px; color: #53616a !important; border: 1px solid #d8dee2; border-radius: 999px; background: #f1f3f4 !important; font-size: .62rem; letter-spacing: .04em; line-height: 1.25; text-align: center; white-space: normal; overflow-wrap: anywhere; }
 .badge-in-school { color: #276842 !important; border-color: #bddbc8; background: #e8f5ed !important; }
+.badge-class-substitute { color: #ad4669 !important; border-color: #efb4c7 !important; background: #fce4ec !important; }
 .badge-off-campus { color: #8b551a !important; border-color: #e2c99e; background: #fff4e3 !important; }
 .badge-on-leave { color: #7d4545 !important; border-color: #dec5c5; background: #f7eded !important; }
 .badge-on-meeting { color: #765f2e !important; border-color: #e1d5b8; background: #f8f3e7 !important; }

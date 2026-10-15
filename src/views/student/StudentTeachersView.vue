@@ -604,6 +604,7 @@ const visibleTeacherCount = computed(() => {
 
 function statusClass(s) {
   if (s === 'On School - In Class') return 'pill-green'
+  if (/^(on|in)\s+class[\s-]*substitute$/i.test(String(s || '').trim())) return 'pill-pink'
   if (s === 'Off Campus') return 'pill-yellow'
   return {
     'On School': 'pill-green',
@@ -1182,6 +1183,7 @@ onUnmounted(() => {
 .subject-chip { border-color: #cdd4d9; border-radius: 999px; background: rgba(245,247,247,.7); color: #56616b; }
 .status-pill { border: 1px solid rgba(255,255,255,.7); border-radius: 999px; padding: 6px 9px; }
 .pill-green { background: #e0eee5; color: #397051; }
+.pill-pink { background: #fce4ec; color: #ad4669; }
 .pill-gray { background: #e3e6e8; color: #68727a; }
 .consultation-hours { border-color: #cbded2; border-radius: 14px; background: #edf6f0; }
 .hours-chip { border-radius: 999px; background: #f8fbf9; }

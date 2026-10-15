@@ -20,7 +20,7 @@
 
           <div class="filter-row">
             <button :class="['filter-chip', { active: eventsTab === 'active' }]" @click="eventsTab = 'active'">Active</button>
-            <button :class="['filter-chip', { active: eventsTab === 'ended' }]" @click="eventsTab = 'ended'">Ended</button>
+            <button :class="['filter-chip', { active: eventsTab === 'ended' }]" @click="eventsTab = 'ended'">Ended <span class="filter-count">{{ endedEventCount }}</span></button>
           </div>
 
           <div class="events-grid">
@@ -162,7 +162,13 @@
                   <span class="info-val">{{ viewEvent.location || '—' }}</span>
                 </div>
               </div>
-              <button class="modal-close-btn detail-close-btn" type="button" @click="showViewModal = false">Close</button>
+              <div class="modal-event-teachers">
+                <div class="modal-event-teachers-heading"><span class="modal-event-teachers-icon" aria-hidden="true">👥</span><div><span class="info-label">Teachers involved</span><small>{{ viewEvent.teachers?.length || viewEvent.teacherIds?.length || 0 }} assigned</small></div></div>
+                <div v-if="viewEvent.teachers?.length" class="modal-event-teacher-list">
+                  <span v-for="teacher in viewEvent.teachers" :key="teacher.id" class="modal-event-teacher-chip">{{ teacher.name }}</span>
+                </div>
+                <span v-else class="modal-event-teachers-empty">{{ eventTeacherNames(viewEvent) }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -240,6 +246,12 @@ const now = ref(new Date())
 
 const showViewModal = ref(false)
 const viewEvent = ref(null)
+function eventTeacherNames(event) {
+  const names = Array.isArray(event?.teachers) ? event.teachers.map((teacher) => teacher?.name).filter(Boolean) : []
+  if (names.length) return names.join(', ')
+  const ids = Array.isArray(event?.teacherIds) ? event.teacherIds : []
+  return ids.length ? `${ids.length} assigned teacher${ids.length === 1 ? '' : 's'}` : 'No teachers assigned'
+}
 
 const showEventModal = ref(false)
 const editingEvent = ref(null)
@@ -270,6 +282,7 @@ function matchesSearch(event) {
 
 const activeEvents = computed(() => events.value.filter(e => e.status === 'active' && !isEventEnded(e) && matchesSearch(e)))
 const endedEvents = computed(() => events.value.filter(e => e.status === 'active' && isEventEnded(e) && matchesSearch(e)))
+const endedEventCount = computed(() => events.value.filter(e => e.status === 'active' && isEventEnded(e)).length)
 
 function isEventEnded(event) {
   if (!event?.date || !event?.endTime) return false
@@ -563,6 +576,8 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   color: #fff;
   box-shadow: inset 0 1px rgba(255,255,255,.18), 0 6px 13px rgba(48,57,64,.2);
 }
+.filter-count { display: inline-grid; min-width: 18px; height: 18px; margin-left: 4px; padding: 0 5px; place-items: center; border-radius: 99px; background: #e7ebee; color: #56616a; font-size: .68rem; line-height: 1; }
+.filter-chip.active .filter-count { background: rgba(255,255,255,.22); color: #fff; }
 
 .tab-btn {
   flex: 1;
@@ -892,6 +907,14 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   font-weight: 600;
   color: #303940;
 }
+.modal-event-teachers { padding: 15px; border: 1px solid #e2e9ed; border-radius: 15px; background: linear-gradient(145deg,#f8fafb,#f0f4f6); }
+.modal-event-teachers-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.modal-event-teachers-heading > div { display: flex; flex-direction: column; gap: 3px; }
+.modal-event-teachers-heading small { color: #87939b; font-size: .72rem; }
+.modal-event-teachers-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: #e5edf2; font-size: 16px; }
+.modal-event-teacher-list { display: flex; flex-wrap: wrap; gap: 7px; }
+.modal-event-teacher-chip { padding: 7px 10px; border: 1px solid #e1e7ea; border-radius: 999px; background: #fff; color: #354149; font-size: .78rem; font-weight: 600; }
+.modal-event-teachers-empty { color: #697780; font-size: .86rem; }
 
 .modal-edit-btn {
   width: 100%;

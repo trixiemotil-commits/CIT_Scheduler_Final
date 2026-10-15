@@ -241,7 +241,8 @@ function toSafeUser(user) {
     account_status: user.account_status,
     // Clocking out at 8 PM is a persistent state. Do not let an older
     // temporary status expiry make the teacher appear back On School.
-    teacher_status: user.teacher_clocked_out ? "Offline" : (statusExpired ? "On School" : user.teacher_status),
+    teacher_status: user.teacher_admin_status || (user.teacher_clocked_out ? "Offline" : (statusExpired ? "On School" : user.teacher_status)),
+    teacher_admin_status: user.teacher_admin_status || "",
     teacher_availability: user.teacher_availability,
     teacher_time_in: user.teacher_time_in,
     teacher_clocked_out: Boolean(user.teacher_clocked_out),

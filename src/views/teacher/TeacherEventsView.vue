@@ -172,6 +172,13 @@
                 </div>
               </div>
             </div>
+            <div class="ev-view-teachers">
+              <div class="ev-view-teachers-heading"><span class="ev-view-teachers-icon" aria-hidden="true">👥</span><div><span class="ev-view-desc-label">Teachers involved</span><small>{{ viewEvent.teachers?.length || viewEvent.teacherIds?.length || 0 }} assigned</small></div></div>
+              <div v-if="viewEvent.teachers?.length" class="ev-view-teacher-list">
+                <span v-for="teacher in viewEvent.teachers" :key="teacher.id" class="ev-view-teacher-chip"><i>{{ teacher.name.split(/\s+/).map(part => part[0]).slice(0, 2).join('').toUpperCase() }}</i>{{ teacher.name }}</span>
+              </div>
+              <p v-else class="ev-view-teachers-empty">{{ eventTeacherNames(viewEvent) }}</p>
+            </div>
             <div v-if="viewEvent.description" class="ev-view-desc-wrap">
               <div class="ev-view-desc-label">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
@@ -410,6 +417,12 @@ async function confirmLogout() {
 const showEventModal = ref(false)
 const editingEvent = ref(null)
 const eventForm = ref({ title: '', description: '', date: '', time: '', location: '', image: '', teacherIds: [] })
+function eventTeacherNames(event) {
+  const names = Array.isArray(event?.teachers) ? event.teachers.map((teacher) => teacher?.name).filter(Boolean) : []
+  if (names.length) return names.join(', ')
+  const ids = Array.isArray(event?.teacherIds) ? event.teacherIds : []
+  return ids.length ? `${ids.length} assigned teacher${ids.length === 1 ? '' : 's'}` : 'No teachers assigned'
+}
 const imagePreview = ref('')
 const imgInput = ref(null)
 const todayDate = (() => {
@@ -969,6 +982,10 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 /* Reference-style event overview */
 .events-section {
   position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
   width: 100%;
   padding: 24px 28px 28px;
@@ -1020,7 +1037,21 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 .events-section .ev-tab.active { border-color: #465761; background: #465761; color: #fff; box-shadow: 0 3px 8px rgba(45, 58, 66, .17); }
 .events-section .ev-tab-count { padding: 1px 6px; background: rgba(255,255,255,.9); color: #52616b; font-size: .62rem; }
 .events-section .ev-tab.active .ev-tab-count { color: #465761; }
-.events-grid { display: flex; flex-direction: column; gap: 16px; }
+.events-grid {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #b7c1c8 transparent;
+  padding: 0 5px 4px 0;
+}
+.events-grid::-webkit-scrollbar { width: 8px; }
+.events-grid::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: #b7c1c8; background-clip: padding-box; }
+.events-grid::-webkit-scrollbar-track { background: transparent; }
 .events-section .event-card {
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);
@@ -1278,6 +1309,16 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
   margin-bottom: 10px;
 }
 .ev-view-desc { font-size: 0.92rem; color: #444; line-height: 1.7; margin: 0; }
+.ev-view-teachers { padding: 17px 20px; border: 1px solid #e8edf0; border-radius: 16px; background: linear-gradient(145deg, #f8fafb, #f2f5f7); }
+.ev-view-teachers-heading { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+.ev-view-teachers-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #e5edf2; font-size: 17px; }
+.ev-view-teachers-heading > div { display: flex; flex-direction: column; gap: 3px; }
+.ev-view-teachers-heading .ev-view-desc-label { margin: 0; color: #46535c; }
+.ev-view-teachers-heading small { color: #87939b; font-size: .74rem; }
+.ev-view-teacher-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.ev-view-teacher-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px 6px 6px; border: 1px solid #e1e7ea; border-radius: 999px; background: #fff; color: #354149; font-size: .82rem; font-weight: 600; box-shadow: 0 1px 2px rgba(32,46,55,.04); }
+.ev-view-teacher-chip i { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; background: #e8eff3; color: #526570; font-size: .63rem; font-style: normal; font-weight: 750; }
+.ev-view-teachers-empty { margin: 0; color: #697780; font-size: .88rem; }
 
 .ev-view-edit-btn {
   display: flex;

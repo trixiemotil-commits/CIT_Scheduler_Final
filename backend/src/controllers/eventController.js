@@ -38,10 +38,29 @@ async function validateEventTeacherIds(teacherIds) {
   return unavailable ? "Only active teacher accounts can be assigned to an event." : null;
 }
 
-function serializeEvent(event) {
+function serializeEvent(event, teachersById = new Map()) {
   const value = event?.toObject ? event.toObject() : event;
   if (!value) return value;
-  return { ...value, id: String(value._id) };
+  const teacherIds = cleanTeacherIds(value.teacherIds);
+  return {
+    ...value,
+    id: String(value._id),
+    teachers: teacherIds.map((id) => teachersById.get(id)).filter(Boolean),
+  };
+}
+
+async function serializeEvents(events) {
+  const ids = [...new Set(events.flatMap((event) => cleanTeacherIds(event.teacherIds)))];
+  const teachers = ids.length
+    ? await User.find({ _id: { $in: ids } })
+      .select("_id firstName lastName")
+      .lean()
+    : [];
+  const teachersById = new Map(teachers.map((teacher) => [String(teacher._id), {
+    id: String(teacher._id),
+    name: `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim() || "Teacher",
+  }]));
+  return events.map((event) => serializeEvent(event, teachersById));
 }
 
 function eventPayload(body = {}) {
@@ -154,13 +173,7 @@ async function listEvents(req, res) {
       query.status = requestedStatus;
     }
 
-    if (req.user?.role === "teacher") {
-      query.$or = [
-        { teacherIds: { $exists: false } },
-        { teacherIds: { $size: 0 } },
-        { teacherIds: String(req.user.id) },
-      ];
-    } else if (req.user?.role === "student") {
+    if (req.user?.role === "student") {
       const student = await User.findById(req.user.id).select("yearLevel studentYearSections").lean();
       const studentYears = [...new Set([
         student?.yearLevel,
@@ -174,7 +187,7 @@ async function listEvents(req, res) {
     }
 
     const events = await Event.find(query).sort({ date: 1, time: 1, createdAt: -1 }).lean();
-    return res.json({ events: events.map(serializeEvent) });
+    return res.json({ events: await serializeEvents(events) });
   } catch (error) {
     console.error("Failed to list events:", error);
     return res.status(500).json({ message: "Failed to load events.", error: error.message });

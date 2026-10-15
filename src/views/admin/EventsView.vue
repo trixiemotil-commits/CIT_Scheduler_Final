@@ -319,6 +319,17 @@
               </div>
             </div>
 
+            <div class="ev-view-teachers">
+              <div class="ev-view-teachers-heading">
+                <span class="ev-view-teachers-icon" aria-hidden="true">👥</span>
+                <div><span class="ev-view-desc-label">Teachers involved</span><small>{{ viewEvent.teachers?.length || viewEvent.teacherIds?.length || 0 }} assigned</small></div>
+              </div>
+              <div v-if="viewEvent.teachers?.length" class="ev-view-teacher-list">
+                <span v-for="teacher in viewEvent.teachers" :key="teacher.id" class="ev-view-teacher-chip"><i>{{ teacher.name.split(/\s+/).map(part => part[0]).slice(0, 2).join('').toUpperCase() }}</i>{{ teacher.name }}</span>
+              </div>
+              <p v-else class="ev-view-teachers-empty">{{ eventTeacherNames(viewEvent) }}</p>
+            </div>
+
             <!-- Description -->
             <div v-if="viewEvent.description" class="ev-view-desc-wrap">
               <div class="ev-view-desc-label">
@@ -330,7 +341,6 @@
 
             <!-- Footer actions -->
             <div class="ev-view-actions">
-              <button class="ev-view-close-btn" @click="showViewModal = false">Close</button>
               <button class="ev-view-edit-btn" @click="showViewModal = false; openEditEvent(viewEvent)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 Edit Event
@@ -722,6 +732,17 @@ const selectedTeacherLabel = computed(() => {
   const count = eventForm.value.teacherIds.length
   return count ? `${count} teacher${count === 1 ? '' : 's'} selected` : 'Select teachers involved'
 })
+function eventTeacherNames(event) {
+  const names = Array.isArray(event?.teachers) ? event.teachers.map((teacher) => teacher?.name).filter(Boolean) : []
+  if (names.length) return names.join(', ')
+  const assignedIds = Array.isArray(event?.teacherIds) ? event.teacherIds : []
+  if (assignedIds.length) {
+    const knownNames = assignedIds.map((id) => eventTeachers.value.find((teacher) => teacher.id === String(id))?.name).filter(Boolean)
+    if (knownNames.length) return knownNames.join(', ')
+    return `${assignedIds.length} assigned teacher${assignedIds.length === 1 ? '' : 's'}`
+  }
+  return 'No teachers assigned'
+}
 const allVisibleTeachersSelected = computed(() => {
   const visible = filteredEventTeachers.value
   return visible.length > 0 && visible.every((teacher) => eventForm.value.teacherIds.includes(teacher.id))
@@ -1549,6 +1570,16 @@ onMounted(() => {
   margin-bottom: 10px;
 }
 .ev-view-desc { font-size: 0.92rem; color: #444; line-height: 1.7; margin: 0; }
+.ev-view-teachers { padding: 17px 20px; border: 1px solid #e8edf0; border-radius: 16px; background: linear-gradient(145deg, #f8fafb, #f2f5f7); }
+.ev-view-teachers-heading { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+.ev-view-teachers-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #e5edf2; font-size: 17px; }
+.ev-view-teachers-heading > div { display: flex; flex-direction: column; gap: 3px; }
+.ev-view-teachers-heading .ev-view-desc-label { margin: 0; color: #46535c; }
+.ev-view-teachers-heading small { color: #87939b; font-size: .74rem; }
+.ev-view-teacher-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.ev-view-teacher-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px 6px 6px; border: 1px solid #e1e7ea; border-radius: 999px; background: #fff; color: #354149; font-size: .82rem; font-weight: 600; box-shadow: 0 1px 2px rgba(32,46,55,.04); }
+.ev-view-teacher-chip i { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; background: #e8eff3; color: #526570; font-size: .63rem; font-style: normal; font-weight: 750; }
+.ev-view-teachers-empty { margin: 0; color: #697780; font-size: .88rem; }
 
 .ev-view-actions {
   display: flex;
@@ -1559,19 +1590,6 @@ onMounted(() => {
   border-top: 1.5px solid #f0f0f0;
   margin-top: 2px;
 }
-.ev-view-close-btn {
-  background: none;
-  border: 1.5px solid #e0e0e0;
-  font-family: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #666;
-  cursor: pointer;
-  padding: 10px 22px;
-  border-radius: 10px;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.ev-view-close-btn:hover { background: #f5f5f5; border-color: #bbb; color: #333; }
 .ev-view-edit-btn {
   display: flex;
   align-items: center;

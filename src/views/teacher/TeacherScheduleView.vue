@@ -83,7 +83,7 @@
           <span><i class="legend-swatch legend-consultation" aria-hidden="true"></i>Consultation</span>
           <span><i class="legend-swatch legend-main-campus" aria-hidden="true"></i>Main Campus</span>
           <span><i class="legend-swatch legend-lunch" aria-hidden="true"></i>Lunch Break</span>
-          <span><i class="legend-swatch legend-free" aria-hidden="true"></i>Free time</span>
+          <span><i class="legend-swatch legend-free" aria-hidden="true"></i>Office hours</span>
         </div>
 
         <!-- Grid -->
@@ -264,7 +264,7 @@
                     v-else-if="cell.type === 'empty'"
                     :class="['td-empty', { 'free-time-cell': cell.withinWorkHours, 'col-expanded': expandedDay === DAYS[ci], 'col-collapsed': expandedDay && expandedDay !== DAYS[ci] }]"
                   >
-                    <span v-if="cell.withinWorkHours" class="free-time-label">Free time</span>
+                    <span v-if="cell.withinWorkHours" class="free-time-label">Office hours</span>
                   </td>
                   <!-- occupied: skip -->
                 </template>

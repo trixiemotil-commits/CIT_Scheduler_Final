@@ -436,6 +436,7 @@ const upcomingConsultCount = ref(0)
 const consultationStatsLoading = ref(true)
 const dashboardLoading = ref(true)
 let consultationStatsRefreshTimer
+let teacherStatusRefreshTimer
 let consultationStatsInFlight = false
 
 async function loadConsultationStats() {
@@ -599,6 +600,7 @@ function _onNotif(n) {
 
 function refreshDashboardWhenVisible() {
   if (document.visibilityState !== 'visible') return
+  loadTeacherStatus()
   loadConsultationNotifications()
   loadConsultationStats()
 }
@@ -810,6 +812,8 @@ function setTeacherStatus(status) {
 }
 
 const teacherStatusDisplay = computed(() => {
+  const adminStatus = normalizeTeacherStatus(getUser()?.teacher_admin_status)
+  if (['On School', 'On Meeting', 'On Leave', 'Off Campus'].includes(adminStatus)) return adminStatus
   if (teacherIsClockedOut.value) return 'Offline'
   const status = normalizeTeacherStatus(teacherStatus.value)
   if (status === 'On School') return 'On School'
@@ -826,6 +830,9 @@ const workStatusDisabled = computed(() => {
 })
 
 const teacherStatusClass = computed(() => {
+  const adminStatus = normalizeTeacherStatus(getUser()?.teacher_admin_status)
+  if (['On School', 'On Meeting', 'Off Campus'].includes(adminStatus)) return 'is-in-school'
+  if (adminStatus === 'On Leave') return 'is-on-leave'
   if (teacherIsClockedOut.value) return 'is-offline'
   return teacherStatus.value === 'On School' ? 'is-in-school' : 'is-on-leave'
 })
@@ -1379,6 +1386,7 @@ onMounted(() => {
   loadConsultationStats()
   loadEvents()
   notificationRefreshTimer = window.setInterval(loadConsultationNotifications, 30000)
+  teacherStatusRefreshTimer = window.setInterval(loadTeacherStatus, 15000)
   consultationStatsRefreshTimer = window.setInterval(loadConsultationStats, 30000)
   document.addEventListener('visibilitychange', refreshDashboardWhenVisible)
   initDailyStatusTimers()
@@ -1387,6 +1395,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.clearInterval(notificationRefreshTimer)
+  window.clearInterval(teacherStatusRefreshTimer)
   window.clearInterval(consultationStatsRefreshTimer)
   document.removeEventListener('visibilitychange', refreshDashboardWhenVisible)
   useNotifications.removeNotificationListener(_onNotif)

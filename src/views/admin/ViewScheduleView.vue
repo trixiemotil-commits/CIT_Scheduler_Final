@@ -216,7 +216,7 @@
                         </div>
                       </template>
                       <template v-else>
-                        <span class="free-time-label">Free time</span>
+                        <span class="free-time-label">Office hours</span>
                       </template>
                     </td>
                   </template>
@@ -276,7 +276,7 @@
                           <div class="entry-section-row"><span class="entry-section-badge">{{ [getEntriesForStudentCell(slot, day)[0].year, getEntriesForStudentCell(slot, day)[0].section].filter(Boolean).join(' · ') }}</span><span class="entry-room">Room: {{ getEntriesForStudentCell(slot, day)[0].room || 'not assigned' }}</span></div>
                         </div>
                       </template>
-                      <span v-else class="free-time-label">Free time</span>
+                      <span v-else class="free-time-label">Office hours</span>
                     </td>
                   </template>
                 </tr>
@@ -423,7 +423,7 @@
                         </div>
                       </template>
                       <template v-else-if="isWithinTeacherWorkHours(slot, day)">
-                        <span class="free-time-label">Free time</span>
+                        <span class="free-time-label">Office hours</span>
                       </template>
                     </td>
                   </template>

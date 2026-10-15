@@ -162,14 +162,18 @@
               </div>
               <div class="req-actions">
                 <!-- Pending actions -->
-                <template v-if="req.status === 'pending' && !req.isSubjectTeacher && !req.availabilityId && Number(req.pendingQueuePosition) === 1">
-                  <button class="btn-approve" @click.stop="approve(req.id)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    Approve
+                <template v-if="req.status === 'pending'">
+                  <button class="btn-edit" title="Update status" @click.stop="editReq(req.id)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    <span>Update Status</span>
                   </button>
                   <button class="btn-reject" @click.stop="reject(req.id)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     Reschedule
+                  </button>
+                  <button v-if="!req.isSubjectTeacher && !req.availabilityId && Number(req.pendingQueuePosition) === 1" class="btn-approve" @click.stop="approve(req.id)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Approve
                   </button>
                 </template>
                 <!-- Allow approved and rescheduled requests to have their status edited. -->
