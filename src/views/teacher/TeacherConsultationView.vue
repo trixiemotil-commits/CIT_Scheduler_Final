@@ -161,37 +161,25 @@
                 </div>
               </div>
               <div class="req-actions">
-                <!-- Pending actions -->
                 <template v-if="req.status === 'pending'">
-                  <button class="btn-edit" title="Update status" @click.stop="editReq(req.id)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    <span>Update Status</span>
+                  <button class="btn-approve" @click.stop="approve(req.id)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Approve
                   </button>
                   <button class="btn-reject" @click.stop="reject(req.id)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     Reschedule
                   </button>
-                  <button v-if="!req.isSubjectTeacher && !req.availabilityId && Number(req.pendingQueuePosition) === 1" class="btn-approve" @click.stop="approve(req.id)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    Approve
-                  </button>
                 </template>
-                <!-- Allow approved and rescheduled requests to have their status edited. -->
-                <template v-else-if="req.status === 'approved' || req.status === 'resched'">
-                  <button class="btn-edit" :title="'Update status'" @click.stop="editReq(req.id)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    <span>Update Status</span>
+                <template v-else-if="req.status === 'approved'">
+                  <button class="btn-reject" @click.stop="reject(req.id)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6m0-6 6 6"/></svg>
+                    Reschedule
                   </button>
-                  <template v-if="req.status === 'approved'">
-                    <button class="btn-reject" @click.stop="reject(req.id)">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6m0-6 6 6"/></svg>
-                      Reschedule
-                    </button>
-                    <button v-if="Number(req.approvedQueuePosition) === 1" class="btn-done" @click.stop="openDoneModal(req.id)">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      Mark as Done
-                    </button>
-                  </template>
+                  <button class="btn-done" @click.stop="openDoneModal(req.id)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Mark as Done
+                  </button>
                 </template>
               </div>
             </div>
@@ -353,45 +341,6 @@
             <button class="confirm-cancel-btn" :disabled="isRescheduling" @click="cancelConfirm">Cancel</button>
             <button class="confirm-ok-btn" :disabled="isRescheduling" @click="confirmReject">
               {{ isRescheduling ? 'Rescheduling...' : 'Yes, Reschedule' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- ═══ Edit Modal ═══ -->
-    <Teleport to="body">
-      <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
-        <div class="edit-modal">
-          <div class="edit-modal-header">
-            <div>
-              <h2 class="edit-modal-title">Update Consultation Status</h2>
-              <p class="edit-modal-sub">Choose the current status for this consultation request.</p>
-            </div>
-            <button class="edit-modal-close" :disabled="isSavingStatus" @click="closeEditModal">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-
-          <div class="edit-modal-body">
-            <label class="edit-label">Update Status</label>
-            <div class="edit-status-options">
-              <label
-                v-for="opt in statusOptions"
-                :key="opt.value"
-                :class="['edit-status-opt', `opt-${opt.value}`, { selected: editForm.status === opt.value }]"
-              >
-                <input type="radio" v-model="editForm.status" :value="opt.value" hidden />
-                <span class="opt-dot"></span>
-                {{ opt.label }}
-              </label>
-            </div>
-          </div>
-
-          <div class="edit-modal-actions">
-            <button class="edit-save-btn" :disabled="isSavingStatus || editForm.status === editTarget?.status" @click="saveEdit">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-              {{ isSavingStatus ? 'Saving...' : 'Update Status' }}
             </button>
           </div>
         </div>
@@ -803,26 +752,19 @@ const rejectTarget     = ref(null)
 const rejectionReason  = ref('')
 const otherReason      = ref('')
 const rejectReasonError = ref(false)
-const rescheduleOpenedFromEdit = ref(false)
 const isRescheduling = ref(false)
 
-function reject(id, { fromEdit = false } = {}) {
+function reject(id) {
   rejectTarget.value     = requests.value.find(r => r.id === id) || null
   rejectionReason.value  = ''
   otherReason.value      = ''
   rejectReasonError.value = false
-  rescheduleOpenedFromEdit.value = fromEdit
   showRejectModal.value  = true
 }
 
 function closeRejectModal() {
   if (isRescheduling.value) return
   showRejectModal.value = false
-  if (rescheduleOpenedFromEdit.value && editTarget.value) {
-    showEditModal.value = true
-    rescheduleOpenedFromEdit.value = false
-    return
-  }
   rejectTarget.value = null
 }
 
@@ -873,16 +815,8 @@ async function confirmReject() {
     await patchRequestStatus(pendingRejectTarget.value.id, 'resched', 'Reschedule Successful', getRejectReasonText())
     showConfirmModal.value = false
     showRejectModal.value = false
-    if (rescheduleOpenedFromEdit.value) {
-      rescheduleOpenedFromEdit.value = false
-      editTarget.value = null
-    }
   } catch (error) {
     showConfirmModal.value = false
-    if (rescheduleOpenedFromEdit.value) {
-      rescheduleOpenedFromEdit.value = false
-      showEditModal.value = true
-    }
     Swal.fire('Unable to reschedule', error.message || 'Failed to update request status.', 'error')
   } finally {
     isRescheduling.value = false
@@ -923,76 +857,6 @@ async function confirmDone() {
   } finally {
     isCompleting.value = false
   }
-}
-
-/* ── Edit modal ── */
-const showEditModal = ref(false)
-const editTarget    = ref(null)
-const editForm      = ref({ status: '' })
-const isSavingStatus = ref(false)
-
-const statusOptions = [
-  { value: 'pending',   label: 'Pending'   },
-  { value: 'approved',  label: 'Approved'  },
-  { value: 'resched',   label: 'Reschedule' },
-  { value: 'completed', label: 'Completed' },
-]
-
-function editReq(id) {
-  const r = requests.value.find(r => r.id === id)
-  if (!r) return
-  editTarget.value    = r
-  editForm.value      = { status: r.status }
-  showEditModal.value = true
-}
-
-function closeEditModal() {
-  if (isSavingStatus.value) return
-  showEditModal.value = false
-  editTarget.value    = null
-}
-
-async function saveEdit() {
-  if (!editTarget.value || isSavingStatus.value || editForm.value.status === editTarget.value.status) return
-  if (editForm.value.status === 'resched') {
-    const targetId = editTarget.value.id
-    showEditModal.value = false
-    reject(targetId, { fromEdit: true })
-    return
-  }
-  const label = statusOptions.find(o => o.value === editForm.value.status)?.label ?? editForm.value.status
-  let didUpdate = false
-  try {
-    const result = await Swal.fire({
-      title: `Set as ${label}?`,
-      text: `This will update the request status to "${label}".`,
-      icon: 'question',
-      showCancelButton: true,
-      cancelButtonText: 'Cancel',
-      confirmButtonText: 'Yes, update',
-      confirmButtonColor: '#ed9b38',
-      allowOutsideClick: () => !Swal.isLoading(),
-      preConfirm: async () => {
-        isSavingStatus.value = true
-        const confirmButton = Swal.getConfirmButton()
-        if (confirmButton) confirmButton.textContent = 'Updating...'
-        try {
-          await patchRequestStatus(editTarget.value.id, editForm.value.status, 'Status Updated')
-        } catch (error) {
-          Swal.showValidationMessage(error.message || 'Failed to update request status.')
-          return false
-        } finally {
-          isSavingStatus.value = false
-        }
-      },
-      customClass: { cancelButton: 'swal-cancel-text', popup: 'swal-rounded consult-status-confirm' },
-      reverseButtons: false
-    })
-    didUpdate = result.isConfirmed
-  } catch (error) {
-    Swal.fire('Unable to update', error.message || 'Failed to update request status.', 'error')
-  }
-  if (didUpdate) closeEditModal()
 }
 
 /* ── Inline request details ── */
