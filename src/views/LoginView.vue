@@ -161,6 +161,10 @@
           {{ isSigningUp ? 'Signing up...' : 'Sign up' }}
         </button>
       </form>
+
+      <p class="support-contact">
+        Need help? <a href="mailto:support@citscheduler.com">Contact support</a>
+      </p>
     </div>
 
     <!-- Login and reCAPTCHA alerts -->
@@ -1090,6 +1094,26 @@ watch(activeTab, (val) => {
   flex-direction: column;
   gap: 16px;
   transition: max-width 0.25s, width 0.25s;
+}
+
+.support-contact {
+  margin: 0;
+  color: #65707b;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.support-contact a {
+  color: #394b60;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.support-contact a:focus-visible {
+  outline: 2px solid #52677e;
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 .card.card--wide {
