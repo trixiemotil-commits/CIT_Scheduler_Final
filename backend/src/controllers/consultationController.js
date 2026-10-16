@@ -523,6 +523,15 @@ function normalizeAcademicYear(value) {
   return match ? match[1] : text;
 }
 
+function normalizeAcademicSection(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function isTeacherConsultationOpen(value) {
+  const availability = String(value || 'Available').trim().toLowerCase();
+  return availability === 'available' || availability === 'open' || availability === 'open for consultations';
+}
+
 async function isStudentAssignedToTeacher(teacherUser, studentYearSections, subject = '') {
   const teacherName = normalizeTeacherFullName(teacherUser);
   const pairs = Array.isArray(studentYearSections) ? studentYearSections : [];
@@ -547,13 +556,9 @@ async function isStudentAssignedToTeacher(teacherUser, studentYearSections, subj
 async function getStudentAcademicContext(userId) {
   if (!userId) return { yearSections: [] };
 
-  const activeAcademicTermId = await getActiveAcademicTermReference();
   const student = await User.findById(userId)
-    .select("yearLevel grade section studentYearSections assignedAcademicTermId")
+    .select("yearLevel grade section studentYearSections")
     .lean();
-  if (!activeAcademicTermId || String(student?.assignedAcademicTermId || "") !== String(activeAcademicTermId)) {
-    return { yearSections: [] };
-  }
 
   const savedPairs = Array.isArray(student?.studentYearSections)
     ? student.studentYearSections
@@ -902,8 +907,8 @@ async function listTeachersForStudents(req, res) {
 
         const studentSubjects = scheduleEntries
           .filter((entry) => studentContext.yearSections.some((pair) => (
-            String(entry?.year || "").trim() === pair.year
-            && String(entry?.section || "").trim().toLowerCase() === pair.section.toLowerCase()
+            normalizeAcademicYear(entry?.year) === normalizeAcademicYear(pair.year)
+            && normalizeAcademicSection(entry?.section) === normalizeAcademicSection(pair.section)
           )))
           .map((entry) => String(entry?.subject || "").trim())
           .filter(Boolean);
@@ -937,9 +942,14 @@ async function listTeachersForStudents(req, res) {
           [...currentTermScheduleEntries, ...substituteScheduleEntries],
           now,
         );
-        const isSubjectTeacher = uniqueStudentSubjects.length > 0;
-        const canAcceptRequests = String(status || '').toLowerCase() === "on school"
-          && String(teacherUser.teacher_availability || '').toLowerCase() !== "unavailable";
+        // The schedule assignment itself defines a student's subject teacher.
+        // Do not depend on subject text or exact punctuation/spacing in section names.
+        const isSubjectTeacher = scheduleEntries.some((entry) => studentContext.yearSections.some((pair) => (
+          normalizeAcademicYear(entry?.year) === normalizeAcademicYear(pair.year)
+          && normalizeAcademicSection(entry?.section) === normalizeAcademicSection(pair.section)
+        )));
+        const canAcceptRequests = String(status || '').trim().toLowerCase() === "on school"
+          && isTeacherConsultationOpen(teacherUser.teacher_availability);
 
         return {
           id: teacherUser._id.toString(),
@@ -1040,7 +1050,7 @@ async function createConsultationRequest(req, res) {
     if (
       ["On Leave", "Offline", "On Event", "On Meeting"].includes(teacherStatus)
       || (isSubjectTeacher && (teacherScheduleStatus === "On School - In Class" || teacherScheduleStatus === "Off Campus"))
-      || String(teacherUser.teacher_availability || "").trim().toLowerCase() === "unavailable"
+      || (!isSubjectTeacher && !isTeacherConsultationOpen(teacherUser.teacher_availability))
     ) {
       return res.status(409).json({
         message: `${teacherName} is not open for consultation right now. Please select another teacher.`,
@@ -1507,7 +1517,7 @@ async function updateConsultationRequestByStudent(req, res) {
       studentContext.yearSections
     );
 
-    if (["On Leave", "Offline", "On Event", "On Meeting"].includes(teacherStatus) || String(teacherUser.teacher_availability || "").trim().toLowerCase() === "unavailable") {
+    if (["On Leave", "Offline", "On Event", "On Meeting"].includes(teacherStatus) || !isTeacherConsultationOpen(teacherUser.teacher_availability)) {
       return res.status(409).json({
         message: `${teacherName} is not open for consultation right now. Please select another teacher.`,
       });

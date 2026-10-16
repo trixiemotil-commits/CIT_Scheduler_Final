@@ -87,7 +87,7 @@
       </div>
 
       <div v-if="reqError" class="msg-err">{{ reqError }}</div>
-      <button class="modal-submit booking-submit" type="submit" :disabled="!selectedTeacher || isSubmittingRequest || !selectedTeacher.available">
+      <button class="modal-submit booking-submit" type="submit" :disabled="!selectedTeacher || isSubmittingRequest || (bookingTeacherType === 'Available Teacher' && !selectedTeacher.available)">
         {{ isSubmittingRequest ? 'Sending...' : 'Send Request' }}
       </button>
     </form>
@@ -269,17 +269,24 @@ const studentYearSections = computed(() => {
 })
 
 function normalizeSection(section) {
-  return String(section || '').trim().toLowerCase()
+  return String(section || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function normalizeYearLevel(year) {
+  const value = String(year || '').trim().toLowerCase()
+  const ordinal = value.match(/[1-4]/)
+  return ordinal ? ordinal[0] : value.replace(/\s+/g, '')
 }
 
 function hasMatchingAssignment(teacher) {
+  if (teacher?.isSubjectTeacher === true) return true
   if (!studentYearSections.value.length) {
     return true
   }
 
   const pairs = Array.isArray(teacher.assignedYearSections) ? teacher.assignedYearSections : []
   return pairs.some((assignedPair) => studentYearSections.value.some((studentPair) =>
-    String(assignedPair?.year || '').trim() === studentPair.year
+    normalizeYearLevel(assignedPair?.year) === normalizeYearLevel(studentPair.year)
     && normalizeSection(assignedPair?.section) === normalizeSection(studentPair.section)
   ))
 }
@@ -429,26 +436,28 @@ function mapTeacher(teacher) {
   const matchedSubjects = studentYearSections.value.length
     ? subjectAssignments
       .filter((entry) => studentYearSections.value.some((studentPair) =>
-        String(entry?.year || '').trim() === studentPair.year
+        normalizeYearLevel(entry?.year) === normalizeYearLevel(studentPair.year)
         && normalizeSection(entry?.section) === normalizeSection(studentPair.section)
       ))
       .map((entry) => String(entry?.subject || '').trim())
       .filter(Boolean)
     : []
 
-  const backendSubjectTeacher = typeof teacher.isSubjectTeacher === 'boolean'
-    ? teacher.isSubjectTeacher
-    : null
-  const subjectTeacherMatch = backendSubjectTeacher ?? matchedSubjects.length > 0
+  // Determine this from the actual schedule assignments for this student's
+  // year and section. The API flag can be false when the student's term link
+  // is stale even though the teacher's active-term schedule matches.
+  const subjectTeacherMatch = matchedSubjects.length > 0 || teacher.isSubjectTeacher === true
   const resolvedSubjects = (subjectTeacherMatch
     ? [...new Set(studentSubjects.length ? studentSubjects : matchedSubjects)]
     : subjects).filter((subject) => String(subject || '').trim().toLowerCase() !== 'lunch break')
 
   const hasSlots = consultationSlots.length > 0
   const statusAllowsConsultation = resolvedStatus === 'In School'
+  const normalizedAvailability = teacherAvailability.trim().toLowerCase()
+  const isConsultationOpen = ['available', 'open', 'open for consultations'].includes(normalizedAvailability)
   const availabilityAllowsConsultation = typeof teacher.available === 'boolean'
     ? teacher.available
-    : teacherAvailability.toLowerCase() !== 'unavailable'
+    : isConsultationOpen
   const isAvailable = statusAllowsConsultation
     && availabilityAllowsConsultation
 
@@ -526,10 +535,8 @@ function compareTeacherStatusAndConsultation(a, b) {
 
 const subjectTeachers = computed(() => {
   return teachers.value
-    .filter((t) => isSubjectTeacher(t)
-      && matchesSearch(t)
-      && hasMatchingAssignment(t)
-      && (!isConsultationBooking.value || (t.status === 'In School' && t.available && t.consultationSlots.length)))
+    .filter((t) => hasMatchingAssignment(t)
+      && matchesSearch(t))
     .sort((a, b) => {
       const availabilityDifference = compareTeacherStatusAndConsultation(a, b)
       if (availabilityDifference) return availabilityDifference
@@ -551,7 +558,8 @@ const availableTeachers = computed(() => {
 
 const bookingAvailableTeachers = computed(() => {
   return teachers.value
-    .filter((t) => matchesSearch(t)
+    .filter((t) => !hasMatchingAssignment(t)
+      && matchesSearch(t)
       && t.status === 'In School'
       && t.available)
     .sort((a, b) => a.name.localeCompare(b.name))
