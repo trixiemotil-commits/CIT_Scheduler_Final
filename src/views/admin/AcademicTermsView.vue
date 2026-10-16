@@ -947,8 +947,14 @@ async function downloadTermExcel(term) {
           .filter(Boolean),
       }))
     const studentScheduleSheet = gridGroups(studentGroups, 'FACE-TO-FACE', false, true)
+    const roomScheduleEntries = entries.filter(entry => !isLunchEntry(entry) && entry?.entryType !== 'practicum' && entry?.room && entry?.day && entry?.timeIn && entry?.timeOut)
+    const roomGroups = [...new Set(roomScheduleEntries.map(entry => String(entry.room).trim()).filter(Boolean))]
+      .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
+      .map(room => ({ label: room, entries: roomScheduleEntries.filter(entry => String(entry.room).trim() === room) }))
+    const roomScheduleSheet = gridGroups(roomGroups, 'Room Schedule')
     styleGridSheet(facultyScheduleSheet, true)
     styleGridSheet(studentScheduleSheet)
+    styleGridSheet(roomScheduleSheet)
 
     const scheduleColumns = ['Subj Code', 'Subj Desc', 'Section', 'Teacher', 'Lec Room', 'Lec Day', 'Lec S Time', 'Lec E Time', 'Session', 'Lab Room', 'Lab Day', 'Lab S Time', 'Lab E Time', 'Session']
     const splitSubject = (subject) => {
@@ -1005,6 +1011,7 @@ async function downloadTermExcel(term) {
     XLSX.utils.book_append_sheet(workbook, facultyScheduleSheet, 'Faculty Schedule')
     XLSX.utils.book_append_sheet(workbook, scheduleSheet, 'Schedule')
     XLSX.utils.book_append_sheet(workbook, studentScheduleSheet, 'Student Schedule')
+    XLSX.utils.book_append_sheet(workbook, roomScheduleSheet, 'Room Schedule')
     const safeTermLabel = termLabel(term).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()
     XLSX.writeFile(workbook, `faculty-loading-${safeTermLabel || 'academic-term'}.xlsx`)
     showStatusToast('success', 'Excel workbook downloaded.')
