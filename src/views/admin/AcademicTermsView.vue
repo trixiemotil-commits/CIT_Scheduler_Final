@@ -310,6 +310,7 @@
 import { getToken, getUser, logout } from '@/auth.js'
 import PublishedTermScheduleLink from '@/components/PublishedTermScheduleLink.vue'
 import RoleSwitchButton from '@/components/RoleSwitchButton.vue'
+import { timeOptions } from '@/composables/useSchedule.js'
 import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
@@ -559,8 +560,6 @@ async function loadPage() {
       avatar: item.avatar || '',
       position: item.position || '',
       status: item.teacher_status || item.account_status || '',
-      startDate: item.startDate || '',
-      endDate: item.endDate || '',
     })).filter(item => item.name).sort((a, b) => a.name.localeCompare(b.name))
     const requestedTermId = String(route.query.term || '').trim()
     const requestedTerm = terms.value.find(term => termId(term) === requestedTermId)
@@ -618,11 +617,27 @@ async function downloadTermExcel(term) {
   activeTermAction.value = `${academicTermId}:download`
   try {
     const XLSX = await import('xlsx-js-style')
-    const [scheduleResponse, consultationResponse] = await Promise.all([
+    const scheduleQuery = `?academicTermId=${encodeURIComponent(academicTermId)}`
+    const [scheduleResponse, consultationResponse, workHoursResponse] = await Promise.all([
       apiRequest(`/schedules?academicTermId=${encodeURIComponent(academicTermId)}`),
       apiRequest(`/consultations?academicTermId=${encodeURIComponent(academicTermId)}`),
+      apiRequest(`/schedules/tables${scheduleQuery}`),
     ])
     const entries = Array.isArray(scheduleResponse.entries) ? scheduleResponse.entries : []
+    const workHoursByFaculty = new Map((Array.isArray(workHoursResponse.tables) ? workHoursResponse.tables : []).map(table => {
+      const daySettings = table.workHoursByDay && typeof table.workHoursByDay === 'object' ? table.workHoursByDay : {}
+      const hasDaySettings = weekdays.some(day => daySettings[day]?.startTime || daySettings[day]?.endTime)
+      const workHoursByDay = Object.fromEntries(weekdays.map(day => {
+        const settings = hasDaySettings
+          ? daySettings[day]
+          : { startTime: table.workStartTime, endTime: table.workEndTime }
+        return [day, settings?.startTime && settings?.endTime ? {
+          startTime: String(settings.startTime).trim(),
+          endTime: String(settings.endTime).trim(),
+        } : null]
+      }))
+      return [String(table.teacher || table.label || '').trim(), workHoursByDay]
+    }).filter(([teacher]) => teacher))
     const consultations = (Array.isArray(consultationResponse.consultations) ? consultationResponse.consultations : []).map(consultation => ({
       ...consultation,
       day: consultation.dayOfWeek,
@@ -636,33 +651,60 @@ async function downloadTermExcel(term) {
     const exportEntries = [...entries, ...consultations]
     const loadByFaculty = new Map()
 
-    entries.forEach(entry => {
-      if (!entry?.teacher || entry.entryType === 'lunch') return
-      const start = Number(entry.timeInMinutes)
-      const end = Number(entry.timeOutMinutes)
-      const minutes = Number.isFinite(start) && Number.isFinite(end) && end > start ? end - start : 0
-      loadByFaculty.set(entry.teacher, (loadByFaculty.get(entry.teacher) || 0) + minutes / 60)
+    const workloadGroups = new Map()
+    entries
+      .filter(entry => entry.entryType !== 'lunch' && entry.teacher && String(entry.teacher).trim().toLowerCase() !== 'cit faculty')
+      .forEach((entry, index) => {
+        const sections = entry.parallel
+          ? ((entry.parallelSlots || []).map(slot => String(slot.section || '').trim()).filter(Boolean).sort().join(',') || String(entry.parallelGroupId || '').trim())
+          : String(entry.section || '').trim()
+        const key = `${entry.teacher}|${entry.year}|${entry.subject}|${entry.parallel ? 'parallel' : 'single'}|${sections || index}`
+        const group = workloadGroups.get(key) || { entries: [], parallel: Boolean(entry.parallel) }
+        group.entries.push(entry)
+        workloadGroups.set(key, group)
+      })
+
+    const minutesFor = (entry, minuteField, timeField) => {
+      if (Number.isFinite(entry[minuteField])) return Number(entry[minuteField])
+      const match = String(entry[timeField] || '').match(/(\d+):(\d+)\s*(AM|PM)/i)
+      if (!match) return 0
+      let hour = Number(match[1])
+      if (match[3].toUpperCase() === 'PM' && hour !== 12) hour += 12
+      if (match[3].toUpperCase() === 'AM' && hour === 12) hour = 0
+      return hour * 60 + Number(match[2])
+    }
+
+    workloadGroups.forEach(group => {
+      const first = group.entries[0]
+      if (first.entryType === 'practicum') return
+      const meetingMinutes = new Map()
+      group.entries.forEach(entry => {
+        const key = group.parallel
+          ? `${entry.day}|${entry.timeIn}|${entry.timeOut}`
+          : `${entry.day}|${entry.timeIn}|${entry.timeOut}|${entry.roomType || 'Lecture'}`
+        if (meetingMinutes.has(key)) return
+        const start = minutesFor(entry, 'timeInMinutes', 'timeIn')
+        const end = minutesFor(entry, 'timeOutMinutes', 'timeOut')
+        meetingMinutes.set(key, Math.max(0, end - start))
+      })
+      const hours = [...meetingMinutes.values()].reduce((total, minutes) => total + minutes, 0) / 60
+      loadByFaculty.set(first.teacher, (loadByFaculty.get(first.teacher) || 0) + hours)
     })
 
-    const headers = ['ID', 'No.', 'FULL NAME', 'POSITION', 'STATUS', 'START DATE', 'END DATE', 'TOTAL LOAD', 'TEACHING LOAD', 'OVERLOAD', 'DELOAD', 'MODULE WRITING']
+    const headers = ['ID', 'No.', 'FULL NAME', 'TOTAL LOAD', 'TEACHING LOAD', 'OVERLOAD', 'DELOAD']
     const facultyRows = teachers.value.map((teacher, index) => {
-      const teachingLoad = Number((loadByFaculty.get(teacher.name) || 0).toFixed(2))
+      const teachingLoad = Number((loadByFaculty.get(teacher.name) || 0).toFixed(1))
       return [
         teacher.employeeId,
         index + 1,
         teacher.name.toUpperCase(),
-        teacher.position,
-        '',
-        teacher.startDate,
-        teacher.endDate,
         teachingLoad,
         teachingLoad,
-        0,
         0,
         0,
       ]
     })
-    const totals = headers.map((_, index) => index >= 7 ? facultyRows.reduce((sum, row) => sum + (Number(row[index]) || 0), 0) : '')
+    const totals = headers.map((_, index) => index >= 3 ? facultyRows.reduce((sum, row) => sum + (Number(row[index]) || 0), 0) : '')
     const matrix = [
       [],
       ['', termLabel(term)],
@@ -678,8 +720,7 @@ async function downloadTermExcel(term) {
       { s: { r: 4, c: 0 }, e: { r: 4, c: headers.length - 1 } },
     ]
     sheet['!cols'] = [
-      { wch: 15 }, { wch: 7 }, { wch: 30 }, { wch: 28 }, { wch: 20 }, { wch: 16 },
-      { wch: 18 }, { wch: 13 }, { wch: 15 }, { wch: 13 }, { wch: 12 }, { wch: 18 },
+      { wch: 15 }, { wch: 7 }, { wch: 30 }, { wch: 13 }, { wch: 15 }, { wch: 13 }, { wch: 12 },
     ]
     sheet['!rows'] = [{ hpt: 8 }, { hpt: 24 }, { hpt: 52 }, { hpt: 8 }, { hpt: 20 }]
     sheet['!freeze'] = { xSplit: 2, ySplit: 5 }
@@ -692,6 +733,7 @@ async function downloadTermExcel(term) {
     }
     const headerStyle = { fill: { fgColor: { rgb: '365F91' } }, font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 10 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
     const loadHeaderStyle = { fill: { fgColor: { rgb: 'FFF2CC' } }, font: { bold: true, color: { rgb: '5A4300' }, sz: 10 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
+    const workHoursStyle = { fill: { fgColor: { rgb: 'E4EFE8' } }, font: { bold: true, color: { rgb: '43564F' }, sz: 9 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
     const bodyStyle = { font: { color: { rgb: '263238' }, sz: 9 }, alignment: { vertical: 'center', wrapText: true }, border }
     const groupStyle = { fill: { fgColor: { rgb: 'D9EAD3' } }, font: { bold: true, color: { rgb: '274E13' }, sz: 10 }, alignment: { horizontal: 'left', vertical: 'center' }, border }
     const totalStyle = { fill: { fgColor: { rgb: 'FFF2CC' } }, font: { bold: true, color: { rgb: '5A4300' }, sz: 9 }, alignment: { horizontal: 'right', vertical: 'center' }, border }
@@ -699,7 +741,7 @@ async function downloadTermExcel(term) {
     sheet.B2.s = { font: { bold: true, color: { rgb: '1F1F1F' }, sz: 14 }, alignment: { horizontal: 'left', vertical: 'center' } }
     headers.forEach((_, index) => {
       const cell = sheet[XLSX.utils.encode_cell({ r: 2, c: index })]
-      if (cell) cell.s = index >= 7 ? loadHeaderStyle : headerStyle
+      if (cell) cell.s = index >= 3 ? loadHeaderStyle : headerStyle
     })
     for (let column = 0; column < headers.length; column += 1) {
       const groupCell = sheet[XLSX.utils.encode_cell({ r: 4, c: column })]
@@ -716,8 +758,9 @@ async function downloadTermExcel(term) {
       if (cell) cell.s = totalStyle
     }
 
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    const slots = ['7:30 AM', '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM', '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM', '6:00 PM', '6:30 PM', '7:00 PM']
+    const days = weekdays
+    const slots = timeOptions
+    const timeSlotCount = slots.length
     const toMinutes = (value) => {
       const match = String(value || '').match(/(\d+):(\d+)\s*(AM|PM)/i)
       if (!match) return 0
@@ -727,7 +770,16 @@ async function downloadTermExcel(term) {
       if (match[3].toUpperCase() === 'AM' && hour === 12) hour = 0
       return hour * 60 + minute
     }
-    const slotText = (entry) => [entry.subject || (entry.entryType === 'lunch' ? 'Lunch Break' : ''), entry.teacher || 'CIT Faculty', entry.room].filter(Boolean).join(' / ')
+    const isLunchEntry = (entry) => entry.entryType === 'lunch' || entry.color === 'color-gray' || /\blunch\b/i.test(String(entry.subject || ''))
+    const slotText = (entry, includeUnassignedRoom = false) => {
+      const teacher = entry.teacher || 'CIT Faculty'
+      const timeRange = [entry.timeIn, entry.timeOut].filter(Boolean).join(' - ')
+      const isLunch = isLunchEntry(entry)
+      if (isLunch) return [teacher, 'Lunch Break', timeRange].filter(Boolean).join('\n')
+      const yearAndSection = [entry.year, entry.section].filter(Boolean).join(' · ').toUpperCase()
+      const room = entry.room ? `Room: ${entry.room}` : includeUnassignedRoom ? 'Room: not assigned' : ''
+      return [teacher, entry.subject || 'Schedule', timeRange, yearAndSection, room].filter(Boolean).join('\n')
+    }
     const legend = [
       ['Lecture', 'color-yellow'],
       ['Laboratory', 'color-green'],
@@ -735,6 +787,7 @@ async function downloadTermExcel(term) {
       ['Lunch', 'color-gray'],
       ['Consultation', 'color-blue'],
       ['Main Campus', 'color-orange'],
+      ['Office hours', 'color-purple'],
     ]
     const scheduleColors = {
       'color-green': { fill: 'D9EAD3', font: '274E13' },
@@ -743,67 +796,96 @@ async function downloadTermExcel(term) {
       'color-blue': { fill: 'CFE2F3', font: '1F4E79' },
       'color-gray': { fill: 'D9D9D9', font: '404040' },
       'color-pink': { fill: 'F4CCCC', font: '761C3B' },
-      'color-purple': { fill: '7B5EA7', font: 'FFFFFF' },
+      'color-purple': { fill: 'EEE8FF', font: '000000' },
       'color-red': { fill: 'E63946', font: 'FFFFFF' },
     }
     const entryColor = (entry) => {
       if (!entry?.teacher || entry.teacher === 'CIT Faculty') return scheduleColors['color-pink']
       return scheduleColors[entry?.color] || scheduleColors['color-yellow']
     }
-    const gridGroups = (groups, bandLabel) => {
+    const gridGroups = (groups, bandLabel, includeOfficeTasks = false, includeStudentDetails = false) => {
       const matrix = legend.map(([label]) => [label])
       const gridEntries = []
+      const officeTaskCells = []
+      const practicumBandRows = []
       groups.forEach(group => {
         matrix.push([])
         matrix.push([group.label])
-        matrix.push([bandLabel])
-        matrix.push(['Time', '', ...days])
+        const practicumTeachers = includeStudentDetails ? (group.practicumTeachers || []) : []
+        const groupBandLabel = practicumTeachers.length
+          ? [bandLabel, 'IT Practicum · 6 units', ...practicumTeachers, 'No fixed day, time, or room'].join('\n')
+          : bandLabel
+        if (practicumTeachers.length) practicumBandRows.push({ row: matrix.length, lineCount: groupBandLabel.split('\n').length })
+        matrix.push([groupBandLabel])
+        matrix.push(['Time', ...days])
+        if (includeOfficeTasks) {
+          matrix.push(['Work hours', ...days.map(day => {
+            const hours = group.workHoursByDay?.[day]
+            return hours ? `${hours.startTime} - ${hours.endTime}` : 'Not set'
+          })])
+        }
         const dataStartRow = matrix.length
         const occupied = days.map(() => new Set())
         slots.forEach((slot, index) => {
           const start = toMinutes(slot)
-          const end = start + 30
+          const end = index + 1 < slots.length ? toMinutes(slots[index + 1]) : start + 30
           const values = days.map(day => {
             const dayIndex = days.indexOf(day)
             if (occupied[dayIndex].has(index)) return ''
             const entry = group.entries.find(item => item.day === day && toMinutes(item.timeIn) >= start && toMinutes(item.timeIn) < end)
-            if (!entry) return ''
-            const span = Math.max(1, Math.ceil((toMinutes(entry.timeOut) - toMinutes(entry.timeIn)) / 30))
-            for (let offset = 1; offset < span && index + offset < slots.length; offset += 1) occupied[dayIndex].add(index + offset)
-            gridEntries.push({ row: dataStartRow + index, column: dayIndex + 2, span, entry })
-            return slotText(entry)
+            if (!entry) {
+              const workHours = group.workHoursByDay?.[day]
+              const isOfficeTask = includeOfficeTasks && workHours
+                && start >= toMinutes(workHours.startTime)
+                && start < toMinutes(workHours.endTime)
+              if (isOfficeTask) officeTaskCells.push({ row: dataStartRow + index, column: dayIndex + 1 })
+              return isOfficeTask ? 'Office task' : ''
+            }
+            const entryStart = toMinutes(entry.timeIn)
+            const entryEnd = toMinutes(entry.timeOut)
+            const duration = Math.max(1, entryEnd - entryStart + 30)
+            const startOffset = entry.entryType === 'consultation' ? 0 : entryStart % 30
+            const requestedSpan = Math.max(1, Math.ceil((startOffset + duration) / 30))
+            const span = Math.min(timeSlotCount - index, requestedSpan)
+            for (let offset = 1; offset < span; offset += 1) occupied[dayIndex].add(index + offset)
+            gridEntries.push({ row: dataStartRow + index, column: dayIndex + 1, span, entry })
+            return slotText(entry, includeStudentDetails)
           })
-          matrix.push([slot, index + 1 < slots.length ? slots[index + 1] : '', ...values])
+          matrix.push([slot, ...values])
         })
       })
       const sheet = XLSX.utils.aoa_to_sheet(matrix)
       sheet.__gridEntries = gridEntries
+      sheet.__officeTaskCells = officeTaskCells
+      sheet.__practicumBandRows = practicumBandRows
       return sheet
     }
-    const styleGridSheet = (gridSheet) => {
-      gridSheet['!cols'] = [{ wch: 11 }, { wch: 11 }, ...days.map(() => ({ wch: 25 }))]
-      gridSheet['!freeze'] = { xSplit: 2, ySplit: 8 }
+    const styleGridSheet = (gridSheet, includeOfficeTasks = false) => {
+      gridSheet['!cols'] = [{ wch: 12 }, ...days.map(() => ({ wch: 34 }))]
+      gridSheet['!freeze'] = { xSplit: 1, ySplit: legend.length + 2 }
+      const groupHeaderRows = includeOfficeTasks ? 5 : 4
       const range = XLSX.utils.decode_range(gridSheet['!ref'])
       for (let row = 0; row <= range.e.r; row += 1) {
         const firstValue = gridSheet[XLSX.utils.encode_cell({ r: row, c: 0 })]?.v
         if (row < legend.length) {
           const legendColor = entryColor({ color: legend[row][1], teacher: 'legend' })
-          for (let column = 0; column < 2; column += 1) {
+          for (let column = 0; column < 1; column += 1) {
             const cell = gridSheet[XLSX.utils.encode_cell({ r: row, c: column })]
             if (cell) cell.s = { fill: { fgColor: { rgb: legendColor.fill } }, font: { bold: true, color: { rgb: legendColor.font }, sz: 11 }, alignment: { horizontal: 'center', vertical: 'center' }, border }
           }
           continue
         }
-        const rowType = (row - legend.length) % (slots.length + 4)
+        const rowType = (row - legend.length) % (timeSlotCount + groupHeaderRows)
         if (rowType === 1 || rowType === 2) {
           gridSheet['!merges'] = gridSheet['!merges'] || []
-          gridSheet['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: days.length + 1 } })
+          gridSheet['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: days.length } })
         }
-        for (let column = 0; column <= days.length + 1; column += 1) {
+        for (let column = 0; column <= days.length; column += 1) {
           const cell = gridSheet[XLSX.utils.encode_cell({ r: row, c: column })]
           if (!cell) continue
           if (rowType === 1 || rowType === 2) cell.s = groupStyle
           else if (rowType === 3) cell.s = loadHeaderStyle
+          else if (includeOfficeTasks && rowType === 4) cell.s = workHoursStyle
           else if (row >= 8) cell.s = bodyStyle
         }
       }
@@ -812,22 +894,60 @@ async function downloadTermExcel(term) {
         const cell = gridSheet[XLSX.utils.encode_cell({ r: row, c: column })]
         if (cell) {
           cell.s = { fill: { fgColor: { rgb: color.fill } }, font: { bold: true, color: { rgb: color.font }, sz: 9 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
+          const wrappedLines = String(cell.v || '').split('\n').reduce((total, line) => total + Math.max(1, Math.ceil(line.length / 34)), 0)
+          const heightPerRow = Math.max(15, (wrappedLines * 13 + 6) / span)
+          gridSheet['!rows'] = gridSheet['!rows'] || []
+          for (let offset = 0; offset < span; offset += 1) {
+            const targetRow = row + offset
+            gridSheet['!rows'][targetRow] = {
+              ...gridSheet['!rows'][targetRow],
+              hpt: Math.max(gridSheet['!rows'][targetRow]?.hpt || 15, heightPerRow),
+            }
+          }
         }
         if (span > 1) {
           gridSheet['!merges'] = gridSheet['!merges'] || []
           gridSheet['!merges'].push({ s: { r: row, c: column }, e: { r: row + span - 1, c: column } })
         }
       })
+      ;(gridSheet.__officeTaskCells || []).forEach(({ row, column }) => {
+        const cell = gridSheet[XLSX.utils.encode_cell({ r: row, c: column })]
+        const color = scheduleColors['color-purple']
+        if (cell) cell.s = { fill: { fgColor: { rgb: color.fill } }, font: { bold: true, color: { rgb: color.font }, sz: 9 }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border }
+      })
+      ;(gridSheet.__practicumBandRows || []).forEach(({ row, lineCount }) => {
+        gridSheet['!rows'] = gridSheet['!rows'] || []
+        gridSheet['!rows'][row] = {
+          ...gridSheet['!rows'][row],
+          hpt: Math.max(gridSheet['!rows'][row]?.hpt || 15, lineCount * 14),
+        }
+      })
       delete gridSheet.__gridEntries
+      delete gridSheet.__officeTaskCells
+      delete gridSheet.__practicumBandRows
     }
-    const facultyGroups = teachers.value.map(teacher => ({ label: teacher.name, entries: exportEntries.filter(entry => entry.teacher === teacher.name) }))
+    const facultyGroups = teachers.value.map(teacher => ({
+      label: teacher.name,
+      entries: exportEntries.filter(entry => entry.teacher === teacher.name),
+      workHoursByDay: workHoursByFaculty.get(teacher.name) || {},
+    }))
     const unassignedEntries = exportEntries.filter(entry => !entry.teacher || entry.teacher === 'CIT Faculty')
     if (unassignedEntries.length) facultyGroups.push({ label: 'CIT Faculty', entries: unassignedEntries })
-    const facultyScheduleSheet = gridGroups(facultyGroups, 'Faculty Schedule')
-    const studentGroups = [...new Set(entries.filter(entry => entry.year || entry.section).map(entry => `${entry.year || 'Unknown'} · ${entry.section || 'Unassigned'}`))]
-      .map(label => ({ label, entries: entries.filter(entry => `${entry.year || 'Unknown'} · ${entry.section || 'Unassigned'}` === label) }))
-    const studentScheduleSheet = gridGroups(studentGroups, 'FACE-TO-FACE')
-    styleGridSheet(facultyScheduleSheet)
+    const facultyScheduleSheet = gridGroups(facultyGroups, 'Faculty Schedule', true)
+    const studentGroupLabel = entry => `${entry.year} · ${entry.section}`
+    const studentScheduleEntries = entries.filter(entry => !isLunchEntry(entry) && entry?.entryType !== 'practicum' && entry?.year && entry?.section && entry?.day && entry?.timeIn && entry?.timeOut)
+    const studentPracticumEntries = entries.filter(entry => entry?.entryType === 'practicum' && entry?.year && entry?.section)
+    const studentGroups = [...new Set([...studentScheduleEntries, ...studentPracticumEntries].map(studentGroupLabel))]
+      .map(label => ({
+        label,
+        entries: studentScheduleEntries.filter(entry => studentGroupLabel(entry) === label),
+        practicumTeachers: studentPracticumEntries
+          .filter(entry => studentGroupLabel(entry) === label)
+          .map(entry => entry.teacher || entry.tableLabel)
+          .filter(Boolean),
+      }))
+    const studentScheduleSheet = gridGroups(studentGroups, 'FACE-TO-FACE', false, true)
+    styleGridSheet(facultyScheduleSheet, true)
     styleGridSheet(studentScheduleSheet)
 
     const scheduleColumns = ['Subj Code', 'Subj Desc', 'Section', 'Teacher', 'Lec Room', 'Lec Day', 'Lec S Time', 'Lec E Time', 'Session', 'Lab Room', 'Lab Day', 'Lab S Time', 'Lab E Time', 'Session']
@@ -840,14 +960,23 @@ async function downloadTermExcel(term) {
         description: value.slice(separatorIndex + 1).trim(),
       }
     }
-    const scheduleRows = exportEntries.map(entry => {
-      const subject = splitSubject(entry.subject)
-      return [
-      subject.code, subject.description, entry.section || '', entry.teacher || 'CIT Faculty', entry.roomType === 'Comlab/Laboratory' ? '' : entry.room || '',
-      entry.roomType === 'Comlab/Laboratory' ? '' : entry.day || '', entry.roomType === 'Comlab/Laboratory' ? '' : entry.timeIn || '', entry.roomType === 'Comlab/Laboratory' ? '' : entry.timeOut || '',
-      entry.roomType === 'Comlab/Laboratory' ? '' : 'Lec', entry.roomType === 'Comlab/Laboratory' ? entry.room || '' : '', entry.roomType === 'Comlab/Laboratory' ? entry.day || '' : '',
-      entry.roomType === 'Comlab/Laboratory' ? entry.timeIn || '' : '', entry.roomType === 'Comlab/Laboratory' ? entry.timeOut || '' : '', entry.roomType === 'Comlab/Laboratory' ? 'Lab' : '',
-      ]
+    const scheduleRowEntries = entries.filter(entry => entry?.entryType !== 'practicum' && entry?.day && entry?.timeIn && entry?.timeOut)
+    const scheduleRows = scheduleRowEntries.map(entry => {
+      const isLunch = isLunchEntry(entry)
+      const isLab = !isLunch && entry.roomType === 'Comlab/Laboratory'
+      const subject = isLunch ? { code: '', description: 'Lunch Break' } : splitSubject(entry.subject)
+      const row = Array(scheduleColumns.length).fill('')
+      const sessionStart = isLab ? 9 : 4
+      row[0] = subject.code
+      row[1] = subject.description
+      row[2] = isLunch ? '' : entry.section || ''
+      row[3] = entry.teacher || entry.tableLabel || 'CIT Faculty'
+      row[sessionStart] = isLunch ? '' : entry.room || ''
+      row[sessionStart + 1] = entry.day
+      row[sessionStart + 2] = entry.timeIn
+      row[sessionStart + 3] = entry.timeOut
+      row[sessionStart + 4] = isLunch ? 'Lunch Break' : isLab ? 'Lab' : 'Lec'
+      return row
     })
     const scheduleSheet = XLSX.utils.aoa_to_sheet([
       ['CLASS DETAILS', '', '', '', '', 'SESSION 1 : LEC', '', '', '', 'SESSION 1 : LAB', '', '', '', ''],
@@ -865,7 +994,7 @@ async function downloadTermExcel(term) {
       for (let row = 2; row < scheduleRows.length + 2; row += 1) {
         const cell = scheduleSheet[XLSX.utils.encode_cell({ r: row, c: column })]
         if (cell) {
-          const color = entryColor(exportEntries[row - 2])
+          const color = entryColor(scheduleRowEntries[row - 2])
           cell.s = { fill: { fgColor: { rgb: color.fill } }, font: { color: { rgb: color.font }, sz: 9 }, alignment: { vertical: 'center', wrapText: true }, border }
         }
       }
