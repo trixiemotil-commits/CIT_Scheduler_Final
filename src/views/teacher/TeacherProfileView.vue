@@ -116,6 +116,15 @@
             </button>
           </div>
           <div class="edit-modal-body">
+            <div class="avatar-editor">
+              <img :src="editForm.avatar || profile.avatar" class="avatar-editor-preview" alt="Profile picture preview" />
+              <div class="avatar-editor-details">
+                <span class="edit-label">Profile Picture</span>
+                <p>PNG, JPG, or WebP. Images are resized automatically.</p>
+                <button type="button" class="avatar-upload-btn" @click="avatarInput?.click()">Choose Photo</button>
+                <input ref="avatarInput" class="avatar-file-input" type="file" accept="image/png,image/jpeg,image/webp" @change="onAvatarSelected" />
+              </div>
+            </div>
             <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Full Name</label>
@@ -128,14 +137,24 @@
                 <input v-model="editForm.email" class="edit-input" type="email" placeholder="Email address" />
               </div>
             </div>
-            <div class="edit-row two-col">
+            <div class="edit-row">
               <div class="edit-field">
                 <label class="edit-label">Contact No.</label>
-                <input v-model="editForm.contact" class="edit-input" type="text" placeholder="09XXXXXXXXX" />
+                <input v-model="editForm.contact" class="edit-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="11" autocomplete="tel" placeholder="09XXXXXXXXX" @input="formatContactNumber" />
               </div>
+            </div>
+            <div class="edit-row">
               <div class="edit-field">
-                <label class="edit-label">Status</label>
-                <input v-model="editForm.status" class="edit-input" type="text" disabled />
+                <label class="edit-label">Gender</label>
+                <div class="select-wrap">
+                  <select v-model="editForm.gender" class="edit-select">
+                    <option value="">Not specified</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <svg class="select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
               </div>
             </div>
             <div class="edit-row">
@@ -144,25 +163,41 @@
                 <input v-model="editForm.employeeId" class="edit-input" type="text" inputmode="text" maxlength="12" placeholder="AU2025-00000" @input="formatEmployeeId" />
               </div>
             </div>
-            <div class="edit-row two-col">
-              <div class="edit-field">
-                <label class="edit-label">Profile Photo</label>
-                <input class="edit-input" type="file" accept="image/*" @change="onAvatarSelected" />
-                <small class="photo-help">JPG, PNG, or WEBP. Max 5 MB.</small>
-              </div>
-              <div class="edit-field">
-                <label class="edit-label">Photo Preview</label>
-                <div class="photo-preview-wrap">
-                  <img :src="editForm.avatar || profile.avatar" alt="Preview" class="photo-preview" />
-                </div>
-              </div>
-            </div>
           </div>
           <div class="edit-modal-actions">
-            <button class="edit-cancel-btn" @click="closeEdit">Cancel</button>
-            <button class="edit-save-btn" @click="saveProfile">Save Changes</button>
+            <button class="edit-save-btn" :disabled="isSavingProfile" :aria-busy="isSavingProfile" @click="saveProfile">
+              {{ isSavingProfile ? 'Saving...' : 'Save Changes' }}
+            </button>
           </div>
         </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showAvatarCrop" class="crop-overlay" @click.self="cancelAvatarCrop">
+        <section class="crop-dialog" role="dialog" aria-modal="true" aria-labelledby="crop-title">
+          <header class="crop-header">
+            <div>
+              <h2 id="crop-title">Crop Profile Picture</h2>
+              <p>Drag to reposition your photo. Use the slider to zoom.</p>
+            </div>
+            <button type="button" class="crop-close" aria-label="Cancel crop" @click="cancelAvatarCrop">×</button>
+          </header>
+          <div
+            class="crop-viewport"
+            @pointerdown="startCropDrag"
+            @pointermove.window="moveCropImage"
+            @pointerup.window="stopCropDrag"
+            @pointercancel.window="stopCropDrag"
+          >
+            <img v-if="cropSource" :src="cropSource" :style="cropImageStyle" alt="Photo crop preview" draggable="false" @load="onCropImageLoad" />
+          </div>
+          <label class="crop-zoom-label" for="teacher-avatar-crop-zoom"><span>Zoom</span><span>{{ Math.round(cropZoom * 100) }}%</span></label>
+          <input id="teacher-avatar-crop-zoom" v-model.number="cropZoom" class="crop-zoom" type="range" min="1" max="3" step="0.01" @input="clampCropPosition" />
+          <footer class="crop-actions">
+            <button type="button" class="crop-apply" :disabled="!cropImageSize.width" @click="applyAvatarCrop">Use Photo</button>
+          </footer>
+        </section>
       </div>
     </Teleport>
 
@@ -186,6 +221,14 @@
         </div>
       </div>
     </Teleport>
+    <Teleport to="body">
+      <Transition name="profile-toast">
+        <div v-if="statusToast" class="profile-status-toast" role="status" aria-live="polite">
+          <span class="profile-status-toast__icon" aria-hidden="true">✓</span>
+          <span>{{ statusToast }}</span>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -194,14 +237,29 @@ import { getToken, getUser, logout, saveMergedUser } from '@/auth.js'
 import TeacherSidebarStatus from '@/components/teacher/TeacherSidebarStatus.vue'
 import { initialsAvatar } from '@/utils/avatar.js'
 import Swal from 'sweetalert2'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
 const route  = useRoute()
+const statusToast = ref('')
+let statusToastTimer = null
 const currentRoute = computed(() => route.path)
 const user = getUser() || {}
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+
+function showSuccessToast(title) {
+  statusToast.value = title
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+  statusToastTimer = window.setTimeout(() => {
+    statusToast.value = ''
+    statusToastTimer = null
+  }, 5000)
+}
+
+onBeforeUnmount(() => {
+  if (statusToastTimer) window.clearTimeout(statusToastTimer)
+})
 
 const navItems = [
   {
@@ -231,6 +289,7 @@ const profile = ref({
   fullName:   user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Teacher',
   email:      user.email || 'teacher@gmail.com',
   contact:    user.phone || 'N/A',
+  gender:     user.gender || '',
   status:     user.status || 'Active',
   employeeId: user.employeeId || user.studentId || 'N/A',
   role:       ((user.role || 'teacher').toString().charAt(0).toUpperCase() + (user.role || 'teacher').toString().slice(1).toLowerCase()),
@@ -285,6 +344,7 @@ async function loadProfile() {
       fullName: dbUser.name || `${dbUser.firstName || ''} ${dbUser.lastName || ''}`.trim() || 'Teacher',
       email: dbUser.email || 'teacher@gmail.com',
       contact: dbUser.phone || 'N/A',
+      gender: dbUser.gender || '',
       status: dbUser.status || 'Active',
       employeeId: dbUser.employeeId || dbUser.studentId || 'N/A',
       role: normalizeRoleLabel(dbUser.role),
@@ -305,10 +365,31 @@ onMounted(loadProfile)
 /* ── Edit modal ── */
 const showEditModal = ref(false)
 const editForm = ref({})
+const isSavingProfile = ref(false)
+const avatarInput = ref(null)
+const showAvatarCrop = ref(false)
+const cropSource = ref('')
+const cropImageSize = ref({ width: 0, height: 0 })
+const cropZoom = ref(1)
+const cropPosition = ref({ x: 0, y: 0 })
+const cropDrag = ref(null)
+const CROP_VIEWPORT_SIZE = 260
+const cropScale = computed(() => {
+  const { width, height } = cropImageSize.value
+  if (!width || !height) return 1
+  return Math.max(CROP_VIEWPORT_SIZE / width, CROP_VIEWPORT_SIZE / height) * cropZoom.value
+})
+const cropImageStyle = computed(() => ({
+  width: `${cropImageSize.value.width * cropScale.value}px`,
+  height: `${cropImageSize.value.height * cropScale.value}px`,
+  left: `${cropPosition.value.x}px`,
+  top: `${cropPosition.value.y}px`,
+}))
 
 function openEdit() {
   editForm.value = {
     ...profile.value,
+    contact: profile.value.contact === 'N/A' ? '' : String(profile.value.contact || ''),
     employeeId: normalizeEmployeeId(profile.value.employeeId),
   }
   showEditModal.value = true
@@ -324,6 +405,10 @@ function formatEmployeeId(event) {
     : ''
 }
 
+function formatContactNumber() {
+  editForm.value.contact = String(editForm.value.contact || '').replace(/\D/g, '').slice(0, 11)
+}
+
 function normalizeEmployeeId(value) {
   const digits = String(value || '').replace(/\D/g, '').slice(0, 9)
   if (!digits) return ''
@@ -335,14 +420,14 @@ function onAvatarSelected(event) {
   const file = event.target?.files?.[0]
   if (!file) return
 
-  const isImage = /^image\//.test(file.type)
-  if (!isImage) {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
     Swal.fire({
       icon: 'warning',
-      title: 'Invalid image file',
-      text: 'Please select a valid image file.',
+      title: 'Unsupported image',
+      text: 'Choose a PNG, JPG, or WebP image.',
       confirmButtonColor: '#4b5563',
     })
+    event.target.value = ''
     return
   }
 
@@ -353,17 +438,90 @@ function onAvatarSelected(event) {
       text: 'Please use an image smaller than 5 MB.',
       confirmButtonColor: '#4b5563',
     })
+    event.target.value = ''
     return
   }
 
-  const reader = new FileReader()
-  reader.onload = () => {
-    editForm.value.avatar = typeof reader.result === 'string' ? reader.result : editForm.value.avatar
+  if (cropSource.value) URL.revokeObjectURL(cropSource.value)
+  cropSource.value = URL.createObjectURL(file)
+  cropImageSize.value = { width: 0, height: 0 }
+  cropPosition.value = { x: 0, y: 0 }
+  cropZoom.value = 1
+  cropDrag.value = null
+  showAvatarCrop.value = true
+  event.target.value = ''
+}
+
+function onCropImageLoad(event) {
+  const image = event.target
+  cropImageSize.value = { width: image.naturalWidth, height: image.naturalHeight }
+  const scale = Math.max(CROP_VIEWPORT_SIZE / image.naturalWidth, CROP_VIEWPORT_SIZE / image.naturalHeight)
+  cropPosition.value = {
+    x: (CROP_VIEWPORT_SIZE - image.naturalWidth * scale) / 2,
+    y: (CROP_VIEWPORT_SIZE - image.naturalHeight * scale) / 2,
   }
-  reader.readAsDataURL(file)
+  clampCropPosition()
+}
+
+function clampCropPosition() {
+  const width = cropImageSize.value.width * cropScale.value
+  const height = cropImageSize.value.height * cropScale.value
+  cropPosition.value = {
+    x: Math.min(0, Math.max(CROP_VIEWPORT_SIZE - width, cropPosition.value.x)),
+    y: Math.min(0, Math.max(CROP_VIEWPORT_SIZE - height, cropPosition.value.y)),
+  }
+}
+
+function startCropDrag(event) {
+  if (!cropImageSize.value.width) return
+  event.preventDefault()
+  cropDrag.value = {
+    pointerX: event.clientX,
+    pointerY: event.clientY,
+    x: cropPosition.value.x,
+    y: cropPosition.value.y,
+  }
+}
+
+function moveCropImage(event) {
+  if (!cropDrag.value) return
+  cropPosition.value = {
+    x: cropDrag.value.x + event.clientX - cropDrag.value.pointerX,
+    y: cropDrag.value.y + event.clientY - cropDrag.value.pointerY,
+  }
+  clampCropPosition()
+}
+
+function stopCropDrag() {
+  cropDrag.value = null
+}
+
+function cancelAvatarCrop() {
+  showAvatarCrop.value = false
+  cropImageSize.value = { width: 0, height: 0 }
+  cropDrag.value = null
+  if (cropSource.value) URL.revokeObjectURL(cropSource.value)
+  cropSource.value = ''
+}
+
+function applyAvatarCrop() {
+  const image = document.querySelector('.crop-viewport img')
+  if (!image || !cropImageSize.value.width) return
+  const sourceX = -cropPosition.value.x / cropScale.value
+  const sourceY = -cropPosition.value.y / cropScale.value
+  const sourceSize = CROP_VIEWPORT_SIZE / cropScale.value
+  const canvas = document.createElement('canvas')
+  canvas.width = 512
+  canvas.height = 512
+  const context = canvas.getContext('2d')
+  if (!context) return
+  context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, canvas.width, canvas.height)
+  editForm.value.avatar = canvas.toDataURL('image/jpeg', 0.9)
+  cancelAvatarCrop()
 }
 
 async function saveProfile() {
+  if (isSavingProfile.value) return
   const fullName = (editForm.value.fullName || '').trim()
   const nameParts = fullName.split(/\s+/).filter(Boolean)
   const firstName = nameParts.shift() || ''
@@ -374,6 +532,17 @@ async function saveProfile() {
       icon: 'warning',
       title: 'Missing required fields',
       text: 'Name and email are required.',
+      confirmButtonColor: '#4b5563',
+    })
+    return
+  }
+
+  const contactNumber = String(editForm.value.contact || '').trim()
+  if (contactNumber && !/^\d{11}$/.test(contactNumber)) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Invalid contact number',
+      text: 'Enter exactly 11 digits, or leave the field blank.',
       confirmButtonColor: '#4b5563',
     })
     return
@@ -390,6 +559,7 @@ async function saveProfile() {
     return
   }
 
+  isSavingProfile.value = true
   try {
     const payload = await apiRequest('/auth/me', {
       method: 'PUT',
@@ -397,7 +567,8 @@ async function saveProfile() {
         firstName,
         lastName,
         email: editForm.value.email,
-        phone: editForm.value.contact === 'N/A' ? '' : (editForm.value.contact || ''),
+        phone: contactNumber,
+        gender: editForm.value.gender || '',
         employeeId,
         avatar: editForm.value.avatar || profile.value.avatar,
       }),
@@ -409,6 +580,7 @@ async function saveProfile() {
       fullName: updatedUser.name || `${updatedUser.firstName || ''} ${updatedUser.lastName || ''}`.trim() || 'Teacher',
       email: updatedUser.email || 'teacher@gmail.com',
       contact: updatedUser.phone || 'N/A',
+      gender: updatedUser.gender || '',
       status: updatedUser.status || 'Active',
       employeeId: updatedUser.employeeId || updatedUser.studentId || 'N/A',
       role: normalizeRoleLabel(updatedUser.role),
@@ -416,12 +588,7 @@ async function saveProfile() {
     }
 
     closeEdit()
-    Swal.fire({
-      toast: true, position: 'top-end', icon: 'success',
-      title: 'Profile Updated', showConfirmButton: false,
-      timer: 2500, timerProgressBar: true,
-      background: '#4b5563', color: '#fff', iconColor: '#cbd5e1'
-    })
+    showSuccessToast('Profile Updated')
   } catch (error) {
     await Swal.fire({
       icon: 'error',
@@ -429,6 +596,8 @@ async function saveProfile() {
       text: error.message || 'Please try again.',
       confirmButtonColor: '#4b5563',
     })
+  } finally {
+    isSavingProfile.value = false
   }
 }
 
@@ -807,6 +976,38 @@ async function confirmLogout() {
 
 .edit-row { display: flex; gap: 14px; }
 .edit-row.two-col .edit-field { flex: 1; }
+.avatar-editor {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+.avatar-editor-preview {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border: 2px solid #c4c9cd;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.avatar-editor-details { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.avatar-editor-details p { margin: 0; font-size: 0.72rem; color: #64748b; }
+.avatar-upload-btn {
+  margin-top: 3px;
+  padding: 6px 10px;
+  color: #4b5563;
+  background: #f3f4f6;
+  border: 1px solid #c4c9cd;
+  border-radius: 7px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.avatar-upload-btn:hover { background: #e5e7eb; border-color: #9ca3af; }
+.avatar-file-input { display: none; }
 
 .edit-field { display: flex; flex-direction: column; gap: 5px; flex: 1; }
 .edit-label {
@@ -894,19 +1095,6 @@ async function confirmLogout() {
   border-top: 1px solid #f0f0f0;
   margin-top: 6px;
 }
-.edit-cancel-btn {
-  padding: 9px 22px;
-  background: none;
-  border: 1.5px solid #e4e4e7;
-  border-radius: 9px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #475569;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s, border-color 0.15s;
-}
-.edit-cancel-btn:hover { background: #f5f5f5; border-color: #c0c0c0; }
 .edit-save-btn {
   padding: 9px 24px;
   background: linear-gradient(135deg, #4b5563, #6b7280);
@@ -921,6 +1109,77 @@ async function confirmLogout() {
   box-shadow: 0 2px 8px rgba(48, 53, 58,0.25);
 }
 .edit-save-btn:hover { opacity: 0.88; box-shadow: 0 4px 14px rgba(48, 53, 58,0.32); }
+.edit-save-btn:disabled { cursor: not-allowed; opacity: 0.65; box-shadow: 0 2px 8px rgba(48, 53, 58,0.16); }
+
+.crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(20, 25, 30, 0.68);
+  backdrop-filter: blur(5px);
+}
+.crop-dialog {
+  width: min(100%, 390px);
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 22px;
+  background: linear-gradient(155deg, #fff 0%, #f3f5f7 100%);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+}
+.crop-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.crop-header h2 { margin: 0; color: #27313a; font-size: 1.2rem; letter-spacing: -0.02em; }
+.crop-header p { max-width: 280px; margin: 6px 0 0; color: #75808c; font-size: 0.8rem; line-height: 1.45; }
+.crop-close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #4b5563;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.crop-close:hover { background: #edf0f2; border-color: #aeb6bd; }
+.crop-viewport {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  margin: 24px auto 22px;
+  overflow: hidden;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: #d1d5db;
+  box-shadow: 0 0 0 1px #cbd5e1, 0 8px 22px rgba(31, 41, 55, 0.18);
+  cursor: grab;
+  touch-action: none;
+}
+.crop-viewport:active { cursor: grabbing; }
+.crop-viewport img { position: absolute; max-width: none; user-select: none; pointer-events: none; }
+.crop-zoom-label { display: flex; justify-content: space-between; margin-bottom: 8px; color: #4b5563; font-size: 0.8rem; font-weight: 700; }
+.crop-zoom-label span:last-child { color: #7b858f; font-variant-numeric: tabular-nums; }
+.crop-zoom { width: 100%; accent-color: #56616b; cursor: pointer; }
+.crop-actions { display: flex; margin-top: 22px; }
+.crop-apply {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #424b54;
+  border-radius: 11px;
+  color: #fff;
+  background: linear-gradient(135deg, #56616b, #343c44);
+  box-shadow: 0 7px 16px rgba(44, 52, 60, 0.2);
+  font-weight: 700;
+  cursor: pointer;
+}
+.crop-apply:hover { background: linear-gradient(135deg, #434d57, #283039); }
+.crop-apply:disabled { opacity: 0.55; cursor: not-allowed; }
+
+@media (max-width: 440px) {
+  .crop-overlay { padding: 8px; }
+  .crop-dialog { padding: 16px; border-radius: 18px; }
+}
 
 /* Logout Modal */
 .logout-modal-box {
@@ -968,6 +1227,54 @@ async function confirmLogout() {
   cursor: pointer; transition: background 0.15s;
 }
 .logout-confirm-btn:hover { background: #c1121f; }
+
+.profile-status-toast {
+  position: fixed;
+  z-index: 2000;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  display: flex;
+  width: min(380px, calc(100vw - 32px));
+  align-items: center;
+  gap: 11px;
+  overflow: hidden;
+  padding: 13px 16px;
+  border: 1px solid #d8dee2;
+  border-left: 3px solid #547b66;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .97);
+  box-shadow: 0 12px 34px rgba(27, 37, 45, .18);
+  color: #303a42;
+  font: 600 .82rem/1.45 'Poppins', sans-serif;
+}
+.profile-status-toast::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: #aeb5b9;
+  content: '';
+  transform-origin: left;
+  animation: profile-toast-progress 5s linear forwards;
+}
+.profile-status-toast__icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf0f2;
+  color: #303a42;
+  font-size: .82rem;
+  font-weight: 800;
+}
+.profile-toast-enter-active,
+.profile-toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.profile-toast-enter-from,
+.profile-toast-leave-to { opacity: 0; transform: translateY(-8px); }
+@keyframes profile-toast-progress { to { transform: scaleX(0); } }
 
 @media (max-width: 900px) {
   .main { padding: 24px 20px; }
@@ -1035,6 +1342,16 @@ async function confirmLogout() {
   }
   .edit-modal-body { padding: 18px 18px 8px; }
   .edit-row.two-col { flex-direction: column; }
+}
+
+@media (max-width: 640px) {
+  .profile-status-toast {
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    padding: 12px 14px;
+    font-size: .78rem;
+  }
 }
 
 @media (max-width: 768px) {

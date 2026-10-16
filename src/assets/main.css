@@ -1108,7 +1108,7 @@ body,
 .sidebar .profile-avatar img {
   border: 0 !important;
   box-shadow: none !important;
-  filter: grayscale(0.45) contrast(1.03);
+  filter: none;
 }
 
 .sidebar .brand {

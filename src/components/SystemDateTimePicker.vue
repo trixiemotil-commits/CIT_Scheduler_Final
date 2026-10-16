@@ -58,6 +58,8 @@
               </div>
 
               <div class="clock-face" :class="`clock-face--${stage}`">
+                <span class="clock-hand clock-hand--hour" :style="hourHandStyle" aria-hidden="true"></span>
+                <span class="clock-hand clock-hand--minute" :style="minuteHandStyle" aria-hidden="true"></span>
                 <button
                   v-for="item in faceItems"
                   :key="item"
@@ -116,6 +118,8 @@ const faceItems = computed(() =>
     : Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, '0'))
 )
 const selectedValue = computed(() => stage.value === 'hour' ? String(Number(hour.value) || 12) : minute.value)
+const hourHandStyle = computed(() => ({ transform: `rotate(${((Number(hour.value) % 12) * 30) + (Number(minute.value) / 60) * 30}deg)` }))
+const minuteHandStyle = computed(() => ({ transform: `rotate(${Number(minute.value) * 6}deg)` }))
 
 function dateKey(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
@@ -228,4 +232,67 @@ function formatDateTime(value) {
 .dt-dialog{width:min(680px,calc(100vw - 36px))}.dt-body{grid-template-columns:minmax(0,1fr) 238px;align-items:stretch;gap:20px;padding:20px}.dt-calendar,.dt-time-card{min-height:360px;box-sizing:border-box}.dt-calendar{display:flex;flex-direction:column;padding:16px}.calendar-head{margin-bottom:12px}.calendar-grid{gap:6px}.days{flex:1;align-content:start}.days button{min-height:38px;border-radius:11px}.dt-time-card{justify-content:flex-start;padding:18px}.time-card-head{min-height:36px}.time-display{margin-top:2px}.clock-face{width:190px;height:190px;margin:4px auto 0}.clock-number{width:34px;height:34px}.dt-actions{padding:16px 20px 20px}
 
 @media(max-width:760px){.dt-dialog{width:min(560px,calc(100vw - 36px))}.dt-body{grid-template-columns:1fr}.dt-calendar,.dt-time-card{min-height:auto}.dt-time-card{align-items:stretch}.clock-face{width:190px;height:190px}.dt-actions{position:sticky;bottom:0}}
+/* Refined date and time dialog styling */
+.dt-overlay { padding: 24px; background: rgba(26, 33, 39, .58); }
+.dt-dialog {
+  border-color: rgba(216, 224, 230, .9);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 30px 80px rgba(24, 32, 39, .28), 0 6px 20px rgba(24, 32, 39, .1);
+}
+.dt-header { padding: 24px 28px; background: linear-gradient(125deg, #55616c, #303a43); }
+.dt-header p { margin-bottom: 8px; color: #e1e7eb; font-size: .66rem; letter-spacing: .16em; }
+.dt-header strong { font-size: clamp(1.2rem, 2vw, 1.45rem); }
+.dt-body { gap: 18px; padding: 22px; background: #f8fafb; }
+.dt-calendar,
+.dt-time-card {
+  border-color: #e0e7eb;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(48, 60, 69, .04), inset 0 1px 0 #fff;
+}
+.calendar-head button { transition: background .16s, border-color .16s, transform .16s; }
+.calendar-head button:hover { transform: translateY(-1px); }
+.days button { transition: background .16s, color .16s, box-shadow .16s; }
+.days button.today:not(.selected) { color: #34414b; box-shadow: inset 0 0 0 1px #8d9aa4; }
+.days button.selected { background: linear-gradient(145deg, #5b6772, #35404a); box-shadow: 0 5px 12px rgba(53, 64, 74, .18); }
+.dt-time-card { background: linear-gradient(160deg, #fff, #f7f9fa); }
+.period-pills { background: #f2f5f6; }
+.period-pills button.active,
+.time-display button.active,
+.clock-number.selected { background: linear-gradient(145deg, #5b6772, #35404a); }
+.clock-face { box-shadow: inset 3px 3px 9px rgba(84, 96, 106, .08), inset -3px -3px 9px rgba(255, 255, 255, .95); }
+.clock-hand {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: 50%;
+  display: block;
+  margin-left: -1.5px;
+  width: 3px;
+  border-radius: 999px;
+  background: #64717c;
+  transform-origin: 50% 100%;
+  pointer-events: none;
+  transition: transform .18s ease;
+}
+.clock-hand--hour { height: 48px; width: 4px; margin-left: -2px; background: #3d4953; }
+.clock-hand--minute { height: 66px; background: #788590; }
+.clock-center { z-index: 3; }
+.dt-actions { gap: 10px; padding: 16px 22px 20px; }
+.dt-actions button { min-height: 42px; border-radius: 12px; transition: background .16s, border-color .16s, transform .16s; }
+.dt-actions button:hover { border-color: #cbd5dc; }
+.dt-actions .set-button { background: linear-gradient(145deg, #5b6772, #35404a); }
+.dt-trigger:focus-visible,
+.calendar-head button:focus-visible,
+.days button:focus-visible,
+.period-pills button:focus-visible,
+.time-display button:focus-visible,
+.clock-number:focus-visible,
+.dt-actions button:focus-visible { outline: 3px solid rgba(78, 101, 120, .28); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .calendar-head button,
+  .days button,
+  .dt-actions button { transition: none; }
+}
 </style>

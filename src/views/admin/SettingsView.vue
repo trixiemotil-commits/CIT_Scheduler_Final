@@ -8,7 +8,7 @@
           <img :src="user.avatar || initialsAvatar(user)" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
-        <div class="role">Admin Portal</div>
+        <div class="role">{{ user.roles?.includes('admin') && user.roles?.includes('teacher') ? 'Super Admin Portal' : 'Admin Portal' }}</div>
         <div class="email">{{ user.email || 'admin@gmail.com' }}</div>
       </div>
 

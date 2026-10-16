@@ -8,7 +8,7 @@
           <img :src="profile.avatar" alt="Admin" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
-        <div class="role">Admin Portal</div>
+        <div class="role">{{ user.roles?.includes('admin') && user.roles?.includes('teacher') ? 'Super Admin Portal' : 'Admin Portal' }}</div>
         <div class="email">{{ profile.email }}</div>
       </div>
       <nav class="sidebar-nav">
@@ -173,10 +173,44 @@
             </div>
           </div>
           <div class="edit-modal-actions">
-            <button class="edit-cancel-btn" @click="closeEdit">Cancel</button>
             <button class="edit-save-btn" :disabled="isSaving || !hasEditChanges" @click="saveProfile">{{ isSaving ? 'Saving...' : 'Save Changes' }}</button>
           </div>
         </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showAvatarCrop" class="crop-overlay" @click.self="cancelAvatarCrop">
+        <section class="crop-dialog" role="dialog" aria-modal="true" aria-labelledby="crop-title">
+          <header class="crop-header">
+            <div>
+              <h2 id="crop-title">Crop Profile Picture</h2>
+              <p>Drag to reposition your photo. Use the slider to zoom.</p>
+            </div>
+            <button type="button" class="crop-close" aria-label="Cancel crop" @click="cancelAvatarCrop">×</button>
+          </header>
+          <div
+            class="crop-viewport"
+            @pointerdown="startCropDrag"
+            @pointermove.window="moveCropImage"
+            @pointerup.window="stopCropDrag"
+            @pointercancel.window="stopCropDrag"
+          >
+            <img
+              v-if="cropSource"
+              :src="cropSource"
+              :style="cropImageStyle"
+              alt="Photo crop preview"
+              draggable="false"
+              @load="onCropImageLoad"
+            />
+          </div>
+          <label class="crop-zoom-label" for="avatar-crop-zoom"><span>Zoom</span><span>{{ Math.round(cropZoom * 100) }}%</span></label>
+          <input id="avatar-crop-zoom" v-model.number="cropZoom" class="crop-zoom" type="range" min="1" max="3" step="0.01" @input="clampCropPosition" />
+          <footer class="crop-actions">
+            <button type="button" class="crop-apply" :disabled="!cropImageSize.width" @click="applyAvatarCrop">Use Photo</button>
+          </footer>
+        </section>
       </div>
     </Teleport>
 
@@ -347,6 +381,24 @@ const showEditModal = ref(false)
 const editForm = ref({})
 const initialEditSnapshot = ref(null)
 const avatarInput = ref(null)
+const showAvatarCrop = ref(false)
+const cropSource = ref('')
+const cropImageSize = ref({ width: 0, height: 0 })
+const cropZoom = ref(1)
+const cropPosition = ref({ x: 0, y: 0 })
+const cropDrag = ref(null)
+const CROP_VIEWPORT_SIZE = 260
+const cropScale = computed(() => {
+  const { width, height } = cropImageSize.value
+  if (!width || !height) return 1
+  return Math.max(CROP_VIEWPORT_SIZE / width, CROP_VIEWPORT_SIZE / height) * cropZoom.value
+})
+const cropImageStyle = computed(() => ({
+  width: `${cropImageSize.value.width * cropScale.value}px`,
+  height: `${cropImageSize.value.height * cropScale.value}px`,
+  left: `${cropPosition.value.x}px`,
+  top: `${cropPosition.value.y}px`,
+}))
 const editableFields = ['fullName', 'email', 'contact', 'gender', 'employeeId', 'avatar']
 const hasEditChanges = computed(() => {
   if (!initialEditSnapshot.value) return false
@@ -402,36 +454,82 @@ async function handleAvatarChange(event) {
     return
   }
 
-  try {
-    editForm.value.avatar = await resizeAvatar(file)
-  } catch (_error) {
-    Swal.fire({ icon: 'error', title: 'Unable to read image', text: 'Please choose a different image.' })
-  } finally {
-    event.target.value = ''
+  if (cropSource.value) URL.revokeObjectURL(cropSource.value)
+  cropSource.value = URL.createObjectURL(file)
+  cropImageSize.value = { width: 0, height: 0 }
+  cropPosition.value = { x: 0, y: 0 }
+  cropZoom.value = 1
+  cropDrag.value = null
+  showAvatarCrop.value = true
+  event.target.value = ''
+}
+
+function onCropImageLoad(event) {
+  const image = event.target
+  cropImageSize.value = { width: image.naturalWidth, height: image.naturalHeight }
+  const scale = Math.max(CROP_VIEWPORT_SIZE / image.naturalWidth, CROP_VIEWPORT_SIZE / image.naturalHeight)
+  cropPosition.value = {
+    x: (CROP_VIEWPORT_SIZE - image.naturalWidth * scale) / 2,
+    y: (CROP_VIEWPORT_SIZE - image.naturalHeight * scale) / 2,
+  }
+  clampCropPosition()
+}
+
+function clampCropPosition() {
+  const width = cropImageSize.value.width * cropScale.value
+  const height = cropImageSize.value.height * cropScale.value
+  cropPosition.value = {
+    x: Math.min(0, Math.max(CROP_VIEWPORT_SIZE - width, cropPosition.value.x)),
+    y: Math.min(0, Math.max(CROP_VIEWPORT_SIZE - height, cropPosition.value.y)),
   }
 }
 
-function resizeAvatar(file) {
-  return new Promise((resolve, reject) => {
-    const image = new Image()
-    const objectUrl = URL.createObjectURL(file)
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl)
-      const maxDimension = 512
-      const scale = Math.min(maxDimension / image.width, maxDimension / image.height, 1)
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.max(1, Math.round(image.width * scale))
-      canvas.height = Math.max(1, Math.round(image.height * scale))
-      const context = canvas.getContext('2d')
-      context.drawImage(image, 0, 0, canvas.width, canvas.height)
-      resolve(canvas.toDataURL('image/jpeg', 0.88))
-    }
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
-      reject(new Error('Invalid image file.'))
-    }
-    image.src = objectUrl
-  })
+function startCropDrag(event) {
+  if (!cropImageSize.value.width) return
+  event.preventDefault()
+  cropDrag.value = {
+    pointerX: event.clientX,
+    pointerY: event.clientY,
+    x: cropPosition.value.x,
+    y: cropPosition.value.y,
+  }
+}
+
+function moveCropImage(event) {
+  if (!cropDrag.value) return
+  cropPosition.value = {
+    x: cropDrag.value.x + event.clientX - cropDrag.value.pointerX,
+    y: cropDrag.value.y + event.clientY - cropDrag.value.pointerY,
+  }
+  clampCropPosition()
+}
+
+function stopCropDrag() {
+  cropDrag.value = null
+}
+
+function cancelAvatarCrop() {
+  showAvatarCrop.value = false
+  cropImageSize.value = { width: 0, height: 0 }
+  cropDrag.value = null
+  if (cropSource.value) URL.revokeObjectURL(cropSource.value)
+  cropSource.value = ''
+}
+
+function applyAvatarCrop() {
+  const image = document.querySelector('.crop-viewport img')
+  if (!image || !cropImageSize.value.width) return
+  const sourceX = -cropPosition.value.x / cropScale.value
+  const sourceY = -cropPosition.value.y / cropScale.value
+  const sourceSize = CROP_VIEWPORT_SIZE / cropScale.value
+  const canvas = document.createElement('canvas')
+  canvas.width = 512
+  canvas.height = 512
+  const context = canvas.getContext('2d')
+  if (!context) return
+  context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, canvas.width, canvas.height)
+  editForm.value.avatar = canvas.toDataURL('image/jpeg', 0.9)
+  cancelAvatarCrop()
 }
 
 async function saveProfile() {
@@ -880,8 +978,83 @@ onMounted(loadProfile)
   font-weight: 600;
   cursor: pointer;
 }
-.avatar-upload-btn:hover { background: #d8f0e2; }
+.avatar-upload-btn:hover { background: #e5e7eb; border-color: #9ca3af; }
 .avatar-file-input { display: none; }
+
+.crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(20, 25, 30, 0.68);
+  backdrop-filter: blur(5px);
+}
+.crop-dialog {
+  width: min(100%, 390px);
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 22px;
+  background: linear-gradient(155deg, #ffffff 0%, #f3f5f7 100%);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+}
+.crop-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.crop-header h2 { margin: 0; color: #27313a; font-size: 1.2rem; letter-spacing: -0.02em; }
+.crop-header p { max-width: 280px; margin: 6px 0 0; color: #75808c; font-size: 0.8rem; line-height: 1.45; }
+.crop-close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #4b5563;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.crop-close:hover { background: #edf0f2; border-color: #aeb6bd; }
+.crop-viewport {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  margin: 24px auto 22px;
+  overflow: hidden;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: #d1d5db;
+  box-shadow: 0 0 0 1px #cbd5e1, 0 8px 22px rgba(31, 41, 55, 0.18);
+  cursor: grab;
+  touch-action: none;
+}
+.crop-viewport:active { cursor: grabbing; }
+.crop-viewport img {
+  position: absolute;
+  max-width: none;
+  user-select: none;
+  pointer-events: none;
+}
+.crop-zoom-label { display: flex; justify-content: space-between; margin-bottom: 8px; color: #4b5563; font-size: 0.8rem; font-weight: 700; }
+.crop-zoom-label span:last-child { color: #7b858f; font-variant-numeric: tabular-nums; }
+.crop-zoom { width: 100%; accent-color: #56616b; cursor: pointer; }
+.crop-actions { display: flex; margin-top: 22px; }
+.crop-apply {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #424b54;
+  border-radius: 11px;
+  color: #fff;
+  background: linear-gradient(135deg, #56616b, #343c44);
+  box-shadow: 0 7px 16px rgba(44, 52, 60, 0.2);
+  font-weight: 700;
+  cursor: pointer;
+}
+.crop-apply:hover { background: linear-gradient(135deg, #434d57, #283039); }
+.crop-apply:disabled { opacity: 0.55; cursor: not-allowed; }
+
+@media (max-width: 440px) {
+  .crop-overlay { padding: 8px; }
+  .crop-dialog { padding: 16px; border-radius: 18px; }
+}
 
 .edit-field { display: flex; flex-direction: column; gap: 5px; flex: 1; }
 .edit-label {

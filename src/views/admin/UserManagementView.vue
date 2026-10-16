@@ -8,7 +8,7 @@
           <img :src="user.avatar || initialsAvatar(user)" :alt="user.name || 'Admin'" class="avatar" />
         </div>
         <div class="brand">CIT Scheduler</div>
-        <div class="role">Admin Portal</div>
+        <div class="role">{{ user.roles?.includes('admin') && user.roles?.includes('teacher') ? 'Super Admin Portal' : 'Admin Portal' }}</div>
         <div class="email">{{ user.email || 'admin@gmail.com' }}</div>
       </div>
 
@@ -164,6 +164,9 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path v-if="isMultiSelectMode" d="m8 12 2.5 2.5L16 9"/></svg>
           {{ isMultiSelectMode ? 'Cancel selection' : 'Select multiple' }}
         </button>
+        <span v-if="isMultiSelectMode" class="um-selected-count" aria-live="polite">
+          {{ selectedUserIds.length }} selected
+        </span>
         <template v-if="activeView === 'active'">
           <div class="um-search-wrap">
             <span class="um-search-icon">
@@ -187,21 +190,6 @@
             <option value="Student">Student</option>
           </select>
         </template>
-        <template v-if="selectedNonPendingUsers.length > 0">
-          <button class="um-bulk-archive-btn" @click="showBulkArchiveModal = true">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-            Archive ({{ selectedNonPendingUsers.length }})
-          </button>
-        </template>
-        <button
-          v-if="pendingCount > 0"
-          class="um-approve-all-btn"
-          :disabled="isBulkApproving"
-          @click="promptApproveAction"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/><path d="M22 10l-7 7"/></svg>
-          {{ isBulkApproving ? 'Approving...' : isMultiSelectMode && selectedPendingUsers.length ? `Approve Selected (${selectedPendingUsers.length})` : `Approve All Pending (${pendingCount})` }}
-        </button>
       </div>
 
       <div class="um-login-date-filter" role="group" aria-label="Filter by last login date">
@@ -215,6 +203,21 @@
           <input v-model="lastLoginEndDate" type="date" :min="lastLoginStartDate || undefined" aria-label="Last login to date" />
         </label>
         <button v-if="lastLoginStartDate || lastLoginEndDate" type="button" @click="clearLastLoginDateFilter">Clear</button>
+        <div v-if="selectedNonPendingUsers.length > 0 || pendingCount > 0" class="um-login-date-filter__actions">
+          <button v-if="selectedNonPendingUsers.length > 0" class="um-bulk-archive-btn" @click="showBulkArchiveModal = true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            Archive ({{ selectedNonPendingUsers.length }})
+          </button>
+          <button
+            v-if="pendingCount > 0"
+            class="um-approve-all-btn um-login-date-filter__approve"
+            :disabled="isBulkApproving"
+            @click="promptApproveAction"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/><path d="M22 10l-7 7"/></svg>
+            {{ isBulkApproving ? 'Approving...' : isMultiSelectMode && selectedPendingUsers.length ? `Approve Selected (${selectedPendingUsers.length})` : `Approve All Pending (${pendingCount})` }}
+          </button>
+        </div>
       </div>
 
       <!-- Table -->
@@ -245,10 +248,19 @@
           </thead>
           <tbody>
             <tr v-if="isLoadingUsers">
-              <td :colspan="isMultiSelectMode ? 8 : 7">
-                <div class="um-empty">
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                  <span>Loading users...</span>
+              <td :colspan="isMultiSelectMode ? 8 : 7" class="um-skeleton-cell">
+                <div class="um-user-skeleton-list" role="status" aria-label="Loading users">
+                  <div v-for="row in 6" :key="row" class="um-user-skeleton-row" aria-hidden="true">
+                    <span v-if="isMultiSelectMode" class="um-skeleton um-skeleton-check"></span>
+                    <span class="um-skeleton um-skeleton-avatar"></span>
+                    <span class="um-user-skeleton-name"><span class="um-skeleton um-skeleton-name"></span><span class="um-skeleton um-skeleton-department"></span></span>
+                    <span class="um-skeleton um-skeleton-email"></span>
+                    <span class="um-skeleton um-skeleton-role"></span>
+                    <span class="um-skeleton um-skeleton-status"></span>
+                    <span class="um-skeleton um-skeleton-date"></span>
+                    <span class="um-skeleton um-skeleton-actions"></span>
+                  </div>
+                  <span class="um-skeleton-loading-label">Loading users…</span>
                 </div>
               </td>
             </tr>
@@ -1953,7 +1965,7 @@ function confirmRestoreUser() {
   display: flex;
   align-items: center;
   gap: 7px;
-  background: #41484f;
+  background: #14532d;
   color: #fff;
   border: none;
   font-family: inherit;
@@ -1964,7 +1976,7 @@ function confirmRestoreUser() {
   cursor: pointer;
   transition: background 0.18s, opacity 0.18s;
 }
-.um-approve-all-btn:hover { background: #4b5259; }
+.um-approve-all-btn:hover { background: #0f3d22; }
 .um-approve-all-btn[disabled] {
   opacity: 0.65;
   cursor: not-allowed;
@@ -1996,6 +2008,19 @@ function confirmRestoreUser() {
 .um-select-mode-btn:hover { background: #f1f5f7; border-color: #aebbc3; }
 .um-select-mode-btn.is-active { border-color: #9aa6ae; background: #e8ecef; color: #3f4b53; }
 .um-select-mode-btn.is-active:hover { background: #dce2e6; }
+.um-selected-count {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid #d5dde2;
+  border-radius: 999px;
+  background: #eef2f4;
+  color: #46535d;
+  font-size: .74rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
 .um-print-btn {
   display: flex;
   align-items: center;
@@ -2313,6 +2338,56 @@ function confirmRestoreUser() {
   padding: 48px 20px;
   color: #bbb;
   font-size: 0.88rem;
+}
+.um-skeleton-cell { padding: 0 !important; }
+.um-user-skeleton-list { padding: 8px 14px 14px; }
+.um-user-skeleton-row {
+  display: grid;
+  grid-template-columns: 44px minmax(180px, 1.15fr) minmax(180px, 1.3fr) minmax(76px, .55fr) minmax(82px, .65fr) minmax(100px, .75fr) minmax(110px, .8fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 74px;
+  padding: 0 12px;
+  border-bottom: 1px solid #e9eef1;
+}
+.um-user-skeleton-row:has(.um-skeleton-check) {
+  grid-template-columns: 20px 44px minmax(180px, 1.15fr) minmax(180px, 1.3fr) minmax(76px, .55fr) minmax(82px, .65fr) minmax(100px, .75fr) minmax(110px, .8fr);
+}
+.um-skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: #e9eef1;
+}
+.um-skeleton::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent);
+  animation: um-skeleton-shimmer 1.35s ease-in-out infinite;
+}
+.um-skeleton-check { width: 18px; height: 18px; border-radius: 5px; }
+.um-skeleton-avatar { width: 42px; height: 42px; border-radius: 50%; }
+.um-user-skeleton-name { display: grid; gap: 8px; }
+.um-skeleton-name { width: 62%; height: 13px; border-radius: 7px; }
+.um-skeleton-department { width: 82%; height: 11px; border-radius: 6px; }
+.um-skeleton-email { width: 84%; height: 13px; border-radius: 7px; }
+.um-skeleton-role { width: 68px; height: 24px; border-radius: 999px; }
+.um-skeleton-status { width: 82px; height: 26px; border-radius: 999px; }
+.um-skeleton-date { width: 86px; height: 13px; border-radius: 7px; }
+.um-skeleton-actions { width: 74px; height: 30px; border-radius: 8px; }
+.um-skeleton-loading-label {
+  display: block;
+  padding: 12px 0 2px;
+  color: #77838c;
+  font-size: .76rem;
+  font-weight: 700;
+  text-align: center;
+}
+@keyframes um-skeleton-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .um-skeleton::after { animation: none; }
 }
 
 /* ── Modal overlay ── */
@@ -3220,13 +3295,11 @@ function confirmRestoreUser() {
 }
 .um-view-tabs { background: transparent; box-shadow: none; }
 .um-view-tab--on,
-.um-approve-all-btn,
 .um-approve-selected-btn {
   background: #44515d;
   box-shadow: none;
 }
 .um-view-tab--on:hover,
-.um-approve-all-btn:hover,
 .um-approve-selected-btn:hover { background: #35424d; }
 .um-add-btn {
   min-height: 46px;
@@ -3246,7 +3319,7 @@ function confirmRestoreUser() {
 .um-approve-all-btn {
   border-color: #176b3a;
   background: #21834b;
-  color: #fff;
+  color: #000;
 }
 .um-approve-all-btn:hover { background: #176b3a; }
 .um-approve-selected-btn {
@@ -3275,7 +3348,7 @@ function confirmRestoreUser() {
   white-space: nowrap;
   cursor: pointer;
 }
-.um-bulk-archive-btn { border: 1px solid #edb888; background: #fff4e8; color: #b45309; }
+.um-bulk-archive-btn { border: 1px solid #edb888; background: #fff4e8; color: #000; }
 .um-bulk-archive-btn:hover { background: #ffedd5; }
 .um-bulk-archive-icon { background: #fff7ed; color: #b45309; }
 .um-archive-confirm-btn:disabled,
@@ -3340,7 +3413,14 @@ function confirmRestoreUser() {
   flex-basis: 160px;
   min-width: 150px;
 }
-.um-stats-actions .um-approve-all-btn { margin-left: auto; }
+.um-bulk-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
 .um-stat-card {
   background: #fff;
   border-color: #dbe3e7;
@@ -3810,7 +3890,7 @@ function confirmRestoreUser() {
   .um-stats-actions .um-filter-select { height: 36px; font-size: .7rem; }
   .um-stats-actions .um-filter-select { flex: 1 1 105px; min-width: 95px; }
   .um-stats-actions .um-filter-select--status { flex-basis: 110px; min-width: 100px; }
-  .um-stats-actions .um-approve-all-btn { margin-left: auto; }
+  .um-bulk-actions { flex: 0 0 auto; margin-left: auto; }
 
   .um-table-wrap { max-width: 100%; overflow-x: auto; }
   .um-table { table-layout: fixed; }
@@ -3854,7 +3934,8 @@ function confirmRestoreUser() {
 
 @media (max-width: 760px) {
   .um-management-panel { padding: 14px; }
-  .um-stats-actions .um-approve-all-btn { flex: 1 1 100%; }
+  .um-bulk-actions { flex: 1 1 100%; margin-left: 0; }
+  .um-bulk-actions > button { flex: 1 1 0; justify-content: center; }
   .um-table { min-width: 680px; }
 }
 
@@ -3926,6 +4007,40 @@ function confirmRestoreUser() {
   font: inherit;
   font-weight: 750;
   cursor: pointer;
+}
+.um-login-date-filter__approve {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.um-login-date-filter__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+.um-login-date-filter__actions .um-bulk-archive-btn,
+.um-login-date-filter__actions .um-approve-all-btn {
+  color: #14532d !important;
+  box-shadow: 0 2px 5px rgba(20, 83, 45, .12) !important;
+}
+.um-login-date-filter__actions .um-approve-all-btn {
+  border-color: #b7e4c7 !important;
+  background: #e2f4e8 !important;
+}
+.um-login-date-filter__actions .um-approve-all-btn:hover {
+  background: #d2eddc !important;
+}
+.um-login-date-filter__actions .um-bulk-archive-btn {
+  border-color: #f3c99f !important;
+  background: #fff0df !important;
+  color: #9a4d0b !important;
+  box-shadow: 0 2px 5px rgba(154, 77, 11, .1) !important;
+}
+.um-login-date-filter__actions .um-bulk-archive-btn:hover {
+  background: #ffe7cc !important;
+  color: #9a4d0b !important;
 }
 .um-table { min-width: 1460px; }
 .um-table:not(.um-table--selecting) th:nth-child(1),
