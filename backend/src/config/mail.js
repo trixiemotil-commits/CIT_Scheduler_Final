@@ -1,4 +1,7 @@
 const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
+
+let gmailTransporter;
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
@@ -17,6 +20,34 @@ async function sendMail({ to, subject, text, html }) {
   }
   const { error } = await resend.emails.send({ from: FROM, to, subject, text, ...(html ? { html } : {}) });
   if (error) throw new Error(error.message);
+}
+
+async function sendAcademicTermPublishedEmail({ to, firstName, schoolYear, semester, isStudent }) {
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!user || !pass) {
+    const error = new Error('Gmail email delivery is not configured. Set SMTP_USER and SMTP_PASS in backend/.env.');
+    error.code = 'MAIL_NOT_CONFIGURED';
+    throw error;
+  }
+
+  gmailTransporter ||= nodemailer.createTransport({
+    service: process.env.SMTP_SERVICE || 'Gmail',
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+    auth: { user, pass },
+  });
+  const termLabel = `${schoolYear} ${semester}`.trim();
+  const nextStep = isStudent
+    ? 'Please log in to update your year and section.'
+    : 'Please log in to view the updated schedule.';
+  await gmailTransporter.sendMail({
+    from: process.env.SMTP_FROM || user,
+    to,
+    subject: `New academic term published: ${termLabel}`,
+    text: `Hello ${firstName || 'CIT Scheduler user'},\n\nThe academic term ${termLabel} has been published and is now the current term in CIT Scheduler. ${nextStep}`,
+  });
 }
 
 async function sendPasswordOtpEmail({ to, code }) {
@@ -94,4 +125,5 @@ module.exports = {
   sendNewDeviceLoginEmail,
   sendConsultationApprovedEmail,
   sendAccountApprovedEmail,
+  sendAcademicTermPublishedEmail,
 };

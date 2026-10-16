@@ -2,6 +2,9 @@ const AcademicTerm = require("../models/AcademicTerm");
 const User = require("../models/User");
 const { logActivity } = require("../utils/activityLogWriter");
 const { notifyActiveAdmins } = require("../utils/adminNotification");
+const { sendAcademicTermPublishedEmail } = require("../config/mail");
+
+const TERM_EMAIL_CONCURRENCY = 3;
 
 function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -274,6 +277,45 @@ async function publishTerm(req, res) {
       { $set: { authSessionInvalidatedAt: new Date() } }
     );
 
+    let emailSent = 0;
+    let emailFailed = 0;
+    let recipientLookupFailed = false;
+    try {
+      const recipients = await User.find({
+        account_status: "Active",
+        email: { $exists: true, $ne: "" },
+        $or: [
+          { role: { $in: ["student", "teacher", "admin"] } },
+          { roles: { $in: ["student", "teacher", "admin"] } },
+        ],
+      }).select("email firstName role roles").lean();
+
+      let nextRecipientIndex = 0;
+      const workerCount = Math.min(TERM_EMAIL_CONCURRENCY, recipients.length);
+      await Promise.all(Array.from({ length: workerCount }, async () => {
+        while (nextRecipientIndex < recipients.length) {
+          const recipient = recipients[nextRecipientIndex];
+          nextRecipientIndex += 1;
+          try {
+            await sendAcademicTermPublishedEmail({
+              to: recipient.email,
+              firstName: recipient.firstName,
+              schoolYear: target.schoolYear,
+              semester: target.semester,
+              isStudent: recipient.role === "student" || recipient.roles?.includes("student"),
+            });
+            emailSent += 1;
+          } catch (emailError) {
+            emailFailed += 1;
+            console.warn(`Term publication email failed for ${recipient.email}:`, emailError.message);
+          }
+        }
+      }));
+    } catch (recipientError) {
+      recipientLookupFailed = true;
+      console.warn("Term published, but publication email recipients could not be loaded:", recipientError.message);
+    }
+
     await logActivity({
       actor: req.user,
       action: `Published term ${target.schoolYear} ${target.semester}`,
@@ -295,7 +337,7 @@ async function publishTerm(req, res) {
       console.warn("Academic term published, but admin notification failed:", notificationError.message);
     }
 
-    return res.json({ term: target });
+    return res.json({ term: target, emailNotifications: { sent: emailSent, failed: emailFailed, recipientLookupFailed } });
   } catch (error) {
     console.error("Failed to publish academic term:", error);
     return res.status(500).json({ message: "Failed to publish academic term.", error: error.message });

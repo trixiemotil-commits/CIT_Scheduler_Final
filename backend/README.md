@@ -19,9 +19,13 @@ PORT=5000
 JWT_SECRET=your_long_random_secret
 FRONTEND_URL=https://citscheduler.com
 RESEND_API_KEY=your_resend_api_key
+SMTP_SERVICE=Gmail
+SMTP_USER=your_gmail_address
+SMTP_PASS=your_google_app_password
+SMTP_FROM="CIT Scheduler <your_gmail_address>"
 ```
 
-`FRONTEND_URL` is the public web app origin used to build new-device review links. Configure `RESEND_API_KEY` for security and account email delivery.
+`FRONTEND_URL` is the public web app origin used to build new-device review links. Configure `RESEND_API_KEY` for security and account email delivery. Gmail SMTP settings are used for individual academic-term publication notices; use a Google App Password for `SMTP_PASS`.
 
 3. Start server:
 
