@@ -444,7 +444,17 @@
             </div>
           </div>
 
-          <div v-if="userForm.role === 'Student'" class="form-row">
+          <div v-if="userForm.role === 'Student'" class="form-row form-row--single">
+            <div class="form-group">
+              <label class="form-label">Enrollment Type</label>
+              <select v-model="userForm.studentEnrollmentType" class="form-input" @change="handleEnrollmentTypeChange">
+                <option value="Regular">Regular</option>
+                <option value="Irregular">Irregular</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="userForm.role === 'Student' && userForm.studentEnrollmentType === 'Regular'" class="form-row">
             <div class="form-group">
               <label class="form-label">Year Level</label>
               <select v-model="userForm.yearLevel" class="form-input">
@@ -456,6 +466,28 @@
               <label class="form-label">Section</label>
               <input v-model.trim="userForm.section" class="form-input" type="text" placeholder="e.g. South 1" />
             </div>
+          </div>
+
+          <div v-if="userForm.role === 'Student' && userForm.studentEnrollmentType === 'Irregular'" class="form-group student-year-sections">
+            <div class="student-year-sections-heading">
+              <label class="form-label">Year and Section Assignments</label>
+              <button type="button" class="student-year-add" :disabled="userForm.studentYearSections.length >= studentYearOptions.length" @click="addStudentYearSection">+ Add year</button>
+            </div>
+            <div v-for="(assignment, index) in userForm.studentYearSections" :key="index" class="form-row student-year-section-row">
+              <div class="form-group">
+                <label class="form-label">Year Level</label>
+                <select v-model="assignment.yearLevel" class="form-input">
+                  <option value="">Select year level</option>
+                  <option v-for="year in studentYearOptions" :key="year" :value="year" :disabled="isStudentYearAlreadySelected(year, index)">{{ year }}</option>
+                </select>
+              </div>
+              <div class="form-group student-section-input">
+                <label class="form-label">Section</label>
+                <input v-model.trim="assignment.section" class="form-input" type="text" placeholder="e.g. South 3" />
+              </div>
+              <button type="button" class="student-year-remove" aria-label="Remove year assignment" @click="removeStudentYearSection(index)">Remove</button>
+            </div>
+            <p class="student-year-help">Assign the student’s section separately for each enrolled year.</p>
           </div>
 
           <!-- ── Section: Credentials ── -->
@@ -1039,6 +1071,8 @@ function mapUserForUi(user) {
     employeeId: user.employeeId || '',
     yearLevel: user.yearLevel || '',
     section: user.section || '',
+    studentEnrollmentType: user.studentEnrollmentType === 'Irregular' ? 'Irregular' : 'Regular',
+    studentYearSections: Array.isArray(user.studentYearSections) ? user.studentYearSections : [],
     isLoginLocked: Boolean(user.isLoginLocked),
     loginLockoutLevel: Number(user.loginLockoutLevel || 0),
     loginLockedUntil: user.loginLockedUntil || null,
@@ -1216,6 +1250,17 @@ function buildUserPayload(includePassword) {
     status: editingUser.value ? (userForm.value.status || 'Active') : 'Active',
     yearLevel: roles.includes('student') ? trimValue(userForm.value.yearLevel) : '',
     section: roles.includes('student') ? trimValue(userForm.value.section) : '',
+    studentEnrollmentType: roles.includes('student') ? userForm.value.studentEnrollmentType : undefined,
+    studentYearSections: roles.includes('student')
+      ? userForm.value.studentEnrollmentType === 'Irregular'
+        ? userForm.value.studentYearSections.map((assignment) => ({
+          yearLevel: trimValue(assignment.yearLevel),
+          section: trimValue(assignment.section),
+        }))
+        : (userForm.value.yearLevel && userForm.value.section
+          ? [{ yearLevel: trimValue(userForm.value.yearLevel), section: trimValue(userForm.value.section) }]
+          : [])
+      : undefined,
   }
 
   if (schoolId) {
@@ -1257,7 +1302,7 @@ const rowStatusTarget = ref(null)
 const rowStatusNextValue = ref('')
 const isSavingUser    = ref(false)
 const studentYearOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
-const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', yearLevel: '', section: '', password: '', confirmPassword: '', currentPassword: '' })
+const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', yearLevel: '', section: '', studentEnrollmentType: 'Regular', studentYearSections: [], password: '', confirmPassword: '', currentPassword: '' })
 const userForm  = ref(emptyForm())
 const roleSelectElement = ref(null)
 
@@ -1293,6 +1338,11 @@ function openEditUser(user) {
     status: user.status,
     yearLevel: user.yearLevel || '',
     section: user.section || '',
+    studentEnrollmentType: user.studentEnrollmentType === 'Irregular' ? 'Irregular' : 'Regular',
+    studentYearSections: (Array.isArray(user.studentYearSections) && user.studentYearSections.length
+      ? user.studentYearSections
+      : (user.yearLevel && user.section ? [{ yearLevel: user.yearLevel, section: user.section }] : []))
+      .map((assignment) => ({ yearLevel: assignment.yearLevel || '', section: assignment.section || '' })),
     password: '',
     confirmPassword: '',
     currentPassword: '',
@@ -1301,6 +1351,30 @@ function openEditUser(user) {
   showConfirmPassword.value = false
   showCurrentAdminPassword.value = false
   showUserModal.value = true
+}
+
+function handleEnrollmentTypeChange() {
+  if (userForm.value.studentEnrollmentType === 'Irregular' && !userForm.value.studentYearSections.length && userForm.value.yearLevel && userForm.value.section) {
+    userForm.value.studentYearSections = [{ yearLevel: userForm.value.yearLevel, section: userForm.value.section }]
+  }
+  if (userForm.value.studentEnrollmentType === 'Regular' && userForm.value.studentYearSections.length) {
+    const firstAssignment = userForm.value.studentYearSections[0]
+    userForm.value.yearLevel = firstAssignment.yearLevel || userForm.value.yearLevel
+    userForm.value.section = firstAssignment.section || userForm.value.section
+  }
+}
+
+function addStudentYearSection() {
+  const availableYear = studentYearOptions.find((year) => !userForm.value.studentYearSections.some((item) => item.yearLevel === year))
+  userForm.value.studentYearSections.push({ yearLevel: availableYear || '', section: '' })
+}
+
+function removeStudentYearSection(index) {
+  userForm.value.studentYearSections.splice(index, 1)
+}
+
+function isStudentYearAlreadySelected(year, currentIndex) {
+  return userForm.value.studentYearSections.some((assignment, index) => index !== currentIndex && assignment.yearLevel === year)
 }
 
 async function validateCurrentAdminPassword() {
@@ -1353,6 +1427,24 @@ async function saveUser() {
   if (!PHINMA_EMAIL_REGEX.test(normalizedEmail)) {
     showUserFormError('PHINMA Email must end with .au@phinmaed.com.')
     return
+  }
+
+  if (userForm.value.role === 'Student') {
+    if (userForm.value.studentEnrollmentType === 'Irregular') {
+      const assignments = userForm.value.studentYearSections
+      const years = assignments.map((item) => item.yearLevel).filter(Boolean)
+      if (!assignments.length || assignments.some((item) => !item.yearLevel || !item.section.trim())) {
+        showUserFormError('Add a year and section for every irregular student assignment.')
+        return
+      }
+      if (new Set(years).size !== years.length) {
+        showUserFormError('Each year level can only be assigned once.')
+        return
+      }
+    } else if (Boolean(userForm.value.yearLevel) !== Boolean(userForm.value.section.trim())) {
+      showUserFormError('Enter both the year level and section, or leave both blank.')
+      return
+    }
   }
 
   if (!editingUser.value) {
@@ -2318,6 +2410,13 @@ function confirmRestoreUser() {
 .form-row--single {
   grid-template-columns: 1fr;
 }
+.student-year-sections { padding: 15px; border: 1px solid #dce2e7; border-radius: 12px; background: #f8fafb; }
+.student-year-sections-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.student-year-sections-heading .form-label { margin: 0; }
+.student-year-add, .student-year-remove { border: 1px solid #cbd4db; border-radius: 8px; background: #fff; color: #40505c; padding: 8px 11px; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.student-year-add:disabled { opacity: .5; cursor: not-allowed; }
+.student-year-section-row { grid-template-columns: 1fr 1fr auto; align-items: end; margin-top: 12px; }
+.student-year-help { margin: 10px 0 0; color: #75818b; font-size: .78rem; }
 .form-label {
   font-size: 0.78rem;
   font-weight: 700;

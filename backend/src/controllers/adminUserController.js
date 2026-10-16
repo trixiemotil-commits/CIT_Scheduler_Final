@@ -81,6 +81,10 @@ function toClientUser(user) {
     designatedAreas: Array.isArray(user.designatedAreas) ? user.designatedAreas : [],
     yearLevel: user.yearLevel || "",
     section: user.section || "",
+    studentEnrollmentType: user.studentEnrollmentType || "Regular",
+    studentYearSections: Array.isArray(user.studentYearSections)
+      ? user.studentYearSections.map((item) => ({ yearLevel: item.yearLevel || "", section: item.section || "" }))
+      : [],
     isLoginLocked: Boolean(user.loginLockedUntil && user.loginLockedUntil > new Date()),
     loginLockoutLevel: Number(user.loginLockoutLevel || 0),
     loginLockedUntil: user.loginLockedUntil || null,
@@ -316,6 +320,8 @@ async function updateUser(req, res) {
       studentId = "",
       yearLevel = "",
       section = "",
+      studentEnrollmentType = "Regular",
+      studentYearSections = [],
       designatedAreas = [],
     } = req.body;
 
@@ -423,15 +429,38 @@ async function updateUser(req, res) {
 
     if (normalizedStudentId) {
       user.studentId = normalizedStudentId;
-      user.yearLevel = normalizeString(yearLevel);
-      user.section = normalizeString(section);
-      user.studentYearSections = user.yearLevel && user.section
-        ? [{ yearLevel: user.yearLevel, section: user.section }]
+      const enrollmentType = normalizeString(studentEnrollmentType) || "Regular";
+      if (!["Regular", "Irregular"].includes(enrollmentType)) {
+        return res.status(400).json({ message: "Enrollment type must be Regular or Irregular." });
+      }
+
+      const yearSections = Array.isArray(studentYearSections)
+        ? studentYearSections.map((item) => ({
+          yearLevel: normalizeString(item?.yearLevel),
+          section: normalizeString(item?.section),
+        }))
         : [];
+      const assignments = enrollmentType === "Regular"
+        ? (normalizeString(yearLevel) && normalizeString(section)
+          ? [{ yearLevel: normalizeString(yearLevel), section: normalizeString(section) }]
+          : yearSections.slice(0, 1))
+        : yearSections;
+      const validYearLevels = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
+      const hasIncompleteAssignment = assignments.some((item) => !validYearLevels.includes(item.yearLevel) || !item.section);
+      const hasDuplicateYears = new Set(assignments.map((item) => item.yearLevel)).size !== assignments.length;
+      if (hasIncompleteAssignment || hasDuplicateYears || (enrollmentType === "Irregular" && assignments.length === 0)) {
+        return res.status(400).json({ message: "Provide a valid, unique year and section for each student assignment." });
+      }
+
+      user.studentEnrollmentType = enrollmentType;
+      user.studentYearSections = assignments;
+      user.yearLevel = assignments[0]?.yearLevel || "";
+      user.section = assignments[0]?.section || "";
     } else {
       user.studentId = undefined;
       user.yearLevel = undefined;
       user.section = "";
+      user.studentEnrollmentType = "Regular";
       user.studentYearSections = [];
     }
 
