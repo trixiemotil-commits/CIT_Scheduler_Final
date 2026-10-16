@@ -25,10 +25,9 @@
 
           <div class="events-grid">
             <template v-if="eventsTab === 'active'">
-              <div v-if="eventsLoading" class="events-state events-state--loading" role="status">
-                <span class="events-loader" aria-hidden="true"></span>
-                <strong>Loading events</strong>
-                <span>Checking the latest school announcements...</span>
+              <div v-if="eventsLoading" class="events-skeleton-list" role="status" aria-label="Loading events">
+                <span class="sr-only">Loading events…</span>
+                <div v-for="item in 3" :key="`active-skeleton-${item}`" class="events-skeleton-card"><i class="events-skeleton-block cover"></i><i class="events-skeleton-block title"></i><i class="events-skeleton-block line"></i><i class="events-skeleton-block line short"></i></div>
               </div>
               <div v-else-if="eventsError" class="events-state events-state--error">{{ eventsError }}</div>
               <div v-else-if="!activeEvents.length" class="events-state">
@@ -79,10 +78,9 @@
             </template>
 
             <template v-else>
-              <div v-if="eventsLoading" class="events-state events-state--loading" role="status">
-                <span class="events-loader" aria-hidden="true"></span>
-                <strong>Loading events</strong>
-                <span>Checking the latest school announcements...</span>
+              <div v-if="eventsLoading" class="events-skeleton-list" role="status" aria-label="Loading events">
+                <span class="sr-only">Loading events…</span>
+                <div v-for="item in 3" :key="`ended-skeleton-${item}`" class="events-skeleton-card"><i class="events-skeleton-block cover"></i><i class="events-skeleton-block title"></i><i class="events-skeleton-block line"></i><i class="events-skeleton-block line short"></i></div>
               </div>
               <div v-else-if="!endedEvents.length" class="events-state">
                 <span class="events-state-icon" aria-hidden="true">
@@ -238,7 +236,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 // State
 const events = ref([])
-const eventsLoading = ref(false)
+const eventsLoading = ref(true)
 const eventsError = ref('')
 const eventsTab = ref('active')
 const eventSearch = ref('')
@@ -414,6 +412,18 @@ onBeforeUnmount(() => window.clearInterval(eventClock))
 </script>
 
 <style scoped>
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.events-skeleton-list { display: grid; gap: 14px; }
+.events-skeleton-card { display: grid; gap: 10px; padding: 12px; border: 1px solid rgba(91,99,106,.12); border-radius: 16px; background: rgba(255,255,255,.8); box-shadow: 0 7px 16px rgba(38,44,49,.07); }
+.events-skeleton-block { display: block; position: relative; overflow: hidden; border-radius: 8px; background: rgba(115,125,133,.15); }
+.events-skeleton-block::after { position: absolute; inset: 0; content: ''; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent); animation: events-shimmer 1.35s ease-in-out infinite; }
+.events-skeleton-block.cover { height: 142px; border-radius: 11px; }
+.events-skeleton-block.title { width: 70%; height: 17px; margin-top: 2px; }
+.events-skeleton-block.line { width: 92%; height: 11px; }
+.events-skeleton-block.line.short { width: 54%; }
+@keyframes events-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .events-skeleton-block::after { animation: none; transform: none; opacity: .25; } }
+
 .mobile-app {
   max-width: 430px;
   min-height: 100%;

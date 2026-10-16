@@ -194,7 +194,7 @@ onBeforeUnmount(() => { document.body.classList.remove('student-settings-active'
 <style scoped>
 :global(body.student-settings-active .student-tab-bar) { display: none !important; }
 :global(ion-content) { --background: linear-gradient(145deg, #eef0f1 0%, #dfe3e5 52%, #c7cdd1 100%); }
-.change-password-page { width: 100%; max-width: 430px; min-height: 100dvh; margin: 0 auto; padding-bottom: calc(34px + env(safe-area-inset-bottom, 0px)); color: #252b31; background: radial-gradient(circle at 100% 0%, rgba(255,255,255,.78), transparent 34%), linear-gradient(145deg, #f1f3f4 0%, #dfe3e5 52%, #c7cdd1 100%); font-family: 'Poppins', sans-serif; }
+.change-password-page { width: 100%; max-width: 430px; min-height: 100dvh; box-sizing: border-box; overflow-x: clip; margin: 0 auto; padding-bottom: calc(34px + env(safe-area-inset-bottom, 0px)); color: #252b31; background: radial-gradient(circle at 100% 0%, rgba(255,255,255,.78), transparent 34%), linear-gradient(145deg, #f1f3f4 0%, #dfe3e5 52%, #c7cdd1 100%); font-family: 'Poppins', sans-serif; }
 .change-password-header { min-height: 68px; display: flex; align-items: center; justify-content: space-between; padding: calc(10px + env(safe-area-inset-top, 0px)) 18px 14px; }
 .change-password-header h1 { color: #3e4851; font-size: 1.08rem; font-weight: 800; }
 .change-password-back, .header-spacer { width: 44px; height: 44px; }
@@ -234,5 +234,15 @@ onBeforeUnmount(() => { document.body.classList.remove('student-settings-active'
 .verification-toggle.enabled { background: #4b5563; }
 .verification-toggle.enabled span { transform: translateX(22px); }
 .security-input { margin-top: 14px; padding-right: 14px; }
-@media (max-width: 380px) { .change-password-content { padding-inline: 14px; } .security-card { padding-inline: 16px; } .otp-boxes { gap: 4px; } .otp-input { min-height: 48px !important; } .otp-button { padding-inline: 10px; font-size: .66rem; } }
+@media (max-width: 380px) {
+  .change-password-content { padding: 14px 12px 0; gap: 12px; }
+  .security-card { padding: 16px 14px; border-radius: 18px; }
+  .card-heading h2 { font-size: 1.02rem; }
+  .otp-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; }
+  .otp-boxes { gap: 6px; }
+  .otp-input { min-height: 46px !important; padding-inline: 0 !important; }
+  .otp-button { width: 100%; min-height: 44px; padding-inline: 10px; font-size: .72rem; }
+  .password-form { gap: 12px; margin-top: 15px; }
+  .password-input-wrap input, .security-input { min-height: 48px; }
+}
 </style>

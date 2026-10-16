@@ -111,12 +111,7 @@
     <!-- Teacher List -->
     <div :class="['teacher-list', { 'is-loading': loadingTeachers }]">
       <div v-if="loadingTeachers" class="empty-state-card loading-state" role="status" aria-label="Loading teachers">
-        <div class="loading-panel">
-          <div class="loading-orbit" aria-hidden="true"><span></span></div>
-          <div class="loading-copy">
-            <strong>Loading teachers</strong>
-            <span>Finding teachers and consultation hours...</span>
-          </div>
+        <div class="loading-panel" aria-hidden="true">
           <div class="teacher-skeleton" aria-hidden="true">
             <div class="skeleton-avatar"></div>
             <div class="skeleton-content">
@@ -241,7 +236,7 @@ const activeFilter = ref('All')
 const bookingTeacherType = ref('')
 const bookingTeacherId = ref('')
 const filters      = ['All', 'Subject Teacher', 'Available Teacher']
-const loadingTeachers = ref(false)
+const loadingTeachers = ref(true)
 const loadError = ref('')
 const CONSULTATION_REASONS = [
   'Lesson Clarification',

@@ -3,6 +3,13 @@
     <IonContent :fullscreen="true">
       <StudentRefresher :refresh="refreshProfile" />
       <div class="mobile-app" :class="{ 'profile-modal-open': showModal || showLogoutModal }">
+    <div v-if="profileLoading" class="profile-skeleton" role="status" aria-label="Loading profile">
+      <span class="sr-only">Loading profile…</span>
+      <header class="app-header"><i class="profile-skeleton-block circle"></i><i class="profile-skeleton-block heading"></i><i class="profile-skeleton-block circle"></i></header>
+      <section class="profile-skeleton-card"><i class="profile-skeleton-block avatar"></i><div><i class="profile-skeleton-block line wide"></i><i class="profile-skeleton-block line"></i><i class="profile-skeleton-block badge"></i></div></section>
+      <section v-for="section in 2" :key="section" class="profile-skeleton-menu"><i class="profile-skeleton-block title"></i><div v-for="row in (section === 1 ? 2 : 4)" :key="row" class="profile-skeleton-row"><i class="profile-skeleton-block icon"></i><div><i class="profile-skeleton-block line wide"></i><i class="profile-skeleton-block line"></i></div></div></section>
+    </div>
+    <template v-else>
     <div class="app-header">
       <button class="back-btn" aria-label="Go to home" @click="$router.push('/student/dashboard')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -145,6 +152,7 @@
       </div>
     </Teleport>
 
+    </template>
       </div>
     </IonContent>
   </IonPage>
@@ -171,6 +179,7 @@ function normalizeUser(rawUser) {
 }
 
 const user = ref(normalizeUser(getUser()))
+const profileLoading = ref(true)
 const fullName = computed(() => user.value.name || '--')
 const initials = computed(() => fullName.value.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'S')
 const studentIdDisplay = computed(() => {
@@ -241,7 +250,10 @@ function persistUser() {
 
 async function fetchLatestProfile() {
   const token = getToken()
-  if (!token) return
+  if (!token) {
+    profileLoading.value = false
+    return
+  }
 
   try {
     const response = await fetch(`${API_BASE}/auth/me`, {
@@ -263,6 +275,8 @@ async function fetchLatestProfile() {
     persistUser()
   } catch (_error) {
     // Non-blocking profile refresh.
+  } finally {
+    profileLoading.value = false
   }
 }
 
@@ -426,6 +440,26 @@ const { refresh: refreshProfile } = useAutoRefresh(fetchLatestProfile)
 </script>
 
 <style scoped>
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.profile-skeleton { min-height: 100dvh; padding: 0 18px 110px; }
+.profile-skeleton .app-header { margin: 0 -18px 20px; }
+.profile-skeleton-block { display: block; position: relative; overflow: hidden; background: rgba(115,125,133,.15); border-radius: 8px; }
+.profile-skeleton-block::after { position: absolute; inset: 0; content: ''; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent); animation: profile-shimmer 1.35s ease-in-out infinite; }
+.profile-skeleton-block.circle { width: 40px; height: 40px; border-radius: 50%; }
+.profile-skeleton-block.heading { width: 130px; height: 18px; }
+.profile-skeleton-card { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding: 20px; border-radius: 18px; background: rgba(255,255,255,.72); }
+.profile-skeleton-block.avatar { width: 72px; height: 72px; flex: 0 0 72px; border-radius: 50%; }
+.profile-skeleton-card > div, .profile-skeleton-row > div { display: grid; flex: 1; gap: 8px; }
+.profile-skeleton-block.line { width: 55%; height: 11px; }
+.profile-skeleton-block.line.wide { width: 82%; height: 15px; }
+.profile-skeleton-block.badge { width: 90px; height: 20px; margin-top: 2px; border-radius: 999px; }
+.profile-skeleton-menu { margin: 0 0 22px; }
+.profile-skeleton-block.title { width: 85px; height: 13px; margin: 0 0 10px 4px; }
+.profile-skeleton-row { display: flex; align-items: center; gap: 13px; min-height: 68px; padding: 10px 13px; border-bottom: 1px solid rgba(104,112,120,.12); background: rgba(255,255,255,.58); }
+.profile-skeleton-block.icon { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 11px; }
+@keyframes profile-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .profile-skeleton-block::after { animation: none; transform: none; opacity: .25; } }
+
 :global(ion-content) {
   --background: linear-gradient(145deg, #eef0f1 0%, #dfe3e5 52%, #cfd4d7 100%);
 }

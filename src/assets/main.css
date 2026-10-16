@@ -470,12 +470,22 @@ select {
 }
 
 .mobile-app .header-notif-btn .notif-dot {
-  top: 7px !important;
-  right: 7px !important;
-  width: 10px !important;
-  height: 10px !important;
+  top: -5px !important;
+  right: -7px !important;
+  display: grid !important;
+  min-width: 19px !important;
+  height: 19px !important;
+  padding: 0 5px !important;
+  place-items: center !important;
+  border: 2px solid #f8f9fa !important;
+  border-radius: 999px !important;
   background: #ef3f4b !important;
-  box-shadow: 0 0 0 3px rgba(248,249,250,.95) !important;
+  color: #fff !important;
+  font-size: .62rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  box-shadow: 0 0 0 2px rgba(248,249,250,.95) !important;
 }
 
 .mobile-app .stat-card,
@@ -509,9 +519,9 @@ select {
 
 .student-app-shell {
   position: relative;
-  width: min(100%, 440px);
-  max-width: 440px;
-  min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  min-height: 100dvh;
   margin: 0 auto;
   background:
     radial-gradient(circle at 90% 0%, rgba(255,255,255,.78), transparent 18rem),
@@ -521,17 +531,22 @@ select {
 
 @media (min-width: 768px) {
   .student-app-shell {
-    width: min(100%, 460px);
-    max-width: 460px;
+    width: min(100%, 1120px);
+    max-width: 1120px;
   }
 
-  .student-tab-bar { max-width: min(430px, calc(100vw - 48px)) !important; }
+  .student-tab-bar {
+    width: min(430px, calc(100vw - 48px)) !important;
+    max-width: 430px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+  }
 }
 
 @media (min-width: 1024px) {
   .student-app-shell {
-    width: min(100%, 430px);
-    max-width: 430px;
+    width: min(100%, 1280px);
+    max-width: 1280px;
   }
 }
 

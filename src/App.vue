@@ -17,7 +17,11 @@
         </svg>
       </button>
     </Transition>
-    <div v-if="securitySuccess" class="security-success-toast" role="status">{{ securitySuccess }}</div>
+    <div v-if="securitySuccess" class="security-success-toast" role="status" aria-live="polite">
+      <span class="security-success-icon" aria-hidden="true">✓</span>
+      <span class="security-success-message">{{ securitySuccess }}</span>
+      <button type="button" class="security-success-dismiss" aria-label="Dismiss success message" @click="dismissSecuritySuccess">×</button>
+    </div>
     <div v-if="showNativeSplash" class="native-splash" aria-label="CITScheduler" role="status">
       <div class="native-splash__lottie-art" aria-hidden="true">
         <span class="native-splash__orbit native-splash__orbit--one"></span>
@@ -244,6 +248,14 @@ async function checkForNewLogin() {
 function dismissSecurityWarning() {
   securityDismissed.value = true
   showSecurityWarning.value = false
+}
+
+function dismissSecuritySuccess() {
+  securitySuccess.value = ''
+  if (securitySuccessTimer) {
+    window.clearTimeout(securitySuccessTimer)
+    securitySuccessTimer = null
+  }
 }
 
 async function trustCurrentDevice() {
@@ -575,19 +587,57 @@ onUnmounted(() => {
 .security-warning-error { color: #b64f59 !important; }
 .security-success-toast {
   position: fixed;
-  top: max(18px, env(safe-area-inset-top));
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
   left: 50%;
   z-index: 11000;
-  width: min(440px, calc(100% - 32px));
-  padding: 13px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(440px, calc(100% - 28px));
+  box-sizing: border-box;
+  padding: 11px 12px;
   transform: translateX(-50%);
   border: 1px solid #93c7ad;
-  border-radius: 8px;
-  background: #effaf3;
+  border-radius: 14px;
+  background: rgba(239, 250, 243, .98);
   color: #1c6843;
-  box-shadow: 0 8px 24px rgba(25, 58, 41, .18);
-  font-size: .85rem;
+  box-shadow: 0 8px 24px rgba(25, 58, 41, .2);
+  font-size: .82rem;
   font-weight: 650;
-  text-align: center;
+  line-height: 1.4;
+  text-align: left;
+}
+.security-success-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  border-radius: 50%;
+  background: #d8f0e1;
+  font-size: .9rem;
+  font-weight: 800;
+}
+.security-success-message {
+  min-width: 0;
+  flex: 1;
+}
+.security-success-dismiss {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #397657;
+  font: inherit;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.security-success-dismiss:focus-visible {
+  outline: 2px solid #397657;
+  outline-offset: 1px;
 }
 </style>

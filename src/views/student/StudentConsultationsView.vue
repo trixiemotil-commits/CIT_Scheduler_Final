@@ -25,11 +25,6 @@
     <div :class="['sessions-list', { 'is-loading': isLoadingSessions }]">
       <div v-if="isLoadingSessions" class="empty-state loading-state">
         <div class="loading-panel" role="status" aria-label="Loading consultation sessions">
-          <div class="loading-orbit" aria-hidden="true"><span></span></div>
-          <div class="loading-copy">
-            <strong>Loading your sessions</strong>
-            <span>Getting your latest consultation details...</span>
-          </div>
           <div class="session-skeleton" aria-hidden="true">
             <div class="skeleton-avatar"></div>
             <div class="skeleton-content">

@@ -2,6 +2,17 @@
   <IonPage>
     <IonContent :fullscreen="true">
       <div class="mobile-app">
+    <div v-if="isLoading" class="notifications-skeleton" role="status" aria-label="Loading notifications">
+      <span class="sr-only">Loading notifications…</span>
+      <div class="app-header"><i class="skeleton-block skeleton-back"></i><i class="skeleton-block skeleton-heading"></i><i class="skeleton-block skeleton-action"></i></div>
+      <i class="skeleton-block skeleton-unread"></i>
+      <i class="skeleton-block skeleton-group"></i>
+      <div v-for="item in 6" :key="item" class="skeleton-notification-row">
+        <i class="skeleton-block skeleton-avatar"></i>
+        <div class="skeleton-copy"><i class="skeleton-block"></i><i class="skeleton-block"></i><i class="skeleton-block"></i></div>
+      </div>
+    </div>
+    <template v-else>
     <div class="app-header">
       <button class="back-btn" @click="$router.back()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -50,6 +61,7 @@
         </div>
       </section>
     </div>
+    </template>
 
       </div>
     </IonContent>
@@ -78,12 +90,14 @@ async function apiRequest(path, options = {}) {
 }
 
 const notifications = ref([])
+const isLoading = ref(true)
 const router = useRouter()
 const isClearing = ref(false)
 const showClearConfirm = ref(false)
 const clearError = ref('')
 
 async function loadNotifications() {
+  isLoading.value = true
   try {
     const payload = await apiRequest('/notifications')
     const notifs = Array.isArray(payload.notifications) ? payload.notifications : []
@@ -101,6 +115,8 @@ async function loadNotifications() {
     }))
   } catch (err) {
     notifications.value = []
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -211,6 +227,25 @@ async function confirmClearAll() {
 </script>
 
 <style scoped>
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.notifications-skeleton { min-height: 100dvh; padding-bottom: 16px; background: #f3f5f7; }
+.notifications-skeleton .app-header { min-height: 68px; }
+.skeleton-block { position: relative; display: block; overflow: hidden; border-radius: 8px; background: rgba(115,125,133,.14); }
+.skeleton-block::after { position: absolute; inset: 0; content: ''; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent); animation: notification-shimmer 1.35s ease-in-out infinite; }
+.skeleton-back { width: 28px; height: 28px; border-radius: 50%; }
+.skeleton-heading { width: 100px; height: 17px; }
+.skeleton-action { width: 86px; height: 32px; }
+.skeleton-unread { height: 37px; width: 100%; border-radius: 0; }
+.skeleton-group { width: 54px; height: 10px; margin: 16px 16px 8px; }
+.skeleton-notification-row { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border-bottom: 1px solid rgba(104,112,120,.1); }
+.skeleton-avatar { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%; }
+.skeleton-copy { display: grid; flex: 1; gap: 8px; padding-top: 3px; }
+.skeleton-copy .skeleton-block:nth-child(1) { width: 58%; height: 14px; }
+.skeleton-copy .skeleton-block:nth-child(2) { width: 94%; height: 12px; }
+.skeleton-copy .skeleton-block:nth-child(3) { width: 34%; height: 10px; }
+@keyframes notification-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skeleton-block::after { animation: none; transform: none; opacity: .25; } }
+
 .mobile-app {
   max-width: 430px;
   min-height: 100%;

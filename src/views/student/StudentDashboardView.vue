@@ -3,6 +3,30 @@
     <IonContent :fullscreen="true">
       <StudentRefresher :refresh="refreshDashboard" />
       <div class="mobile-app">
+    <div v-if="isInitialLoading" class="dashboard-skeleton" role="status" aria-label="Loading student dashboard">
+      <span class="sr-only">Loading student dashboard…</span>
+      <div class="skeleton-header">
+        <span class="skeleton-block skeleton-avatar"></span>
+        <span class="skeleton-heading"><i class="skeleton-block"></i><i class="skeleton-block"></i></span>
+        <span class="skeleton-block skeleton-notification"></span>
+      </div>
+      <div class="skeleton-kicker skeleton-block"></div>
+      <div class="stats-grid skeleton-stats" aria-hidden="true">
+        <div v-for="item in 4" :key="`stat-${item}`" class="stat-card skeleton-card"><i class="skeleton-block"></i><i class="skeleton-block"></i><i class="skeleton-block"></i></div>
+      </div>
+      <section class="section-card skeleton-section" aria-hidden="true">
+        <i class="skeleton-kicker skeleton-block"></i>
+        <i class="skeleton-block skeleton-title"></i>
+        <div class="skeleton-count-grid"><i v-for="item in 4" :key="`count-${item}`" class="skeleton-block"></i></div>
+        <div v-for="item in 2" :key="`consult-${item}`" class="skeleton-row"><i class="skeleton-block"></i><i class="skeleton-block"></i></div>
+      </section>
+      <div class="cta-row skeleton-ctas" aria-hidden="true"><i class="skeleton-block"></i><i class="skeleton-block"></i></div>
+      <section class="section-card skeleton-section skeleton-events" aria-hidden="true">
+        <i class="skeleton-block skeleton-title"></i>
+        <div v-for="item in 2" :key="`event-${item}`" class="skeleton-row"><i class="skeleton-block"></i></div>
+      </section>
+    </div>
+    <template v-else>
     <!-- Header -->
     <div class="app-header">
       <div class="header-left">
@@ -17,7 +41,9 @@
       </div>
       <button class="header-notif-btn" @click="$router.push('/student/notifications')" aria-label="Notifications">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        <span v-if="unreadCount > 0" class="notif-dot"></span>
+        <span v-if="unreadCount > 0" class="notif-dot" :aria-label="`${unreadCount} unread notifications`">
+          {{ unreadCount > 99 ? '99+' : unreadCount }}
+        </span>
       </button>
     </div>
 
@@ -96,6 +122,7 @@
       </div>
       <button class="view-events-btn" @click="$router.push('/student/events')">View All Events</button>
     </div>
+    </template>
       </div>
     </IonContent>
   </IonPage>
@@ -114,6 +141,7 @@ const initials = computed(() => user.name?.split(' ').map(w => w[0]).join('').sl
 
 const { sessions, loadSessions } = useStudentData()
 const teachers = ref([])
+const isInitialLoading = ref(true)
 
 const teacherStats = computed(() => {
   const list = teachers.value
@@ -162,8 +190,8 @@ const consultationStatusCounts = computed(() => {
 })
 
 onMounted(() => {
-  loadRecentEvents()
-  loadTeachers()
+  Promise.all([loadSessions(), loadTeachers(), loadRecentEvents()])
+    .finally(() => { isInitialLoading.value = false })
   useNotifications.addNotificationListener(handleNotification)
 })
 
@@ -268,6 +296,54 @@ function formatDate(dateStr) {
 </script>
 
 <style scoped>
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.dashboard-skeleton { min-height: 100dvh; padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+.skeleton-header { display: flex; align-items: center; gap: 14px; min-height: 100px; padding: 16px 20px 20px; }
+.skeleton-heading { display: grid; flex: 1; gap: 8px; }
+.skeleton-block { display: block; position: relative; overflow: hidden; border-radius: 8px; background: rgba(115, 125, 133, .15); }
+.skeleton-block::after { position: absolute; inset: 0; content: ''; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.66), transparent); animation: dashboard-shimmer 1.35s ease-in-out infinite; }
+.skeleton-avatar { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 50%; }
+.skeleton-heading .skeleton-block:first-child { width: min(190px, 80%); height: 17px; }
+.skeleton-heading .skeleton-block:last-child { width: min(135px, 60%); height: 12px; }
+.skeleton-notification { width: 46px; height: 46px; flex: 0 0 46px; border-radius: 50%; }
+.skeleton-kicker { width: 68px; height: 9px; margin: 8px 20px 0; border-radius: 5px; }
+.skeleton-stats { padding-top: 16px; }
+.skeleton-card { display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; pointer-events: none; }
+.skeleton-card .skeleton-block:nth-child(1) { width: 58%; height: 12px; }
+.skeleton-card .skeleton-block:nth-child(2) { width: 30%; height: 30px; }
+.skeleton-card .skeleton-block:nth-child(3) { width: 78%; height: 10px; }
+.skeleton-section { margin-top: 0; }
+.skeleton-section > .skeleton-kicker { margin: 0 0 9px; }
+.skeleton-title { width: min(220px, 70%); height: 19px; margin-bottom: 12px; }
+.skeleton-count-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
+.skeleton-count-grid .skeleton-block { height: 42px; border-radius: 10px; }
+.skeleton-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; border-bottom: 1px solid rgba(104,112,120,.12); }
+.skeleton-row:last-child { border-bottom: 0; }
+.skeleton-row .skeleton-block:first-child { width: 58%; height: 13px; }
+.skeleton-row .skeleton-block:last-child { width: 24%; height: 24px; border-radius: 999px; }
+.skeleton-ctas > .skeleton-block { flex: 1; height: 50px; border-radius: 14px; }
+.skeleton-events { margin-bottom: 18px; }
+@keyframes dashboard-shimmer { to { transform: translateX(100%); } }
+@media (min-width: 768px) {
+  .skeleton-header { min-height: 108px; padding-inline: 28px; }
+  .dashboard-skeleton > .skeleton-kicker { margin-left: 28px; }
+  .skeleton-section { margin-inline: 28px; padding: 22px 24px 18px; }
+  .skeleton-ctas { padding-inline: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block::after { animation: none; transform: none; opacity: .3; }
+}
+
 .mobile-app {
   max-width: 430px;
   min-height: 100%;
@@ -333,13 +409,22 @@ function formatDate(dateStr) {
 
 .header-notif-btn .notif-dot {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  top: -5px;
+  right: -7px;
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  place-items: center;
+  padding: 0 5px;
+  border: 2px solid #f8f9fa;
+  border-radius: 999px;
   background: #ef4444;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9);
+  color: #fff;
+  font-size: .62rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 /* Stats */
@@ -717,7 +802,8 @@ function formatDate(dateStr) {
 
 @media (min-width: 768px) {
   .mobile-app {
-    max-width: 470px;
+    width: 100%;
+    max-width: 100%;
     padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -733,7 +819,7 @@ function formatDate(dateStr) {
 
   .stats-grid {
     gap: 13px;
-    padding: 12px 18px 18px;
+    padding: 12px 28px 22px;
   }
 
   .stat-card {
@@ -745,9 +831,9 @@ function formatDate(dateStr) {
   .stat-desc { font-size: .7rem; }
 
   .section-card {
-    margin-left: 18px;
-    margin-right: 18px;
-    padding: 18px 16px 14px;
+    margin-left: 28px;
+    margin-right: 28px;
+    padding: 22px 24px 18px;
   }
 
   .consultation-count-card { min-height: 40px; }
@@ -755,8 +841,45 @@ function formatDate(dateStr) {
   .consult-teacher { font-size: .72rem; }
   .consult-status-card { min-width: 76px; }
 
-  .cta-row { padding: 16px 18px 18px; }
+  .cta-row { padding: 18px 28px 22px; }
   .cta-btn { min-height: 50px; font-size: .9rem; }
+}
+
+@media (min-width: 1024px) {
+  .app-header {
+    min-height: 124px;
+    padding: 24px 36px 28px !important;
+  }
+
+  .app-header::after { left: 36px; bottom: 7px; }
+  .header-left { gap: 18px; }
+  .avatar-sm { width: 58px; height: 58px; }
+  .header-title { font-size: 1.3rem; }
+  .header-sub { font-size: .9rem; }
+  .stats-grid {
+    gap: 18px;
+    padding: 14px 36px 26px;
+  }
+  .stat-card {
+    min-height: 142px;
+    padding: 20px 22px 18px;
+  }
+  .stat-label { font-size: .83rem; }
+  .stat-num { font-size: 2.35rem; }
+  .stat-desc { font-size: .78rem; }
+  .stat-icon { top: 16px; right: 17px; width: 46px; height: 46px; }
+  .section-card { margin-inline: 36px; padding: 25px 28px 20px; }
+  .section-card:not(.events-card) .section-title,
+  .events-card .section-title { font-size: 1.12rem; }
+  .consultation-counts { gap: 10px; }
+  .consultation-count-card { min-height: 48px; padding-inline: 12px; }
+  .consultation-count-card .count-label { font-size: .68rem; }
+  .consultation-count-card strong { font-size: .82rem; }
+  .consult-row { padding: 16px 0; }
+  .consult-name { font-size: .92rem; }
+  .consult-teacher { font-size: .78rem; }
+  .cta-row { padding: 20px 36px 24px; }
+  .cta-btn { min-height: 58px; font-size: .98rem; }
 }
 
 @media (max-width: 360px) {
