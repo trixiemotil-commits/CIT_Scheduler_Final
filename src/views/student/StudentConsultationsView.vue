@@ -141,8 +141,8 @@
             </div>
             <span :class="['status-pill', pillClass(activeSession.status)]">{{ activeSession.status }}</span>
           </div>
-          <div class="detail-row"><span class="detail-label">Date</span><span class="detail-val">{{ formatWeekday(activeSession.date) }}, {{ formatDate(activeSession.date) }}</span></div>
-          <div class="detail-row"><span class="detail-label">Time</span><span class="detail-val">{{ formatTimeRange(activeSession.timeStart, activeSession.timeEnd) }}</span></div>
+          <div class="detail-row"><span class="detail-label">Date</span><span class="detail-val">{{ activeSession.status === 'Approved' && activeSession.approvedAt ? formatApprovalDate(activeSession.approvedAt) : `${formatWeekday(activeSession.date)}, ${formatDate(activeSession.date)}` }}</span></div>
+          <div class="detail-row"><span class="detail-label">Time</span><span class="detail-val">{{ activeSession.status === 'Approved' && activeSession.approvedAt ? formatApprovalTime(activeSession.approvedAt) : formatTimeRange(activeSession.timeStart, activeSession.timeEnd) }}</span></div>
           <div v-if="detailNotes(activeSession)" class="detail-row">
             <span class="detail-label">{{ detailNotesLabel(activeSession) }}</span>
             <span class="detail-val">{{ detailNotes(activeSession) }}</span>
@@ -154,11 +154,6 @@
                 <div class="queue-card-subtitle">{{ queueLineLabel(activeSession) }}</div>
               </div>
               <div class="queue-ticket-badge">{{ activeSession.ticketNumber || 'Queue' }}</div>
-            </div>
-            <div class="queue-qr-panel" role="img" aria-label="Queue ticket barcode">
-              <div class="qr-grid">
-                <div v-for="(cell, index) in qrCells" :key="index" class="qr-cell" :class="{ filled: cell }"></div>
-              </div>
             </div>
             <div class="queue-ticket-details">
               <div class="queue-ticket-line"><span>Ticket</span><strong>{{ activeSession.ticketNumber || `#${activeSession.id}` }}</strong></div>
@@ -406,6 +401,22 @@ function formatWeekday(dateStr) {
   }
 }
 
+function formatApprovalDate(timestamp) {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila',
+  }).format(date)
+}
+
+function formatApprovalTime(timestamp) {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return '--:--'
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila',
+  }).format(date)
+}
+
 function formatTime(timeStr) {
   if (!timeStr) return ''
 
@@ -523,23 +534,6 @@ function queueWaitNote(session) {
   if (hasConsultationStarted(session)) return ''
   return 'Please wait for the start of consultation hours.'
 }
-
-const qrCells = computed(() => {
-  const seed = String(activeSession.value?.ticketNumber || activeSession.value?.id || 'queue')
-  const size = 9
-  const cells = []
-
-  for (let row = 0; row < size; row += 1) {
-    for (let col = 0; col < size; col += 1) {
-      const edge = row < 2 || row > size - 3 || col < 2 || col > size - 3
-      const corner = (row < 3 && col < 3) || (row < 3 && col > size - 4) || (row > size - 4 && col < 3)
-      const hash = (seed.charCodeAt((row + col) % seed.length) + row * 7 + col * 5) % 2
-      cells.push(edge || corner ? 1 : hash === 0)
-    }
-  }
-
-  return cells
-})
 
 function downloadQueueDetails() {
   const session = activeSession.value
@@ -1312,29 +1306,6 @@ onMounted(() => {
   padding: 5px 9px;
   font-size: 0.72rem;
   font-weight: 700;
-}
-.queue-qr-panel {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 12px;
-  border-radius: 12px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-}
-.qr-grid {
-  display: grid;
-  grid-template-columns: repeat(9, 8px);
-  gap: 2px;
-}
-.qr-cell {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  background: #e5e7eb;
-}
-.qr-cell.filled {
-  background: #111827;
 }
 .queue-ticket-details {
   margin-top: 10px;

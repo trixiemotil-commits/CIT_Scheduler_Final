@@ -673,6 +673,7 @@ function toClientRequest(doc, studentMeta = null, availabilityMeta = null, consu
     consultationEndTime: doc.consultationEndTime || availabilityMeta?.endTime || "",
     consultationNotes: consultationNotes || "",
     status: doc.status,
+    approvedAt: doc.approvedAt || null,
     rescheduleOfferPending: Boolean(doc.rescheduleOfferPending),
     isSubjectTeacher: Boolean(doc.isSubjectTeacher),
     createdAt: doc.createdAt,
@@ -1195,6 +1196,7 @@ async function createConsultationRequest(req, res) {
       requestDate,
       consultationDate,
       status: isSubjectTeacher ? "APPROVED" : "PENDING",
+      approvedAt: isSubjectTeacher ? new Date() : undefined,
     });
 
     if (consultationStartTime && consultationEndTime) {
@@ -1431,12 +1433,17 @@ async function listConsultationRequests(req, res) {
       : [];
 
     const noteByRequestId = new Map();
+    const approvalAtByRequestId = new Map();
     for (const log of logs) {
       const requestId = String(log.requestId || "");
-      if (!requestId || noteByRequestId.has(requestId)) {
-        continue;
+      if (!requestId) continue;
+
+      if (!approvalAtByRequestId.has(requestId)
+        && /^Request status updated to APPROVED\./i.test(String(log.notes || ""))) {
+        approvalAtByRequestId.set(requestId, log.createdAt);
       }
 
+      if (noteByRequestId.has(requestId)) continue;
       const normalizedNote = normalizeConsultationLogNote(log.notes);
       if (normalizedNote) {
         noteByRequestId.set(requestId, normalizedNote);
@@ -1445,7 +1452,10 @@ async function listConsultationRequests(req, res) {
 
     const requests = docs.map((doc) =>
       toClientRequest(
-        doc,
+        {
+          ...doc,
+          approvedAt: doc.approvedAt || approvalAtByRequestId.get(String(doc._id || "")) || null,
+        },
         studentById.get(String(doc.studentId || "")) || null,
         {
           ...(availabilityById.get(String(doc.availabilityId || "")) || {}),
@@ -1724,6 +1734,9 @@ async function updateConsultationRequestStatus(req, res) {
     }
 
     const statusUpdate = { status: nextStatus };
+    if (statusChanged && nextStatus === "APPROVED" && actorRole !== "student") {
+      statusUpdate.approvedAt = new Date();
+    }
     if (nextStatus === "APPROVED" && requestDoc.rescheduleOfferPending) {
       statusUpdate.rescheduleOfferPending = false;
     }

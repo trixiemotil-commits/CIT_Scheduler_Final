@@ -181,12 +181,16 @@ const studentIdDisplay = computed(() => {
 const studentYearSections = computed(() => Array.isArray(user.value.studentYearSections)
   ? user.value.studentYearSections.filter((item) => item?.yearLevel && item?.section)
   : [])
-const yearLevelDisplay = computed(() => studentYearSections.value.length
-  ? studentYearSections.value.map((item) => item.yearLevel).join(', ')
-  : user.value.yearLevel || user.value.grade || '--')
-const sectionDisplay = computed(() => studentYearSections.value.length
-  ? studentYearSections.value.map((item) => `${item.yearLevel}: ${item.section}`).join(' · ')
-  : user.value.section || '--')
+const yearLevelDisplay = computed(() => user.value.yearLevel || user.value.grade || (
+  studentYearSections.value.length
+    ? studentYearSections.value.map((item) => item.yearLevel).join(', ')
+    : '--'
+))
+const sectionDisplay = computed(() => user.value.section || (
+  studentYearSections.value.length
+    ? studentYearSections.value.map((item) => `${item.yearLevel}: ${item.section}`).join(' · ')
+    : '--'
+))
 const roleLabel = computed(() => {
   const role = String(user.value.role || 'student')
   return role.charAt(0).toUpperCase() + role.slice(1)

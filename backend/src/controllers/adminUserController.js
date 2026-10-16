@@ -425,10 +425,14 @@ async function updateUser(req, res) {
       user.studentId = normalizedStudentId;
       user.yearLevel = normalizeString(yearLevel);
       user.section = normalizeString(section);
+      user.studentYearSections = user.yearLevel && user.section
+        ? [{ yearLevel: user.yearLevel, section: user.section }]
+        : [];
     } else {
       user.studentId = undefined;
       user.yearLevel = undefined;
       user.section = "";
+      user.studentYearSections = [];
     }
 
     await user.save();

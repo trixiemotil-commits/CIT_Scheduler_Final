@@ -62,6 +62,10 @@ const consultationRequestSchema = new mongoose.Schema(
       default: "PENDING",
       index: true,
     },
+    approvedAt: {
+      type: Date,
+      required: false,
+    },
   },
   {
     timestamps: true,
