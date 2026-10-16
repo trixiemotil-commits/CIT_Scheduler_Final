@@ -2990,7 +2990,7 @@ function getSubjectOptions(year, major) {
   return subjectCatalog
     .filter((option) => {
       if (option.year === 'Elective') {
-        return (year === '3rd Year' && semester === '2nd Semester' && subjectMatchesMajor(option.label, major))
+        return (year === '3rd Year' && subjectMatchesMajor(option.label, major))
           || (isFourthYearFirstSemester && Boolean(major))
       }
       return option.year === year && option.semester === semester
