@@ -2859,9 +2859,11 @@ async function confirmLongTeacherSession(payload) {
     icon: 'warning',
     title: 'Long teaching block',
     html: `
-      <p style="font-size:0.95rem;color:#444;margin:0 0 12px;">${payload.teacher} is scheduled for <strong>${duration}</strong> straight on <strong>${payload.day}</strong>.</p>
-      <p style="font-size:0.95rem;color:#444;margin:0 0 12px;"><strong>${startTime} – ${endTime}</strong></p>
-      <p style="font-size:0.95rem;color:#444;margin:0;">Please give a 30 mins break if possible.</p>
+      <div class="long-block-content">
+        <p>${payload.teacher} is scheduled for <strong>${duration}</strong> straight on <strong>${payload.day}</strong>.</p>
+        <div class="long-block-time">${startTime} – ${endTime}</div>
+        <aside class="long-block-note"><span class="long-block-note-label">Advice</span><span>Please add a 30-minute break if possible.</span></aside>
+      </div>
     `,
     showCancelButton: true,
     confirmButtonText: 'Yes, continue',
@@ -2869,7 +2871,16 @@ async function confirmLongTeacherSession(payload) {
     confirmButtonColor: '#4b5563',
     cancelButtonColor: '#6c757d',
     background: '#fff',
-    customClass: { popup: 'swal-cit-popup', title: 'swal-cit-title', confirmButton: 'swal-cit-btn' },
+    reverseButtons: true,
+    buttonsStyling: false,
+    customClass: {
+      popup: 'swal-long-block-popup',
+      title: 'swal-long-block-title',
+      htmlContainer: 'swal-long-block-html',
+      actions: 'swal-long-block-actions',
+      confirmButton: 'swal-long-block-confirm',
+      cancelButton: 'swal-long-block-cancel',
+    },
   })
 
   if (result.isConfirmed) {
@@ -4969,6 +4980,9 @@ onMounted(async () => {
 .schedule-entry-modal .form-input { min-height: 43px; padding: 9px 34px 9px 11px; color: #344149; border-color: #cbd3d8; border-radius: 9px; background: #fff; font-size: .74rem; }
 .schedule-entry-modal .schedule-year-field .form-value-locked,
 .schedule-entry-modal .schedule-section-field .form-value-locked { min-height: 43px; }
+.schedule-entry-modal .schedule-room-field .form-input,
+.schedule-entry-modal .schedule-room-field .form-select,
+.schedule-entry-modal .schedule-room-field .form-value-locked { min-height: 47px; font-size: .78rem; }
 .schedule-entry-modal .form-select:focus,
 .schedule-entry-modal .form-input:focus { border-color: #7f8d96; box-shadow: 0 0 0 3px rgba(70,84,94,.09); }
 .schedule-entry-modal .campus-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 4px; border: 1px solid #cbd3d8; border-radius: 9px; background: #e9edef; }
@@ -6638,6 +6652,26 @@ onMounted(async () => {
 
 <style>
 .swal2-container { z-index: 12000 !important; }
+.swal-long-block-popup { width: min(500px, calc(100vw - 32px)) !important; border: 1px solid rgba(255,255,255,.8) !important; border-radius: 24px !important; padding: 30px 30px 24px !important; background: linear-gradient(145deg,#fff 0%,#f3f5f6 100%) !important; box-shadow: 0 20px 60px rgba(20,27,33,.24) !important; }
+.swal-long-block-popup .swal2-icon { margin: 4px auto 14px !important; }
+.swal-long-block-title { margin: 0 0 8px !important; color: #222a31 !important; font-family: 'Poppins',sans-serif !important; font-size: 1.35rem !important; font-weight: 800 !important; }
+.swal-long-block-html { margin: 0 !important; color: #64717a !important; font-family: 'Poppins',sans-serif !important; font-size: .96rem !important; line-height: 1.55 !important; }
+.long-block-content p { margin: 0; }
+.long-block-content strong { color: #303940; font-weight: 700; }
+.long-block-time { display: inline-flex; margin: 14px 0; padding: 8px 14px; border: 1px solid #d9e0e4; border-radius: 999px; background: #edf1f3; color: #394650; font-weight: 800; letter-spacing: .01em; }
+.long-block-content .long-block-note { display: flex; align-items: flex-start; gap: 10px; margin-top: 4px; padding: 11px 13px; border: 1px solid #f1dfbd; border-radius: 12px; background: #fff8e9; color: #6d5a37; font-size: .84rem; line-height: 1.45; text-align: left; }
+.long-block-note-label { flex: 0 0 auto; color: #98651a; font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.swal-long-block-actions { display: flex !important; justify-content: stretch !important; width: 100% !important; gap: 12px !important; margin: 24px 0 0 !important; }
+.swal-long-block-confirm,.swal-long-block-cancel { flex: 1 1 0 !important; width: 50% !important; min-height: 46px !important; margin: 0 !important; padding: 10px 12px !important; border-radius: 12px !important; font-family: 'Poppins',sans-serif !important; font-size: .9rem !important; font-weight: 700 !important; cursor: pointer !important; }
+.swal-long-block-confirm { order: 2 !important; border: 1px solid #343d45 !important; background: linear-gradient(145deg,#66717a,#303940) !important; color: #fff !important; box-shadow: 0 6px 14px rgba(39,44,49,.2) !important; }
+.swal-long-block-confirm:hover { background: #303940 !important; }
+.swal-long-block-cancel { order: 1 !important; border: 1px solid #cbd2d7 !important; background: #eef1f3 !important; color: #4b555d !important; }
+.swal-long-block-cancel:hover { background: #e3e8eb !important; }
+@media (max-width: 480px) {
+  .swal-long-block-popup { padding: 24px 20px 20px !important; border-radius: 20px !important; }
+  .swal-long-block-actions { gap: 9px !important; margin-top: 20px !important; }
+  .swal-long-block-confirm,.swal-long-block-cancel { flex: 1 1 0 !important; width: 50% !important; padding-inline: 8px !important; }
+}
 .swal-cit-popup { font-family: 'Poppins', sans-serif !important; border-radius: 18px !important; padding: 32px 28px 24px !important; box-shadow: 0 12px 48px rgba(0,0,0,0.18) !important; }
 .swal-clear-slot-popup { width: min(460px, calc(100vw - 32px)) !important; padding: 22px 30px 20px !important; border-radius: 20px !important; box-shadow: 0 16px 48px rgba(24, 30, 36, .2) !important; }
 .swal-clear-slot-popup .swal2-icon { width: 76px !important; height: 76px !important; margin: 4px auto 6px !important; border: 2px solid #a51f1f !important; border-radius: 50% !important; color: #a51f1f !important; }

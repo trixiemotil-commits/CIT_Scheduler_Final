@@ -154,9 +154,9 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleOutsideCli
 }
 .typeahead-input:focus { border-color: #7f8d96; box-shadow: 0 0 0 3px rgba(70, 84, 94, .09); }
 .typeahead-arrow { position: absolute; z-index: 1; top: 50%; right: 12px; pointer-events: none; transform: translateY(-50%); }
-.typeahead-menu { position: absolute; z-index: 40; top: calc(100% + 5px); left: 0; right: 0; max-height: 230px; overflow-y: auto; padding: 5px; border: 1px solid #d7e0df; border-radius: 8px; background: #fff; box-shadow: 0 12px 28px rgba(22, 49, 45, .16); }
+.typeahead-menu { position: absolute; z-index: 40; top: calc(100% + 5px); left: 0; right: 0; max-height: 230px; overflow-y: auto; padding: 5px; border: 1px solid #d2d7db; border-radius: 8px; background: #fff; box-shadow: 0 12px 28px rgba(36, 43, 49, .14); }
 .typeahead-option { display: block; width: 100%; padding: 9px 11px; border: 0; border-radius: 5px; background: transparent; color: #263139; text-align: left; font: inherit; cursor: pointer; }
-.typeahead-option:hover, .typeahead-option.highlighted { background: #e6f1ed; color: #1b4332; }
+.typeahead-option:hover, .typeahead-option.highlighted { background: #e9ecef; color: #343a40; }
 .typeahead-option :deep(mark) { padding: 0; background: transparent; color: inherit; font-weight: 650; }
 .typeahead-empty { padding: 12px 11px; color: #68777a; font-size: .9rem; }
 </style>

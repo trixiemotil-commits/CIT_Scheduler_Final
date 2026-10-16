@@ -98,7 +98,7 @@
         </Transition>
       </Teleport>
 
-      <div v-if="showTermPrompt" class="term-prompt-overlay">
+      <div v-if="showTermPrompt && !showTermReview" class="term-prompt-overlay">
         <form class="term-prompt" @submit.prevent="saveTermAssignment">
           <div class="term-prompt-icon">
             <IonIcon :icon="calendarOutline" />
@@ -219,6 +219,7 @@ const showTermPrompt = ref(false)
 const showTermReview = ref(false)
 const publishedTerm = ref(null)
 const promptedTermId = ref('')
+const completedTermId = ref(String(studentUser.value.assignedAcademicTermId || ''))
 const savingAssignment = ref(false)
 const termPromptError = ref('')
 const termPromptSuccess = ref('')
@@ -267,7 +268,7 @@ async function authenticatedRequest(path, options = {}) {
 let termCheckInFlight = false
 
 async function checkPublishedTerm() {
-  if (termCheckInFlight) return
+  if (termCheckInFlight || savingAssignment.value) return
   termCheckInFlight = true
 
   try {
@@ -281,9 +282,19 @@ async function checkPublishedTerm() {
     const profilePayload = await authenticatedRequest('/auth/me')
     const user = profilePayload.user || {}
     if (user.id || user._id) saveMergedUser(user)
+    // A profile read can finish after a successful save with stale assignment data.
+    // Keep the prompt closed for the term just completed while that response settles.
+    if (completedTermId.value === termId) {
+      showTermReview.value = false
+      showTermPrompt.value = false
+      promptedTermId.value = termId
+      return
+    }
     if (String(user.assignedAcademicTermId || '') === termId) {
       showTermPrompt.value = false
-      promptedTermId.value = ''
+      showTermReview.value = false
+      promptedTermId.value = termId
+      completedTermId.value = termId
       return
     }
 
@@ -346,9 +357,10 @@ async function confirmTermAssignment() {
       }),
     })
     studentUser.value = saveMergedUser(payload.user || {})
+    completedTermId.value = String(publishedTerm.value?.id || publishedTerm.value?._id || '')
     showTermReview.value = false
     showTermPrompt.value = false
-    promptedTermId.value = ''
+    promptedTermId.value = completedTermId.value
     termPromptSuccess.value = 'Your enrollment details were saved successfully.'
     setTimeout(() => { termPromptSuccess.value = '' }, 3500)
   } catch (error) {
