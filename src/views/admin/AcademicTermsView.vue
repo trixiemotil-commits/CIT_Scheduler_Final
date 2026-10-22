@@ -169,7 +169,8 @@
           <div class="term-filter">
             <button :class="{ active: termFilter === 'all' }" @click="termFilter = 'all'">All terms</button>
             <button :class="{ active: termFilter === 'current' }" @click="termFilter = 'current'">Published</button>
-            <button :class="{ active: termFilter === 'archived' }" @click="termFilter = 'archived'">Unpublished</button>
+            <button :class="{ active: termFilter === 'unpublished' }" @click="termFilter = 'unpublished'">Unpublished</button>
+            <button :class="{ active: termFilter === 'archived' }" @click="termFilter = 'archived'">Archived</button>
           </div>
         </div>
         <div v-if="loading" class="term-list term-skeleton-list" aria-hidden="true">
@@ -192,10 +193,11 @@
             <div class="term-summary">
               <div class="term-title">
                 <h3>{{ termLabel(term) }}</h3>
-                <span v-if="term.isPublished" class="pill published"><span class="status-dot"></span> Current published term</span>
+                <span v-if="term.isArchived" class="pill archived">Archived</span>
+                <span v-else-if="term.isPublished" class="pill published"><span class="status-dot"></span> Current published term</span>
                 <span v-else class="pill draft">Not published</span>
               </div>
-              <p class="term-guidance">{{ term.isPublished ? 'Visible to teachers and students' : 'Only visible in the admin workspace' }}</p>
+              <p class="term-guidance">{{ term.isArchived ? 'Read-only archive · View and download only' : term.isPublished ? 'Visible to teachers and students' : 'Only visible in the admin workspace' }}</p>
               <div class="term-metrics" aria-label="Term summary">
                 <span v-for="(year, index) in yearOptions" :key="year" class="term-metric" :class="`section-metric--year-${index + 1}`"><b>{{ sectionCount(term, year) }}</b>{{ year.replace(' Year', '') }} year sections</span>
                 <span class="term-metric room-metric"><b>{{ roomCount(term) }}</b>rooms</span>
@@ -207,7 +209,7 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
                 <span>View schedules</span>
               </button>
-              <button class="add-btn" title="Add a schedule to this term" @click="openWorkspace(term, 'add')">
+              <button v-if="!term.isArchived" class="add-btn" title="Add a schedule to this term" @click="openWorkspace(term, 'add')">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v15H4zM4 9h16M8 3v4M16 3v4M12 12v5M9.5 14.5h5"/></svg>
                 <span>Add schedule</span>
               </button>
@@ -215,13 +217,17 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/></svg>
                 <span>{{ isTermActionLoading(term, 'download') ? 'Downloading…' : 'Download Excel' }}</span>
               </button>
-              <button class="edit-btn" title="Edit this term's details" @click="openTermModal(term)">
+              <button v-if="!term.isArchived" class="edit-btn" title="Edit this term's details" @click="openTermModal(term)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-.7L19 7.8 16.2 5 4.7 16.5 4 20Z"/></svg>
                 <span>Edit details</span>
               </button>
-              <button class="publish-btn" :class="{ 'is-loading': isTermActionLoading(term, 'publish') }" :disabled="term.isPublished || !!activeTermAction" :title="term.isPublished ? 'This is the current published term' : 'Make this term visible to teachers and students'" @click="publishTerm(term)">
+              <button v-if="!term.isArchived" class="publish-btn" :class="{ 'is-loading': isTermActionLoading(term, 'publish') }" :disabled="term.isPublished || !!activeTermAction" :title="term.isPublished ? 'This is the current published term' : 'Make this term visible to teachers and students'" @click="publishTerm(term)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 14v6h14v-6"/></svg>
                 <span>{{ isTermActionLoading(term, 'publish') ? 'Publishing…' : term.isPublished ? 'Currently published' : 'Publish term' }}</span>
+              </button>
+              <button v-if="!term.isArchived" class="archive-btn" :class="{ 'is-loading': isTermActionLoading(term, 'archive') }" :disabled="!!activeTermAction" title="Archive this term as read-only" @click="archiveTerm(term)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4"/></svg>
+                <span>{{ isTermActionLoading(term, 'archive') ? 'Archiving…' : 'Archive term' }}</span>
               </button>
             </div>
           </article>
@@ -435,11 +441,12 @@ const filteredWorkspaceEntries = computed(() => workspaceEntries.value)
 
 const filteredTerms = computed(() => terms.value
   .filter(term => {
-    if (termFilter.value === 'current') return term.isPublished
-    if (termFilter.value === 'archived') return !term.isPublished
+    if (termFilter.value === 'current') return term.isPublished && !term.isArchived
+    if (termFilter.value === 'unpublished') return !term.isPublished && !term.isArchived
+    if (termFilter.value === 'archived') return term.isArchived
     return true
   })
-  .sort((first, second) => Number(Boolean(second.isPublished)) - Number(Boolean(first.isPublished))))
+  .sort((first, second) => Number(Boolean(first.isArchived)) - Number(Boolean(second.isArchived)) || Number(Boolean(second.isPublished)) - Number(Boolean(first.isPublished))))
 const sectionCount = (term, year) => Number(term?.sectionCounts?.[year] ?? term?.sectionNames?.[year]?.length ?? 0)
 const sectionSummaryText = computed(() => {
   const parts = yearOptions
@@ -576,7 +583,7 @@ async function loadPage() {
 }
 function openWorkspace(term, action) {
   workspaceTerm.value = term
-  workspaceAction.value = action
+  workspaceAction.value = term?.isArchived ? 'view' : action
   workspaceMode.value = ''
   studentYearSelection.value = null
   previewSearch.value = ''
@@ -759,7 +766,9 @@ async function downloadTermExcel(term) {
     }
 
     const days = weekdays
-    const slots = timeOptions
+    // Each row represents the half-hour interval beginning at this time.
+    // Keep the final 7:30 PM slot and use 8:00 PM only as its end boundary.
+    const slots = timeOptions.slice(0, -1)
     const timeSlotCount = slots.length
     const toMinutes = (value) => {
       const match = String(value || '').match(/(\d+):(\d+)\s*(AM|PM)/i)
@@ -851,7 +860,7 @@ async function downloadTermExcel(term) {
             gridEntries.push({ row: dataStartRow + index, column: dayIndex + 1, span, entry })
             return slotText(entry, includeStudentDetails)
           })
-          matrix.push([slot, ...values])
+          matrix.push([`${slot} - ${timeOptions[index + 1]}`, ...values])
         })
       })
       const sheet = XLSX.utils.aoa_to_sheet(matrix)
@@ -861,7 +870,7 @@ async function downloadTermExcel(term) {
       return sheet
     }
     const styleGridSheet = (gridSheet, includeOfficeTasks = false) => {
-      gridSheet['!cols'] = [{ wch: 12 }, ...days.map(() => ({ wch: 34 }))]
+      gridSheet['!cols'] = [{ wch: 23 }, ...days.map(() => ({ wch: 34 }))]
       gridSheet['!freeze'] = { xSplit: 1, ySplit: legend.length + 2 }
       const groupHeaderRows = includeOfficeTasks ? 5 : 4
       const range = XLSX.utils.decode_range(gridSheet['!ref'])
@@ -1334,7 +1343,7 @@ async function saveTerm() {
   else showStatusToast('success', successMessage)
 }
 async function publishTerm(term) {
-  if (activeTermAction.value) return
+  if (activeTermAction.value || term?.isArchived) return
   const result = await Swal.fire({
     icon: 'question',
     title: `Publish ${termLabel(term)}?`,
@@ -1363,6 +1372,42 @@ async function publishTerm(term) {
     else showStatusToast('success', `${termLabel(term)} is now published.`)
   } catch (error) {
     showStatusToast('error', error.message || 'Unable to publish this academic term.')
+  } finally {
+    activeTermAction.value = ''
+  }
+}
+async function archiveTerm(term) {
+  if (activeTermAction.value || term?.isArchived) return
+  const result = await Swal.fire({
+    icon: 'warning',
+    title: `Archive ${termLabel(term)}?`,
+    text: term.isPublished
+      ? 'This removes the term from the published schedule. Its schedules and details remain available for viewing and Excel download, but cannot be edited or added to.'
+      : 'Its schedules and details will remain available for viewing and Excel download, but cannot be edited or added to.',
+    showCancelButton: true,
+    reverseButtons: true,
+    confirmButtonText: 'Archive term',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#9a4b32',
+    cancelButtonColor: '#6c757d',
+    background: '#fff',
+    customClass: {
+      popup: 'publish-confirm-popup',
+      title: 'publish-confirm-title',
+      icon: 'publish-confirm-icon',
+      confirmButton: 'publish-confirm-button',
+      cancelButton: 'publish-cancel-button',
+    },
+  })
+  if (!result.isConfirmed) return
+  activeTermAction.value = `${termId(term)}:archive`
+  try {
+    await apiRequest(`/academic-terms/${termId(term)}/archive`, { method: 'POST' })
+    const refreshed = await loadPage()
+    if (!refreshed) showStatusToast('error', 'Term archived, but the term list could not be refreshed.')
+    else showStatusToast('success', `${termLabel(term)} is now archived and read-only.`)
+  } catch (error) {
+    showStatusToast('error', error.message || 'Unable to archive this academic term.')
   } finally {
     activeTermAction.value = ''
   }
@@ -1459,6 +1504,8 @@ loadPage()
 .term-actions .excel-btn { color: #176a94; border-color: #b9d7e6; background: linear-gradient(180deg, #f3fbff, #e6f4fb); }
 .term-actions .publish-btn { grid-column: 1 / -1; justify-content: center; color: #176a94; border-color: #b9d7e6; background: linear-gradient(180deg, #f3fbff, #e6f4fb); }
 .term-actions .publish-btn:disabled { color: #668176; border-color: #cfddd5; background: linear-gradient(180deg, #edf7f1, #e2efe5); opacity: 1; }
+.term-actions .archive-btn { color: #8f4935; border-color: #e5c9be; background: linear-gradient(180deg, #fff8f5, #f9ebe5); }
+.term-filter { flex-wrap: wrap; }
 .empty-state { border: 1px dashed #ccd4d9; border-radius: 14px; background: #f8fafb; }
 
 /* Schedule browser: compact, high-contrast metallic workspace */

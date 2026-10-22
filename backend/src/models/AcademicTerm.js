@@ -42,6 +42,15 @@ const academicTermSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isArchived: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    archivedAt: {
+      type: Date,
+      default: null,
+    },
     publishedAt: {
       type: Date,
       default: null,

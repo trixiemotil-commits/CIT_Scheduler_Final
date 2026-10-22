@@ -179,7 +179,7 @@
               <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day">{{ day }}</th></tr></thead>
               <tbody>
                 <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
-                  <td class="td-time">{{ slot }}</td>
+                  <td class="td-time"><span class="time-slot-range"><span>{{ slot }}</span><span>{{ nextTimeSlot(slot) }}</span></span></td>
                   <template v-for="day in days" :key="day">
                     <td
                       v-if="!isSpannedRoomCell(slot, day)"
@@ -187,13 +187,12 @@
                       class="td-cell"
                       :class="{
                         'has-entry': getEntriesForRoomCell(slot, day).length,
-                        'free-time-cell': !getEntriesForRoomCell(slot, day).length
                       }"
                     >
                       <template v-if="getEntriesForRoomCell(slot, day).length">
                         <div
                           class="sched-entry sched-entry-clickable"
-                          :class="getEntriesForRoomCell(slot, day)[0].color"
+                          :class="[getEntriesForRoomCell(slot, day)[0].color, { 'compact-entry': getRoomScheduleRowspan(getEntriesForRoomCell(slot, day)[0]) <= 2 }]"
                           :style="roomEntryStyle(slot, getEntriesForRoomCell(slot, day)[0])"
                           role="button"
                           tabindex="0"
@@ -214,9 +213,6 @@
                             </div>
                           </div>
                         </div>
-                      </template>
-                      <template v-else>
-                        <span class="free-time-label">Office hours</span>
                       </template>
                     </td>
                   </template>
@@ -266,17 +262,16 @@
               <thead><tr><th class="th-time">Time</th><th v-for="day in days" :key="day" :class="{ 'current-day-header': day === highlightedTeacherDay }">{{ day }}</th></tr></thead>
               <tbody>
                 <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
-                  <td class="td-time">{{ slot }}</td>
+                  <td class="td-time"><span class="time-slot-range"><span>{{ slot }}</span><span>{{ nextTimeSlot(slot) }}</span></span></td>
                   <template v-for="day in days" :key="day">
-                    <td v-if="!isSpannedStudentCell(slot, day)" :rowspan="getEntriesForStudentCell(slot, day).length ? getStudentRowspan(getEntriesForStudentCell(slot, day)[0]) : 1" class="td-cell" :class="{ 'has-entry': getEntriesForStudentCell(slot, day).length, 'free-time-cell': !getEntriesForStudentCell(slot, day).length }">
+                    <td v-if="!isSpannedStudentCell(slot, day)" :rowspan="getEntriesForStudentCell(slot, day).length ? getStudentRowspan(getEntriesForStudentCell(slot, day)[0]) : 1" class="td-cell" :class="{ 'has-entry': getEntriesForStudentCell(slot, day).length }">
                       <template v-if="getEntriesForStudentCell(slot, day).length">
-                        <div class="sched-entry sched-entry-clickable" :class="getEntriesForStudentCell(slot, day)[0].color" :style="studentEntryStyle(slot, getEntriesForStudentCell(slot, day)[0])" role="button" tabindex="0" @click="openScheduleDetails(getEntriesForStudentCell(slot, day))" @keydown.enter.space.prevent="openScheduleDetails(getEntriesForStudentCell(slot, day))">
+                        <div class="sched-entry sched-entry-clickable" :class="[getEntriesForStudentCell(slot, day)[0].color, { 'compact-entry': getStudentRowspan(getEntriesForStudentCell(slot, day)[0]) <= 2 }]" :style="studentEntryStyle(slot, getEntriesForStudentCell(slot, day)[0])" role="button" tabindex="0" @click="openScheduleDetails(getEntriesForStudentCell(slot, day))" @keydown.enter.space.prevent="openScheduleDetails(getEntriesForStudentCell(slot, day))">
                           <div class="entry-teacher">{{ getEntriesForStudentCell(slot, day)[0].subject }}</div>
                           <div class="entry-subject">{{ getEntriesForStudentCell(slot, day)[0].teacher }}</div>
                           <div class="entry-section-row"><span class="entry-section-badge">{{ [getEntriesForStudentCell(slot, day)[0].year, getEntriesForStudentCell(slot, day)[0].section].filter(Boolean).join(' · ') }}</span><span class="entry-room">Room: {{ getEntriesForStudentCell(slot, day)[0].room || 'not assigned' }}</span></div>
                         </div>
                       </template>
-                      <span v-else class="free-time-label">Office hours</span>
                     </td>
                   </template>
                 </tr>
@@ -366,7 +361,7 @@
               </thead>
               <tbody>
                 <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
-                  <td class="td-time">{{ slot }}</td>
+                  <td class="td-time"><span class="time-slot-range"><span>{{ slot }}</span><span>{{ nextTimeSlot(slot) }}</span></span></td>
                   <template v-for="day in days" :key="day">
                     <td
                     v-if="!isSpannedTeacherCell(slot, day) && !isSpannedConsultTeacherCell(slot, day)"
@@ -382,7 +377,7 @@
                       <template v-if="getEntriesForTeacherCell(slot, day).length">
                         <div
                           class="sched-entry sched-entry-clickable"
-                          :class="getEntriesForTeacherCell(slot, day)[0].color"
+                          :class="[getEntriesForTeacherCell(slot, day)[0].color, { 'compact-entry': getTeacherRowspan(getEntriesForTeacherCell(slot, day)[0]) <= 2 }]"
                           :style="teacherEntryStyle(slot, getEntriesForTeacherCell(slot, day)[0])"
                           role="button"
                           tabindex="0"
@@ -620,7 +615,10 @@ watch(selectedTerm, async () => {
 })
 
 /* 30-minute grid slots (matches AddScheduleView) */
-const timeSlots30 = timeOptions
+const timeSlots30 = timeOptions.slice(0, -1)
+function nextTimeSlot(slot) {
+  return timeOptions[timeOptions.indexOf(slot) + 1] || ''
+}
 
 const showLogoutModal = ref(false)
 const isLoggingOut = ref(false)
@@ -658,7 +656,7 @@ function isWithinTeacherWorkHours(rowSlot, day) {
   const slotStart = parseTime(rowSlot)
   const start = parseTime(hours.startTime)
   const end = parseTime(hours.endTime)
-  return slotStart >= start && slotStart <= end
+  return slotStart >= start && slotStart < end
 }
 
 const selectedScheduleEntry = computed(() => selectedScheduleEntries.value[0] || null)
@@ -1066,7 +1064,17 @@ function isSpannedTeacherCell(slot, day) {
 }
 
 function getTeacherRowspan(entry) {
-  return Math.min(timeSlots30.length, getRoomRowspan(entry))
+  if (!entry?.timeIn || !entry?.timeOut) return 1
+  const start = parseTime(entry.timeIn)
+  const end = parseTime(entry.timeOut)
+  const startIndex = timeSlots30.findIndex(slot => {
+    const rowStart = parseTime(slot)
+    return start >= rowStart && start < rowStart + 30
+  })
+  if (startIndex < 0) return 1
+  const firstRowStart = parseTime(timeSlots30[startIndex])
+  const durationFromRowStart = Math.max(1, end - firstRowStart)
+  return Math.max(1, Math.min(timeSlots30.length - startIndex, Math.ceil(durationFromRowStart / 30)))
 }
 
 function getConsultationForTeacherCell(rowSlot, day) {
@@ -1101,7 +1109,7 @@ function consultEntryStyle(rowSlot, consult) {
   const consultStart = parseTime(consult.startTime)
   const offsetMins   = Math.max(0, consultStart - rowStart)
   const spannedMins  = getConsultRowspan(consult) * 30
-  const durationMins = Math.max(1, parseTime(consult.endTime) - consultStart + 30)
+  const durationMins = Math.max(1, parseTime(consult.endTime) - consultStart)
   const trailingMins = Math.max(0, spannedMins - offsetMins - durationMins)
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
@@ -1239,9 +1247,14 @@ function getRoomRowspan(entry) {
   if (!entry?.timeIn || !entry?.timeOut) return 1
   const start = parseTime(entry.timeIn)
   const end   = parseTime(entry.timeOut)
-  const duration = Math.max(1, end - start + 30)
-  const startOffset = start % 30
-  return Math.max(1, Math.ceil((startOffset + duration) / 30))
+  const startIndex = timeSlots30.findIndex(slot => {
+    const rowStart = parseTime(slot)
+    return start >= rowStart && start < rowStart + 30
+  })
+  if (startIndex < 0) return 1
+  const endIndex = timeSlots30.findIndex(slot => parseTime(slot) >= end)
+  const exclusiveEndIndex = endIndex < 0 ? timeSlots30.length : endIndex
+  return Math.max(1, Math.min(timeSlots30.length - startIndex, exclusiveEndIndex - startIndex))
 }
 
 const ROW_HEIGHT = 44
@@ -1251,7 +1264,7 @@ function roomEntryStyle(rowHour, entry) {
   const entryStart = parseTime(entry.timeIn)
   const offsetMins = Math.max(0, entryStart - rowStart)
   const spannedMins = getRoomScheduleRowspan(entry) * 30
-  const durationMins = Math.max(1, parseTime(entry.timeOut) - entryStart + 30)
+  const durationMins = Math.max(1, parseTime(entry.timeOut) - entryStart)
   const trailingMins = Math.max(0, spannedMins - offsetMins - durationMins)
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
@@ -1267,7 +1280,7 @@ function studentEntryStyle(rowSlot, entry) {
   const entryStart = parseTime(entry.timeIn)
   const offset = Math.max(0, entryStart - rowStart)
   const spannedMinutes = getStudentRowspan(entry) * 30
-  const durationMinutes = Math.max(1, parseTime(entry.timeOut) - entryStart + 30)
+  const durationMinutes = Math.max(1, parseTime(entry.timeOut) - entryStart)
   const trailingMinutes = Math.max(0, spannedMinutes - offset - durationMinutes)
 
   return {
@@ -1283,14 +1296,13 @@ function teacherEntryStyle(rowSlot, entry) {
   const rowStart = parseTime(rowSlot)
   const entryStart = parseTime(entry.timeIn)
   const offset = Math.max(0, entryStart - rowStart)
-  const spannedMinutes = getTeacherRowspan(entry) * 30
-  const durationMinutes = Math.max(1, parseTime(entry.timeOut) - entryStart + 30)
-  const trailingMinutes = Math.max(0, spannedMinutes - offset - durationMinutes)
+  const durationMinutes = Math.max(1, parseTime(entry.timeOut) - entryStart)
+  const pixelsPerMinute = ROW_HEIGHT / 30
 
   return {
-    top: `calc(${(offset / spannedMinutes) * 100}% + 4px)`,
-    bottom: `calc(${(trailingMinutes / spannedMinutes) * 100}% + 4px)`,
-    height: 'auto',
+    top: `${offset * pixelsPerMinute + 4}px`,
+    bottom: 'auto',
+    height: `${Math.max(1, durationMinutes * pixelsPerMinute - 8)}px`,
     zIndex: 3,
   }
 }
@@ -1391,7 +1403,8 @@ function exportScheduleExcel() {
   if (!selectedName) return
 
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const SLOTS = timeOptions
+  // Rows show half-hour ranges; 8:00 PM is the end boundary, not a row.
+  const SLOTS = timeOptions.slice(0, -1)
   const colorMap = {
     'color-green': { bg: '#1f6b45', fg: '#ffffff' },
     'color-yellow': { bg: '#e9c46a', fg: '#5a3e00' },
@@ -1465,7 +1478,8 @@ function exportScheduleExcel() {
   let bodyHTML = ''
   for (let slotIndex = 0; slotIndex < SLOTS.length; slotIndex++) {
     const isHalf = SLOTS[slotIndex].includes(':30')
-    bodyHTML += `<tr${isHalf ? ' class="half"' : ''}><td class="time-col">${esc(SLOTS[slotIndex])}</td>`
+    const slotEnd = SLOTS[slotIndex + 1] || timeOptions[timeOptions.indexOf(SLOTS[slotIndex]) + 1] || ''
+    bodyHTML += `<tr${isHalf ? ' class="half"' : ''}><td class="time-col">${esc(SLOTS[slotIndex])} - ${esc(slotEnd)}</td>`
     DAYS.forEach((day, dayIndex) => {
       if (occupied[slotIndex][dayIndex]) return
       const matched = entriesAt(slotIndex, day)
@@ -1497,8 +1511,8 @@ function exportScheduleExcel() {
   const title = isRoom ? `Room ${selectedRoom.value} - Weekly Schedule` : `Prof. ${selectedTeacher.value} - Weekly Schedule`
   const sub = [selectedTermLabel.value ? `Term: ${selectedTermLabel.value}` : '', isRoom ? selectedFloor.value : '', `Exported on ${new Date().toLocaleDateString('en-US')}`].filter(Boolean).join(' | ')
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-    @page{size:landscape;margin:10mm}*{box-sizing:border-box}body{font-family:Segoe UI,Arial,sans-serif;padding:14px 18px;font-size:11px;color:#252d33}h2{font-size:16px;margin:0 0 4px}.sub{font-size:10px;color:#66727c;margin:0 0 12px}table{width:100%;border-collapse:collapse;table-layout:fixed;border:1px solid #cfd6df}th{background:#3f4b55;color:#fff;padding:8px 6px;text-align:center;font-size:10px;border:1px solid #26333d}th:first-child{width:68px}td{border:1px solid #d9dfe4;height:44px;vertical-align:top}.half td{border-top:1px dashed #d9dfe4}.time-col{background:#f0f2f4;color:#4b5563;font-size:9px;font-weight:700;text-align:center;vertical-align:middle;padding:4px 2px}.free-cell{background:#f5f1ff}.entry-cell{padding:8px 9px;vertical-align:top;border:3px solid #fff;line-height:1.35;overflow:hidden}.entry-cell span{display:block}.e-teacher{font-size:10px;font-weight:700}.e-main{font-size:10px;font-weight:800}.e-time{font-size:8.5px;margin-top:2px;opacity:.9}.e-section{font-size:9px;margin-top:2px;font-weight:600}</style></head><body><h2>${esc(title)}</h2><p class="sub">${esc(sub)}</p><table><thead><tr><th>Time</th>${DAYS.map(day => `<th>${esc(day)}</th>`).join('')}</tr></thead><tbody>${bodyHTML}</tbody></table></body></html>`
-  const excelHtml = html.replace('</head>', '<style>body{padding:8px;font-size:9px;}h2{font-size:13px;margin-bottom:2px}.sub{font-size:8px;margin-bottom:6px}table{width:100%;table-layout:fixed;border:1px solid #000}th{padding:4px 3px;font-size:8px;border:1px solid #000}th:first-child{width:54px}tbody tr{height:24px;min-height:24px;max-height:24px}td{border:1px solid #000;height:24px}.time-col{font-size:8px;padding:2px 1px}.entry-cell{padding:3px 4px;border:0;border-radius:0;line-height:1.1}.entry-cell span{line-height:1.1}.e-teacher{font-size:8px}.e-main{font-size:8px}.e-time{font-size:7px;margin-top:1px}.e-section{font-size:7px;margin-top:1px}</style></head>')
+    @page{size:landscape;margin:10mm}*{box-sizing:border-box}body{font-family:Segoe UI,Arial,sans-serif;padding:14px 18px;font-size:11px;color:#252d33}h2{font-size:16px;margin:0 0 4px}.sub{font-size:10px;color:#66727c;margin:0 0 12px}table{width:100%;border-collapse:collapse;table-layout:fixed;border:1px solid #cfd6df}th{background:#3f4b55;color:#fff;padding:8px 6px;text-align:center;font-size:10px;border:1px solid #26333d}th:first-child{width:100px}td{border:1px solid #d9dfe4;height:44px;vertical-align:top}.half td{border-top:1px dashed #d9dfe4}.time-col{background:#f0f2f4;color:#4b5563;font-size:9px;font-weight:700;text-align:center;vertical-align:middle;padding:4px 2px}.free-cell{background:#f5f1ff}.entry-cell{padding:8px 9px;vertical-align:top;border:3px solid #fff;line-height:1.35;overflow:hidden}.entry-cell span{display:block}.e-teacher{font-size:10px;font-weight:700}.e-main{font-size:10px;font-weight:800}.e-time{font-size:8.5px;margin-top:2px;opacity:.9}.e-section{font-size:9px;margin-top:2px;font-weight:600}</style></head><body><h2>${esc(title)}</h2><p class="sub">${esc(sub)}</p><table><thead><tr><th>Time</th>${DAYS.map(day => `<th>${esc(day)}</th>`).join('')}</tr></thead><tbody>${bodyHTML}</tbody></table></body></html>`
+  const excelHtml = html.replace('</head>', '<style>body{padding:8px;font-size:9px;}h2{font-size:13px;margin-bottom:2px}.sub{font-size:8px;margin-bottom:6px}table{width:100%;table-layout:fixed;border:1px solid #000}th{padding:4px 3px;font-size:8px;border:1px solid #000}th:first-child{width:82px}tbody tr{height:24px;min-height:24px;max-height:24px}td{border:1px solid #000;height:24px}.time-col{font-size:8px;padding:2px 1px}.entry-cell{padding:3px 4px;border:0;border-radius:0;line-height:1.1}.entry-cell span{line-height:1.1}.e-teacher{font-size:8px}.e-main{font-size:8px}.e-time{font-size:7px;margin-top:1px}.e-section{font-size:7px;margin-top:1px}</style></head>')
   const blob = new Blob([`\ufeff${excelHtml}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -2851,4 +2865,13 @@ function printSchedule() {
   }
   .schedule-card > .sched-topbar .schedule-legend-wrap { grid-row: 3; }
 }
+.time-slot-range { display: grid; grid-template-columns: 1fr 1fr; align-items: center; width: 100%; gap: 3px; font-size: .61rem; }
+.time-slot-range > span { min-width: 0; white-space: nowrap; }
+.sched-grid td.td-time { width: 150px; padding-inline: 4px; }
+.sched-entry.compact-entry { top: 2px; bottom: 2px; padding: 2px 4px; gap: 0; justify-content: flex-start; }
+.sched-entry.compact-entry .entry-teacher { font-size: .62rem; line-height: 1.05; }
+.sched-entry.compact-entry .entry-subject { font-size: .56rem; line-height: 1.05; }
+.sched-entry.compact-entry .entry-time-range { font-size: .52rem; line-height: 1.05; }
+.sched-entry.compact-entry .entry-section-rows, .sched-entry.compact-entry .entry-section-row { display: none; }
+@media (max-width: 900px) { .sched-grid td.td-time { width: 112px; } .time-slot-range { gap: 1px; font-size: .53rem; } }
 </style>

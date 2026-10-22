@@ -75,7 +75,7 @@ async function listTerms(req, res) {
 
 async function getInUseTerm(_req, res) {
   try {
-    const term = await AcademicTerm.findOne({ isInUse: true }).sort({ usedAt: -1, createdAt: -1 }).lean();
+    const term = await AcademicTerm.findOne({ isInUse: true, isArchived: { $ne: true } }).sort({ usedAt: -1, createdAt: -1 }).lean();
     return res.json({ term });
   } catch (error) {
     console.error("Failed to load in-use academic term:", error);
@@ -85,7 +85,7 @@ async function getInUseTerm(_req, res) {
 
 async function getPublishedTerm(_req, res) {
   try {
-    const term = await AcademicTerm.findOne({ isPublished: true }).sort({ publishedAt: -1, createdAt: -1 }).lean();
+    const term = await AcademicTerm.findOne({ isPublished: true, isArchived: { $ne: true } }).sort({ publishedAt: -1, createdAt: -1 }).lean();
     return res.json({ term });
   } catch (error) {
     console.error("Failed to load published academic term:", error);
@@ -155,6 +155,9 @@ async function updateTerm(req, res) {
     if (!term) {
       return res.status(404).json({ message: "Academic term not found." });
     }
+    if (term.isArchived) {
+      return res.status(409).json({ message: "Archived academic terms are read-only." });
+    }
 
     const nextIsPublished = Boolean(req.body?.isPublished);
     const payload = {
@@ -221,6 +224,9 @@ async function useTerm(req, res) {
     if (!target) {
       return res.status(404).json({ message: "Academic term not found." });
     }
+    if (target.isArchived) {
+      return res.status(409).json({ message: "Archived academic terms cannot be selected for scheduling." });
+    }
 
     await AcademicTerm.updateMany({}, { $set: { isInUse: false, usedAt: null } });
     target.isInUse = true;
@@ -265,6 +271,9 @@ async function publishTerm(req, res) {
     const target = await AcademicTerm.findById(termId);
     if (!target) {
       return res.status(404).json({ message: "Academic term not found." });
+    }
+    if (target.isArchived) {
+      return res.status(409).json({ message: "Archived academic terms cannot be published." });
     }
 
     await AcademicTerm.updateMany({}, { $set: { isPublished: false, publishedAt: null } });
@@ -344,6 +353,39 @@ async function publishTerm(req, res) {
   }
 }
 
+async function archiveTerm(req, res) {
+  try {
+    const termId = normalizeString(req.params?.id);
+    if (!/^[a-f\d]{24}$/i.test(termId)) {
+      return res.status(400).json({ message: "Invalid term id." });
+    }
+    const term = await AcademicTerm.findById(termId);
+    if (!term) return res.status(404).json({ message: "Academic term not found." });
+    if (term.isArchived) return res.json({ message: "Academic term is already archived.", term });
+
+    const archivedAt = new Date();
+    term.isArchived = true;
+    term.archivedAt = archivedAt;
+    term.isPublished = false;
+    term.publishedAt = null;
+    term.isInUse = false;
+    term.usedAt = null;
+    await term.save();
+
+    await logActivity({
+      actor: req.user,
+      action: `Archived term ${term.schoolYear} ${term.semester}`,
+      path: req.originalUrl || "/api/academic-terms",
+      method: req.method,
+      req,
+    });
+    return res.json({ message: "Academic term archived.", term });
+  } catch (error) {
+    console.error("Failed to archive academic term:", error);
+    return res.status(500).json({ message: "Failed to archive academic term.", error: error.message });
+  }
+}
+
 module.exports = {
   listTerms,
   getInUseTerm,
@@ -352,5 +394,6 @@ module.exports = {
   updateTerm,
   useTerm,
   publishTerm,
+  archiveTerm,
   getTermKey,
 };

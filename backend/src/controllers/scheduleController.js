@@ -31,12 +31,20 @@ function resolveAcademicTermReference(value) {
 
 async function getActiveAcademicTermReference() {
   try {
-    const term = await AcademicTerm.findOne({ isPublished: true }).sort({ publishedAt: -1, createdAt: -1 }).select("_id").lean();
+    const term = await AcademicTerm.findOne({ isPublished: true, isArchived: { $ne: true } }).sort({ publishedAt: -1, createdAt: -1 }).select("_id").lean();
     return term?._id || null;
   } catch (error) {
     console.error("Failed to resolve active academic term:", error);
     return null;
   }
+}
+
+async function rejectArchivedTerm(res, termId) {
+  if (!termId) return false;
+  const term = await AcademicTerm.findById(termId).select("isArchived").lean();
+  if (!term?.isArchived) return false;
+  res.status(403).json({ message: "Archived academic terms are read-only. Schedules cannot be added, changed, or removed." });
+  return true;
 }
 
 function parseTimeToMinutes(value) {
@@ -590,8 +598,9 @@ async function findConflict(doc, excludedIds = []) {
   // Overlap: same day, time windows intersect
   const overlapFilter = {
     day: doc.day,
-    timeInMinutes: { $lt: doc.timeOutMinutes + 30 },
-    timeOutMinutes: { $gt: doc.timeInMinutes - 30 },
+    // Schedule windows are half-open: [start, end). Adjacent classes are valid.
+    timeInMinutes: { $lt: doc.timeOutMinutes },
+    timeOutMinutes: { $gt: doc.timeInMinutes },
   };
 
   if (excludedIds.length) {
@@ -652,7 +661,7 @@ async function findConflict(doc, excludedIds = []) {
     for (const slot of consultSlots) {
       const slotStart = parseTimeToMinutes(slot.startTime);
       const slotEnd   = parseTimeToMinutes(slot.endTime);
-      if (doc.timeInMinutes < slotEnd + 30 && doc.timeOutMinutes + 30 > slotStart) {
+      if (doc.timeInMinutes < slotEnd && doc.timeOutMinutes > slotStart) {
         console.debug('findConflict -> consultConflict', { slot });
         console.debug('findConflict -> consultConflict', { slot });
         return {
@@ -708,6 +717,7 @@ async function createScheduleTable(req, res) {
     if (requestedTermId && !academicTerm) {
       return res.status(400).json({ message: "A valid academic term is required to save schedule work hours." });
     }
+    if (await rejectArchivedTerm(res, academicTerm)) return;
     const academicTermKey = academicTerm?.toString() || "";
 
     const hasPerDayHours = req.body.workHoursByDay !== undefined;
@@ -858,6 +868,7 @@ async function createSchedule(req, res) {
       entryType: payload.entryType || 'class',
     });
     const academicTermId = resolveAcademicTermReference(payload?.academicTermId) || await getActiveAcademicTermReference();
+    if (await rejectArchivedTerm(res, academicTermId)) return;
     await assertPracticumSemester(payload, academicTermId);
     const isLunchBreak = normalizeString(payload.entryType).toLowerCase() === "lunch";
     const docs = isLunchBreak ? [buildLunchBreakDoc(payload, academicTermId)] : buildEntryDocs(payload, academicTermId);
@@ -940,6 +951,7 @@ async function createSchedule(req, res) {
 async function createLunchBreak(req, res) {
   try {
     const academicTermId = resolveAcademicTermReference(req.body?.academicTermId) || await getActiveAcademicTermReference();
+    if (await rejectArchivedTerm(res, academicTermId)) return;
     const doc = buildLunchBreakDoc(req.body || {}, academicTermId);
     await ensureTableExists(doc.tableLabel);
 
@@ -993,6 +1005,7 @@ async function updateLunchBreak(req, res) {
     if (!isLunchBreak) {
       return res.status(404).json({ message: "Lunch break not found." });
     }
+    if (await rejectArchivedTerm(res, existing.academicTermId)) return;
 
     // Take only the editable values from the request. The owner and the rest
     // of the lunch metadata always come from the original saved entry.
@@ -1073,6 +1086,7 @@ async function deleteLunchBreak(req, res) {
     if (!isLunchBreak) {
       return res.status(404).json({ message: "Lunch break not found." });
     }
+    if (await rejectArchivedTerm(res, existing.academicTermId)) return;
 
     await existing.deleteOne();
     await logActivity({
@@ -1110,7 +1124,12 @@ async function replaceSchedule(req, res) {
       return res.status(400).json({ message: "Missing old and next schedule payload." });
     }
 
+    const oldEntries = await ScheduleEntry.find(getDescriptorFilter(oldDescriptor)).select("academicTermId").lean();
+    for (const entry of oldEntries) {
+      if (await rejectArchivedTerm(res, entry.academicTermId)) return;
+    }
     const academicTermId = resolveAcademicTermReference(next?.academicTermId) || await getActiveAcademicTermReference();
+    if (await rejectArchivedTerm(res, academicTermId)) return;
     await assertPracticumSemester(next, academicTermId);
     const excludedIds = await getExcludedIds(oldDescriptor);
     const docs = oldDescriptor.recurringAssignment
@@ -1196,6 +1215,10 @@ async function deleteSchedule(req, res) {
     }
 
     const filter = getDescriptorFilter(oldDescriptor);
+    const existingEntries = await ScheduleEntry.find(filter).select("academicTermId").lean();
+    for (const entry of existingEntries) {
+      if (await rejectArchivedTerm(res, entry.academicTermId)) return;
+    }
     const result = await ScheduleEntry.deleteMany(filter);
     await logActivity({
       actor: req.user,

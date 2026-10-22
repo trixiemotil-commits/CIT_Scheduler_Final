@@ -331,7 +331,11 @@ async function createAssignment(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Substituted a class for ${originalTeacher}: assigned ${substituteTeacher} on ${date}`,
+      action: `Substituted a class for ${teacherFullName(populated?.originalTeacher, 'a teacher')}: assigned ${teacherFullName(populated?.substituteTeacher, 'a substitute teacher')} on ${date}`,
+      actionType: 'substitute.create',
+      targetType: 'substituteAssignment',
+      targetId: populated?._id,
+      targetName: `${teacherFullName(populated?.originalTeacher, 'a teacher')} on ${date}`,
       path: req.originalUrl || "/api/substitutions",
       method: req.method,
       req,
@@ -355,6 +359,11 @@ async function syncAssignments(req, res) {
     if (isNaN(target.getTime())) {
       return res.status(400).json({ message: 'Invalid date.' })
     }
+
+    const originalTeacherDoc = mongoose.Types.ObjectId.isValid(String(originalTeacher))
+      ? await User.findById(originalTeacher).select('firstName lastName').lean()
+      : null
+    const originalTeacherName = teacherFullName(originalTeacherDoc, 'the selected teacher')
 
     const grouped = new Map()
     for (const item of assignments) {
@@ -448,7 +457,12 @@ async function syncAssignments(req, res) {
       try {
         await logActivity({
           actor,
-          action: `Updated substitute assignments for ${originalTeacher} on ${date}`,
+          action: `${grouped.size ? 'Updated' : 'Removed'} substitute assignments for ${originalTeacherName} on ${date}`,
+          actionType: grouped.size ? 'substitute.update' : 'substitute.remove',
+          targetType: 'user',
+          targetId: originalTeacherDoc?._id || null,
+          targetName: originalTeacherName,
+          details: { date, assignmentCount: grouped.size },
           path: requestPath,
           method: requestMethod,
           req,
@@ -533,6 +547,8 @@ async function deleteAssignment(req, res) {
   try {
     const { id } = req.params
     const doc = await SubstituteAssignment.findByIdAndDelete(id)
+      .populate('originalTeacher', 'firstName lastName')
+      .populate('substituteTeacher', 'firstName lastName')
     if (!doc) return res.status(404).json({ message: 'Assignment not found.' })
     try {
       await notifyActiveAdmins({
@@ -548,7 +564,11 @@ async function deleteAssignment(req, res) {
     }
     await logActivity({
       actor: req.user,
-      action: `Deleted substitute assignment ${id}`,
+      action: `Deleted substitute assignment for ${teacherFullName(doc.originalTeacher, 'a teacher')} with ${teacherFullName(doc.substituteTeacher, 'a substitute teacher')}`,
+      actionType: 'substitute.delete',
+      targetType: 'substituteAssignment',
+      targetId: doc._id,
+      targetName: teacherFullName(doc.originalTeacher, 'a teacher'),
       path: req.originalUrl || `/api/substitutions/${id}`,
       method: req.method,
       req,
@@ -573,6 +593,11 @@ async function deleteAssignmentsForTeacher(req, res) {
       return res.status(400).json({ message: 'Invalid date.' })
     }
 
+    const originalTeacherDoc = mongoose.Types.ObjectId.isValid(String(originalTeacher))
+      ? await User.findById(originalTeacher).select('firstName lastName').lean()
+      : null
+    const originalTeacherName = teacherFullName(originalTeacherDoc, 'the selected teacher')
+
     const result = await SubstituteAssignment.deleteMany({
       originalTeacher,
       date: { $gte: startOfDayUTC(target), $lte: endOfDayUTC(target) },
@@ -593,7 +618,12 @@ async function deleteAssignmentsForTeacher(req, res) {
 
     await logActivity({
       actor: req.user,
-      action: `Removed substitute assignments for ${originalTeacher} on ${date}`,
+      action: `Removed substitute assignments for ${originalTeacherName} on ${date}`,
+      actionType: 'substitute.remove',
+      targetType: 'user',
+      targetId: originalTeacherDoc?._id || null,
+      targetName: originalTeacherName,
+      details: { date, deletedCount: result.deletedCount || 0 },
       path: req.originalUrl || "/api/substitutions/delete-for-teacher",
       method: req.method,
       req,

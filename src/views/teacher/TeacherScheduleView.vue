@@ -133,7 +133,7 @@
             </thead>
             <tbody>
               <tr v-for="(rowCells, ri) in tableMatrix" :key="ri" class="time-row" :class="{ 'half-hour': TIME_SLOTS[ri].start.endsWith(':30') }">
-                <td class="td-time">{{ TIME_SLOTS[ri].label }}</td>
+                <td class="td-time"><span class="time-slot-range"><span>{{ TIME_SLOTS[ri].label }}</span><span>{{ timeOptions[ri + 1] || '' }}</span></span></td>
                 <template v-for="(cell, ci) in rowCells" :key="ci">
                   <!-- Class cell -->
                   <td
@@ -149,7 +149,7 @@
                           : cell.cls.color === 'yellow'
                             ? 'cell-yellow'
                             : 'cell-green',
-                      { 'col-expanded': expandedDay === DAYS[ci], 'col-collapsed': expandedDay && expandedDay !== DAYS[ci], 'is-focus': isFocusedClassCell(cell), 'is-focus-animate': isFocusedClassCell(cell) }
+                      { 'col-expanded': expandedDay === DAYS[ci], 'col-collapsed': expandedDay && expandedDay !== DAYS[ci], 'is-focus': isFocusedClassCell(cell), 'is-focus-animate': isFocusedClassCell(cell), 'compact-cell': cell.rowspan <= 2 }
                     ]"
                     @click="toggleExpand(DAYS[ci])"
                   >
@@ -414,7 +414,7 @@ const navItems = [
 ]
 
 /* ── Schedule grid constants ── */
-const TIME_SLOTS = timeOptions.map((start) => ({ start, label: start }))
+const TIME_SLOTS = timeOptions.slice(0, -1).map((start) => ({ start, label: start }))
 const GRID_START_MINUTES = timeToMinutes(timeOptions[0])
 const GRID_END_MINUTES = timeToMinutes(timeOptions[timeOptions.length - 1])
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -453,7 +453,7 @@ function isWithinWorkHours(day, rowIndex) {
   const start = timeToMinutes(startTime)
   const end = timeToMinutes(endTime)
   const slotStart = timeToMinutes(TIME_SLOTS[rowIndex]?.start)
-  return Number.isFinite(start) && Number.isFinite(end) && slotStart >= start && slotStart <= end
+  return Number.isFinite(start) && Number.isFinite(end) && slotStart >= start && slotStart < end
 }
 
 function to24Hour(value) {
@@ -996,15 +996,6 @@ const tableMatrix = computed(() => {
   const consultations = filteredConsultations.value
   const occupied = Array.from({ length: DAYS.length }, () => new Array(TIME_SLOTS.length).fill(false))
 
-  const getDisplaySpan = (item, actualSpan, day) => {
-    const nextSlot = item.startIndex + actualSpan
-    if (nextSlot >= TIME_SLOTS.length) return actualSpan
-
-    const nextSlotHasClass = data.some((other) => other !== item && other.day === day && other.startIndex === nextSlot)
-    const nextSlotHasConsultation = consultations.some((other) => other !== item && other.day === day && other.startIndex === nextSlot)
-    return nextSlotHasClass || nextSlotHasConsultation ? actualSpan : actualSpan + 1
-  }
-
   return TIME_SLOTS.map((slot, ri) =>
     DAYS.map((day, ci) => {
       if (occupied[ci][ri]) return { type: 'occupied' }
@@ -1012,7 +1003,9 @@ const tableMatrix = computed(() => {
       const cls = data.find((c) => c.day === day && c.startIndex === ri)
       if (cls) {
         const actualSpan = Math.max(1, Number(cls.rowspan) || 1)
-        const span = getDisplaySpan(cls, actualSpan, day)
+        // The end time is exclusive. Do not extend into the next half-hour row
+        // just because the following row has no other class or consultation.
+        const span = actualSpan
         for (let r = ri + 1; r < ri + span && r < TIME_SLOTS.length; r++) occupied[ci][r] = true
         return { type: 'start', cls, rowspan: span }
       }
@@ -1020,7 +1013,7 @@ const tableMatrix = computed(() => {
       const consult = consultations.find((slotItem) => slotItem.day === day && slotItem.startIndex === ri)
       if (consult) {
         const actualSpan = Math.max(1, Number(consult.rowspan) || 1)
-        const span = getDisplaySpan(consult, actualSpan, day)
+        const span = actualSpan
         for (let r = ri + 1; r < ri + span && r < TIME_SLOTS.length; r++) occupied[ci][r] = true
         return { type: 'consult', consult, rowspan: span }
       }
@@ -2363,4 +2356,13 @@ async function confirmLogout() {
     font-size: 6pt !important;
   }
 }
+.time-slot-range { display: grid; grid-template-columns: 1fr 1fr; align-items: center; width: 100%; gap: 3px; font-size: .61rem; }
+.time-slot-range > span { min-width: 0; white-space: nowrap; }
+.sched-table td.td-time { width: 150px; padding-inline: 4px; }
+.td-class.compact-cell { padding: 2px 3px; }
+.td-class.compact-cell .cell-room-sm { margin: 0; font-size: .58rem; line-height: 1.05; }
+.td-class.compact-cell .cell-subject-sm { margin: 0; font-size: .62rem; line-height: 1.05; }
+.td-class.compact-cell .cell-year-section { display: none; }
+.td-class.compact-cell .cell-time-range-sm { margin-top: 1px; padding: 1px 3px; font-size: .52rem; line-height: 1; }
+@media (max-width: 900px) { .sched-table td.td-time { width: 112px; } .time-slot-range { gap: 1px; font-size: .53rem; } }
 </style>

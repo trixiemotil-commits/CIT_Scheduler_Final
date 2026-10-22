@@ -112,12 +112,20 @@ function resolveAcademicTermReference(value) {
 
 async function getActiveAcademicTermReference() {
   try {
-    const term = await AcademicTerm.findOne({ isPublished: true }).sort({ publishedAt: -1, createdAt: -1 }).select("_id").lean();
+    const term = await AcademicTerm.findOne({ isPublished: true, isArchived: { $ne: true } }).sort({ publishedAt: -1, createdAt: -1 }).select("_id").lean();
     return term?._id || null;
   } catch (error) {
     console.error("Failed to resolve active academic term:", error);
     return null;
   }
+}
+
+async function rejectArchivedTerm(res, termId) {
+  if (!termId) return false;
+  const term = await AcademicTerm.findById(termId).select("isArchived").lean();
+  if (!term?.isArchived) return false;
+  res.status(403).json({ message: "Archived academic terms are read-only. Consultation hours cannot be added, changed, or removed." });
+  return true;
 }
 
 function nowContext() {
@@ -1989,6 +1997,7 @@ async function createConsultation(req, res) {
     }
 
     const academicTermId = resolveAcademicTermReference(req.body?.academicTermId) || await getActiveAcademicTermReference();
+    if (await rejectArchivedTerm(res, academicTermId)) return;
 
     // Weekly limits apply independently to each academic term.
     const existing = await ConsultationAvailability.find({
@@ -2053,6 +2062,7 @@ async function updateConsultation(req, res) {
     const academicTermId = resolveAcademicTermReference(req.body?.academicTermId)
       || target.academicTermId
       || await getActiveAcademicTermReference();
+    if (await rejectArchivedTerm(res, academicTermId)) return;
 
     // Weekly totals and conflicts apply only within this slot's term.
     const others = await ConsultationAvailability.find({
@@ -2104,6 +2114,9 @@ async function updateConsultation(req, res) {
 // DELETE /api/consultations/:id
 async function deleteConsultation(req, res) {
   try {
+    const target = await ConsultationAvailability.findById(req.params.id);
+    if (!target) return res.status(404).json({ message: "Consultation slot not found." });
+    if (await rejectArchivedTerm(res, target.academicTermId)) return;
     const deleted = await ConsultationAvailability.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ message: "Consultation slot not found." });
 

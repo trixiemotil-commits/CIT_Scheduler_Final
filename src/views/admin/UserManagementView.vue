@@ -433,7 +433,7 @@
           <div class="form-row form-row--single">
             <div class="form-group">
               <label class="form-label">Role <span class="form-required">*</span></label>
-              <select ref="roleSelectElement" v-model="userForm.role" class="form-input" required @change="handleRoleChange">
+              <select ref="roleSelectElement" v-model="userForm.role" class="form-input" required :disabled="editingUser && !canAddUsers" @change="handleRoleChange">
                 <option value="" disabled>Select role…</option>
                 <option value="Admin">Admin</option>
                 <option value="Teacher">Teacher</option>
@@ -469,14 +469,17 @@
           <div v-if="userForm.role === 'Student' && userForm.studentEnrollmentType === 'Regular'" class="form-row">
             <div class="form-group">
               <label class="form-label">Year Level</label>
-              <select v-model="userForm.yearLevel" class="form-input">
+              <select v-model="userForm.yearLevel" class="form-input" @change="handleStudentYearLevelChange">
                 <option value="">Select year level</option>
                 <option v-for="year in studentYearOptions" :key="year" :value="year">{{ year }}</option>
               </select>
             </div>
             <div class="form-group">
               <label class="form-label">Section</label>
-              <input v-model.trim="userForm.section" class="form-input" type="text" placeholder="e.g. South 1" />
+              <select v-model="userForm.section" class="form-input">
+                <option value="">Select section</option>
+                <option v-for="section in sectionsForYear(userForm.yearLevel, userForm.section)" :key="section" :value="section">{{ section }}</option>
+              </select>
             </div>
           </div>
 
@@ -488,14 +491,17 @@
             <div v-for="(assignment, index) in userForm.studentYearSections" :key="index" class="form-row student-year-section-row">
               <div class="form-group">
                 <label class="form-label">Year Level</label>
-                <select v-model="assignment.yearLevel" class="form-input">
+                <select v-model="assignment.yearLevel" class="form-input" @change="assignment.section = ''">
                   <option value="">Select year level</option>
                   <option v-for="year in studentYearOptions" :key="year" :value="year" :disabled="isStudentYearAlreadySelected(year, index)">{{ year }}</option>
                 </select>
               </div>
               <div class="form-group student-section-input">
                 <label class="form-label">Section</label>
-                <input v-model.trim="assignment.section" class="form-input" type="text" placeholder="e.g. South 3" />
+                <select v-model="assignment.section" class="form-input">
+                  <option value="">Select section</option>
+                  <option v-for="section in sectionsForYear(assignment.yearLevel, assignment.section)" :key="section" :value="section">{{ section }}</option>
+                </select>
               </div>
               <button type="button" class="student-year-remove" aria-label="Remove year assignment" @click="removeStudentYearSection(index)">Remove</button>
             </div>
@@ -1292,7 +1298,7 @@ function buildUserPayload(includePassword) {
 }
 
 onMounted(async () => {
-  await fetchUsers()
+  await Promise.all([fetchUsers(), fetchPublishedTermSections()])
   startAutoRefreshUsers()
 })
 
@@ -1314,6 +1320,27 @@ const rowStatusTarget = ref(null)
 const rowStatusNextValue = ref('')
 const isSavingUser    = ref(false)
 const studentYearOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+const publishedTerm = ref(null)
+async function fetchPublishedTermSections() {
+  try {
+    const response = await apiRequest('/academic-terms/published')
+    publishedTerm.value = response.term || null
+  } catch (_error) {
+    publishedTerm.value = null
+  }
+}
+function sectionsForYear(yearLevel, currentSection = '') {
+  const sections = publishedTerm.value?.sectionNames?.[yearLevel]
+  const options = Array.isArray(sections) ? [...sections] : []
+  const current = String(currentSection || '').trim()
+  if (current && !options.includes(current)) options.unshift(current)
+  return options
+}
+function handleStudentYearLevelChange() {
+  if (!sectionsForYear(userForm.value.yearLevel).includes(userForm.value.section)) {
+    userForm.value.section = ''
+  }
+}
 const emptyForm = () => ({ firstName: '', lastName: '', email: '', schoolId: '', role: '', status: 'Active', yearLevel: '', section: '', studentEnrollmentType: 'Regular', studentYearSections: [], password: '', confirmPassword: '', currentPassword: '' })
 const userForm  = ref(emptyForm())
 const roleSelectElement = ref(null)
