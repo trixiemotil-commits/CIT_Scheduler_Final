@@ -276,6 +276,11 @@ async function createUser(req, res) {
     await logActivity({
       actor: req.user,
       action: `Added ${normalizedRoles.join(" & ")} user ${user.firstName} ${user.lastName}`,
+      actionType: "user.create",
+      targetType: "user",
+      targetId: user._id,
+      targetName: `${user.firstName} ${user.lastName}`.trim(),
+      details: { roles: normalizedRoles, status: user.account_status },
       path: req.originalUrl || "/api/users",
       method: req.method,
       req,
@@ -372,6 +377,12 @@ async function updateUser(req, res) {
     }
     if (hasAdminAndTeacherRoles(user) && !actorCanManageUsers(req)) {
       return res.status(403).json({ message: "Only users with both Admin and Teacher roles can edit Admin & Teacher accounts." });
+    }
+    const currentRoles = [...new Set(getUserRoles(user).map((value) => String(value || "").trim().toLowerCase()))].sort();
+    const requestedRoles = [...normalizedRoles].sort();
+    const previousAccountStatus = user.account_status;
+    if (!actorCanManageUsers(req) && JSON.stringify(currentRoles) !== JSON.stringify(requestedRoles)) {
+      return res.status(403).json({ message: "Only users with both Admin and Teacher roles can change account roles." });
     }
     const previousTeacherStatus = user.teacher_status;
 
@@ -471,6 +482,18 @@ async function updateUser(req, res) {
       action: normalizedRoles.includes("teacher") && String(previousTeacherStatus || "") !== String(user.teacher_status || "")
         ? `Teacher ${user.firstName} ${user.lastName} is ${user.teacher_status}`
         : `Updated ${normalizedRoles.join(" & ")} account for ${user.firstName} ${user.lastName}`,
+      actionType: "user.update",
+      targetType: "user",
+      targetId: user._id,
+      targetName: `${user.firstName} ${user.lastName}`.trim(),
+      details: {
+        previousRoles: currentRoles,
+        roles: normalizedRoles,
+        previousStatus: previousAccountStatus,
+        status: user.account_status,
+        previousTeacherStatus: previousTeacherStatus || "",
+        teacherStatus: user.teacher_status || "",
+      },
       path: req.originalUrl || `/api/users/${id}`,
       method: req.method,
       req,
@@ -538,6 +561,11 @@ async function updateUserStatus(req, res) {
         : nextStatus === "Active"
           ? `Approved user ${user.firstName} ${user.lastName}`
           : `Changed status to ${nextStatus}: user ${user.firstName} ${user.lastName}`,
+      actionType: nextStatus === "Active" && previousStatus === "Pending" ? "user.approve" : "user.status.update",
+      targetType: "user",
+      targetId: user._id,
+      targetName: `${user.firstName} ${user.lastName}`.trim(),
+      details: { previousStatus, status: nextStatus },
       path: req.originalUrl || `/api/users/${id}/status`,
       method: req.method,
       req,
@@ -579,6 +607,10 @@ async function unlockUser(req, res) {
     await logActivity({
       actor: req.user,
       action: `Unlocked user ${user.firstName} ${user.lastName}`,
+      actionType: "user.unlock",
+      targetType: "user",
+      targetId: user._id,
+      targetName: `${user.firstName} ${user.lastName}`.trim(),
       path: req.originalUrl || `/api/users/${id}/unlock`,
       method: req.method,
       req,
@@ -669,6 +701,11 @@ async function updateTeacherStatus(req, res) {
     await logActivity({
       actor: req.user,
       action: `Teacher ${updatedUser.firstName} ${updatedUser.lastName} is ${nextStatus}`,
+      actionType: "user.teacher_status.update",
+      targetType: "user",
+      targetId: updatedUser._id,
+      targetName: `${updatedUser.firstName} ${updatedUser.lastName}`.trim(),
+      details: { teacherStatus: nextStatus },
       path: req.originalUrl || `/api/users/${id}/teacher-status`,
       method: req.method,
       req,
@@ -716,6 +753,9 @@ async function approveAllPendingUsers(req, res) {
     await logActivity({
       actor: req.user,
       action: `Approved ${result.modifiedCount || 0} pending user account(s)`,
+      actionType: "user.approve_pending.bulk",
+      targetType: "user",
+      details: { count: result.modifiedCount || 0 },
       path: req.originalUrl || "/api/users/approve-pending",
       method: req.method,
       req,

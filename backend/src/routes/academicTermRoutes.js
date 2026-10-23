@@ -8,6 +8,7 @@ const {
   updateTerm,
   useTerm,
   publishTerm,
+  archiveTerm,
 } = require("../controllers/academicTermController");
 
 const router = express.Router();
@@ -19,5 +20,6 @@ router.post("/", authRequired, authorizeRoles("admin"), createTerm);
 router.patch("/:id", authRequired, authorizeRoles("admin"), updateTerm);
 router.post("/:id/use", authRequired, authorizeRoles("admin"), useTerm);
 router.post("/:id/publish", authRequired, authorizeRoles("admin"), publishTerm);
+router.post("/:id/archive", authRequired, authorizeRoles("admin"), archiveTerm);
 
 module.exports = router;

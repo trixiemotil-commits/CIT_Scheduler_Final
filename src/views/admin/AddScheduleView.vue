@@ -573,7 +573,7 @@
             </thead>
             <tbody>
               <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
-                <td class="td-time"><span class="time-boundary-label">{{ slot }}</span></td>
+                <td class="td-time"><span class="time-slot-range"><span>{{ slot }}</span><span>{{ nextTimeSlot(slot) }}</span></span></td>
                 <template v-for="day in days" :key="day">
                   <td
                     v-if="!isSpannedCell30(slot, day) && !isConsultSpannedCell30(slot, day)"
@@ -595,7 +595,7 @@
                     <template v-if="getEntriesForCell30(slot, day).length">
                       <div
                         class="sched-entry"
-                        :class="[getEntriesForCell30(slot, day)[0].color, { 'entry-readonly': addMode === 'teacher' && !selectedTeacher }]"
+                        :class="[getEntriesForCell30(slot, day)[0].color, { 'entry-readonly': addMode === 'teacher' && !selectedTeacher, 'compact-entry': getScheduleRowspan30(getEntriesForCell30(slot, day)[0]) <= 2 }]"
                         :style="scheduleEntryStyle30(slot, getEntriesForCell30(slot, day)[0])"
                       >
                         <div
@@ -1796,7 +1796,10 @@ const navItems = [
 ]
 
 /* ── 30-minute time slots for grid (same as timeOptions) ── */
-const timeSlots30 = timeOptions  // ['7:00 AM', '7:30 AM', '8:00 AM', ...]
+const timeSlots30 = timeOptions.slice(0, -1)  // Each row is a half-hour interval ending by 8:00 PM.
+function nextTimeSlot(slot) {
+  return timeOptions[timeOptions.indexOf(slot) + 1] || ''
+}
 
 /* ── Add mode state ── */
 const initialAddRouteMode = ['room', 'teacher', 'student'].includes(String(route.query.mode || ''))
@@ -2299,7 +2302,7 @@ function getRowspan30(entry) {
   if (!entry?.timeIn || !entry?.timeOut) return 1
   const start = parseTime(entry.timeIn)
   const end   = parseTime(entry.timeOut)
-  const duration = Math.max(1, end - start + 30)
+  const duration = Math.max(1, end - start)
   const startOffset = start % 30
   return Math.max(1, Math.ceil((startOffset + duration) / 30))
 }
@@ -2348,8 +2351,8 @@ function isWithinTeacherWorkHours(slot, day) {
   const slotMinutes = parseTime(slot)
   const workStartMinutes = parseTime(startTime)
   const workEndMinutes = parseTime(endTime)
-  // Include one extra half-hour row after the configured end time.
-  return Boolean(startTime && endTime && slotMinutes >= workStartMinutes && slotMinutes < workEndMinutes + 30)
+  // Work-hour windows are half-open: the row starting at the end time is outside.
+  return Boolean(startTime && endTime && slotMinutes >= workStartMinutes && slotMinutes < workEndMinutes)
 }
 
 function teacherWorkHoursEntryCellStyle30(slot, day) {
@@ -2363,7 +2366,7 @@ function teacherWorkHoursEntryCellStyle30(slot, day) {
   const cellStart = parseTime(slot)
   const cellEnd = cellStart + getScheduleRowspan30(entries[0]) * 30
   const workStart = parseTime(startTime)
-  const workEnd = parseTime(endTime) + 30
+  const workEnd = parseTime(endTime)
   const overlapStart = Math.max(cellStart, workStart)
   const overlapEnd = Math.min(cellEnd, workEnd)
   if (overlapStart >= overlapEnd) return { backgroundColor: '#fff' }
@@ -2387,7 +2390,7 @@ function scheduleEntryStyle30(rowSlot, entry) {
   const entryStart = parseTime(entry.timeIn)
   const offsetMins = Math.max(0, entryStart - rowStart)
   const spannedMins = getScheduleRowspan30(entry) * 30
-  const durationMins = Math.max(1, parseTime(entry.timeOut) - entryStart + 30)
+  const durationMins = Math.max(1, parseTime(entry.timeOut) - entryStart)
   const trailingMins = Math.max(0, spannedMins - offsetMins - durationMins)
 
   return {
@@ -2446,7 +2449,7 @@ function consultEntryStyle30(rowSlot, consult) {
   const consultStart = parseTime(consult.startTime)
   const offsetMins   = Math.max(0, consultStart - rowStart)
   const spannedMins  = getConsultRowspan30(consult) * 30
-  const durationMins = Math.max(1, parseTime(consult.endTime) - consultStart + 30)
+  const durationMins = Math.max(1, parseTime(consult.endTime) - consultStart)
   const trailingMins = Math.max(0, spannedMins - offsetMins - durationMins)
   return {
     top: `calc(${(offsetMins / spannedMins) * 100}% + 4px)`,
@@ -2709,7 +2712,9 @@ function checkScheduleConflict(payload, skipFilter = null) {
       if (!entryTermId || entryTermId !== String(selectedId)) return
     }
     const isSameDay     = entry.day === payload.day
-    const isTimeOverlap = newTimeIn < parseTime(entry.timeOut) + 30 && newTimeOut + 30 > parseTime(entry.timeIn)
+    // Treat schedule ranges as [start, end), so a class ending at 11:00
+    // does not conflict with another class beginning at 11:00.
+    const isTimeOverlap = newTimeIn < parseTime(entry.timeOut) && newTimeOut > parseTime(entry.timeIn)
     if (!isSameDay || !isTimeOverlap) return
     const teacherIsGeneric = String(payload.teacher || '').trim().toLowerCase() === 'cit faculty'
     const payloadTeacherNorm = String(payload.teacher || '').trim().toLowerCase()
@@ -2808,8 +2813,8 @@ function buildTeacherScheduleIntervals(payload) {
     .filter(entry => entry.entryType !== 'lunch' && entry.subject !== 'Lunch Break')
 
   const intervals = scheduleEntries
-    .map(entry => ({ start: parseTime(entry.timeIn), end: parseTime(entry.timeOut) + 30 }))
-    .concat([{ start: parseTime(payload.timeIn), end: parseTime(payload.timeOut) + 30 }])
+    .map(entry => ({ start: parseTime(entry.timeIn), end: parseTime(entry.timeOut) }))
+    .concat([{ start: parseTime(payload.timeIn), end: parseTime(payload.timeOut) }])
     .filter(interval => interval.start < interval.end)
     .sort((a, b) => a.start - b.start)
 
@@ -2990,7 +2995,7 @@ function getSubjectOptions(year, major) {
   return subjectCatalog
     .filter((option) => {
       if (option.year === 'Elective') {
-        return (year === '3rd Year' && semester === '2nd Semester' && subjectMatchesMajor(option.label, major))
+        return (year === '3rd Year' && subjectMatchesMajor(option.label, major))
           || (isFourthYearFirstSemester && Boolean(major))
       }
       return option.year === year && option.semester === semester
@@ -3008,12 +3013,7 @@ const modalSubjectOptionsForAdd = computed(() => getSubjectOptions(addForm.year,
 const listSubjectOptions = computed(() => getSubjectOptions(listAddForm.year, listAddForm.major))
 const lunchBreakForm = reactive({ days: [], timeIn: '', timeOut: '' })
 const lunchBreakStartTimeOptions = computed(() => {
-  const earliestStart = parseTime('10:00 AM')
-  const latestEarlyLunchStart = parseTime('1:00 PM')
-  const options = timeOptions.filter(time => {
-    const minutes = parseTime(time)
-    return minutes >= earliestStart && minutes <= latestEarlyLunchStart
-  })
+  const options = [...timeOptions]
   if (lunchBreakContext.editing && lunchBreakForm.timeIn && !options.includes(lunchBreakForm.timeIn)) {
     options.unshift(lunchBreakForm.timeIn)
   }
@@ -3496,6 +3496,10 @@ async function applyRouteContext() {
   if (requestedTermId) {
     const response = await apiRequest('/academic-terms')
     selectedTerm.value = (response.terms || []).find(term => getTermId(term) === requestedTermId) || selectedTerm.value
+    if (selectedTerm.value?.isArchived) {
+      await router.replace({ path: '/admin/schedule/view', query: { ...route.query } })
+      return false
+    }
   }
 
   const requestedMode = String(route.query.mode || '')
@@ -3513,6 +3517,7 @@ async function applyRouteContext() {
       || contextRoom.value.startsWith(`${room} `)
     ))?.label || null
   }
+  return true
 }
 
 function isEntryBeingEdited(entry) {
@@ -4143,7 +4148,8 @@ async function confirmLogout() { if (isLoggingOut.value) return; isLoggingOut.va
 onMounted(async () => {
   try {
     await loadTermContext()
-    await applyRouteContext()
+    const canOpenAddSchedule = await applyRouteContext()
+    if (!canOpenAddSchedule) return
     await ensureTermSelection()
     const response = await apiRequest('/users?role=teacher')
     if (response.users && Array.isArray(response.users)) {
@@ -6695,4 +6701,13 @@ onMounted(async () => {
 .swal-lunch-conflict-popup .swal2-html-container > div { max-height: 160px !important; }
 .swal-lunch-conflict-popup .swal2-actions { margin-top: .5em !important; }
 .swal-lunch-conflict-popup .swal2-confirm { width: 132px; min-height: 36px; padding: 7px 20px !important; font-size: .76rem !important; }
+.time-slot-range { display: grid; grid-template-columns: 1fr 1fr; align-items: center; width: 100%; gap: 3px; font-size: .61rem; }
+.time-slot-range > span { min-width: 0; white-space: nowrap; }
+.sched-grid td.td-time { width: 150px; padding-inline: 4px; }
+.sched-entry.compact-entry { top: 2px; bottom: 2px; padding: 2px 4px; gap: 0; }
+.sched-entry.compact-entry .entry-teacher { font-size: .62rem; line-height: 1.05; padding-right: 0; }
+.sched-entry.compact-entry .entry-subject { font-size: .56rem; line-height: 1.05; padding-right: 0; }
+.sched-entry.compact-entry .entry-time-range { font-size: .52rem; line-height: 1.05; margin: 0; }
+.sched-entry.compact-entry .entry-section-rows, .sched-entry.compact-entry .entry-timestamp { display: none; }
+@media (max-width: 900px) { .sched-grid td.td-time { width: 112px; } .time-slot-range { gap: 1px; font-size: .53rem; } }
 </style>

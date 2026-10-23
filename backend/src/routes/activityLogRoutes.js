@@ -72,14 +72,28 @@ router.get("/", authRequired, authorizeRoles("admin"), async (req, res) => {
       ActivityLog.countDocuments(query),
     ]);
     const actorIds = [...new Set(logs.map((log) => String(log.actorId)))];
+    const referencedUserIds = [...new Set(logs.flatMap((log) => (
+      String(log.action || '').match(/\b[a-f\d]{24}\b/gi) || []
+    )))];
     const actors = await User.find({ _id: { $in: actorIds } }).select("firstName lastName email avatar").lean();
     const actorById = new Map(actors.map((actor) => [String(actor._id), actor]));
+    const referencedUsers = referencedUserIds.length
+      ? await User.find({ _id: { $in: referencedUserIds } }).select("firstName lastName").lean()
+      : [];
+    const nameById = new Map(referencedUsers.map((user) => [
+      String(user._id).toLowerCase(),
+      `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+    ]));
 
     res.json({
       logs: logs.map((log) => {
         const actor = actorById.get(String(log.actorId));
         const name = actor ? `${actor.firstName || ""} ${actor.lastName || ""}`.trim() : "";
-        return { id: log._id, actorName: name || log.actorEmail || "Unknown user", actorEmail: log.actorEmail, actorAvatar: actor?.avatar || "", actorRole: log.actorRole, action: displayAction(log), actionType: log.actionType || "system.update", targetType: log.targetType || "system", targetName: log.targetName || "", details: log.details || null, ipAddress: log.ipAddress || "", device: log.device || "", createdAt: log.createdAt };
+        const readableLog = {
+          ...log,
+          action: String(log.action || "").replace(/\b[a-f\d]{24}\b/gi, (id) => nameById.get(id.toLowerCase()) || id),
+        };
+        return { id: log._id, actorName: name || log.actorEmail || "Unknown user", actorEmail: log.actorEmail, actorAvatar: actor?.avatar || "", actorRole: log.actorRole, action: displayAction(readableLog), actionType: log.actionType || "system.update", targetType: log.targetType || "system", targetName: log.targetName || "", details: log.details || null, ipAddress: log.ipAddress || "", device: log.device || "", createdAt: log.createdAt };
       }),
       pagination: {
         page,

@@ -118,7 +118,7 @@
                 </td>
                 <td class="um-log-action">
                   <strong>{{ log.action }}</strong>
-                  <span v-if="log.targetName" class="um-log-target">{{ log.targetType }}: {{ log.targetName }}</span>
+                  <span v-if="shouldShowTarget(log)" class="um-log-target">{{ formatTargetType(log.targetType) }}: {{ log.targetName }}</span>
                   <span v-if="formatDetails(log.details)" class="um-log-details">{{ formatDetails(log.details) }}</span>
                 </td>
                 <td>
@@ -219,12 +219,48 @@ function changePage(page) {
 }
 function initials(name) { return String(name || 'U').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() }
 function formatTime(value) { return new Date(value).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) }
+function formatTargetType(value) {
+  const labels = { user: 'User', academicTerm: 'Academic term', substituteAssignment: 'Substitute assignment', consultation: 'Consultation', schedule: 'Schedule' }
+  return labels[value] || String(value || 'Item').replace(/([a-z])([A-Z])/g, '$1 $2')
+}
+function shouldShowTarget(log) {
+  if (!log.targetName) return false
+  return !String(log.action || '').toLowerCase().includes(String(log.targetName).toLowerCase())
+}
 function formatDetails(details) {
   if (!details || typeof details !== 'object') return ''
-  return Object.entries(details)
-    .filter(([, value]) => value !== null && value !== undefined && value !== '')
-    .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
-    .join(' · ')
+  const parts = []
+  const rolesBefore = details.previousRoles
+  const rolesAfter = details.roles
+  const statusBefore = details.previousStatus
+  const statusAfter = details.status
+  const teacherStatusBefore = details.previousTeacherStatus
+  const teacherStatusAfter = details.teacherStatus
+  const sameValues = (before, after) => JSON.stringify(before ?? null) === JSON.stringify(after ?? null)
+  const displayValue = (value) => {
+    if (Array.isArray(value)) return value.map(item => String(item).replace(/^./, first => first.toUpperCase())).join(' & ')
+    if (value && typeof value === 'object') return JSON.stringify(value)
+    return String(value)
+  }
+
+  if (rolesAfter !== undefined && !sameValues(rolesBefore, rolesAfter)) {
+    parts.push(`Role: ${displayValue(rolesBefore)} → ${displayValue(rolesAfter)}`)
+  }
+  if (statusAfter !== undefined && statusBefore !== undefined && !sameValues(statusBefore, statusAfter)) {
+    parts.push(`Status: ${displayValue(statusBefore)} → ${displayValue(statusAfter)}`)
+  }
+  if (teacherStatusAfter !== undefined && teacherStatusBefore !== undefined && !sameValues(teacherStatusBefore, teacherStatusAfter)) {
+    parts.push(`Teacher status: ${displayValue(teacherStatusBefore)} → ${displayValue(teacherStatusAfter)}`)
+  }
+
+  const consumed = new Set(['previousRoles', 'roles', 'previousStatus', 'status', 'previousTeacherStatus', 'teacherStatus'])
+  const labels = { count: 'Accounts approved', date: 'Date', assignmentCount: 'Assignments', deletedCount: 'Assignments removed' }
+  Object.entries(details).forEach(([key, value]) => {
+    if (consumed.has(key) || value === null || value === undefined || value === '') return
+    const label = labels[key] || key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, first => first.toUpperCase())
+    parts.push(`${label}: ${displayValue(value)}`)
+  })
+  return parts.join(' · ')
 }
 function logoutAndLeave() { logout(); router.push('/') }
 onMounted(loadLogs)
