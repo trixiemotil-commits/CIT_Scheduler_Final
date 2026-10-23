@@ -2514,7 +2514,7 @@ function printSchedule() {
   background: rgba(255,255,255,0.3); padding: 2px 4px; border-radius: 5px;
 }
 .entry-room {
-  display: block; width: 100%; max-width: none; font-size: 0.62rem; opacity: 0.75; text-align: left; white-space: normal; overflow-wrap: anywhere;
+  display: block; width: 100%; max-width: none; font-size: 0.62rem; opacity: 0.75; text-align: center; white-space: normal; overflow-wrap: anywhere;
 }
 
 /* Entry colors */
@@ -2534,7 +2534,8 @@ function printSchedule() {
   position: sticky;
   left: 0;
   z-index: 17;
-  text-align: left;
+  text-align: center;
+  vertical-align: middle;
   white-space: nowrap;
 }
 .teacher-work-hours-row .teacher-work-hours-cell {
@@ -2868,10 +2869,13 @@ function printSchedule() {
 .time-slot-range { display: grid; grid-template-columns: 1fr 1fr; align-items: center; width: 100%; gap: 3px; font-size: .61rem; }
 .time-slot-range > span { min-width: 0; white-space: nowrap; }
 .sched-grid td.td-time { width: 150px; padding-inline: 4px; }
-.sched-entry.compact-entry { top: 2px; bottom: 2px; padding: 2px 4px; gap: 0; justify-content: flex-start; }
-.sched-entry.compact-entry .entry-teacher { font-size: .62rem; line-height: 1.05; }
-.sched-entry.compact-entry .entry-subject { font-size: .56rem; line-height: 1.05; }
-.sched-entry.compact-entry .entry-time-range { font-size: .52rem; line-height: 1.05; }
-.sched-entry.compact-entry .entry-section-rows, .sched-entry.compact-entry .entry-section-row { display: none; }
+.sched-entry.compact-entry { top: 2px; bottom: 2px; padding: 3px 5px; gap: 2px; justify-content: center; align-items: center; }
+.sched-entry.compact-entry .entry-teacher { font-size: .58rem; line-height: 1.05; }
+.sched-entry.compact-entry .entry-subject { font-size: .53rem; line-height: 1.05; }
+.sched-entry.compact-entry .entry-time-range { font-size: .49rem; line-height: 1.05; margin-top: 0; }
+.sched-entry.compact-entry .entry-section-rows { display: flex; align-items: center; gap: 1px; margin-top: 3px; padding-top: 2px; }
+.sched-entry.compact-entry .entry-section-row { display: flex; align-items: center; gap: 1px; }
+.sched-entry.compact-entry .entry-section-badge { font-size: .49rem; line-height: 1.05; padding: 1px 3px; }
+.sched-entry.compact-entry .entry-room { font-size: .5rem; line-height: 1.05; text-align: center; }
 @media (max-width: 900px) { .sched-grid td.td-time { width: 112px; } .time-slot-range { gap: 1px; font-size: .53rem; } }
 </style>

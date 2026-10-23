@@ -1504,6 +1504,7 @@ loadPage()
 .term-actions .excel-btn { color: #176a94; border-color: #b9d7e6; background: linear-gradient(180deg, #f3fbff, #e6f4fb); }
 .term-actions .publish-btn { grid-column: 1 / -1; justify-content: center; color: #176a94; border-color: #b9d7e6; background: linear-gradient(180deg, #f3fbff, #e6f4fb); }
 .term-actions .publish-btn:disabled { color: #668176; border-color: #cfddd5; background: linear-gradient(180deg, #edf7f1, #e2efe5); opacity: 1; }
+.term-actions .archive-btn { grid-column: 1 / -1; justify-content: center; }
 .term-actions .archive-btn { color: #8f4935; border-color: #e5c9be; background: linear-gradient(180deg, #fff8f5, #f9ebe5); }
 .term-filter { flex-wrap: wrap; }
 .empty-state { border: 1px dashed #ccd4d9; border-radius: 14px; background: #f8fafb; }

@@ -112,16 +112,6 @@
       <button class="cta-btn primary" @click="$router.push('/student/teachers')">Browse Teachers</button>
       <button class="cta-btn secondary" @click="$router.push('/student/consultations')">My Sessions</button>
     </div>
-    <div class="section-card events-card">
-      <div class="section-title">Recent Events</div>
-      <div v-for="event in recentEvents" :key="event.id" class="consult-row">
-        <div class="consult-info">
-          <div class="consult-name">{{ event.title }}</div>
-          <div class="consult-teacher">{{ event.date }} · {{ event.location }}</div>
-        </div>
-      </div>
-      <button class="view-events-btn" @click="$router.push('/student/events')">View All Events</button>
-    </div>
     </template>
       </div>
     </IonContent>
@@ -190,7 +180,7 @@ const consultationStatusCounts = computed(() => {
 })
 
 onMounted(() => {
-  Promise.all([loadSessions(), loadTeachers(), loadRecentEvents()])
+  Promise.all([loadSessions(), loadTeachers()])
     .finally(() => { isInitialLoading.value = false })
   useNotifications.addNotificationListener(handleNotification)
 })
@@ -205,7 +195,6 @@ onUnmounted(() => {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const unreadCount = ref(0)
-const recentEvents = ref([])
 
 function handleNotification(notification) {
   if (!notification?.read) loadNotifications()
@@ -247,22 +236,6 @@ async function loadNotifications() {
     unreadCount.value = notifs.filter((n) => !n.read).length
   } catch (_err) {
     unreadCount.value = 0
-  }
-}
-
-async function loadRecentEvents() {
-  try {
-    const payload = await apiRequest('/events?status=active')
-    const events = Array.isArray(payload.events) ? payload.events : []
-    recentEvents.value = [...events]
-      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-      .slice(0, 2)
-      .map((event) => ({
-        ...event,
-        date: formatDate(event.date),
-      }))
-  } catch (_err) {
-    recentEvents.value = []
   }
 }
 

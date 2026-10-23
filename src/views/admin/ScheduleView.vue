@@ -158,7 +158,9 @@
             </thead>
             <tbody>
               <tr v-for="slot in timeSlots30" :key="slot" class="time-row" :class="{ 'half-hour': slot.includes(':30') }">
-                <td class="td-time">{{ slot }}</td>
+                <td class="td-time">
+                  <span class="time-slot-range"><span>{{ slot }}</span><span>{{ nextTimeSlot(slot) }}</span></span>
+                </td>
                 <template v-for="day in days" :key="day">
                   <td
                     v-if="!isSpannedCell(slot, day) && !isConsultSpannedCell(slot, day)"
@@ -176,7 +178,7 @@
                     <template v-if="getEntriesForCell(slot, day).length">
                       <div
                         class="sched-entry"
-                        :class="[getEntriesForCell(slot, day)[0].color, { 'entry-readonly': !selectedTeacher || getEntriesForCell(slot, day)[0].entryType === 'lunch' }]"
+                        :class="[getEntriesForCell(slot, day)[0].color, { 'entry-readonly': !selectedTeacher || getEntriesForCell(slot, day)[0].entryType === 'lunch', 'is-compact-entry': isCompactEntry(getEntriesForCell(slot, day)[0]) }]"
                         :style="entryStyle(slot, getEntriesForCell(slot, day)[0])"
                       >
                         <span
@@ -906,7 +908,10 @@ onBeforeUnmount(() => {
 
 // Schedules are entered in 30-minute increments. Render the same increments
 // in this grid so every saved start/end time has an exact label on the left.
-const timeSlots30 = timeOptions
+const timeSlots30 = timeOptions.slice(0, -1)
+function nextTimeSlot(slot) {
+  return timeOptions[timeOptions.indexOf(slot) + 1] || ''
+}
 
 async function apiRequest(path, options = {}) {
   const token = getToken()
@@ -1460,6 +1465,11 @@ function getEntriesForCell(rowHour, day) {
 
 /* One 30-minute grid row is exactly 40px high. */
 const ROW_HEIGHT = 40
+function isCompactEntry(entry) {
+  if (!entry?.timeIn || !entry?.timeOut) return false
+  return Math.max(0, parseTime(entry.timeOut) - parseTime(entry.timeIn)) <= 60
+}
+
 function entryStyle(rowHour, entry) {
   if (!entry?.timeIn || !entry?.timeOut) return {}
   const rowStart   = parseTime(rowHour)
@@ -2488,7 +2498,7 @@ async function confirmLogout() {
   z-index: 10;
 }
 .th-time {
-  width: 100px;
+  width: 150px;
   position: sticky;
   left: 0;
   z-index: 20;
@@ -2507,7 +2517,7 @@ async function confirmLogout() {
   background: #f8f9fa;
   text-align: center;
   vertical-align: middle;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   color: #4b5563;
   font-weight: 600;
   white-space: nowrap;
@@ -2515,8 +2525,8 @@ async function confirmLogout() {
   position: sticky;
   left: 0;
   z-index: 15;
-  width: 100px;
-  padding: 0 8px;
+  width: 150px;
+  padding: 0 10px;
 }
 .sched-grid td.td-time::after {
   content: '';
@@ -2529,6 +2539,17 @@ async function confirmLogout() {
   pointer-events: none;
 }
 .time-row:hover .td-time { background: #e9ecef; }
+.time-slot-range {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.time-slot-range > span { text-align: center; }
+.time-slot-range > span + span::before { content: none; }
 .td-cell {
   cursor: pointer;
   transition: background 0.15s;
@@ -2561,6 +2582,35 @@ async function confirmLogout() {
   box-sizing: border-box;
   overflow: hidden;
 }
+.sched-entry.is-compact-entry {
+  gap: 1px;
+  padding: 5px 6px;
+}
+.sched-entry.is-compact-entry .entry-teacher { display: none; }
+.sched-entry.is-compact-entry .entry-subject {
+  display: -webkit-box;
+  padding-right: 0;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: .72rem;
+  line-height: 1.12;
+}
+.sched-entry.is-compact-entry .entry-time-range {
+  margin-top: 0;
+  padding-right: 0;
+  font-size: .64rem;
+  line-height: 1.1;
+}
+.sched-entry.is-compact-entry .entry-section-rows {
+  gap: 1px;
+  margin-top: 2px;
+  padding-top: 2px;
+}
+.sched-entry.is-compact-entry .entry-section-badge,
+.sched-entry.is-compact-entry .entry-room { font-size: .62rem; }
 .sched-entry:hover { filter: brightness(0.95); }
 .sched-entry.entry-readonly:hover {
   filter: none;
