@@ -394,13 +394,14 @@ async function processExpiredConsultationQueues(now = new Date()) {
 }
 
 function isEventCurrentlyActive(event, now = new Date()) {
-  if (!event || event.status !== "active" || event.date !== `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`) {
+  const parts = philippineDateTimeParts(now);
+  if (!event || event.status !== "active" || event.date !== dateKeyFromParts(parts)) {
     return false;
   }
 
   const startMinutes = parseTimeToMinutes(event.time);
   const endMinutes = parseTimeToMinutes(event.endTime);
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const currentMinutes = Number(parts.hour) * 60 + Number(parts.minute);
   return startMinutes !== null && endMinutes !== null && currentMinutes >= startMinutes && currentMinutes < endMinutes;
 }
 
@@ -440,6 +441,8 @@ async function resolveTeacherStatus(userDoc, eventTeacherIds = new Set(), allTea
     return "Offline";
   }
 
+  // Scheduled event assignments override the generic school status while active.
+  // Check meetings first so meeting events retain their more specific label.
   if (adminStatus === "On Meeting" || meetingTeacherIds.has(String(userDoc._id))) return "On Meeting";
 
   if (allTeachersOnEvent || eventTeacherIds.has(String(userDoc._id))) {
